@@ -230,15 +230,15 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const [url, setUrl] = useState(initialURL);
   const [scanning, setScanning] = useState(false);
   const [currentPhase, setCurrentPhase] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState(null);
-  const [scanLog, setScanLog] = useState([]);
+  const [progress, setProgress] = useState<number>(0);
+  const [results, setResults] = useState<any>(null);
+  const [scanLog, setScanLog] = useState<Array<{message: string, type: string, timestamp: number}>>([]);
 
-  const addLog = (message, type = 'info') => {
+  const addLog = (message: string, type: string = 'info') => {
     setScanLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
   };
 
-  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Save to registry table first
   const saveToRegistry = async (scanResults) => {
