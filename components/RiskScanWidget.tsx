@@ -215,9 +215,19 @@ const TECHNICAL_FIXES = {
   }
 };
 
-const RiskScanWidget = () => {
-  const [npi, setNpi] = useState('');
-  const [url, setUrl] = useState('');
+interface RiskScanWidgetProps {
+  initialNPI?: string;
+  initialURL?: string;
+  onScanComplete?: (results: any) => void;
+}
+
+const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({ 
+  initialNPI = '', 
+  initialURL = '', 
+  onScanComplete 
+}) => {
+  const [npi, setNpi] = useState(initialNPI);
+  const [url, setUrl] = useState(initialURL);
   const [scanning, setScanning] = useState(false);
   const [currentPhase, setCurrentPhase] = useState('');
   const [progress, setProgress] = useState(0);
@@ -765,6 +775,11 @@ const RiskScanWidget = () => {
       setProgress(100);
       addLog('[OK] Scan complete!', 'success');
       setResults(scanResults);
+      
+      // Call the callback if provided
+      if (onScanComplete) {
+        onScanComplete(scanResults);
+      }
 
     } catch (error) {
       addLog(`[ERROR] Scan failed: ${error.message}`, 'error');
