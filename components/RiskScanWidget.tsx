@@ -761,33 +761,6 @@ const RiskScanWidget = () => {
         // Still save violations even if edge function fails
         await saveViolationsToSupabase(npi, allFindings);
       }
-            body: JSON.stringify({
-              id: npi,
-              npi,
-              url,
-              riskScore: scanResults.riskScore,
-              riskLevel: scanResults.riskLevel,
-              riskMeterLevel: scanResults.riskMeterLevel,
-              complianceStatus: scanResults.complianceStatus,
-              overall_compliance_status: scanResults.complianceStatus,
-              lastScanTimestamp: Date.now(),
-              topIssues: topIssues,
-              scanHistory: [{
-                timestamp: Date.now(),
-                findings: allFindings,
-                wafDetected: stealthResult.wafDetected
-              }]
-            })
-          }
-        );
-
-        if (relayResponse.ok) {
-          addLog('[OK] Results saved to registry', 'success');
-        } else {
-          addLog('[WARN] Could not save to registry', 'warning');
-        }
-      } catch (apiError) {
-        addLog('[WARN] Registry update unavailable', 'warning');
         console.error('NPI-relay API error:', apiError);
       }
 
