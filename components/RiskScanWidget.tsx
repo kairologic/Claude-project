@@ -611,9 +611,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     return findings;
   };
 
-  const calculateRiskScore = (allFindings) => {
+  const calculateRiskScore = (allFindings: any[]) => {
     const totalChecks = allFindings.length;
-    const passedChecks = allFindings.filter(f => f.status === 'pass').length;
+    const passedChecks = allFindings.filter((f: any) => f.status === 'pass').length;
     const score = Math.round((passedChecks / totalChecks) * 100);
     
     let riskLevel = 'Critical';
@@ -792,7 +792,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     }
   };
 
-  const getCategoryIcon = (category) => {
+  const getCategoryIcon = (category: string) => {
     if (category.includes('Data')) return <Globe className="w-5 h-5" />;
     if (category.includes('AI')) return <Brain className="w-5 h-5" />;
     if (category.includes('EHR')) return <Lock className="w-5 h-5" />;
