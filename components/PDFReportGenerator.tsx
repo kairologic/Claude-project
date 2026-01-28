@@ -7,12 +7,18 @@ import 'jspdf-autotable';
 const SUPABASE_URL = 'https://mxrtltezhkxhqizvxvsz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cnRsdGV6aGt4aHFpenZ4dnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzI1ODAsImV4cCI6MjA4NDM0ODU4MH0.pkPlFyHsMOKJKcxuw_eoV5EKkrXG09Vx_0MIDgHn7aw';
 
-const PDFReportGenerator = ({ npi, registryId, autoLoad = false }) => {
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [registryData, setRegistryData] = useState(null);
-  const [violations, setViolations] = useState([]);
-  const [error, setError] = useState(null);
+interface PDFReportGeneratorProps {
+  npi?: string;
+  registryId?: string;
+  autoLoad?: boolean;
+}
+
+const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId, autoLoad = false }) => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [generating, setGenerating] = useState<boolean>(false);
+  const [registryData, setRegistryData] = useState<any>(null);
+  const [violations, setViolations] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (autoLoad && (npi || registryId)) {
