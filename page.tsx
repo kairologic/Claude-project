@@ -87,7 +87,7 @@ export default function RegistryPage() {
               </div>
               <div className="text-sm text-gray-600">🟢 LIVE INGEST VERIFICATION</div>
             </div>
-
+            
             <div className="card text-center">
               <div className="text-5xl font-display font-bold text-navy mb-2">100%</div>
               <div className="text-gold uppercase tracking-wider font-semibold mb-2">
@@ -109,7 +109,7 @@ export default function RegistryPage() {
                 Statutory Enforcement Period: ACTIVE
               </h3>
               <p className="text-gray-300">
-                Entities listed with &apos;Warning&apos; status have a mandatory window to anchor PHI to sovereign domestic nodes.
+                Entities listed with 'Warning' status have a mandatory window to anchor PHI to sovereign domestic nodes. 
                 The ledger currently monitors <span className="text-gold font-bold">{totalCount.toLocaleString()}</span> unique identifiers.
               </p>
             </div>
@@ -174,7 +174,7 @@ export default function RegistryPage() {
                         )}
                       </div>
                     </div>
-
+                    
                     {provider.risk_score !== null && (
                       <div className="text-right ml-4">
                         <div className="text-3xl font-display font-bold text-navy">

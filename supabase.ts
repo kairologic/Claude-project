@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Lazy initialization - client is only created when getSupabase() is called
+// Lazy initialization - client is only created when getSupabase() is called at RUNTIME
+// This prevents the "supabaseUrl is required" error during Vercel's build phase
 let supabaseInstance: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
