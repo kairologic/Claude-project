@@ -241,7 +241,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Save to registry table first
-  const saveToRegistry = async (scanResults) => {
+  const saveToRegistry = async (scanResults: any) => {
     addLog('💾 Saving to registry...', 'info');
     
     try {
@@ -335,7 +335,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   };
 
   // Save violations to Supabase
-  const saveViolationsToSupabase = async (registryId, findings) => {
+  const saveViolationsToSupabase = async (registryId: string, findings: any[]) => {
     const failedFindings = findings.filter(f => f.status === 'fail');
     
     if (failedFindings.length === 0) {
@@ -396,7 +396,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   };
 
   // Simulated WAF/Firewall detection and evasion
-  const stealthProbe = async (targetUrl) => {
+  const stealthProbe = async (targetUrl: string) => {
     addLog('🕵️ Initializing stealth probe...', 'info');
     await delay(800);
     
@@ -417,7 +417,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   };
 
   // Data Sovereignty Scan (SB 1188)
-  const scanDataSovereignty = async (targetUrl) => {
+  const scanDataSovereignty = async (targetUrl: string) => {
     setCurrentPhase('Data Sovereignty & Residency');
     const findings = [];
 
@@ -482,7 +482,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   };
 
   // AI Transparency Scan (HB 149)
-  const scanAITransparency = async (targetUrl) => {
+  const scanAITransparency = async (targetUrl: string) => {
     setCurrentPhase('AI Transparency & Disclosure');
     const findings = [];
 
@@ -546,7 +546,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   };
 
   // EHR System Integrity Scan (SB 1188)
-  const scanEHRIntegrity = async (targetUrl) => {
+  const scanEHRIntegrity = async (targetUrl: string) => {
     setCurrentPhase('EHR System Integrity & Parental Access');
     const findings = [];
 
