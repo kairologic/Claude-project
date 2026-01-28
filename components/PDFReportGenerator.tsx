@@ -316,7 +316,7 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
       }
 
       // Footer on all pages
-      const pageCount = doc.internal.getNumberOfPages();
+      const pageCount = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
