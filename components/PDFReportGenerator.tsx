@@ -293,9 +293,9 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
         yPos += 8;
 
         // Sort by priority
-        const priorityOrder = { 'Critical': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
-        const sortedViolations = [...violations].sort((a, b) => 
-          priorityOrder[a.fix_priority] - priorityOrder[b.fix_priority]
+        const priorityOrder: Record<string, number> = { 'Critical': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
+        const sortedViolations = [...violations].sort((a: any, b: any) => 
+          (priorityOrder[a.fix_priority] || 999) - (priorityOrder[b.fix_priority] || 999)
         );
 
         sortedViolations.forEach((violation, idx) => {
