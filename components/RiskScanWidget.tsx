@@ -761,11 +761,9 @@ const RiskScanWidget = () => {
         // Still save violations even if edge function fails
         await saveViolationsToSupabase(npi, allFindings);
       }
-        console.error('NPI-relay API error:', apiError);
-      }
 
       setProgress(100);
-      addLog('✅ Scan complete!', 'success');
+      addLog('[OK] Scan complete!', 'success');
       setResults(scanResults);
 
     } catch (error) {
