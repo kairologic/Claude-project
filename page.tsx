@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-export const dynamic = 'force-dynamic';
 export default function RegistryPage() {
   const [providers, setProviders] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,6 +16,7 @@ export default function RegistryPage() {
 
   const loadProviders = async () => {
     try {
+      const supabase = getSupabase();
       const { data, error, count } = await supabase
         .from('registry')
         .select('*', { count: 'exact' })
@@ -42,6 +42,7 @@ export default function RegistryPage() {
     }
 
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('registry')
         .select('*')
@@ -108,7 +109,7 @@ export default function RegistryPage() {
                 Statutory Enforcement Period: ACTIVE
               </h3>
               <p className="text-gray-300">
-                Entities listed with 'Warning' status have a mandatory window to anchor PHI to sovereign domestic nodes.
+                Entities listed with &apos;Warning&apos; status have a mandatory window to anchor PHI to sovereign domestic nodes.
                 The ledger currently monitors <span className="text-gold font-bold">{totalCount.toLocaleString()}</span> unique identifiers.
               </p>
             </div>
