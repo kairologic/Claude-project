@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 
 export default function Header() {
@@ -12,17 +13,13 @@ export default function Header() {
         <div className="flex justify-between items-center h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-navy rounded-lg flex items-center justify-center">
-              <span className="text-gold text-2xl font-bold">🛡</span>
-            </div>
-            <div>
-              <div className="font-display font-bold text-xl text-navy">
-                KAIRO<span className="text-gold">LOGIC</span>
-              </div>
-              <div className="text-xs text-gray-600 uppercase tracking-wider">
-                Statutory Vanguard
-              </div>
-            </div>
+            <Image 
+              src="/logo.svg" 
+              alt="KairoLogic" 
+              width={180} 
+              height={40}
+              className="h-10 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}
