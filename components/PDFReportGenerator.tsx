@@ -150,7 +150,7 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
       doc.text('Compliance Score:', 30, yPos);
       
       const score = registryData.riskScore || registryData.risk_score || 0;
-      const scoreColor = score >= 75 ? [34, 197, 94] : score >= 50 ? [251, 191, 36] : [239, 68, 68];
+      const scoreColor = score >= 75 ? [34, 197, 94] as [number, number, number] : score >= 50 ? [251, 191, 36] as [number, number, number] : [239, 68, 68] as [number, number, number];
       doc.setTextColor(...scoreColor);
       doc.setFontSize(20);
       doc.text(`${score}%`, 90, yPos);
@@ -219,8 +219,8 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
             doc.setFont('helvetica', 'normal');
             
             // Priority badge
-            const priorityColor = violation.fix_priority === 'Critical' ? [220, 38, 38] : 
-                                  violation.fix_priority === 'High' ? [234, 88, 12] : [202, 138, 4];
+            const priorityColor = violation.fix_priority === 'Critical' ? [220, 38, 38] as [number, number, number] : 
+                                  violation.fix_priority === 'High' ? [234, 88, 12] as [number, number, number] : [202, 138, 4] as [number, number, number];
             doc.setFillColor(...priorityColor);
             doc.roundedRect(28, yPos - 3, 20, 4, 1, 1, 'F');
             doc.setTextColor(255, 255, 255);
