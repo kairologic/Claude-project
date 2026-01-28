@@ -667,9 +667,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       const { score, riskLevel, riskMeterLevel } = calculateRiskScore(allFindings);
       
       const topIssues = allFindings
-        .filter(f => f.status === 'fail')
+        .filter((f: any) => f.status === 'fail')
         .slice(0, 3)
-        .map(f => ({ id: f.id, name: f.name, clause: f.clause }));
+        .map((f: any) => ({ id: f.id, name: f.name, clause: f.clause }));
 
       setProgress(90);
       addLog('📊 Calculating risk score via edge function...', 'info');
@@ -877,7 +877,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
           {/* Live Log */}
           <div className="mt-4 bg-slate-50 rounded-lg p-4 max-h-48 overflow-y-auto font-mono text-xs">
-            {scanLog.map((log, idx) => (
+            {scanLog.map((log: any, idx: number) => (
               <div
                 key={idx}
                 className={`mb-1 ${
@@ -919,7 +919,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             {results.topIssues.length > 0 && (
               <div className="mt-4 pt-4 border-t border-blue-200">
                 <h4 className="text-sm font-semibold text-slate-700 mb-2">Top Issues:</h4>
-                {results.topIssues.map((issue, idx) => (
+                {results.topIssues.map((issue: any, idx: number) => (
                   <div key={idx} className="text-sm text-slate-600 mb-1">
                     • {issue.id}: {issue.name}
                   </div>
@@ -932,8 +932,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           <div>
             <h3 className="text-lg font-bold text-slate-800 mb-4">Detailed Findings</h3>
             <div className="space-y-3">
-              {['Data Sovereignty & Residency', 'AI Transparency & Disclosure', 'EHR System Integrity & Parental Access'].map((category, catIdx) => {
-                const categoryFindings = results.findings.filter(f => {
+              {['Data Sovereignty & Residency', 'AI Transparency & Disclosure', 'EHR System Integrity & Parental Access'].map((category: string, catIdx: number) => {
+                const categoryFindings = results.findings.filter((f: any) => {
                   if (category.includes('Data')) return f.id.startsWith('DR-');
                   if (category.includes('AI')) return f.id.startsWith('AI-');
                   if (category.includes('EHR')) return f.id.startsWith('ER-');
@@ -947,7 +947,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                       <h4 className="font-semibold text-slate-800">{category}</h4>
                     </div>
                     <div className="space-y-2">
-                      {categoryFindings.map((finding, idx) => (
+                      {categoryFindings.map((finding: any, idx: number) => (
                         <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded">
                           {finding.status === 'pass' ? (
                             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
