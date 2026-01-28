@@ -347,8 +347,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     addLog(`💾 Saving ${failedFindings.length} violations to database...`, 'info');
 
     try {
-      const violations = failedFindings.map(finding => {
-        const fixInfo = TECHNICAL_FIXES[finding.id] || {
+      const violations = failedFindings.map((finding: any) => {
+        const fixInfo = (TECHNICAL_FIXES as any)[finding.id] || {
           technical_finding: finding.detail,
           recommended_fix: 'Contact KairoLogic for detailed remediation guidance.',
           fix_priority: 'Medium',
