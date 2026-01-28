@@ -328,7 +328,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         return false;
       }
     } catch (error) {
-      addLog(`[WARN] Registry save failed: ${error.message}`, 'warning');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`[WARN] Registry save failed: ${errorMessage}`, 'warning');
       console.error('Registry error:', error);
       return false;
     }
@@ -389,7 +390,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         return false;
       }
     } catch (error) {
-      addLog(`[WARN] Database connection failed: ${error.message}`, 'warning');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`[WARN] Database connection failed: ${errorMessage}`, 'warning');
       console.error('Supabase error:', error);
       return false;
     }
@@ -782,7 +784,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       }
 
     } catch (error) {
-      addLog(`[ERROR] Scan failed: ${error.message}`, 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`[ERROR] Scan failed: ${errorMessage}`, 'error');
     } finally {
       setScanning(false);
       setCurrentPhase('');
