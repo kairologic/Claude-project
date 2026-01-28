@@ -75,7 +75,8 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
       setViolations(violationsResult);
 
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
       console.error('Error loading report data:', err);
     } finally {
       setLoading(false);
@@ -333,7 +334,8 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
       doc.save(fileName);
 
     } catch (err) {
-      setError('Failed to generate PDF: ' + err.message);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError('Failed to generate PDF: ' + errorMessage);
       console.error('PDF generation error:', err);
     } finally {
       setGenerating(false);
