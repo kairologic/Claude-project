@@ -15,21 +15,46 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // TODO: Send email via API route
-    console.log('Form submitted:', formData);
-    setSubmitted(true);
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({
-        contactName: '',
-        email: '',
-        practiceName: '',
-        subject: 'General Inquiry',
-        message: '',
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
-    }, 3000);
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      setSubmitted(true);
+      
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormData({
+          contactName: '',
+          email: '',
+          practiceName: '',
+          subject: 'General Inquiry',
+          message: '',
+        });
+      }, 3000);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again or email us directly at compliance@kairologic.com');
+    }
+  };
+
+  const handlePrioritize = () => {
+    setFormData({
+      ...formData,
+      subject: 'Remediation Required',
+      message: 'URGENT: We have received a Cure Notice from the Attorney General and need immediate assistance with technical remediation.'
+    });
+    // Scroll to form
+    document.getElementById('contact-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -94,14 +119,17 @@ export default function ContactPage() {
                 <p className="text-gray-300 mb-6">
                   If you have received a 'Cure Notice' from the Attorney General, prioritize scheduling a Technical Briefing.
                 </p>
-                <button className="bg-gold hover:bg-gold-dark text-navy font-semibold px-6 py-3 rounded-lg transition-all duration-200 w-full">
+                <button 
+                  onClick={handlePrioritize}
+                  className="bg-gold hover:bg-gold-dark text-navy font-semibold px-6 py-3 rounded-lg transition-all duration-200 w-full"
+                >
                   PRIORITIZE MY PRACTICE
                 </button>
               </div>
             </div>
 
             {/* Contact Form */}
-            <div className="card">
+            <div className="card" id="contact-form">
               {submitted ? (
                 <div className="text-center py-12">
                   <div className="text-5xl mb-4">✓</div>
