@@ -47,11 +47,17 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
   const [isCreating, setIsCreating] = useState(false);
 
   // Form state for editing/creating
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    page: string;
+    section: string;
+    content: string;
+    content_type: 'text' | 'html' | 'json' | 'markdown' | 'image_url';
+    description: string;
+  }>({
     page: '',
     section: '',
     content: '',
-    content_type: 'text' as const,
+    content_type: 'text',
     description: ''
   });
 
@@ -270,7 +276,7 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
               </label>
               <select
                 value={formData.content_type}
-                onChange={(e) => setFormData({ ...formData, content_type: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, content_type: e.target.value as 'text' | 'html' | 'json' | 'markdown' | 'image_url' })}
                 className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold"
               >
                 <option value="text">Plain Text</option>
