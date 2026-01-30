@@ -1,18 +1,18 @@
 /**
  * KairoLogic Page Content CMS Service
  * Manages dynamic website text content without code deployment
- * Version: 11.0.0
+ * Version: 11.0.0-FIXED
  */
 
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { getSupabase } from '../lib/supabase';
 
 export interface PageContent {
   id: string;
-  page: string;           // 'Homepage', 'Services', 'Compliance', 'Contact', 'Registry'
-  section: string;        // 'hero_title', 'hero_subtitle', 'tier1_price', etc.
+  page: string;
+  section: string;
   content: string;
   content_type: 'text' | 'html' | 'json' | 'markdown' | 'image_url';
-  description?: string;   // Admin note about what this content is for
+  description?: string;
   last_updated: string;
   updated_by?: string;
 }
@@ -23,20 +23,19 @@ const TABLE_NAME = 'page_content';
  * Get all content for a specific page
  */
 export const getPageContent = async (page: string): Promise<PageContent[]> => {
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from(TABLE_NAME)
-        .select('*')
-        .eq('page', page)
-        .order('section');
-      
-      if (!error && data) {
-        return data as PageContent[];
-      }
-    } catch (e) {
-      console.error('[CMS] Failed to fetch page content:', e);
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('page', page)
+      .order('section');
+    
+    if (!error && data) {
+      return data as PageContent[];
     }
+  } catch (e) {
+    console.error('[CMS] Failed to fetch page content:', e);
   }
   return [];
 };
@@ -48,21 +47,20 @@ export const getContentSection = async (
   page: string, 
   section: string
 ): Promise<string> => {
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from(TABLE_NAME)
-        .select('content')
-        .eq('page', page)
-        .eq('section', section)
-        .maybeSingle();
-      
-      if (!error && data) {
-        return data.content;
-      }
-    } catch (e) {
-      console.error('[CMS] Failed to fetch content section:', e);
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('content')
+      .eq('page', page)
+      .eq('section', section)
+      .maybeSingle();
+    
+    if (!error && data) {
+      return data.content;
     }
+  } catch (e) {
+    console.error('[CMS] Failed to fetch content section:', e);
   }
   return '';
 };
@@ -71,20 +69,19 @@ export const getContentSection = async (
  * Get all pages with their content
  */
 export const getAllPageContent = async (): Promise<PageContent[]> => {
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from(TABLE_NAME)
-        .select('*')
-        .order('page')
-        .order('section');
-      
-      if (!error && data) {
-        return data as PageContent[];
-      }
-    } catch (e) {
-      console.error('[CMS] Failed to fetch all content:', e);
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .order('page')
+      .order('section');
+    
+    if (!error && data) {
+      return data as PageContent[];
     }
+  } catch (e) {
+    console.error('[CMS] Failed to fetch all content:', e);
   }
   return [];
 };
@@ -98,11 +95,8 @@ export const updateContentSection = async (
   content: string,
   updatedBy?: string
 ): Promise<{ success: boolean; error?: string }> => {
-  if (!isSupabaseConfigured || !supabase) {
-    return { success: false, error: 'Database not configured' };
-  }
-
   try {
+    const supabase = getSupabase();
     const { error } = await supabase
       .from(TABLE_NAME)
       .upsert({
@@ -131,11 +125,8 @@ export const updateContentSection = async (
 export const createContentSection = async (
   data: Partial<PageContent>
 ): Promise<{ success: boolean; error?: string }> => {
-  if (!isSupabaseConfigured || !supabase) {
-    return { success: false, error: 'Database not configured' };
-  }
-
   try {
+    const supabase = getSupabase();
     const { error } = await supabase
       .from(TABLE_NAME)
       .insert({
@@ -165,11 +156,8 @@ export const createContentSection = async (
 export const deleteContentSection = async (
   id: string
 ): Promise<{ success: boolean; error?: string }> => {
-  if (!isSupabaseConfigured || !supabase) {
-    return { success: false, error: 'Database not configured' };
-  }
-
   try {
+    const supabase = getSupabase();
     const { error } = await supabase
       .from(TABLE_NAME)
       .delete()
@@ -189,19 +177,18 @@ export const deleteContentSection = async (
  * Get pages list (unique page names)
  */
 export const getPagesList = async (): Promise<string[]> => {
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase
-        .from(TABLE_NAME)
-        .select('page');
-      
-      if (!error && data) {
-        const uniquePages = [...new Set(data.map(d => d.page))];
-        return uniquePages;
-      }
-    } catch (e) {
-      console.error('[CMS] Failed to fetch pages list:', e);
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('page');
+    
+    if (!error && data) {
+      const uniquePages = [...new Set(data.map(d => d.page))];
+      return uniquePages;
     }
+  } catch (e) {
+    console.error('[CMS] Failed to fetch pages list:', e);
   }
   return [];
 };
@@ -213,11 +200,8 @@ export const bulkUpdateContent = async (
   updates: Array<{ page: string; section: string; content: string }>,
   updatedBy?: string
 ): Promise<{ success: boolean; error?: string }> => {
-  if (!isSupabaseConfigured || !supabase) {
-    return { success: false, error: 'Database not configured' };
-  }
-
   try {
+    const supabase = getSupabase();
     const timestamp = new Date().toISOString();
     const records = updates.map(u => ({
       page: u.page,
