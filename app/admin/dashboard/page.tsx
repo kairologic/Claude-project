@@ -408,10 +408,9 @@ export default function AdminDashboard() {
       setScanResult(result);
       setShowScanReport(true);
       await loadData();
-      notify(`Scan complete! ${result.scanned} scanned, ${result.withoutUrl.length} need URLs.`);
+      notify(`Scan complete! ${result.scanned} scanned, ${result.withoutUrlCount.toLocaleString()} need URLs.`);
       
     } catch (e: any) {
-      result.errors.push(e.message);
       notify('Scan failed: ' + e.message, 'error');
     } finally {
       setScanning(false);
