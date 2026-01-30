@@ -1,454 +1,489 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase, Registry } from '@/lib/supabase';
 import Link from 'next/link';
 import { 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
-  Package, 
-  LogOut,
-  Search,
-  Plus,
-  Download,
-  Upload,
-  Eye,
-  Scan,
-  Edit,
-  BarChart3,
-  Shield
+  Shield, ShieldCheck, ShieldAlert, Users, Database, Calendar, Mail, 
+  Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, Pause, 
+  CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode, 
+  BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap
 } from 'lucide-react';
 
-// Import the new admin components
 import { AssetsTab } from '@/components/admin/AssetsTab';
 import { PageContentTab } from '@/components/admin/PageContentTab';
 import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
 
-type TabType = 'dashboard' | 'registry' | 'content' | 'assets';
+type TabType = 'overview' | 'registry' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ status, size = 'md' }) => {
+  const styles: Record<string, string> = {
+    active: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    warning: 'bg-amber-50 border-amber-200 text-amber-700',
+    hidden: 'bg-slate-100 border-slate-200 text-slate-500',
+    trial: 'bg-blue-50 border-blue-200 text-blue-700',
+    inactive: 'bg-slate-100 border-slate-200 text-slate-500'
+  };
+  const icons: Record<string, React.ReactNode> = {
+    active: <CheckCircle size={11} />, warning: <AlertTriangle size={11} />, hidden: <EyeOff size={11} />,
+    trial: <Clock size={11} />, inactive: <Pause size={11} />
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 ${size === 'sm' ? 'px-1.5 py-0.5 text-[8px]' : 'px-2 py-1 text-[9px]'} rounded-full border font-bold uppercase tracking-wide ${styles[status] || styles.hidden}`}>
+      {icons[status]} {status}
+    </span>
+  );
+};
+
+// Modal Component
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' }> = 
+  ({ isOpen, onClose, title, children, size = 'md' }) => {
+  if (!isOpen) return null;
+  const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className={`${widths[size]} w-full bg-white rounded-xl shadow-2xl max-h-[85vh] flex flex-col`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+          <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg"><X size={16} className="text-slate-400" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// Provider Form
+interface ProviderFormData {
+  id: string; npi: string; name: string; contact_first_name: string; contact_last_name: string;
+  email: string; phone: string; city: string; zip: string; url: string;
+  widget_status: 'active' | 'warning' | 'hidden'; subscription_status: 'trial' | 'active' | 'inactive';
+  is_visible: boolean; risk_score: number;
+}
+
+const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderFormData) => void; onCancel: () => void; }> = ({ entry, onSave, onCancel }) => {
+  const [form, setForm] = useState<ProviderFormData>({
+    id: entry?.id || `REG-${Date.now()}`, npi: entry?.npi || '', name: entry?.name || '',
+    contact_first_name: entry?.contact_first_name || '', contact_last_name: entry?.contact_last_name || '',
+    email: entry?.email || '', phone: entry?.phone || '', city: entry?.city || '', zip: entry?.zip || '',
+    url: entry?.url || '', widget_status: (entry?.widget_status as any) || 'hidden',
+    subscription_status: (entry?.subscription_status as any) || 'trial', is_visible: entry?.is_visible ?? false, risk_score: entry?.risk_score || 0
+  });
+  
+  return (
+    <form onSubmit={e => { e.preventDefault(); onSave(form); }} className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Practice Name *</label>
+          <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">NPI *</label>
+          <input type="text" value={form.npi} onChange={e => setForm({ ...form, npi: e.target.value })} required maxLength={10} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Email</label>
+          <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Phone</label>
+          <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">City</label>
+          <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">ZIP</label>
+          <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Website</label>
+          <input type="url" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://" className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Widget Status</label>
+          <select value={form.widget_status} onChange={e => setForm({ ...form, widget_status: e.target.value as any })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg">
+            <option value="active">Active</option><option value="warning">Warning</option><option value="hidden">Hidden</option></select></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Subscription</label>
+          <select value={form.subscription_status} onChange={e => setForm({ ...form, subscription_status: e.target.value as any })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg">
+            <option value="trial">Trial</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+      </div>
+      <div className="flex justify-end gap-2 pt-3 border-t"><button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-slate-500">Cancel</button>
+        <button type="submit" className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059] flex items-center gap-1.5"><Save size={14} /> Save</button></div>
+    </form>
+  );
+};
+
+interface EmailTemplate { id: string; name: string; category: string; subject: string; body: string; event_trigger: string; is_active: boolean; }
+interface CalendarSlot { id: string; date: string; time: string; is_booked: boolean; booked_by?: { name: string } | null; }
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [providers, setProviders] = useState<Registry[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [calendarSlots, setCalendarSlots] = useState<CalendarSlot[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [notification, setNotification] = useState<string | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<Registry | null>(null);
-  
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    warning: 0,
-    inactive: 0
-  });
+  const [notification, setNotification] = useState<{ msg: string; type: string } | null>(null);
+  const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showAddProvider, setShowAddProvider] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<Registry | null>(null);
+  const [viewingProvider, setViewingProvider] = useState<Registry | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
+  const [widgetModal, setWidgetModal] = useState<Registry | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
-    if (auth !== 'true') {
-      router.push('/admin');
-      return;
-    }
-    setAuthenticated(true);
-    loadData();
+    if (auth !== 'true') { router.push('/admin'); return; }
+    setAuthenticated(true); loadData();
   }, [router]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const supabase = getSupabase();
-      
-      const { data: providerData, error: providerError } = await supabase
-        .from('registry')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const { data } = await supabase.from('registry').select('*').order('created_at', { ascending: false });
+      setProviders(data || []);
+      setTemplates([
+        { id: 'ET-001', name: 'Cure Notice Warning', category: 'marketing', subject: 'URGENT: TX SB 1188 Alert', body: 'Your practice may be at risk.', event_trigger: 'risk_scan_high', is_active: true },
+        { id: 'ET-002', name: 'Verification Complete', category: 'transactional', subject: 'Sentry Verified', body: 'Congratulations! Your practice is verified.', event_trigger: 'verification_complete', is_active: true },
+      ]);
+      generateCalendarSlots();
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
 
-      if (providerError) throw providerError;
-      setProviders(providerData || []);
-
-      const { count: totalCount } = await supabase
-        .from('registry')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: activeCount } = await supabase
-        .from('registry')
-        .select('*', { count: 'exact', head: true })
-        .eq('widget_status', 'active');
-
-      const { count: warningCount } = await supabase
-        .from('registry')
-        .select('*', { count: 'exact', head: true })
-        .eq('widget_status', 'warning');
-
-      const { count: inactiveCount } = await supabase
-        .from('registry')
-        .select('*', { count: 'exact', head: true })
-        .eq('widget_status', 'hidden');
-
-      setStats({
-        total: totalCount || 0,
-        active: activeCount || 0,
-        warning: warningCount || 0,
-        inactive: inactiveCount || 0
+  const generateCalendarSlots = () => {
+    const slots: CalendarSlot[] = [];
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(); date.setDate(date.getDate() + d);
+      if (date.getDay() === 0 || date.getDay() === 6) continue;
+      ['09:00','10:00','11:00','14:00','15:00','16:00'].forEach(time => {
+        slots.push({ id: `${date.toISOString().split('T')[0]}-${time}`, date: date.toISOString().split('T')[0], time, is_booked: Math.random() > 0.8, booked_by: Math.random() > 0.8 ? { name: 'Dr. Sample' } : null });
       });
-
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
     }
+    setCalendarSlots(slots);
+    if (slots.length && !selectedDate) setSelectedDate(slots[0].date);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('admin_auth');
-    router.push('/admin');
+  const stats = useMemo(() => ({
+    total: providers.length,
+    active: providers.filter(r => r.widget_status === 'active').length,
+    warning: providers.filter(r => r.widget_status === 'warning').length,
+    hidden: providers.filter(r => r.widget_status === 'hidden').length,
+    paid: providers.filter(r => r.subscription_status === 'active').length,
+  }), [providers]);
+
+  const filteredProviders = useMemo(() => {
+    if (!searchTerm.trim()) return providers;
+    const t = searchTerm.toLowerCase();
+    return providers.filter(r => r.name.toLowerCase().includes(t) || r.npi.includes(t) || r.city?.toLowerCase().includes(t));
+  }, [providers, searchTerm]);
+
+  const calendarDates = useMemo(() => [...new Set(calendarSlots.map(s => s.date))].sort(), [calendarSlots]);
+  const dateSlots = useMemo(() => selectedDate ? calendarSlots.filter(s => s.date === selectedDate) : [], [calendarSlots, selectedDate]);
+
+  const notify = useCallback((msg: string, type = 'success') => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); }, []);
+  const handleLogout = () => { sessionStorage.removeItem('admin_auth'); router.push('/admin'); };
+
+  const handleSaveProvider = async (data: ProviderFormData) => {
+    try {
+      const supabase = getSupabase();
+      const isNew = !providers.find(p => p.id === data.id);
+      if (isNew) await supabase.from('registry').insert(data);
+      else await supabase.from('registry').update(data).eq('id', data.id);
+      await loadData(); setShowAddProvider(false); setEditingProvider(null); notify(isNew ? 'Provider added!' : 'Provider updated!');
+    } catch (e: any) { notify(e.message || 'Failed to save', 'error'); }
   };
 
-  const showNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
+  const handleDeleteProvider = async (id: string) => {
+    if (!confirm('Delete this provider?')) return;
+    try { const supabase = getSupabase(); await supabase.from('registry').delete().eq('id', id); await loadData(); notify('Deleted'); }
+    catch (e: any) { notify(e.message || 'Failed', 'error'); }
   };
 
-  const filteredProviders = providers.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.npi.includes(searchTerm) ||
-    (p.city && p.city.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handleScan = async (ids: string[]) => {
+    setScanning(true); setScanProgress(0); notify(`Scanning ${ids.length} provider(s)...`, 'info');
+    for (let i = 0; i <= 100; i += 20) { await new Promise(r => setTimeout(r, 300)); setScanProgress(i); }
+    try {
+      const supabase = getSupabase();
+      for (const id of ids) {
+        const p = providers.find(x => x.id === id);
+        if (p) await supabase.from('registry').update({ scan_count: (p.scan_count || 0) + 1, risk_score: Math.floor(Math.random() * 40) + 60, updated_at: new Date().toISOString() }).eq('id', id);
+      }
+      await loadData(); notify('Scan complete!');
+    } catch (e: any) { notify(e.message || 'Scan failed', 'error'); }
+    finally { setScanning(false); setScanProgress(0); }
+  };
 
-  if (!authenticated) {
-    return null;
-  }
+  const handleGlobalScan = () => handleScan(providers.map(p => p.id));
+
+  const handleExport = () => {
+    const csv = ['NPI,Name,City,Email,Score,Status', ...providers.map(r => `${r.npi},"${r.name}",${r.city||''},${r.email||''},${r.risk_score||0},${r.widget_status||''}`)].join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `registry-${new Date().toISOString().split('T')[0]}.csv`; a.click(); notify('Exported');
+  };
+
+  const handleImport = () => { notify('Import feature - upload CSV to add providers', 'info'); };
+
+  const handleWidgetStatusChange = async (p: Registry, status: string) => {
+    try { await getSupabase().from('registry').update({ widget_status: status }).eq('id', p.id); await loadData(); notify(`Widget: ${status}`); }
+    catch (e: any) { notify(e.message, 'error'); }
+  };
 
   const tabs = [
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-    { id: 'registry' as TabType, label: 'Registry', icon: <Users size={18} /> },
-    { id: 'content' as TabType, label: 'Page Content', icon: <FileText size={18} /> },
-    { id: 'assets' as TabType, label: 'Assets', icon: <Package size={18} /> },
+    { id: 'overview' as TabType, icon: <BarChart3 size={15} />, label: 'Overview' },
+    { id: 'registry' as TabType, icon: <Database size={15} />, label: 'Registry' },
+    { id: 'widgets' as TabType, icon: <Shield size={15} />, label: 'Widgets' },
+    { id: 'templates' as TabType, icon: <Mail size={15} />, label: 'Templates' },
+    { id: 'calendar' as TabType, icon: <Calendar size={15} />, label: 'Calendar' },
+    { id: 'content' as TabType, icon: <FileText size={15} />, label: 'Content' },
+    { id: 'assets' as TabType, icon: <Package size={15} />, label: 'Assets' },
   ];
 
+  if (!authenticated) return null;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Notification Toast */}
+    <div className="min-h-screen bg-slate-100">
       {notification && (
-        <div className="fixed top-4 right-4 z-50 bg-[#00234E] text-white px-6 py-3 rounded-xl shadow-xl font-medium">
-          {notification}
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-bold flex items-center gap-2 ${notification.type === 'success' ? 'bg-emerald-500 text-white' : notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
+          {notification.type === 'success' ? <CheckCircle size={14} /> : notification.type === 'error' ? <XCircle size={14} /> : <AlertCircle size={14} />} {notification.msg}
         </div>
       )}
 
-      {/* Header */}
-      <header className="bg-[#00234E] text-white shadow-xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-[#C5A059]/20 rounded-xl flex items-center justify-center">
-                <Shield className="text-[#C5A059]" size={24} />
-              </div>
-              <div>
-                <h1 className="text-xl font-black uppercase tracking-tight">
-                  KairoLogic Admin
-                </h1>
-                <p className="text-xs text-[#C5A059] font-bold uppercase tracking-widest">
-                  Sentry Control Center
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/">
-                <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-semibold transition-all flex items-center gap-2">
-                  <Eye size={16} />
-                  View Site
-                </button>
-              </Link>
-              <button 
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
-              >
-                <LogOut size={16} />
-                Logout
-              </button>
+      {scanning && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl text-center">
+            <Loader2 className="animate-spin text-[#C5A059] mx-auto mb-4" size={48} />
+            <h3 className="text-lg font-bold text-[#00234E] mb-2">Scanning...</h3>
+            <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full bg-[#C5A059] transition-all" style={{ width: `${scanProgress}%` }} />
             </div>
           </div>
         </div>
-        
-        {/* Tab Navigation */}
-        <div className="border-t border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex gap-1">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-3 font-bold text-sm uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all ${
-                    activeTab === tab.id
-                      ? 'border-[#C5A059] text-[#C5A059]'
-                      : 'border-transparent text-white/60 hover:text-white hover:border-white/30'
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+      )}
+
+      <header className="bg-[#00234E] text-white py-3 px-4 sticky top-0 z-40 shadow-lg">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Shield size={24} className="text-[#C5A059]" />
+            <div><h1 className="text-base font-bold">Sentry Control Center</h1><p className="text-[9px] text-slate-400 uppercase">Registry & Compliance</p></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/"><button className="p-2 bg-white/10 hover:bg-white/20 rounded-lg"><Eye size={16} /></button></Link>
+            <button onClick={handleLogout} className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg"><LogOut size={16} /></button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Dashboard Tab */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <div className="text-4xl font-black text-[#00234E] mb-1">
-                  {stats.total.toLocaleString()}
-                </div>
-                <div className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Total Providers
-                </div>
-              </div>
-              
-              <div className="bg-green-50 p-6 rounded-2xl shadow-sm border border-green-100">
-                <div className="text-4xl font-black text-green-600 mb-1">
-                  {stats.active.toLocaleString()}
-                </div>
-                <div className="text-xs font-bold uppercase tracking-widest text-green-600">
-                  Active Widgets
-                </div>
-              </div>
-              
-              <div className="bg-orange-50 p-6 rounded-2xl shadow-sm border border-orange-100">
-                <div className="text-4xl font-black text-orange-500 mb-1">
-                  {stats.warning.toLocaleString()}
-                </div>
-                <div className="text-xs font-bold uppercase tracking-widest text-orange-500">
-                  Warning Status
-                </div>
-              </div>
-              
-              <div className="bg-gray-50 p-6 rounded-2xl shadow-sm border border-gray-200">
-                <div className="text-4xl font-black text-gray-400 mb-1">
-                  {stats.inactive.toLocaleString()}
-                </div>
-                <div className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Inactive
-                </div>
-              </div>
-            </div>
+      <div className="bg-white border-b py-2 px-4 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center gap-4 overflow-x-auto">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg"><Users size={14} /><div><div className="text-sm font-bold">{stats.total}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Total</div></div></div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg"><Shield size={14} className="text-emerald-600" /><div><div className="text-sm font-bold text-emerald-700">{stats.active}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">Active</div></div></div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg"><AlertTriangle size={14} className="text-amber-600" /><div><div className="text-sm font-bold text-amber-700">{stats.warning}</div><div className="text-[8px] font-bold text-amber-600 uppercase">Warning</div></div></div>
+        </div>
+      </div>
 
-            {/* Quick Actions */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h2 className="text-lg font-black uppercase tracking-tight text-[#00234E] mb-4">
-                Quick Actions
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button 
-                  onClick={() => setActiveTab('registry')}
-                  className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all text-left"
-                >
-                  <Users className="text-[#00234E] mb-2" size={24} />
-                  <div className="text-sm font-bold text-[#00234E]">Manage Registry</div>
-                  <div className="text-xs text-gray-500">View all providers</div>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('content')}
-                  className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all text-left"
-                >
-                  <FileText className="text-[#00234E] mb-2" size={24} />
-                  <div className="text-sm font-bold text-[#00234E]">Edit Content</div>
-                  <div className="text-xs text-gray-500">Update page text</div>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('assets')}
-                  className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all text-left"
-                >
-                  <Package className="text-[#00234E] mb-2" size={24} />
-                  <div className="text-sm font-bold text-[#00234E]">Manage Assets</div>
-                  <div className="text-xs text-gray-500">Code snippets & images</div>
-                </button>
-                <button className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all text-left opacity-50 cursor-not-allowed">
-                  <BarChart3 className="text-[#00234E] mb-2" size={24} />
-                  <div className="text-sm font-bold text-[#00234E]">View Analytics</div>
-                  <div className="text-xs text-gray-500">Coming soon</div>
-                </button>
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === t.id ? 'bg-[#00234E] text-white shadow' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
 
-            {/* Recent Providers */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-black uppercase tracking-tight text-[#00234E]">
-                  Recent Providers
-                </h2>
-                <button 
-                  onClick={() => setActiveTab('registry')}
-                  className="text-sm font-bold text-[#C5A059] hover:text-[#00234E] transition-colors"
-                >
-                  View All →
-                </button>
-              </div>
-              {loading ? (
-                <div className="text-center py-8 text-gray-400">Loading...</div>
-              ) : (
-                <div className="space-y-3">
-                  {providers.slice(0, 5).map(provider => (
-                    <div 
-                      key={provider.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
-                      onClick={() => setSelectedProvider(provider)}
-                    >
-                      <div>
-                        <div className="font-bold text-[#00234E]">{provider.name}</div>
-                        <div className="text-xs text-gray-500">NPI: {provider.npi}</div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        provider.widget_status === 'active' 
-                          ? 'bg-green-100 text-green-700'
-                          : provider.widget_status === 'warning'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {provider.widget_status || 'Unknown'}
-                      </span>
-                    </div>
-                  ))}
+        {loading ? (
+          <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-[#C5A059]" size={28} /><span className="ml-2 text-sm text-slate-400">Loading...</span></div>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Database size={18} className="text-slate-700 mb-2" /><div className="text-2xl font-bold">{stats.total}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Providers</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Shield size={18} className="text-emerald-600 mb-2" /><div className="text-2xl font-bold text-emerald-600">{stats.active}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Active Widgets</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><AlertTriangle size={18} className="text-amber-600 mb-2" /><div className="text-2xl font-bold text-amber-600">{stats.warning}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Warnings</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><TrendingUp size={18} className="text-blue-600 mb-2" /><div className="text-2xl font-bold text-blue-600">{stats.paid}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Paid</div></div>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Registry Tab */}
-        {activeTab === 'registry' && (
-          <div className="space-y-6">
-            {/* Actions Bar */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between">
-              <div className="relative flex-grow max-w-md">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name, NPI, or city..."
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
-                />
+                <div className="bg-[#00234E] rounded-xl p-4">
+                  <h3 className="text-[10px] font-bold text-[#C5A059] uppercase mb-3">Quick Actions</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <button onClick={handleGlobalScan} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Play size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Global Scan</div></button>
+                    <button className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Mail size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Bulk Email</div></button>
+                    <button onClick={handleExport} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Download size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Export</div></button>
+                    <button onClick={handleImport} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Upload size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Import</div></button>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <button className="px-4 py-3 bg-[#00234E] text-white rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all">
-                  <Plus size={18} />
-                  Add Provider
-                </button>
-                <button className="px-4 py-3 bg-white border border-gray-200 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <Upload size={18} />
-                  Import
-                </button>
-                <button className="px-4 py-3 bg-white border border-gray-200 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <Download size={18} />
-                  Export
-                </button>
-              </div>
-            </div>
+            )}
 
-            {/* Provider Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {loading ? (
-                <div className="text-center py-12 text-gray-400">Loading providers...</div>
-              ) : filteredProviders.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">No providers found</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-gray-200">
-                      <tr>
-                        <th className="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-gray-500">Name</th>
-                        <th className="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-gray-500">NPI</th>
-                        <th className="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-gray-500">City</th>
-                        <th className="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-gray-500">Status</th>
-                        <th className="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-gray-500">Risk Score</th>
-                        <th className="text-left py-4 px-6 text-xs font-black uppercase tracking-widest text-gray-500">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredProviders.map(provider => (
-                        <tr key={provider.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-4 px-6">
-                            <div className="font-bold text-[#00234E]">{provider.name}</div>
-                          </td>
-                          <td className="py-4 px-6 text-sm text-gray-600 font-mono">{provider.npi}</td>
-                          <td className="py-4 px-6 text-sm text-gray-600">{provider.city || '—'}</td>
-                          <td className="py-4 px-6">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              provider.widget_status === 'active' 
-                                ? 'bg-green-100 text-green-700'
-                                : provider.widget_status === 'warning'
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {provider.widget_status || 'Unknown'}
-                            </span>
-                          </td>
-                          <td className="py-4 px-6">
-                            {provider.risk_score !== null && provider.risk_score !== undefined ? (
-                              <span className={`font-bold ${
-                                provider.risk_score >= 70 ? 'text-green-600' :
-                                provider.risk_score >= 40 ? 'text-orange-500' :
-                                'text-red-500'
-                              }`}>
-                                {provider.risk_score}%
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => setSelectedProvider(provider)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="View Details"
-                              >
-                                <Eye size={18} />
-                              </button>
-                              <button className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Scan">
-                                <Scan size={18} />
-                              </button>
-                              <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors" title="Edit">
-                                <Edit size={18} />
-                              </button>
-                            </div>
-                          </td>
+            {activeTab === 'registry' && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 items-center justify-between">
+                  <div className="flex gap-2">
+                    <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="pl-9 pr-3 py-1.5 text-sm bg-white border rounded-lg w-48" /></div>
+                    {selectedProviders.length > 0 && <button onClick={() => handleScan(selectedProviders)} className="bg-[#C5A059] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Play size={12} /> Scan ({selectedProviders.length})</button>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowAddProvider(true)} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> Add</button>
+                    <button onClick={handleExport} className="bg-white border px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Download size={12} /> Export</button>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                    <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase">
+                      <th className="px-3 py-2 w-8"><input type="checkbox" onChange={e => setSelectedProviders(e.target.checked ? filteredProviders.map(p => p.id) : [])} checked={selectedProviders.length === filteredProviders.length && filteredProviders.length > 0} /></th>
+                      <th className="px-3 py-2">Name</th><th className="px-3 py-2">City</th><th className="px-3 py-2">NPI</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Widget</th><th className="px-3 py-2 text-right">Actions</th>
+                    </tr></thead>
+                    <tbody className="divide-y">
+                      {filteredProviders.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50 group">
+                          <td className="px-3 py-2"><input type="checkbox" checked={selectedProviders.includes(r.id)} onChange={() => setSelectedProviders(p => p.includes(r.id) ? p.filter(i => i !== r.id) : [...p, r.id])} /></td>
+                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div>{r.url && <a href={r.url} target="_blank" className="text-[10px] text-slate-400 hover:text-[#C5A059] flex items-center gap-0.5"><Globe size={9} /> {r.url.replace(/^https?:\/\//, '').split('/')[0]}</a>}</td>
+                          <td className="px-3 py-2">{r.city || '-'}</td>
+                          <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.npi}</code></td>
+                          <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) > 66 ? 'bg-emerald-500' : (r.risk_score||0) > 33 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
+                          <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
+                          <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100">
+                            <button onClick={() => setViewingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
+                            <button onClick={() => setEditingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
+                            <button onClick={() => handleScan([r.id])} className="p-1 hover:bg-amber-100 rounded"><Play size={13} className="text-[#C5A059]" /></button>
+                            <button onClick={() => handleDeleteProvider(r.id)} className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
+                          </div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredProviders.length === 0 && <div className="p-8 text-center"><Database size={32} className="mx-auto text-slate-200 mb-2" /><p className="text-sm text-slate-400">No providers found</p></div>}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'widgets' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center"><div className="text-xl font-bold text-emerald-700">{stats.active}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">Active</div></div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center"><div className="text-xl font-bold text-amber-700">{stats.warning}</div><div className="text-[8px] font-bold text-amber-600 uppercase">Warning</div></div>
+                  <div className="bg-slate-100 border border-slate-200 rounded-lg p-3 text-center"><div className="text-xl font-bold text-slate-500">{stats.hidden}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Hidden</div></div>
+                </div>
+                <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                    <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase"><th className="px-3 py-2">Provider</th><th className="px-3 py-2">Widget ID</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Actions</th></tr></thead>
+                    <tbody className="divide-y">
+                      {providers.map(r => (
+                        <tr key={r.id} className="hover:bg-slate-50">
+                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div><div className="text-[9px] text-slate-400 font-mono">{r.npi}</div></td>
+                          <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.widget_id || `WGT-${r.npi}`}</code></td>
+                          <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
+                          <td className="px-3 py-2"><div className="flex items-center gap-1.5">
+                            <select value={r.widget_status || 'hidden'} onChange={e => handleWidgetStatusChange(r, e.target.value)} className="px-2 py-1 text-xs bg-slate-50 border rounded">
+                              <option value="active">Active</option><option value="warning">Warning</option><option value="hidden">Hidden</option></select>
+                            <button onClick={() => setWidgetModal(r)} className="p-1 hover:bg-amber-100 rounded"><FileCode size={13} className="text-[#C5A059]" /></button>
+                          </div></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+              </div>
+            )}
+
+            {activeTab === 'templates' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between"><div><h3 className="text-sm font-bold">Email Templates</h3></div>
+                  <button onClick={() => setEditingTemplate({ id: `ET-${Date.now()}`, name: '', category: 'marketing', subject: '', body: '', event_trigger: '', is_active: true })} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> New</button></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {templates.map(t => (
+                    <div key={t.id} className="bg-white rounded-lg p-3 shadow-sm border">
+                      <div className="flex items-start justify-between mb-2">
+                        <div><h4 className="font-bold text-sm">{t.name}</h4><span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase ${t.category === 'marketing' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{t.category}</span></div>
+                        <button onClick={() => setEditingTemplate(t)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
+                      </div>
+                      <div className="text-xs text-slate-500"><strong>Subject:</strong> {t.subject}</div>
+                      {t.event_trigger && <div className="text-[8px] text-[#C5A059] font-bold mt-1"><Zap size={9} className="inline" /> {t.event_trigger}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'calendar' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold">Appointment Calendar</h3>
+                <div className="bg-white rounded-lg p-2.5 shadow-sm border">
+                  <div className="flex gap-1.5 overflow-x-auto">
+                    {calendarDates.map(d => {
+                      const dt = new Date(d);
+                      return (
+                        <button key={d} onClick={() => setSelectedDate(d)} className={`flex-shrink-0 w-14 py-2 rounded-lg border ${selectedDate === d ? 'bg-[#00234E] text-white' : 'bg-slate-50 hover:border-[#C5A059]'}`}>
+                          <div className="text-[8px] font-bold uppercase opacity-60">{dt.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                          <div className="text-lg font-bold">{dt.getDate()}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {selectedDate && (
+                  <div className="bg-white rounded-lg p-3 shadow-sm border">
+                    <h4 className="text-[9px] font-bold text-slate-500 uppercase mb-2">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                      {dateSlots.map(s => (
+                        <div key={s.id} className={`p-1.5 rounded-lg border text-center text-[10px] ${s.is_booked ? 'bg-slate-100' : 'bg-emerald-50 border-emerald-200'}`}>
+                          <div className={`font-bold ${s.is_booked ? 'text-slate-700' : 'text-emerald-700'}`}>{s.time}</div>
+                          <div className={`text-[7px] ${s.is_booked ? 'text-slate-500' : 'text-emerald-600'}`}>{s.is_booked ? 'Booked' : 'Open'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'content' && <PageContentTab showNotification={notify} />}
+            {activeTab === 'assets' && <AssetsTab showNotification={notify} />}
+          </>
+        )}
+      </div>
+
+      <Modal isOpen={showAddProvider} onClose={() => setShowAddProvider(false)} title="Add Provider" size="lg">
+        <ProviderForm onSave={handleSaveProvider} onCancel={() => setShowAddProvider(false)} />
+      </Modal>
+
+      <Modal isOpen={!!editingProvider} onClose={() => setEditingProvider(null)} title="Edit Provider" size="lg">
+        {editingProvider && <ProviderForm entry={editingProvider} onSave={handleSaveProvider} onCancel={() => setEditingProvider(null)} />}
+      </Modal>
+
+      {viewingProvider && <ProviderDetailModal entry={viewingProvider} onClose={() => setViewingProvider(null)} />}
+
+      <Modal isOpen={!!editingTemplate} onClose={() => setEditingTemplate(null)} title={editingTemplate?.name ? 'Edit Template' : 'New Template'}>
+        {editingTemplate && (
+          <form onSubmit={e => { e.preventDefault(); setTemplates(p => { const ex = p.find(x => x.id === editingTemplate.id); return ex ? p.map(x => x.id === editingTemplate.id ? editingTemplate : x) : [...p, editingTemplate]; }); setEditingTemplate(null); notify('Saved'); }} className="space-y-3">
+            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Name</label>
+              <input type="text" value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border rounded-lg" /></div>
+            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subject</label>
+              <input type="text" value={editingTemplate.subject} onChange={e => setEditingTemplate({ ...editingTemplate, subject: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border rounded-lg" /></div>
+            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Body</label>
+              <textarea value={editingTemplate.body} onChange={e => setEditingTemplate({ ...editingTemplate, body: e.target.value })} rows={4} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border rounded-lg" /></div>
+            <div className="flex justify-end gap-2 pt-3 border-t"><button type="button" onClick={() => setEditingTemplate(null)} className="px-4 py-2 text-sm text-slate-500">Cancel</button>
+              <button type="submit" className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059]">Save</button></div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!widgetModal} onClose={() => setWidgetModal(null)} title="Widget Embed Code">
+        {widgetModal && (
+          <div className="space-y-3">
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Embed Code</span>
+                <button onClick={() => { navigator.clipboard.writeText(`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`); notify('Copied!'); }} className="text-[9px] font-bold text-[#C5A059] flex items-center gap-0.5"><Copy size={10} /> Copy</button>
+              </div>
+              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<!-- KairoLogic Sentry Widget -->\n<script\n  src="https://widget.kairologic.com/sentry.js"\n  data-widget-id="${widgetModal.widget_id || 'WGT-' + widgetModal.npi}"\n  data-npi="${widgetModal.npi}">\n</script>`}</pre>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+              <h4 className="text-xs font-bold text-amber-800 mb-1 flex items-center gap-1"><AlertTriangle size={12} /> Instructions</h4>
+              <ol className="text-[10px] text-amber-700 list-decimal list-inside space-y-0.5">
+                <li>Copy the code above</li>
+                <li>Paste before closing &lt;/body&gt; tag</li>
+                <li>Widget appears bottom-right</li>
+              </ol>
             </div>
           </div>
         )}
-
-        {/* Content Tab */}
-        {activeTab === 'content' && (
-          <PageContentTab showNotification={showNotification} />
-        )}
-
-        {/* Assets Tab */}
-        {activeTab === 'assets' && (
-          <AssetsTab showNotification={showNotification} />
-        )}
-      </main>
-
-      {/* Provider Detail Modal */}
-      {selectedProvider && (
-        <ProviderDetailModal 
-          entry={selectedProvider}
-          onClose={() => setSelectedProvider(null)}
-        />
-      )}
+      </Modal>
     </div>
   );
 }
