@@ -33,7 +33,7 @@ import {
   getAssetStats,
   formatFileSize,
   Asset
-} from '../../services/assetsService';
+} from '@/services/assetsService';
 
 interface AssetsTabProps {
   showNotification: (msg: string) => void;

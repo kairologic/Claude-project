@@ -17,15 +17,15 @@ import {
   ExternalLink,
   Calendar
 } from 'lucide-react';
-import { RegistryEntry } from '../../types';
+import { Registry } from '@/lib/supabase';
 import {
   downloadTextReport,
   downloadHTMLReport,
   downloadJSONReport
-} from '../../services/reportService';
+} from '@/services/reportService';
 
 interface ProviderDetailModalProps {
-  entry: RegistryEntry;
+  entry: Registry;
   onClose: () => void;
 }
 

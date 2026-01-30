@@ -30,7 +30,7 @@ import {
   createContentSection,
   deleteContentSection,
   PageContent
-} from '../../services/pageContentService';
+} from '@/services/pageContentService';
 
 interface PageContentTabProps {
   showNotification: (msg: string) => void;

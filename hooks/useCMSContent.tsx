@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getContentSection, getPageContent, PageContent } from '../services/pageContentService';
+import { getContentSection, getPageContent, PageContent } from '@/services/pageContentService';
 
 /**
  * Hook to fetch a single content section
