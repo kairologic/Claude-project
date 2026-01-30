@@ -130,14 +130,14 @@ export const createContentSection = async (
     const { error } = await supabase
       .from(TABLE_NAME)
       .insert({
-        id: `PG-${Date.now()}`,
         page: data.page,
         section: data.section,
         content: data.content || '',
         content_type: data.content_type || 'text',
         description: data.description,
-        last_updated: new Date().toISOString(),
-        updated_by: data.updated_by || 'admin'
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
     if (error) {
