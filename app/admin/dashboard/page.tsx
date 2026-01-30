@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase, Registry } from '@/lib/supabase';
 import Link from 'next/link';
 import { 
-  Shield, ShieldCheck, ShieldAlert, Users, Database, Calendar, Mail, 
-  Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, Pause, 
+  Shield, Users, Database, Calendar, Mail, 
+  Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, 
   CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode, 
-  BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap
+  BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap, Pause, FileWarning
 } from 'lucide-react';
 
 import { AssetsTab } from '@/components/admin/AssetsTab';
@@ -17,7 +17,15 @@ import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
 
 type TabType = 'overview' | 'registry' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
 
-// Status Badge Component
+interface ScanResult {
+  total: number;
+  scanned: number;
+  withUrl: number;
+  withoutUrl: Registry[];
+  errors: string[];
+  timestamp: string;
+}
+
 const StatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ status, size = 'md' }) => {
   const styles: Record<string, string> = {
     active: 'bg-emerald-50 border-emerald-200 text-emerald-700',
@@ -37,11 +45,10 @@ const StatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ status,
   );
 };
 
-// Modal Component
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' }> = 
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }> = 
   ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
-  const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' };
+  const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <div className={`${widths[size]} w-full bg-white rounded-xl shadow-2xl max-h-[85vh] flex flex-col`} onClick={e => e.stopPropagation()}>
@@ -55,7 +62,6 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
   );
 };
 
-// Provider Form
 interface ProviderFormData {
   id: string; npi: string; name: string; contact_first_name: string; contact_last_name: string;
   email: string; phone: string; city: string; zip: string; url: string;
@@ -87,8 +93,8 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
           <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">ZIP</label>
           <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
-        <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Website</label>
-          <input type="url" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://" className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Website URL</label>
+          <input type="url" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://example.com" className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Widget Status</label>
           <select value={form.widget_status} onChange={e => setForm({ ...form, widget_status: e.target.value as any })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg">
             <option value="active">Active</option><option value="warning">Warning</option><option value="hidden">Hidden</option></select></div>
@@ -107,6 +113,7 @@ interface CalendarSlot { id: string; date: string; time: string; is_booked: bool
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -124,6 +131,12 @@ export default function AdminDashboard() {
   const [widgetModal, setWidgetModal] = useState<Registry | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
+  const [scanStatus, setScanStatus] = useState('');
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [showScanReport, setShowScanReport] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importPreview, setImportPreview] = useState(false);
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
@@ -164,6 +177,7 @@ export default function AdminDashboard() {
     warning: providers.filter(r => r.widget_status === 'warning').length,
     hidden: providers.filter(r => r.widget_status === 'hidden').length,
     paid: providers.filter(r => r.subscription_status === 'active').length,
+    withoutUrl: providers.filter(r => !r.url || r.url.trim() === '').length,
   }), [providers]);
 
   const filteredProviders = useMemo(() => {
@@ -194,29 +208,229 @@ export default function AdminDashboard() {
     catch (e: any) { notify(e.message || 'Failed', 'error'); }
   };
 
-  const handleScan = async (ids: string[]) => {
-    setScanning(true); setScanProgress(0); notify(`Scanning ${ids.length} provider(s)...`, 'info');
-    for (let i = 0; i <= 100; i += 20) { await new Promise(r => setTimeout(r, 300)); setScanProgress(i); }
+  // GLOBAL SCAN - Scans all providers, identifies missing URLs, stores results
+  const handleGlobalScan = async () => {
+    setScanning(true); 
+    setScanProgress(0); 
+    setScanStatus('Initializing scan...');
+    
+    const result: ScanResult = {
+      total: providers.length,
+      scanned: 0,
+      withUrl: 0,
+      withoutUrl: [],
+      errors: [],
+      timestamp: new Date().toISOString()
+    };
+
     try {
       const supabase = getSupabase();
-      for (const id of ids) {
-        const p = providers.find(x => x.id === id);
-        if (p) await supabase.from('registry').update({ scan_count: (p.scan_count || 0) + 1, risk_score: Math.floor(Math.random() * 40) + 60, updated_at: new Date().toISOString() }).eq('id', id);
+      
+      for (let i = 0; i < providers.length; i++) {
+        const p = providers[i];
+        setScanStatus(`Scanning ${p.name}...`);
+        setScanProgress(Math.round(((i + 1) / providers.length) * 100));
+        
+        // Check if provider has URL
+        if (!p.url || p.url.trim() === '') {
+          result.withoutUrl.push(p);
+          // Update provider to mark as needing URL
+          await supabase.from('registry').update({
+            widget_status: 'warning',
+            updated_at: new Date().toISOString()
+          }).eq('id', p.id);
+        } else {
+          result.withUrl++;
+          // Simulate scan and update risk score
+          const newScore = Math.floor(Math.random() * 30) + 70; // 70-100 for providers with URLs
+          await supabase.from('registry').update({
+            scan_count: (p.scan_count || 0) + 1,
+            risk_score: newScore,
+            updated_at: new Date().toISOString()
+          }).eq('id', p.id);
+        }
+        result.scanned++;
+        
+        // Small delay to show progress
+        await new Promise(r => setTimeout(r, 100));
+      }
+      
+      setScanStatus('Scan complete!');
+      setScanResult(result);
+      setShowScanReport(true);
+      await loadData();
+      notify(`Scan complete! ${result.withoutUrl.length} providers need URLs.`);
+      
+    } catch (e: any) {
+      result.errors.push(e.message);
+      notify('Scan failed: ' + e.message, 'error');
+    } finally {
+      setScanning(false);
+      setScanProgress(0);
+      setScanStatus('');
+    }
+  };
+
+  // Individual provider scan
+  const handleScan = async (ids: string[]) => {
+    setScanning(true); setScanProgress(0);
+    setScanStatus(`Scanning ${ids.length} provider(s)...`);
+    
+    try {
+      const supabase = getSupabase();
+      for (let i = 0; i < ids.length; i++) {
+        const p = providers.find(x => x.id === ids[i]);
+        if (p) {
+          setScanProgress(Math.round(((i + 1) / ids.length) * 100));
+          if (!p.url) {
+            notify(`${p.name} has no URL - cannot scan`, 'error');
+            continue;
+          }
+          const newScore = Math.floor(Math.random() * 30) + 70;
+          await supabase.from('registry').update({ 
+            scan_count: (p.scan_count || 0) + 1, 
+            risk_score: newScore, 
+            updated_at: new Date().toISOString() 
+          }).eq('id', ids[i]);
+        }
       }
       await loadData(); notify('Scan complete!');
     } catch (e: any) { notify(e.message || 'Scan failed', 'error'); }
-    finally { setScanning(false); setScanProgress(0); }
+    finally { setScanning(false); setScanProgress(0); setScanStatus(''); }
   };
 
-  const handleGlobalScan = () => handleScan(providers.map(p => p.id));
-
+  // CSV EXPORT
   const handleExport = () => {
-    const csv = ['NPI,Name,City,Email,Score,Status', ...providers.map(r => `${r.npi},"${r.name}",${r.city||''},${r.email||''},${r.risk_score||0},${r.widget_status||''}`)].join('\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `registry-${new Date().toISOString().split('T')[0]}.csv`; a.click(); notify('Exported');
+    const csv = [
+      'NPI,Name,City,Email,Phone,URL,Score,Widget Status,Subscription',
+      ...providers.map(r => 
+        `${r.npi},"${r.name}",${r.city||''},${r.email||''},${r.phone||''},${r.url||''},${r.risk_score||0},${r.widget_status||''},${r.subscription_status||''}`
+      )
+    ].join('\n');
+    const a = document.createElement('a'); 
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `registry-${new Date().toISOString().split('T')[0]}.csv`; 
+    a.click(); 
+    notify('Exported to CSV');
   };
 
-  const handleImport = () => { notify('Import feature - upload CSV to add providers', 'info'); };
+  // Export providers without URLs
+  const handleExportMissingUrls = () => {
+    const missing = providers.filter(p => !p.url || p.url.trim() === '');
+    const csv = [
+      'NPI,Name,City,Email,Phone,URL (FILL THIS)',
+      ...missing.map(r => `${r.npi},"${r.name}",${r.city||''},${r.email||''},${r.phone||''},`)
+    ].join('\n');
+    const a = document.createElement('a'); 
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `providers-missing-urls-${new Date().toISOString().split('T')[0]}.csv`; 
+    a.click(); 
+    notify(`Exported ${missing.length} providers needing URLs`);
+  };
+
+  // CSV IMPORT - Parse and preview
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n').filter(l => l.trim());
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+      
+      const data = lines.slice(1).map(line => {
+        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        const row: any = {};
+        headers.forEach((h, i) => {
+          let val = values[i]?.replace(/^"|"$/g, '').trim() || '';
+          // Map common header names
+          if (h.includes('npi')) row.npi = val;
+          else if (h.includes('name') || h.includes('practice')) row.name = val;
+          else if (h.includes('city')) row.city = val;
+          else if (h.includes('email')) row.email = val;
+          else if (h.includes('phone')) row.phone = val;
+          else if (h.includes('url') || h.includes('website')) row.url = val;
+          else if (h.includes('zip')) row.zip = val;
+        });
+        return row;
+      }).filter(r => r.npi && r.name); // Require at least NPI and name
+      
+      setImportData(data);
+      setImportPreview(true);
+      setShowImportModal(true);
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
+  // Execute import
+  const executeImport = async () => {
+    if (importData.length === 0) return;
+    
+    setScanning(true);
+    setScanStatus('Importing providers...');
+    setScanProgress(0);
+    
+    try {
+      const supabase = getSupabase();
+      let imported = 0;
+      let updated = 0;
+      
+      for (let i = 0; i < importData.length; i++) {
+        const row = importData[i];
+        setScanProgress(Math.round(((i + 1) / importData.length) * 100));
+        setScanStatus(`Importing ${row.name}...`);
+        
+        // Check if provider exists by NPI
+        const existing = providers.find(p => p.npi === row.npi);
+        
+        if (existing) {
+          // Update existing - especially URL if provided
+          const updateData: any = { updated_at: new Date().toISOString() };
+          if (row.url && row.url.trim()) updateData.url = row.url;
+          if (row.email) updateData.email = row.email;
+          if (row.phone) updateData.phone = row.phone;
+          if (row.city) updateData.city = row.city;
+          if (row.zip) updateData.zip = row.zip;
+          
+          await supabase.from('registry').update(updateData).eq('id', existing.id);
+          updated++;
+        } else {
+          // Insert new
+          await supabase.from('registry').insert({
+            id: `REG-${Date.now()}-${i}`,
+            npi: row.npi,
+            name: row.name,
+            email: row.email || null,
+            phone: row.phone || null,
+            city: row.city || null,
+            zip: row.zip || null,
+            url: row.url || null,
+            widget_status: 'hidden',
+            subscription_status: 'trial',
+            is_visible: false,
+            risk_score: 0,
+            scan_count: 0
+          });
+          imported++;
+        }
+      }
+      
+      await loadData();
+      setShowImportModal(false);
+      setImportData([]);
+      setImportPreview(false);
+      notify(`Import complete! ${imported} new, ${updated} updated.`);
+      
+    } catch (e: any) {
+      notify('Import failed: ' + e.message, 'error');
+    } finally {
+      setScanning(false);
+      setScanProgress(0);
+      setScanStatus('');
+    }
+  };
 
   const handleWidgetStatusChange = async (p: Registry, status: string) => {
     try { await getSupabase().from('registry').update({ widget_status: status }).eq('id', p.id); await loadData(); notify(`Widget: ${status}`); }
@@ -237,6 +451,9 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100">
+      {/* Hidden file input for CSV import */}
+      <input type="file" ref={fileInputRef} accept=".csv" onChange={handleImportFile} className="hidden" />
+
       {notification && (
         <div className={`fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-bold flex items-center gap-2 ${notification.type === 'success' ? 'bg-emerald-500 text-white' : notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
           {notification.type === 'success' ? <CheckCircle size={14} /> : notification.type === 'error' ? <XCircle size={14} /> : <AlertCircle size={14} />} {notification.msg}
@@ -245,12 +462,13 @@ export default function AdminDashboard() {
 
       {scanning && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-8 shadow-2xl text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl text-center max-w-md">
             <Loader2 className="animate-spin text-[#C5A059] mx-auto mb-4" size={48} />
-            <h3 className="text-lg font-bold text-[#00234E] mb-2">Scanning...</h3>
-            <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden">
+            <h3 className="text-lg font-bold text-[#00234E] mb-2">{scanStatus || 'Processing...'}</h3>
+            <div className="w-64 h-2 bg-slate-200 rounded-full overflow-hidden mx-auto">
               <div className="h-full bg-[#C5A059] transition-all" style={{ width: `${scanProgress}%` }} />
             </div>
+            <p className="text-sm text-slate-500 mt-2">{scanProgress}% complete</p>
           </div>
         </div>
       )}
@@ -273,6 +491,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg"><Users size={14} /><div><div className="text-sm font-bold">{stats.total}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Total</div></div></div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg"><Shield size={14} className="text-emerald-600" /><div><div className="text-sm font-bold text-emerald-700">{stats.active}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">Active</div></div></div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg"><AlertTriangle size={14} className="text-amber-600" /><div><div className="text-sm font-bold text-amber-700">{stats.warning}</div><div className="text-[8px] font-bold text-amber-600 uppercase">Warning</div></div></div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg"><FileWarning size={14} className="text-red-600" /><div><div className="text-sm font-bold text-red-700">{stats.withoutUrl}</div><div className="text-[8px] font-bold text-red-600 uppercase">No URL</div></div></div>
         </div>
       </div>
 
@@ -295,15 +514,45 @@ export default function AdminDashboard() {
                   <div className="bg-white rounded-xl p-4 shadow-sm border"><Database size={18} className="text-slate-700 mb-2" /><div className="text-2xl font-bold">{stats.total}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Providers</div></div>
                   <div className="bg-white rounded-xl p-4 shadow-sm border"><Shield size={18} className="text-emerald-600 mb-2" /><div className="text-2xl font-bold text-emerald-600">{stats.active}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Active Widgets</div></div>
                   <div className="bg-white rounded-xl p-4 shadow-sm border"><AlertTriangle size={18} className="text-amber-600 mb-2" /><div className="text-2xl font-bold text-amber-600">{stats.warning}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Warnings</div></div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm border"><TrendingUp size={18} className="text-blue-600 mb-2" /><div className="text-2xl font-bold text-blue-600">{stats.paid}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Paid</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><FileWarning size={18} className="text-red-600 mb-2" /><div className="text-2xl font-bold text-red-600">{stats.withoutUrl}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Missing URLs</div></div>
                 </div>
+                
+                {stats.withoutUrl > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="text-red-600" size={20} />
+                        <div>
+                          <h4 className="font-bold text-red-800">{stats.withoutUrl} providers need URLs</h4>
+                          <p className="text-xs text-red-600">Export the list, add URLs, and re-import to scan them</p>
+                        </div>
+                      </div>
+                      <button onClick={handleExportMissingUrls} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-red-700">
+                        <Download size={12} /> Export Missing URLs
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-[#00234E] rounded-xl p-4">
                   <h3 className="text-[10px] font-bold text-[#C5A059] uppercase mb-3">Quick Actions</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <button onClick={handleGlobalScan} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Play size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Global Scan</div></button>
-                    <button className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Mail size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Bulk Email</div></button>
-                    <button onClick={handleExport} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Download size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Export</div></button>
-                    <button onClick={handleImport} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center"><Upload size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Import</div></button>
+                    <button onClick={handleGlobalScan} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
+                      <Play size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Global Scan</div>
+                      <div className="text-[7px] text-slate-400">Scan all & find missing URLs</div>
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
+                      <Upload size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Import CSV</div>
+                      <div className="text-[7px] text-slate-400">Bulk add providers</div>
+                    </button>
+                    <button onClick={handleExport} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
+                      <Download size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Export All</div>
+                      <div className="text-[7px] text-slate-400">Download registry CSV</div>
+                    </button>
+                    <button onClick={handleExportMissingUrls} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
+                      <FileWarning size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Missing URLs</div>
+                      <div className="text-[7px] text-slate-400">Export to fix</div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -319,6 +568,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowAddProvider(true)} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> Add</button>
+                    <button onClick={() => fileInputRef.current?.click()} className="bg-white border px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Upload size={12} /> Import</button>
                     <button onClick={handleExport} className="bg-white border px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Download size={12} /> Export</button>
                   </div>
                 </div>
@@ -326,21 +576,22 @@ export default function AdminDashboard() {
                   <table className="w-full text-left text-sm">
                     <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase">
                       <th className="px-3 py-2 w-8"><input type="checkbox" onChange={e => setSelectedProviders(e.target.checked ? filteredProviders.map(p => p.id) : [])} checked={selectedProviders.length === filteredProviders.length && filteredProviders.length > 0} /></th>
-                      <th className="px-3 py-2">Name</th><th className="px-3 py-2">City</th><th className="px-3 py-2">NPI</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Widget</th><th className="px-3 py-2 text-right">Actions</th>
+                      <th className="px-3 py-2">Name</th><th className="px-3 py-2">City</th><th className="px-3 py-2">NPI</th><th className="px-3 py-2">URL</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Widget</th><th className="px-3 py-2 text-right">Actions</th>
                     </tr></thead>
                     <tbody className="divide-y">
                       {filteredProviders.map(r => (
-                        <tr key={r.id} className="hover:bg-slate-50 group">
+                        <tr key={r.id} className={`hover:bg-slate-50 group ${!r.url ? 'bg-red-50/50' : ''}`}>
                           <td className="px-3 py-2"><input type="checkbox" checked={selectedProviders.includes(r.id)} onChange={() => setSelectedProviders(p => p.includes(r.id) ? p.filter(i => i !== r.id) : [...p, r.id])} /></td>
-                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div>{r.url && <a href={r.url} target="_blank" className="text-[10px] text-slate-400 hover:text-[#C5A059] flex items-center gap-0.5"><Globe size={9} /> {r.url.replace(/^https?:\/\//, '').split('/')[0]}</a>}</td>
+                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div></td>
                           <td className="px-3 py-2">{r.city || '-'}</td>
                           <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.npi}</code></td>
+                          <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} /> {r.url.replace(/^https?:\/\//, '').substring(0,20)}...</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
                           <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) > 66 ? 'bg-emerald-500' : (r.risk_score||0) > 33 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
                           <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
                           <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100">
                             <button onClick={() => setViewingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
                             <button onClick={() => setEditingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
-                            <button onClick={() => handleScan([r.id])} className="p-1 hover:bg-amber-100 rounded"><Play size={13} className="text-[#C5A059]" /></button>
+                            <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} className="p-1 hover:bg-amber-100 rounded"><Play size={13} className={r.url ? 'text-[#C5A059]' : 'text-slate-300'} /></button>
                             <button onClick={() => handleDeleteProvider(r.id)} className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
                           </div></td>
                         </tr>
@@ -438,6 +689,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
+      {/* Modals */}
       <Modal isOpen={showAddProvider} onClose={() => setShowAddProvider(false)} title="Add Provider" size="lg">
         <ProviderForm onSave={handleSaveProvider} onCancel={() => setShowAddProvider(false)} />
       </Modal>
@@ -483,6 +735,95 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Scan Report Modal */}
+      <Modal isOpen={showScanReport && !!scanResult} onClose={() => setShowScanReport(false)} title="Global Scan Report" size="lg">
+        {scanResult && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-slate-50 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-slate-700">{scanResult.total}</div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase">Total Scanned</div>
+              </div>
+              <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-emerald-700">{scanResult.withUrl}</div>
+                <div className="text-[8px] font-bold text-emerald-600 uppercase">With URLs</div>
+              </div>
+              <div className="bg-red-50 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-red-700">{scanResult.withoutUrl.length}</div>
+                <div className="text-[8px] font-bold text-red-600 uppercase">Missing URLs</div>
+              </div>
+            </div>
+            
+            {scanResult.withoutUrl.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-bold text-red-800">Providers Needing URLs</h4>
+                  <button onClick={handleExportMissingUrls} className="text-[9px] font-bold text-red-600 flex items-center gap-1"><Download size={10} /> Export List</button>
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-left text-red-700"><th className="py-1">NPI</th><th className="py-1">Name</th><th className="py-1">City</th></tr></thead>
+                    <tbody>
+                      {scanResult.withoutUrl.map(p => (
+                        <tr key={p.id} className="border-t border-red-200">
+                          <td className="py-1 font-mono">{p.npi}</td>
+                          <td className="py-1">{p.name}</td>
+                          <td className="py-1">{p.city || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
+            <p className="text-[10px] text-slate-500 text-center">Scan completed at {new Date(scanResult.timestamp).toLocaleString()}</p>
+          </div>
+        )}
+      </Modal>
+
+      {/* Import Preview Modal */}
+      <Modal isOpen={showImportModal} onClose={() => { setShowImportModal(false); setImportData([]); }} title="Import Providers" size="lg">
+        <div className="space-y-4">
+          {importData.length > 0 ? (
+            <>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <h4 className="text-sm font-bold text-emerald-800">Ready to import {importData.length} providers</h4>
+                <p className="text-[10px] text-emerald-600">Review the data below, then click Import to proceed.</p>
+              </div>
+              <div className="max-h-64 overflow-y-auto bg-slate-50 rounded-lg p-2">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-left font-bold text-slate-600"><th className="py-1 px-2">NPI</th><th className="py-1 px-2">Name</th><th className="py-1 px-2">City</th><th className="py-1 px-2">URL</th></tr></thead>
+                  <tbody>
+                    {importData.slice(0, 20).map((r, i) => (
+                      <tr key={i} className="border-t border-slate-200">
+                        <td className="py-1 px-2 font-mono">{r.npi}</td>
+                        <td className="py-1 px-2">{r.name}</td>
+                        <td className="py-1 px-2">{r.city || '-'}</td>
+                        <td className="py-1 px-2 text-blue-600">{r.url ? '✓' : <span className="text-red-500">-</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {importData.length > 20 && <p className="text-[10px] text-slate-400 mt-2 text-center">...and {importData.length - 20} more</p>}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => { setShowImportModal(false); setImportData([]); }} className="px-4 py-2 text-sm text-slate-500">Cancel</button>
+                <button onClick={executeImport} className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059] flex items-center gap-1.5">
+                  <Upload size={14} /> Import {importData.length} Providers
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <Upload size={32} className="mx-auto text-slate-300 mb-2" />
+              <p className="text-sm text-slate-500">Select a CSV file to import</p>
+              <button onClick={() => fileInputRef.current?.click()} className="mt-3 px-4 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg">Choose File</button>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
