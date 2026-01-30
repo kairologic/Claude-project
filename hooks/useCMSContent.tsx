@@ -91,9 +91,13 @@ export const useCMSSection = (
   isLoading: boolean;
   contentType: 'text' | 'html' | 'json' | 'markdown' | 'image_url';
 } => {
-  const [data, setData] = useState({
+  const [data, setData] = useState<{
+    content: string;
+    contentType: 'text' | 'html' | 'json' | 'markdown' | 'image_url';
+    isLoading: boolean;
+  }>({
     content: '',
-    contentType: 'text' as const,
+    contentType: 'text',
     isLoading: true
   });
 
