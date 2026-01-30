@@ -17,11 +17,23 @@ import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
 
 type TabType = 'overview' | 'registry' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
 
+// Technical fixes for violations (from RiskScanWidget)
+const TECHNICAL_FIXES: Record<string, any> = {
+  'DR-01': { name: 'Primary EHR Domain IP Geo-Location', regulation: 'SB1188', clause: 'Sec. 183.002(a)', fix_priority: 'Critical' },
+  'DR-02': { name: 'CDN & Edge Cache Analysis', regulation: 'SB1188', clause: 'Sec. 183.002(a)', fix_priority: 'Critical' },
+  'DR-03': { name: 'MX Record Analysis', regulation: 'SB1188', clause: 'Sec. 183.002(b)', fix_priority: 'High' },
+  'DR-04': { name: 'Third-Party Resource Audit', regulation: 'SB1188', clause: 'Sec. 183.002(c)', fix_priority: 'High' },
+  'AI-01': { name: 'AI Disclosure Presence', regulation: 'HB149', clause: 'Sec. 101.001(a)', fix_priority: 'High' },
+  'AI-02': { name: 'AI Disclosure Visibility', regulation: 'HB149', clause: 'Sec. 101.001(b)', fix_priority: 'Critical' },
+  'AI-03': { name: 'AI Diagnostic Tool Disclaimer', regulation: 'HB149', clause: 'Sec. 101.002', fix_priority: 'High' },
+};
+
 interface ScanResult {
   total: number;
   scanned: number;
   withUrl: number;
   withoutUrl: Registry[];
+  scanResults: any[];
   errors: string[];
   timestamp: string;
 }
@@ -66,7 +78,7 @@ interface ProviderFormData {
   id: string; npi: string; name: string; contact_first_name: string; contact_last_name: string;
   email: string; phone: string; city: string; zip: string; url: string;
   widget_status: 'active' | 'warning' | 'hidden'; subscription_status: 'trial' | 'active' | 'inactive';
-  is_visible: boolean; risk_score: number;
+  is_visible: boolean; risk_score: number; provider_type: number;
 }
 
 const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderFormData) => void; onCancel: () => void; }> = ({ entry, onSave, onCancel }) => {
@@ -75,7 +87,8 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
     contact_first_name: entry?.contact_first_name || '', contact_last_name: entry?.contact_last_name || '',
     email: entry?.email || '', phone: entry?.phone || '', city: entry?.city || '', zip: entry?.zip || '',
     url: entry?.url || '', widget_status: (entry?.widget_status as any) || 'hidden',
-    subscription_status: (entry?.subscription_status as any) || 'trial', is_visible: entry?.is_visible ?? false, risk_score: entry?.risk_score || 0
+    subscription_status: (entry?.subscription_status as any) || 'trial', is_visible: entry?.is_visible ?? false, 
+    risk_score: entry?.risk_score || 0, provider_type: (entry as any)?.provider_type || 2
   });
   
   return (
@@ -85,6 +98,9 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
           <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">NPI *</label>
           <input type="text" value={form.npi} onChange={e => setForm({ ...form, npi: e.target.value })} required maxLength={10} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
+        <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Provider Type</label>
+          <select value={form.provider_type} onChange={e => setForm({ ...form, provider_type: parseInt(e.target.value) })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg">
+            <option value={1}>Type 1</option><option value={2}>Type 2</option></select></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Email</label>
           <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Phone</label>
@@ -93,7 +109,7 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
           <input type="text" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">ZIP</label>
           <input type="text" value={form.zip} onChange={e => setForm({ ...form, zip: e.target.value })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
-        <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Website URL</label>
+        <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Website URL (required for scanning)</label>
           <input type="url" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://example.com" className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#C5A059] focus:outline-none" /></div>
         <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Widget Status</label>
           <select value={form.widget_status} onChange={e => setForm({ ...form, widget_status: e.target.value as any })} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg">
@@ -110,6 +126,53 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
 
 interface EmailTemplate { id: string; name: string; category: string; subject: string; body: string; event_trigger: string; is_active: boolean; }
 interface CalendarSlot { id: string; date: string; time: string; is_booked: boolean; booked_by?: { name: string } | null; }
+
+// Simulated scan function (mimics RiskScanWidget logic)
+const runComplianceScan = async (url: string): Promise<any> => {
+  // Simulate scan checks for SB1188 and HB149
+  const sb1188Findings = [
+    { id: 'DR-01', name: 'Primary EHR Domain IP Geo-Location', status: Math.random() > 0.3 ? 'pass' : 'fail', clause: 'Sec. 183.002(a)' },
+    { id: 'DR-02', name: 'CDN & Edge Cache Analysis', status: Math.random() > 0.4 ? 'pass' : 'fail', clause: 'Sec. 183.002(a)' },
+    { id: 'DR-03', name: 'MX Record Analysis', status: Math.random() > 0.5 ? 'pass' : 'fail', clause: 'Sec. 183.002(b)' },
+    { id: 'DR-04', name: 'Third-Party Resource Audit', status: Math.random() > 0.4 ? 'pass' : 'fail', clause: 'Sec. 183.002(c)' },
+  ];
+  
+  const hb149Findings = [
+    { id: 'AI-01', name: 'AI Disclosure Presence', status: Math.random() > 0.5 ? 'pass' : 'fail', clause: 'Sec. 101.001(a)' },
+    { id: 'AI-02', name: 'AI Disclosure Visibility', status: Math.random() > 0.6 ? 'pass' : 'fail', clause: 'Sec. 101.001(b)' },
+    { id: 'AI-03', name: 'AI Diagnostic Tool Disclaimer', status: Math.random() > 0.5 ? 'pass' : 'fail', clause: 'Sec. 101.002' },
+  ];
+
+  const sb1188Pass = sb1188Findings.filter(f => f.status === 'pass').length;
+  const sb1188Fail = sb1188Findings.filter(f => f.status === 'fail').length;
+  const hb149Pass = hb149Findings.filter(f => f.status === 'pass').length;
+  const hb149Fail = hb149Findings.filter(f => f.status === 'fail').length;
+  
+  const totalPass = sb1188Pass + hb149Pass;
+  const totalChecks = sb1188Findings.length + hb149Findings.length;
+  const riskScore = Math.round((totalPass / totalChecks) * 100);
+  
+  let riskLevel = 'low';
+  if (riskScore < 50) riskLevel = 'critical';
+  else if (riskScore < 70) riskLevel = 'high';
+  else if (riskScore < 85) riskLevel = 'medium';
+
+  return {
+    url,
+    risk_score: riskScore,
+    risk_level: riskLevel,
+    sb1188_findings: sb1188Findings,
+    sb1188_pass_count: sb1188Pass,
+    sb1188_fail_count: sb1188Fail,
+    hb149_findings: hb149Findings,
+    hb149_pass_count: hb149Pass,
+    hb149_fail_count: hb149Fail,
+    technical_fixes: [...sb1188Findings, ...hb149Findings].filter(f => f.status === 'fail').map(f => ({
+      ...f,
+      ...TECHNICAL_FIXES[f.id]
+    }))
+  };
+};
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -136,7 +199,6 @@ export default function AdminDashboard() {
   const [showScanReport, setShowScanReport] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
-  const [importPreview, setImportPreview] = useState(false);
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
@@ -177,7 +239,10 @@ export default function AdminDashboard() {
     warning: providers.filter(r => r.widget_status === 'warning').length,
     hidden: providers.filter(r => r.widget_status === 'hidden').length,
     paid: providers.filter(r => r.subscription_status === 'active').length,
+    withUrl: providers.filter(r => r.url && r.url.trim() !== '').length,
     withoutUrl: providers.filter(r => !r.url || r.url.trim() === '').length,
+    type1: providers.filter(r => (r as any).provider_type === 1).length,
+    type2: providers.filter(r => (r as any).provider_type === 2 || !(r as any).provider_type).length,
   }), [providers]);
 
   const filteredProviders = useMemo(() => {
@@ -208,58 +273,94 @@ export default function AdminDashboard() {
     catch (e: any) { notify(e.message || 'Failed', 'error'); }
   };
 
-  // GLOBAL SCAN - Scans all providers, identifies missing URLs, stores results
+  // GLOBAL SCAN - Scans Type 1 & 2 providers WITH URLs, stores results, reports missing URLs
   const handleGlobalScan = async () => {
     setScanning(true); 
     setScanProgress(0); 
-    setScanStatus('Initializing scan...');
+    setScanStatus('Initializing global scan...');
+    
+    // Filter providers with URLs (Type 1 & 2)
+    const providersWithUrl = providers.filter(p => p.url && p.url.trim() !== '');
+    const providersWithoutUrl = providers.filter(p => !p.url || p.url.trim() === '');
     
     const result: ScanResult = {
       total: providers.length,
       scanned: 0,
-      withUrl: 0,
-      withoutUrl: [],
+      withUrl: providersWithUrl.length,
+      withoutUrl: providersWithoutUrl,
+      scanResults: [],
       errors: [],
       timestamp: new Date().toISOString()
     };
 
+    if (providersWithUrl.length === 0) {
+      setScanStatus('No providers with URLs to scan');
+      await new Promise(r => setTimeout(r, 1000));
+      setScanning(false);
+      setScanResult(result);
+      setShowScanReport(true);
+      notify('No providers with URLs to scan', 'info');
+      return;
+    }
+
     try {
       const supabase = getSupabase();
       
-      for (let i = 0; i < providers.length; i++) {
-        const p = providers[i];
-        setScanStatus(`Scanning ${p.name}...`);
-        setScanProgress(Math.round(((i + 1) / providers.length) * 100));
+      for (let i = 0; i < providersWithUrl.length; i++) {
+        const p = providersWithUrl[i];
+        setScanStatus(`Scanning ${p.name} (${i + 1}/${providersWithUrl.length})...`);
+        setScanProgress(Math.round(((i + 1) / providersWithUrl.length) * 100));
         
-        // Check if provider has URL
-        if (!p.url || p.url.trim() === '') {
-          result.withoutUrl.push(p);
-          // Update provider to mark as needing URL
+        try {
+          // Run compliance scan
+          const scanData = await runComplianceScan(p.url!);
+          
+          // Store scan result in database
+          const scanRecord = {
+            registry_id: p.id,
+            npi: p.npi,
+            url: p.url,
+            scan_type: 'global',
+            risk_score: scanData.risk_score,
+            risk_level: scanData.risk_level,
+            sb1188_findings: scanData.sb1188_findings,
+            sb1188_pass_count: scanData.sb1188_pass_count,
+            sb1188_fail_count: scanData.sb1188_fail_count,
+            hb149_findings: scanData.hb149_findings,
+            hb149_pass_count: scanData.hb149_pass_count,
+            hb149_fail_count: scanData.hb149_fail_count,
+            technical_fixes: scanData.technical_fixes,
+            raw_scan_data: scanData
+          };
+          
+          await supabase.from('scan_results').insert(scanRecord);
+          
+          // Update provider record
           await supabase.from('registry').update({
-            widget_status: 'warning',
-            updated_at: new Date().toISOString()
-          }).eq('id', p.id);
-        } else {
-          result.withUrl++;
-          // Simulate scan and update risk score
-          const newScore = Math.floor(Math.random() * 30) + 70; // 70-100 for providers with URLs
-          await supabase.from('registry').update({
+            risk_score: scanData.risk_score,
+            risk_level: scanData.risk_level,
             scan_count: (p.scan_count || 0) + 1,
-            risk_score: newScore,
+            widget_status: scanData.risk_score >= 70 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
+            last_scan_result: scanData,
             updated_at: new Date().toISOString()
           }).eq('id', p.id);
+          
+          result.scanResults.push({ provider: p.name, ...scanData });
+          result.scanned++;
+          
+        } catch (scanErr: any) {
+          result.errors.push(`${p.name}: ${scanErr.message}`);
         }
-        result.scanned++;
         
-        // Small delay to show progress
-        await new Promise(r => setTimeout(r, 100));
+        // Small delay between scans
+        await new Promise(r => setTimeout(r, 500));
       }
       
       setScanStatus('Scan complete!');
       setScanResult(result);
       setShowScanReport(true);
       await loadData();
-      notify(`Scan complete! ${result.withoutUrl.length} providers need URLs.`);
+      notify(`Scan complete! ${result.scanned} scanned, ${result.withoutUrl.length} need URLs.`);
       
     } catch (e: any) {
       result.errors.push(e.message);
@@ -273,38 +374,54 @@ export default function AdminDashboard() {
 
   // Individual provider scan
   const handleScan = async (ids: string[]) => {
+    const toScan = providers.filter(p => ids.includes(p.id));
+    const withUrl = toScan.filter(p => p.url && p.url.trim());
+    const withoutUrl = toScan.filter(p => !p.url || !p.url.trim());
+    
+    if (withoutUrl.length > 0) {
+      notify(`${withoutUrl.length} provider(s) have no URL and cannot be scanned`, 'error');
+    }
+    
+    if (withUrl.length === 0) return;
+    
     setScanning(true); setScanProgress(0);
-    setScanStatus(`Scanning ${ids.length} provider(s)...`);
+    setScanStatus(`Scanning ${withUrl.length} provider(s)...`);
     
     try {
       const supabase = getSupabase();
-      for (let i = 0; i < ids.length; i++) {
-        const p = providers.find(x => x.id === ids[i]);
-        if (p) {
-          setScanProgress(Math.round(((i + 1) / ids.length) * 100));
-          if (!p.url) {
-            notify(`${p.name} has no URL - cannot scan`, 'error');
-            continue;
-          }
-          const newScore = Math.floor(Math.random() * 30) + 70;
-          await supabase.from('registry').update({ 
-            scan_count: (p.scan_count || 0) + 1, 
-            risk_score: newScore, 
-            updated_at: new Date().toISOString() 
-          }).eq('id', ids[i]);
-        }
+      for (let i = 0; i < withUrl.length; i++) {
+        const p = withUrl[i];
+        setScanProgress(Math.round(((i + 1) / withUrl.length) * 100));
+        setScanStatus(`Scanning ${p.name}...`);
+        
+        const scanData = await runComplianceScan(p.url!);
+        
+        await supabase.from('scan_results').insert({
+          registry_id: p.id, npi: p.npi, url: p.url, scan_type: 'manual',
+          risk_score: scanData.risk_score, risk_level: scanData.risk_level,
+          sb1188_findings: scanData.sb1188_findings, hb149_findings: scanData.hb149_findings,
+          technical_fixes: scanData.technical_fixes
+        });
+        
+        await supabase.from('registry').update({ 
+          risk_score: scanData.risk_score, scan_count: (p.scan_count || 0) + 1,
+          widget_status: scanData.risk_score >= 70 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
+          updated_at: new Date().toISOString() 
+        }).eq('id', p.id);
+        
+        await new Promise(r => setTimeout(r, 300));
       }
       await loadData(); notify('Scan complete!');
     } catch (e: any) { notify(e.message || 'Scan failed', 'error'); }
     finally { setScanning(false); setScanProgress(0); setScanStatus(''); }
   };
 
-  // CSV EXPORT
+  // CSV EXPORT - All providers
   const handleExport = () => {
     const csv = [
-      'NPI,Name,City,Email,Phone,URL,Score,Widget Status,Subscription',
+      'NPI,Name,Provider Type,City,Email,Phone,URL,Risk Score,Widget Status,Subscription',
       ...providers.map(r => 
-        `${r.npi},"${r.name}",${r.city||''},${r.email||''},${r.phone||''},${r.url||''},${r.risk_score||0},${r.widget_status||''},${r.subscription_status||''}`
+        `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city||''},${r.email||''},${r.phone||''},${r.url||''},${r.risk_score||0},${r.widget_status||''},${r.subscription_status||''}`
       )
     ].join('\n');
     const a = document.createElement('a'); 
@@ -314,21 +431,21 @@ export default function AdminDashboard() {
     notify('Exported to CSV');
   };
 
-  // Export providers without URLs
+  // Export providers without URLs (Type 2)
   const handleExportMissingUrls = () => {
     const missing = providers.filter(p => !p.url || p.url.trim() === '');
     const csv = [
-      'NPI,Name,City,Email,Phone,URL (FILL THIS)',
-      ...missing.map(r => `${r.npi},"${r.name}",${r.city||''},${r.email||''},${r.phone||''},`)
+      'NPI,Name,Provider Type,City,Email,Phone,URL (ADD THIS)',
+      ...missing.map(r => `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city||''},${r.email||''},${r.phone||''},`)
     ].join('\n');
     const a = document.createElement('a'); 
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `providers-missing-urls-${new Date().toISOString().split('T')[0]}.csv`; 
+    a.download = `providers-needing-urls-${new Date().toISOString().split('T')[0]}.csv`; 
     a.click(); 
     notify(`Exported ${missing.length} providers needing URLs`);
   };
 
-  // CSV IMPORT - Parse and preview
+  // CSV IMPORT
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -344,9 +461,9 @@ export default function AdminDashboard() {
         const row: any = {};
         headers.forEach((h, i) => {
           let val = values[i]?.replace(/^"|"$/g, '').trim() || '';
-          // Map common header names
           if (h.includes('npi')) row.npi = val;
           else if (h.includes('name') || h.includes('practice')) row.name = val;
+          else if (h.includes('type')) row.provider_type = parseInt(val) || 2;
           else if (h.includes('city')) row.city = val;
           else if (h.includes('email')) row.email = val;
           else if (h.includes('phone')) row.phone = val;
@@ -354,82 +471,56 @@ export default function AdminDashboard() {
           else if (h.includes('zip')) row.zip = val;
         });
         return row;
-      }).filter(r => r.npi && r.name); // Require at least NPI and name
+      }).filter(r => r.npi && r.name);
       
       setImportData(data);
-      setImportPreview(true);
       setShowImportModal(true);
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    e.target.value = '';
   };
 
-  // Execute import
   const executeImport = async () => {
     if (importData.length === 0) return;
-    
-    setScanning(true);
-    setScanStatus('Importing providers...');
-    setScanProgress(0);
+    setScanning(true); setScanStatus('Importing providers...'); setScanProgress(0);
     
     try {
       const supabase = getSupabase();
-      let imported = 0;
-      let updated = 0;
+      let imported = 0, updated = 0;
       
       for (let i = 0; i < importData.length; i++) {
         const row = importData[i];
         setScanProgress(Math.round(((i + 1) / importData.length) * 100));
         setScanStatus(`Importing ${row.name}...`);
         
-        // Check if provider exists by NPI
         const existing = providers.find(p => p.npi === row.npi);
         
         if (existing) {
-          // Update existing - especially URL if provided
           const updateData: any = { updated_at: new Date().toISOString() };
           if (row.url && row.url.trim()) updateData.url = row.url;
           if (row.email) updateData.email = row.email;
           if (row.phone) updateData.phone = row.phone;
           if (row.city) updateData.city = row.city;
           if (row.zip) updateData.zip = row.zip;
-          
+          if (row.provider_type) updateData.provider_type = row.provider_type;
           await supabase.from('registry').update(updateData).eq('id', existing.id);
           updated++;
         } else {
-          // Insert new
           await supabase.from('registry').insert({
-            id: `REG-${Date.now()}-${i}`,
-            npi: row.npi,
-            name: row.name,
-            email: row.email || null,
-            phone: row.phone || null,
-            city: row.city || null,
-            zip: row.zip || null,
-            url: row.url || null,
-            widget_status: 'hidden',
-            subscription_status: 'trial',
-            is_visible: false,
-            risk_score: 0,
-            scan_count: 0
+            id: `REG-${Date.now()}-${i}`, npi: row.npi, name: row.name,
+            email: row.email || null, phone: row.phone || null, city: row.city || null,
+            zip: row.zip || null, url: row.url || null, provider_type: row.provider_type || 2,
+            widget_status: 'hidden', subscription_status: 'trial', is_visible: false, risk_score: 0, scan_count: 0
           });
           imported++;
         }
       }
       
       await loadData();
-      setShowImportModal(false);
-      setImportData([]);
-      setImportPreview(false);
+      setShowImportModal(false); setImportData([]);
       notify(`Import complete! ${imported} new, ${updated} updated.`);
-      
-    } catch (e: any) {
-      notify('Import failed: ' + e.message, 'error');
-    } finally {
-      setScanning(false);
-      setScanProgress(0);
-      setScanStatus('');
-    }
+    } catch (e: any) { notify('Import failed: ' + e.message, 'error'); }
+    finally { setScanning(false); setScanProgress(0); setScanStatus(''); }
   };
 
   const handleWidgetStatusChange = async (p: Registry, status: string) => {
@@ -451,7 +542,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* Hidden file input for CSV import */}
       <input type="file" ref={fileInputRef} accept=".csv" onChange={handleImportFile} className="hidden" />
 
       {notification && (
@@ -489,9 +579,9 @@ export default function AdminDashboard() {
       <div className="bg-white border-b py-2 px-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center gap-4 overflow-x-auto">
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg"><Users size={14} /><div><div className="text-sm font-bold">{stats.total}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Total</div></div></div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg"><Shield size={14} className="text-emerald-600" /><div><div className="text-sm font-bold text-emerald-700">{stats.active}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">Active</div></div></div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg"><AlertTriangle size={14} className="text-amber-600" /><div><div className="text-sm font-bold text-amber-700">{stats.warning}</div><div className="text-[8px] font-bold text-amber-600 uppercase">Warning</div></div></div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg"><Globe size={14} className="text-blue-600" /><div><div className="text-sm font-bold text-blue-700">{stats.withUrl}</div><div className="text-[8px] font-bold text-blue-600 uppercase">With URL</div></div></div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg"><FileWarning size={14} className="text-red-600" /><div><div className="text-sm font-bold text-red-700">{stats.withoutUrl}</div><div className="text-[8px] font-bold text-red-600 uppercase">No URL</div></div></div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg"><Shield size={14} className="text-emerald-600" /><div><div className="text-sm font-bold text-emerald-700">{stats.active}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">Active</div></div></div>
         </div>
       </div>
 
@@ -505,16 +595,16 @@ export default function AdminDashboard() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-[#C5A059]" size={28} /><span className="ml-2 text-sm text-slate-400">Loading...</span></div>
+          <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-[#C5A059]" size={28} /></div>
         ) : (
           <>
             {activeTab === 'overview' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Database size={18} className="text-slate-700 mb-2" /><div className="text-2xl font-bold">{stats.total}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Providers</div></div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Shield size={18} className="text-emerald-600 mb-2" /><div className="text-2xl font-bold text-emerald-600">{stats.active}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Active Widgets</div></div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm border"><AlertTriangle size={18} className="text-amber-600 mb-2" /><div className="text-2xl font-bold text-amber-600">{stats.warning}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Warnings</div></div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm border"><FileWarning size={18} className="text-red-600 mb-2" /><div className="text-2xl font-bold text-red-600">{stats.withoutUrl}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Missing URLs</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Database size={18} className="text-slate-700 mb-2" /><div className="text-2xl font-bold">{stats.total}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Total Providers</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Globe size={18} className="text-blue-600 mb-2" /><div className="text-2xl font-bold text-blue-600">{stats.withUrl}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Ready to Scan</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><FileWarning size={18} className="text-red-600 mb-2" /><div className="text-2xl font-bold text-red-600">{stats.withoutUrl}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Need URLs</div></div>
+                  <div className="bg-white rounded-xl p-4 shadow-sm border"><Shield size={18} className="text-emerald-600 mb-2" /><div className="text-2xl font-bold text-emerald-600">{stats.active}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Compliant</div></div>
                 </div>
                 
                 {stats.withoutUrl > 0 && (
@@ -523,23 +613,23 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="text-red-600" size={20} />
                         <div>
-                          <h4 className="font-bold text-red-800">{stats.withoutUrl} providers need URLs</h4>
-                          <p className="text-xs text-red-600">Export the list, add URLs, and re-import to scan them</p>
+                          <h4 className="font-bold text-red-800">{stats.withoutUrl} providers need URLs before scanning</h4>
+                          <p className="text-xs text-red-600">Export → Add URLs → Re-import → Run Global Scan</p>
                         </div>
                       </div>
                       <button onClick={handleExportMissingUrls} className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 hover:bg-red-700">
-                        <Download size={12} /> Export Missing URLs
+                        <Download size={12} /> Export List
                       </button>
                     </div>
                   </div>
                 )}
 
                 <div className="bg-[#00234E] rounded-xl p-4">
-                  <h3 className="text-[10px] font-bold text-[#C5A059] uppercase mb-3">Quick Actions</h3>
+                  <h3 className="text-[10px] font-bold text-[#C5A059] uppercase mb-3">Scan & Import Actions</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <button onClick={handleGlobalScan} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
+                    <button onClick={handleGlobalScan} disabled={stats.withUrl === 0} className={`${stats.withUrl === 0 ? 'opacity-50 cursor-not-allowed' : ''} bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center`}>
                       <Play size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Global Scan</div>
-                      <div className="text-[7px] text-slate-400">Scan all & find missing URLs</div>
+                      <div className="text-[7px] text-slate-400">Scan {stats.withUrl} providers</div>
                     </button>
                     <button onClick={() => fileInputRef.current?.click()} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
                       <Upload size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Import CSV</div>
@@ -547,7 +637,7 @@ export default function AdminDashboard() {
                     </button>
                     <button onClick={handleExport} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
                       <Download size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Export All</div>
-                      <div className="text-[7px] text-slate-400">Download registry CSV</div>
+                      <div className="text-[7px] text-slate-400">Download registry</div>
                     </button>
                     <button onClick={handleExportMissingUrls} className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg text-center">
                       <FileWarning size={18} className="mx-auto mb-1" /><div className="text-[8px] font-bold uppercase">Missing URLs</div>
@@ -576,22 +666,22 @@ export default function AdminDashboard() {
                   <table className="w-full text-left text-sm">
                     <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase">
                       <th className="px-3 py-2 w-8"><input type="checkbox" onChange={e => setSelectedProviders(e.target.checked ? filteredProviders.map(p => p.id) : [])} checked={selectedProviders.length === filteredProviders.length && filteredProviders.length > 0} /></th>
-                      <th className="px-3 py-2">Name</th><th className="px-3 py-2">City</th><th className="px-3 py-2">NPI</th><th className="px-3 py-2">URL</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Widget</th><th className="px-3 py-2 text-right">Actions</th>
+                      <th className="px-3 py-2">Name</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">NPI</th><th className="px-3 py-2">URL</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Actions</th>
                     </tr></thead>
                     <tbody className="divide-y">
                       {filteredProviders.map(r => (
                         <tr key={r.id} className={`hover:bg-slate-50 group ${!r.url ? 'bg-red-50/50' : ''}`}>
                           <td className="px-3 py-2"><input type="checkbox" checked={selectedProviders.includes(r.id)} onChange={() => setSelectedProviders(p => p.includes(r.id) ? p.filter(i => i !== r.id) : [...p, r.id])} /></td>
-                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div></td>
-                          <td className="px-3 py-2">{r.city || '-'}</td>
+                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-slate-400">{r.city || ''}</div></td>
+                          <td className="px-3 py-2"><span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">Type {(r as any).provider_type || 2}</span></td>
                           <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.npi}</code></td>
-                          <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} /> {r.url.replace(/^https?:\/\//, '').substring(0,20)}...</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
-                          <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) > 66 ? 'bg-emerald-500' : (r.risk_score||0) > 33 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
+                          <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} />{r.url.replace(/^https?:\/\//, '').substring(0,25)}...</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
+                          <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) > 70 ? 'bg-emerald-500' : (r.risk_score||0) > 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
                           <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
                           <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100">
                             <button onClick={() => setViewingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
                             <button onClick={() => setEditingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
-                            <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} className="p-1 hover:bg-amber-100 rounded"><Play size={13} className={r.url ? 'text-[#C5A059]' : 'text-slate-300'} /></button>
+                            <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} className={`p-1 hover:bg-amber-100 rounded ${!r.url ? 'opacity-30' : ''}`}><Play size={13} className="text-[#C5A059]" /></button>
                             <button onClick={() => handleDeleteProvider(r.id)} className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
                           </div></td>
                         </tr>
@@ -634,7 +724,7 @@ export default function AdminDashboard() {
 
             {activeTab === 'templates' && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between"><div><h3 className="text-sm font-bold">Email Templates</h3></div>
+                <div className="flex items-center justify-between"><h3 className="text-sm font-bold">Email Templates</h3>
                   <button onClick={() => setEditingTemplate({ id: `ET-${Date.now()}`, name: '', category: 'marketing', subject: '', body: '', event_trigger: '', is_active: true })} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> New</button></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {templates.map(t => (
@@ -644,7 +734,6 @@ export default function AdminDashboard() {
                         <button onClick={() => setEditingTemplate(t)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
                       </div>
                       <div className="text-xs text-slate-500"><strong>Subject:</strong> {t.subject}</div>
-                      {t.event_trigger && <div className="text-[8px] text-[#C5A059] font-bold mt-1"><Zap size={9} className="inline" /> {t.event_trigger}</div>}
                     </div>
                   ))}
                 </div>
@@ -669,12 +758,10 @@ export default function AdminDashboard() {
                 </div>
                 {selectedDate && (
                   <div className="bg-white rounded-lg p-3 shadow-sm border">
-                    <h4 className="text-[9px] font-bold text-slate-500 uppercase mb-2">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h4>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
                       {dateSlots.map(s => (
                         <div key={s.id} className={`p-1.5 rounded-lg border text-center text-[10px] ${s.is_booked ? 'bg-slate-100' : 'bg-emerald-50 border-emerald-200'}`}>
                           <div className={`font-bold ${s.is_booked ? 'text-slate-700' : 'text-emerald-700'}`}>{s.time}</div>
-                          <div className={`text-[7px] ${s.is_booked ? 'text-slate-500' : 'text-emerald-600'}`}>{s.is_booked ? 'Booked' : 'Open'}</div>
                         </div>
                       ))}
                     </div>
@@ -703,12 +790,9 @@ export default function AdminDashboard() {
       <Modal isOpen={!!editingTemplate} onClose={() => setEditingTemplate(null)} title={editingTemplate?.name ? 'Edit Template' : 'New Template'}>
         {editingTemplate && (
           <form onSubmit={e => { e.preventDefault(); setTemplates(p => { const ex = p.find(x => x.id === editingTemplate.id); return ex ? p.map(x => x.id === editingTemplate.id ? editingTemplate : x) : [...p, editingTemplate]; }); setEditingTemplate(null); notify('Saved'); }} className="space-y-3">
-            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Name</label>
-              <input type="text" value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border rounded-lg" /></div>
-            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subject</label>
-              <input type="text" value={editingTemplate.subject} onChange={e => setEditingTemplate({ ...editingTemplate, subject: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border rounded-lg" /></div>
-            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Body</label>
-              <textarea value={editingTemplate.body} onChange={e => setEditingTemplate({ ...editingTemplate, body: e.target.value })} rows={4} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border rounded-lg" /></div>
+            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Name</label><input type="text" value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border rounded-lg" /></div>
+            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subject</label><input type="text" value={editingTemplate.subject} onChange={e => setEditingTemplate({ ...editingTemplate, subject: e.target.value })} required className="w-full px-3 py-2 text-sm bg-slate-50 border rounded-lg" /></div>
+            <div><label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Body</label><textarea value={editingTemplate.body} onChange={e => setEditingTemplate({ ...editingTemplate, body: e.target.value })} rows={4} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border rounded-lg" /></div>
             <div className="flex justify-end gap-2 pt-3 border-t"><button type="button" onClick={() => setEditingTemplate(null)} className="px-4 py-2 text-sm text-slate-500">Cancel</button>
               <button type="submit" className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059]">Save</button></div>
           </form>
@@ -723,54 +807,37 @@ export default function AdminDashboard() {
                 <span className="text-[9px] font-bold text-slate-500 uppercase">Embed Code</span>
                 <button onClick={() => { navigator.clipboard.writeText(`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`); notify('Copied!'); }} className="text-[9px] font-bold text-[#C5A059] flex items-center gap-0.5"><Copy size={10} /> Copy</button>
               </div>
-              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<!-- KairoLogic Sentry Widget -->\n<script\n  src="https://widget.kairologic.com/sentry.js"\n  data-widget-id="${widgetModal.widget_id || 'WGT-' + widgetModal.npi}"\n  data-npi="${widgetModal.npi}">\n</script>`}</pre>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-              <h4 className="text-xs font-bold text-amber-800 mb-1 flex items-center gap-1"><AlertTriangle size={12} /> Instructions</h4>
-              <ol className="text-[10px] text-amber-700 list-decimal list-inside space-y-0.5">
-                <li>Copy the code above</li>
-                <li>Paste before closing &lt;/body&gt; tag</li>
-                <li>Widget appears bottom-right</li>
-              </ol>
+              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`}</pre>
             </div>
           </div>
         )}
       </Modal>
 
       {/* Scan Report Modal */}
-      <Modal isOpen={showScanReport && !!scanResult} onClose={() => setShowScanReport(false)} title="Global Scan Report" size="lg">
+      <Modal isOpen={showScanReport && !!scanResult} onClose={() => setShowScanReport(false)} title="Global Scan Report" size="xl">
         {scanResult && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-slate-700">{scanResult.total}</div>
-                <div className="text-[8px] font-bold text-slate-400 uppercase">Total Scanned</div>
-              </div>
-              <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-emerald-700">{scanResult.withUrl}</div>
-                <div className="text-[8px] font-bold text-emerald-600 uppercase">With URLs</div>
-              </div>
-              <div className="bg-red-50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-red-700">{scanResult.withoutUrl.length}</div>
-                <div className="text-[8px] font-bold text-red-600 uppercase">Missing URLs</div>
-              </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="bg-slate-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-slate-700">{scanResult.total}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Total Providers</div></div>
+              <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-700">{scanResult.scanned}</div><div className="text-[8px] font-bold text-blue-600 uppercase">Scanned</div></div>
+              <div className="bg-emerald-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-emerald-700">{scanResult.withUrl}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">With URLs</div></div>
+              <div className="bg-red-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-red-700">{scanResult.withoutUrl.length}</div><div className="text-[8px] font-bold text-red-600 uppercase">Missing URLs</div></div>
             </div>
             
-            {scanResult.withoutUrl.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-bold text-red-800">Providers Needing URLs</h4>
-                  <button onClick={handleExportMissingUrls} className="text-[9px] font-bold text-red-600 flex items-center gap-1"><Download size={10} /> Export List</button>
-                </div>
+            {scanResult.scanResults.length > 0 && (
+              <div className="bg-white border rounded-lg p-3">
+                <h4 className="text-sm font-bold mb-2">Scan Results Summary</h4>
                 <div className="max-h-48 overflow-y-auto">
                   <table className="w-full text-xs">
-                    <thead><tr className="text-left text-red-700"><th className="py-1">NPI</th><th className="py-1">Name</th><th className="py-1">City</th></tr></thead>
+                    <thead><tr className="text-left text-slate-500 border-b"><th className="py-1">Provider</th><th className="py-1">Score</th><th className="py-1">SB1188</th><th className="py-1">HB149</th><th className="py-1">Status</th></tr></thead>
                     <tbody>
-                      {scanResult.withoutUrl.map(p => (
-                        <tr key={p.id} className="border-t border-red-200">
-                          <td className="py-1 font-mono">{p.npi}</td>
-                          <td className="py-1">{p.name}</td>
-                          <td className="py-1">{p.city || '-'}</td>
+                      {scanResult.scanResults.map((r, i) => (
+                        <tr key={i} className="border-b border-slate-100">
+                          <td className="py-1">{r.provider}</td>
+                          <td className="py-1 font-bold">{r.risk_score}%</td>
+                          <td className="py-1"><span className="text-emerald-600">{r.sb1188_pass_count}✓</span> <span className="text-red-600">{r.sb1188_fail_count}✗</span></td>
+                          <td className="py-1"><span className="text-emerald-600">{r.hb149_pass_count}✓</span> <span className="text-red-600">{r.hb149_fail_count}✗</span></td>
+                          <td className="py-1"><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${r.risk_level === 'low' ? 'bg-emerald-100 text-emerald-700' : r.risk_level === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{r.risk_level}</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -779,35 +846,55 @@ export default function AdminDashboard() {
               </div>
             )}
             
-            <p className="text-[10px] text-slate-500 text-center">Scan completed at {new Date(scanResult.timestamp).toLocaleString()}</p>
+            {scanResult.withoutUrl.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-bold text-red-800">Providers Needing URLs ({scanResult.withoutUrl.length})</h4>
+                  <button onClick={handleExportMissingUrls} className="text-[9px] font-bold text-red-600 flex items-center gap-1"><Download size={10} /> Export</button>
+                </div>
+                <div className="max-h-32 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-left text-red-700"><th className="py-1">NPI</th><th className="py-1">Name</th><th className="py-1">Type</th></tr></thead>
+                    <tbody>
+                      {scanResult.withoutUrl.slice(0, 10).map(p => (
+                        <tr key={p.id} className="border-t border-red-200">
+                          <td className="py-1 font-mono">{p.npi}</td>
+                          <td className="py-1">{p.name}</td>
+                          <td className="py-1">Type {(p as any).provider_type || 2}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {scanResult.withoutUrl.length > 10 && <p className="text-[10px] text-red-600 mt-1">...and {scanResult.withoutUrl.length - 10} more</p>}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>
 
-      {/* Import Preview Modal */}
+      {/* Import Modal */}
       <Modal isOpen={showImportModal} onClose={() => { setShowImportModal(false); setImportData([]); }} title="Import Providers" size="lg">
         <div className="space-y-4">
           {importData.length > 0 ? (
             <>
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                 <h4 className="text-sm font-bold text-emerald-800">Ready to import {importData.length} providers</h4>
-                <p className="text-[10px] text-emerald-600">Review the data below, then click Import to proceed.</p>
               </div>
               <div className="max-h-64 overflow-y-auto bg-slate-50 rounded-lg p-2">
                 <table className="w-full text-xs">
-                  <thead><tr className="text-left font-bold text-slate-600"><th className="py-1 px-2">NPI</th><th className="py-1 px-2">Name</th><th className="py-1 px-2">City</th><th className="py-1 px-2">URL</th></tr></thead>
+                  <thead><tr className="text-left font-bold text-slate-600"><th className="py-1 px-2">NPI</th><th className="py-1 px-2">Name</th><th className="py-1 px-2">Type</th><th className="py-1 px-2">URL</th></tr></thead>
                   <tbody>
-                    {importData.slice(0, 20).map((r, i) => (
+                    {importData.slice(0, 15).map((r, i) => (
                       <tr key={i} className="border-t border-slate-200">
                         <td className="py-1 px-2 font-mono">{r.npi}</td>
                         <td className="py-1 px-2">{r.name}</td>
-                        <td className="py-1 px-2">{r.city || '-'}</td>
-                        <td className="py-1 px-2 text-blue-600">{r.url ? '✓' : <span className="text-red-500">-</span>}</td>
+                        <td className="py-1 px-2">{r.provider_type || 2}</td>
+                        <td className="py-1 px-2">{r.url ? <span className="text-emerald-600">✓</span> : <span className="text-red-500">-</span>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {importData.length > 20 && <p className="text-[10px] text-slate-400 mt-2 text-center">...and {importData.length - 20} more</p>}
               </div>
               <div className="flex justify-end gap-2">
                 <button onClick={() => { setShowImportModal(false); setImportData([]); }} className="px-4 py-2 text-sm text-slate-500">Cancel</button>
