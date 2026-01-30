@@ -1,27 +1,13 @@
 /**
  * KairoLogic Page Content CMS Tab
  * Admin interface for editing website text without deployment
- * Version: 11.0.0
+ * Version: 12.0.0 - Fixed dropdown, added default pages
  */
 
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Save, 
-  X, 
-  Search,
-  Globe,
-  Home,
-  Briefcase,
-  Shield,
-  Mail,
-  Database,
-  AlertCircle,
-  CheckCircle,
-  RefreshCw
+  FileText, Plus, Edit2, Trash2, Save, X, Search, Globe, Home,
+  Briefcase, Shield, Mail, Database, AlertCircle, CheckCircle, RefreshCw, Image
 } from 'lucide-react';
 import {
   getAllPageContent,
@@ -33,12 +19,15 @@ import {
 } from '@/services/pageContentService';
 
 interface PageContentTabProps {
-  showNotification: (msg: string) => void;
+  showNotification: (msg: string, type?: string) => void;
 }
+
+// Default pages that should always be available
+const DEFAULT_PAGES = ['Homepage', 'Header', 'Footer', 'Services', 'Compliance', 'Contact', 'Registry'];
 
 export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification }) => {
   const [content, setContent] = useState<PageContent[]>([]);
-  const [pages, setPages] = useState<string[]>([]);
+  const [pages, setPages] = useState<string[]>(DEFAULT_PAGES);
   const [selectedPage, setSelectedPage] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +35,6 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
   const [editingItem, setEditingItem] = useState<PageContent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Form state for editing/creating
   const [formData, setFormData] = useState<{
     page: string;
     section: string;
@@ -54,7 +42,7 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
     content_type: 'text' | 'html' | 'json' | 'markdown' | 'image_url';
     description: string;
   }>({
-    page: '',
+    page: 'Homepage',
     section: '',
     content: '',
     content_type: 'text',
@@ -72,15 +60,22 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
       const data = await getAllPageContent();
       setContent(data);
     } catch (e) {
-      showNotification('Failed to load page content');
+      console.error('Failed to load content:', e);
     } finally {
       setIsLoading(false);
     }
   };
 
   const loadPages = async () => {
-    const pagesList = await getPagesList();
-    setPages(pagesList);
+    try {
+      const pagesList = await getPagesList();
+      // Merge default pages with pages from DB
+      const allPages = [...new Set([...DEFAULT_PAGES, ...pagesList])];
+      setPages(allPages.sort());
+    } catch (e) {
+      // Use default pages if fetch fails
+      setPages(DEFAULT_PAGES);
+    }
   };
 
   const handleEdit = (item: PageContent) => {
@@ -97,7 +92,7 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
 
   const handleSave = async () => {
     if (!formData.page || !formData.section || !formData.content) {
-      showNotification('Page, section, and content are required');
+      showNotification('Page, section, and content are required', 'error');
       return;
     }
 
@@ -113,31 +108,35 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
       setIsEditing(false);
       setEditingItem(null);
       loadContent();
+      loadPages();
       resetForm();
     } else {
-      showNotification(`Update failed: ${result.error}`);
+      showNotification(`Update failed: ${result.error}`, 'error');
     }
   };
 
   const handleCreate = async () => {
     if (!formData.page || !formData.section || !formData.content) {
-      showNotification('Page, section, and content are required');
+      showNotification('Page, section, and content are required', 'error');
       return;
     }
 
     const result = await createContentSection({
-      ...formData,
-      updated_by: 'admin'
+      page: formData.page,
+      section: formData.section,
+      content: formData.content,
+      content_type: formData.content_type,
+      description: formData.description
     });
 
     if (result.success) {
-      showNotification('Content section created successfully');
+      showNotification('Content section created');
       setIsCreating(false);
       loadContent();
       loadPages();
       resetForm();
     } else {
-      showNotification(`Creation failed: ${result.error}`);
+      showNotification(`Creation failed: ${result.error}`, 'error');
     }
   };
 
@@ -150,13 +149,13 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
       showNotification('Content section deleted');
       loadContent();
     } else {
-      showNotification(`Delete failed: ${result.error}`);
+      showNotification(`Delete failed: ${result.error}`, 'error');
     }
   };
 
   const resetForm = () => {
     setFormData({
-      page: '',
+      page: 'Homepage',
       section: '',
       content: '',
       content_type: 'text',
@@ -192,308 +191,158 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
 
   const getPageIcon = (page: string) => {
     switch (page) {
-      case 'Homepage': return <Home size={20} />;
-      case 'Services': return <Briefcase size={20} />;
-      case 'Compliance': return <Shield size={20} />;
-      case 'Contact': return <Mail size={20} />;
-      case 'Registry': return <Database size={20} />;
-      default: return <Globe size={20} />;
+      case 'Homepage': return <Home size={16} />;
+      case 'Services': return <Briefcase size={16} />;
+      case 'Compliance': return <Shield size={16} />;
+      case 'Contact': return <Mail size={16} />;
+      case 'Registry': return <Database size={16} />;
+      case 'Header': return <FileText size={16} />;
+      case 'Footer': return <FileText size={16} />;
+      default: return <Globe size={16} />;
     }
   };
 
-  // Edit/Create Modal
-  const renderModal = () => {
-    if (!isEditing && !isCreating) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[3rem] shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="bg-navy p-8 text-white flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gold/20 rounded-2xl flex items-center justify-center">
-                {isEditing ? <Edit2 size={24} className="text-gold" /> : <Plus size={24} className="text-gold" />}
-              </div>
-              <div>
-                <h3 className="text-xl font-black uppercase tracking-tight">
-                  {isEditing ? 'Edit Content Section' : 'Create Content Section'}
-                </h3>
-                <p className="text-xs text-gold font-bold uppercase tracking-widest mt-1">
-                  {isEditing ? editingItem?.page : 'New Section'}
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={handleCancel}
-              className="p-3 hover:bg-white/10 rounded-xl transition-colors"
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* Form */}
-          <div className="p-8 space-y-6 overflow-y-auto flex-grow">
-            {/* Page Selection */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Page *
-              </label>
-              <select
-                value={formData.page}
-                onChange={(e) => setFormData({ ...formData, page: e.target.value })}
-                disabled={isEditing}
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold disabled:opacity-50"
-              >
-                <option value="">Select a page...</option>
-                <option value="Homepage">Homepage</option>
-                <option value="Services">Services</option>
-                <option value="Compliance">Compliance</option>
-                <option value="Contact">Contact</option>
-                <option value="Registry">Registry</option>
-                <option value="About">About</option>
-              </select>
-            </div>
-
-            {/* Section Identifier */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Section Identifier * <span className="text-gray-400 normal-case">(e.g., hero_title, tier1_price)</span>
-              </label>
-              <input
-                type="text"
-                value={formData.section}
-                onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-                disabled={isEditing}
-                placeholder="hero_title"
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-gold disabled:opacity-50"
-              />
-            </div>
-
-            {/* Content Type */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Content Type
-              </label>
-              <select
-                value={formData.content_type}
-                onChange={(e) => setFormData({ ...formData, content_type: e.target.value as 'text' | 'html' | 'json' | 'markdown' | 'image_url' })}
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-              >
-                <option value="text">Plain Text</option>
-                <option value="html">HTML</option>
-                <option value="markdown">Markdown</option>
-                <option value="json">JSON</option>
-                <option value="image_url">Image URL</option>
-              </select>
-            </div>
-
-            {/* Content */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Content *
-              </label>
-              <textarea
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                rows={8}
-                placeholder="Enter your content here..."
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm text-navy focus:outline-none focus:ring-2 focus:ring-gold font-mono resize-none"
-              />
-              <div className="mt-2 text-xs text-gray-400 font-mono">
-                {formData.content.length} characters
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Admin Note
-              </label>
-              <input
-                type="text"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="What is this content for?"
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-              />
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="p-8 border-t border-gray-100 flex justify-between items-center shrink-0">
-            <button
-              onClick={handleCancel}
-              className="px-8 py-4 text-navy font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 rounded-xl transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={isEditing ? handleSave : handleCreate}
-              className="bg-navy text-gold px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-gold hover:text-navy transition-all flex items-center gap-2"
-            >
-              <Save size={16} />
-              {isEditing ? 'Save Changes' : 'Create Section'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Stats
+  const totalSections = content.length;
+  const activePages = [...new Set(content.map(c => c.page))].length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-black uppercase tracking-tight text-navy mb-2">
-            Page Content CMS
-          </h2>
-          <p className="text-sm text-gray-500 font-medium italic">
-            Edit website text without code deployment. Changes sync instantly to production.
-          </p>
+          <h2 className="text-lg font-bold text-slate-800">Page Content CMS</h2>
+          <p className="text-xs text-slate-500">Edit website text without code deployment</p>
         </div>
         <button
-          onClick={() => setIsCreating(true)}
-          className="bg-navy text-gold px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-gold hover:text-navy transition-all flex items-center gap-2 justify-center shrink-0"
+          onClick={() => { resetForm(); setIsCreating(true); }}
+          className="bg-[#00234E] text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-[#C5A059]"
         >
-          <Plus size={16} />
-          New Section
+          <Plus size={16} /> New Section
         </button>
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Page Filter */}
-        <div className="relative">
-          <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-navy/40" size={20} />
-          <select
-            value={selectedPage}
-            onChange={(e) => setSelectedPage(e.target.value)}
-            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-          >
-            <option value="all">All Pages</option>
-            {pages.map(page => (
-              <option key={page} value={page}>{page}</option>
-            ))}
-          </select>
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <select
+              value={selectedPage}
+              onChange={(e) => setSelectedPage(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm appearance-none cursor-pointer"
+            >
+              <option value="all">All Pages</option>
+              {pages.map(page => (
+                <option key={page} value={page}>{page}</option>
+              ))}
+            </select>
+          </div>
         </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-navy/40" size={20} />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search sections or content..."
-            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-          />
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search sections or content..."
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+            />
+          </div>
         </div>
+        <button onClick={loadContent} className="p-2 bg-white border rounded-lg hover:bg-slate-50">
+          <RefreshCw size={16} className={`text-slate-500 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="text-2xl font-black text-navy mb-1">{content.length}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Sections</div>
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg p-3 border">
+          <div className="text-xl font-bold text-slate-700">{totalSections}</div>
+          <div className="text-[9px] font-bold text-slate-400 uppercase">Total Sections</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="text-2xl font-black text-navy mb-1">{pages.length}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Active Pages</div>
+        <div className="bg-white rounded-lg p-3 border">
+          <div className="text-xl font-bold text-blue-600">{activePages}</div>
+          <div className="text-[9px] font-bold text-slate-400 uppercase">Active Pages</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="text-2xl font-black text-navy mb-1">{filteredContent.length}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filtered Results</div>
+        <div className="bg-white rounded-lg p-3 border">
+          <div className="text-xl font-bold text-slate-500">{filteredContent.length}</div>
+          <div className="text-[9px] font-bold text-slate-400 uppercase">Filtered Results</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Last Sync</div>
-            <div className="text-sm font-bold text-navy">Live</div>
-          </div>
-          <CheckCircle className="text-green-500" size={24} />
+        <div className="bg-white rounded-lg p-3 border">
+          <div className="text-sm font-bold text-emerald-600 flex items-center gap-1"><CheckCircle size={14} /> Live</div>
+          <div className="text-[9px] font-bold text-slate-400 uppercase">Last Sync</div>
         </div>
       </div>
 
-      {/* Content Groups */}
+      {/* Content List */}
       {isLoading ? (
-        <div className="bg-white p-20 rounded-[3rem] border border-gray-100 text-center">
-          <RefreshCw className="animate-spin text-navy/20 mx-auto mb-4" size={48} />
-          <p className="text-sm font-bold text-navy/60 uppercase tracking-widest">Loading content...</p>
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="animate-spin text-[#C5A059]" size={24} />
+          <span className="ml-2 text-sm text-slate-500">Loading content...</span>
         </div>
-      ) : Object.keys(groupedContent).length === 0 ? (
-        <div className="bg-slate-50 border-2 border-dashed border-gray-200 rounded-[3rem] p-20 text-center">
-          <FileText className="text-gray-300 mx-auto mb-4" size={48} />
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-            {searchTerm || selectedPage !== 'all' ? 'No matching content found' : 'No content sections yet'}
+      ) : content.length === 0 ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
+          <AlertCircle className="mx-auto text-amber-500 mb-2" size={32} />
+          <h3 className="font-bold text-amber-800 mb-1">No Content Found</h3>
+          <p className="text-sm text-amber-600 mb-3">
+            The page_content table is empty. Create your first content section or run the database migration.
           </p>
+          <button
+            onClick={() => { resetForm(); setIsCreating(true); }}
+            className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-bold"
+          >
+            Create First Section
+          </button>
+        </div>
+      ) : filteredContent.length === 0 ? (
+        <div className="bg-slate-50 border rounded-lg p-8 text-center">
+          <Search className="mx-auto text-slate-300 mb-2" size={32} />
+          <p className="text-sm text-slate-500">No content matches your filters</p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {Object.entries(groupedContent).map(([page, items]) => (
-            <div key={page} className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
-              {/* Page Header */}
-              <div className="bg-navy p-6 flex items-center gap-4">
-                <div className="w-10 h-10 bg-gold/20 rounded-xl flex items-center justify-center text-gold">
-                  {getPageIcon(page)}
-                </div>
-                <div>
-                  <h3 className="text-lg font-black uppercase tracking-tight text-white">{page}</h3>
-                  <p className="text-xs text-gold font-bold uppercase tracking-widest">{items.length} sections</p>
-                </div>
+            <div key={page} className="bg-white rounded-lg border overflow-hidden">
+              <div className="bg-slate-50 px-4 py-2 border-b flex items-center gap-2">
+                {getPageIcon(page)}
+                <span className="font-bold text-sm text-slate-700">{page}</span>
+                <span className="text-xs text-slate-400">({items.length} sections)</span>
               </div>
-
-              {/* Sections */}
-              <div className="divide-y divide-gray-100">
-                {items.map((item) => (
-                  <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors group">
-                    <div className="flex items-start justify-between gap-6">
-                      <div className="flex-grow min-w-0">
-                        {/* Section Header */}
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="font-mono text-sm font-bold text-navy">
-                            {item.section}
-                          </div>
-                          <div className="px-2 py-1 bg-slate-100 text-navy rounded text-[8px] font-black uppercase tracking-widest">
+              <div className="divide-y">
+                {items.map(item => (
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-50 group">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{item.section}</code>
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase font-bold ${
+                            item.content_type === 'html' ? 'bg-purple-100 text-purple-700' :
+                            item.content_type === 'image_url' ? 'bg-green-100 text-green-700' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {item.content_type === 'image_url' && <Image size={8} className="inline mr-0.5" />}
                             {item.content_type}
-                          </div>
+                          </span>
                         </div>
-
-                        {/* Content Preview */}
-                        <div className="bg-slate-50 p-4 rounded-xl border border-gray-100 mb-3">
-                          <p className="text-sm text-navy font-medium line-clamp-3">
-                            {item.content}
-                          </p>
-                        </div>
-
-                        {/* Metadata */}
-                        <div className="flex items-center gap-4 text-xs text-gray-400">
-                          {item.description && (
-                            <div className="flex items-center gap-2">
-                              <AlertCircle size={12} />
-                              <span className="italic">{item.description}</span>
-                            </div>
-                          )}
-                          <div className="text-[9px] font-mono">
-                            Updated: {new Date(item.last_updated).toLocaleDateString()}
-                          </div>
-                        </div>
+                        <p className="text-sm text-slate-600 truncate">{item.content}</p>
+                        {item.description && (
+                          <p className="text-[10px] text-slate-400 mt-0.5">{item.description}</p>
+                        )}
                       </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEdit(item)}
-                          className="p-3 bg-slate-100 text-navy rounded-xl hover:bg-gold hover:text-navy transition-all"
-                          title="Edit"
+                          className="p-1.5 hover:bg-blue-100 rounded"
                         >
-                          <Edit2 size={16} />
+                          <Edit2 size={14} className="text-blue-500" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id, item.section)}
-                          className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                          title="Delete"
+                          className="p-1.5 hover:bg-red-100 rounded"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} className="text-red-500" />
                         </button>
                       </div>
                     </div>
@@ -505,10 +354,119 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
         </div>
       )}
 
-      {/* Modals */}
-      {renderModal()}
+      {/* Edit/Create Modal */}
+      {(isEditing || isCreating) && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="bg-[#00234E] px-6 py-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#C5A059]/20 rounded-lg flex items-center justify-center">
+                  {isEditing ? <Edit2 size={20} className="text-[#C5A059]" /> : <Plus size={20} className="text-[#C5A059]" />}
+                </div>
+                <div>
+                  <h3 className="font-bold">{isEditing ? 'Edit Content Section' : 'Create Content Section'}</h3>
+                  <p className="text-xs text-slate-300">{isEditing ? 'Update existing content' : 'Add new content section'}</p>
+                </div>
+              </div>
+              <button onClick={handleCancel} className="p-2 hover:bg-white/10 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-180px)]">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Page *</label>
+                  <select
+                    value={formData.page}
+                    onChange={(e) => setFormData({ ...formData, page: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm"
+                    disabled={isEditing}
+                  >
+                    {pages.map(page => (
+                      <option key={page} value={page}>{page}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Section Identifier * <span className="text-slate-400 normal-case">(e.g., hero_title)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.section}
+                    onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                    placeholder="hero_title"
+                    className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm font-mono"
+                    disabled={isEditing}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Content Type</label>
+                <select
+                  value={formData.content_type}
+                  onChange={(e) => setFormData({ ...formData, content_type: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm"
+                >
+                  <option value="text">Plain Text</option>
+                  <option value="html">HTML</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="image_url">Image URL</option>
+                  <option value="json">JSON</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Content *</label>
+                <textarea
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  placeholder={formData.content_type === 'image_url' ? 'https://example.com/image.jpg' : 'Enter your content here...'}
+                  rows={formData.content_type === 'html' || formData.content_type === 'json' ? 8 : 4}
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm ${formData.content_type === 'html' || formData.content_type === 'json' ? 'font-mono text-xs' : ''}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description (optional)</label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Brief description of this content section"
+                  className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm"
+                />
+              </div>
+
+              {/* Usage hint */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="text-xs font-bold text-blue-800 mb-1">💡 How this content appears on the site:</h4>
+                <p className="text-[10px] text-blue-700">
+                  The page code reads content using: <code className="bg-blue-100 px-1 rounded">{formData.page}.{formData.section || 'section_name'}</code>
+                </p>
+                <p className="text-[10px] text-blue-600 mt-1">
+                  Design/layout is controlled in code. You control the text, images, and content here.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t bg-slate-50 flex items-center justify-end gap-3">
+              <button onClick={handleCancel} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700">
+                Cancel
+              </button>
+              <button
+                onClick={isEditing ? handleSave : handleCreate}
+                className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059] flex items-center gap-2"
+              >
+                <Save size={16} />
+                {isEditing ? 'Save Changes' : 'Create Section'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-export default PageContentTab;

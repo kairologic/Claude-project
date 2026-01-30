@@ -33,6 +33,7 @@ interface ScanResult {
   scanned: number;
   withUrl: number;
   withoutUrl: Registry[];
+  withoutUrlCount: number;  // Count of providers without URLs (too many to load)
   scanResults: any[];
   errors: string[];
   timestamp: string;
@@ -199,6 +200,7 @@ export default function AdminDashboard() {
   const [showScanReport, setShowScanReport] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
+  const [totalCounts, setTotalCounts] = useState({ total: 0, withUrl: 0, withoutUrl: 0 });
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
@@ -210,8 +212,31 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const supabase = getSupabase();
-      const { data } = await supabase.from('registry').select('*').order('created_at', { ascending: false });
+      
+      // Get total counts first (fast count queries)
+      const [totalResult, withUrlResult] = await Promise.all([
+        supabase.from('registry').select('id', { count: 'exact', head: true }),
+        supabase.from('registry').select('id', { count: 'exact', head: true }).not('url', 'is', null).neq('url', '')
+      ]);
+      
+      const totalCount = totalResult.count || 0;
+      const withUrlCount = withUrlResult.count || 0;
+      setTotalCounts({
+        total: totalCount,
+        withUrl: withUrlCount,
+        withoutUrl: totalCount - withUrlCount
+      });
+      
+      // Only load providers WITH URLs (scannable) - limit to 500 for performance
+      const { data } = await supabase
+        .from('registry')
+        .select('*')
+        .not('url', 'is', null)
+        .neq('url', '')
+        .order('updated_at', { ascending: false })
+        .limit(500);
       setProviders(data || []);
+      console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry)`);
       setTemplates([
         { id: 'ET-001', name: 'Cure Notice Warning', category: 'marketing', subject: 'URGENT: TX SB 1188 Alert', body: 'Your practice may be at risk.', event_trigger: 'risk_scan_high', is_active: true },
         { id: 'ET-002', name: 'Verification Complete', category: 'transactional', subject: 'Sentry Verified', body: 'Congratulations! Your practice is verified.', event_trigger: 'verification_complete', is_active: true },
@@ -234,16 +259,17 @@ export default function AdminDashboard() {
   };
 
   const stats = useMemo(() => ({
-    total: providers.length,
+    total: totalCounts.total,
+    withUrl: totalCounts.withUrl,
+    withoutUrl: totalCounts.withoutUrl,
+    loaded: providers.length,
     active: providers.filter(r => r.widget_status === 'active').length,
     warning: providers.filter(r => r.widget_status === 'warning').length,
     hidden: providers.filter(r => r.widget_status === 'hidden').length,
     paid: providers.filter(r => r.subscription_status === 'active').length,
-    withUrl: providers.filter(r => r.url && r.url.trim() !== '').length,
-    withoutUrl: providers.filter(r => !r.url || r.url.trim() === '').length,
     type1: providers.filter(r => (r as any).provider_type === 1).length,
     type2: providers.filter(r => (r as any).provider_type === 2 || !(r as any).provider_type).length,
-  }), [providers]);
+  }), [providers, totalCounts]);
 
   const filteredProviders = useMemo(() => {
     if (!searchTerm.trim()) return providers;
@@ -273,43 +299,65 @@ export default function AdminDashboard() {
     catch (e: any) { notify(e.message || 'Failed', 'error'); }
   };
 
-  // GLOBAL SCAN - Scans Type 1 & 2 providers WITH URLs, stores results, reports missing URLs
+  // GLOBAL SCAN - Scans Type 2 providers WITH URLs, stores results
   const handleGlobalScan = async () => {
     setScanning(true); 
     setScanProgress(0); 
-    setScanStatus('Initializing global scan...');
+    setScanStatus('Fetching Type 2 providers...');
     
-    // Filter providers with URLs (Type 1 & 2)
-    const providersWithUrl = providers.filter(p => p.url && p.url.trim() !== '');
-    const providersWithoutUrl = providers.filter(p => !p.url || p.url.trim() === '');
-    
-    const result: ScanResult = {
-      total: providers.length,
-      scanned: 0,
-      withUrl: providersWithUrl.length,
-      withoutUrl: providersWithoutUrl,
-      scanResults: [],
-      errors: [],
-      timestamp: new Date().toISOString()
-    };
-
-    if (providersWithUrl.length === 0) {
-      setScanStatus('No providers with URLs to scan');
-      await new Promise(r => setTimeout(r, 1000));
-      setScanning(false);
-      setScanResult(result);
-      setShowScanReport(true);
-      notify('No providers with URLs to scan', 'info');
-      return;
-    }
-
     try {
       const supabase = getSupabase();
       
-      for (let i = 0; i < providersWithUrl.length; i++) {
-        const p = providersWithUrl[i];
-        setScanStatus(`Scanning ${p.name} (${i + 1}/${providersWithUrl.length})...`);
-        setScanProgress(Math.round(((i + 1) / providersWithUrl.length) * 100));
+      // Step 1: Get count of all Type 2 providers
+      const { count: totalType2 } = await supabase
+        .from('registry')
+        .select('id', { count: 'exact', head: true })
+        .or('provider_type.eq.2,provider_type.is.null'); // Type 2 or null (default)
+      
+      // Step 2: Fetch Type 2 providers WITH URLs (scannable)
+      const { data: providersToScan, error } = await supabase
+        .from('registry')
+        .select('*')
+        .or('provider_type.eq.2,provider_type.is.null')
+        .not('url', 'is', null)
+        .neq('url', '')
+        .limit(1000); // Limit to 1000 for reasonable scan time
+      
+      if (error) throw error;
+      
+      // Step 3: Get count of Type 2 providers WITHOUT URLs
+      const { count: type2WithoutUrl } = await supabase
+        .from('registry')
+        .select('id', { count: 'exact', head: true })
+        .or('provider_type.eq.2,provider_type.is.null')
+        .or('url.is.null,url.eq.');
+      
+      const result: ScanResult = {
+        total: totalType2 || 0,
+        scanned: 0,
+        withUrl: providersToScan?.length || 0,
+        withoutUrl: [], // Too many to load individually
+        withoutUrlCount: type2WithoutUrl || 0,  // Just the count
+        scanResults: [],
+        errors: [],
+        timestamp: new Date().toISOString()
+      };
+
+      setScanStatus(`Found ${providersToScan?.length || 0} Type 2 providers with URLs`);
+      await new Promise(r => setTimeout(r, 1000));
+
+      if (!providersToScan || providersToScan.length === 0) {
+        setScanning(false);
+        setScanResult(result);
+        setShowScanReport(true);
+        notify('No Type 2 providers with URLs to scan', 'info');
+        return;
+      }
+      
+      for (let i = 0; i < providersToScan.length; i++) {
+        const p = providersToScan[i];
+        setScanStatus(`Scanning ${p.name} (${i + 1}/${providersToScan.length})...`);
+        setScanProgress(Math.round(((i + 1) / providersToScan.length) * 100));
         
         try {
           // Run compliance scan
@@ -431,18 +479,72 @@ export default function AdminDashboard() {
     notify('Exported to CSV');
   };
 
-  // Export providers without URLs (Type 2)
-  const handleExportMissingUrls = () => {
-    const missing = providers.filter(p => !p.url || p.url.trim() === '');
-    const csv = [
-      'NPI,Name,Provider Type,City,Email,Phone,URL (ADD THIS)',
-      ...missing.map(r => `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city||''},${r.email||''},${r.phone||''},`)
-    ].join('\n');
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `providers-needing-urls-${new Date().toISOString().split('T')[0]}.csv`; 
-    a.click(); 
-    notify(`Exported ${missing.length} providers needing URLs`);
+  // Export Type 2 providers without URLs - fetches directly from DB in batches
+  const handleExportMissingUrls = async () => {
+    setScanning(true);
+    setScanStatus('Fetching Type 2 providers without URLs...');
+    setScanProgress(0);
+    
+    try {
+      const supabase = getSupabase();
+      const allMissing: any[] = [];
+      const batchSize = 10000;
+      let offset = 0;
+      let hasMore = true;
+      
+      // Fetch in batches to handle large datasets
+      while (hasMore) {
+        setScanStatus(`Fetching records ${offset + 1} to ${offset + batchSize}...`);
+        
+        const { data, error } = await supabase
+          .from('registry')
+          .select('npi, name, city, email, phone, provider_type')
+          .or('provider_type.eq.2,provider_type.is.null')
+          .or('url.is.null,url.eq.')
+          .range(offset, offset + batchSize - 1);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allMissing.push(...data);
+          offset += batchSize;
+          setScanProgress(Math.min(90, Math.round((allMissing.length / totalCounts.withoutUrl) * 100)));
+        } else {
+          hasMore = false;
+        }
+        
+        // Stop if we've fetched enough or no more data
+        if (!data || data.length < batchSize) hasMore = false;
+        
+        // Safety limit
+        if (allMissing.length >= 100000) {
+          notify('Export limited to 100,000 records', 'info');
+          hasMore = false;
+        }
+      }
+      
+      setScanStatus('Generating CSV...');
+      setScanProgress(95);
+      
+      const csv = [
+        'NPI,Name,Provider Type,City,Email,Phone,URL (ADD THIS)',
+        ...allMissing.map(r => `${r.npi},"${(r.name || '').replace(/"/g, '""')}",${r.provider_type || 2},${r.city||''},${r.email||''},${r.phone||''},`)
+      ].join('\n');
+      
+      const a = document.createElement('a'); 
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = `type2-providers-needing-urls-${new Date().toISOString().split('T')[0]}.csv`; 
+      a.click(); 
+      
+      notify(`Exported ${allMissing.length.toLocaleString()} Type 2 providers needing URLs`);
+      
+    } catch (e: any) {
+      notify('Export failed: ' + e.message, 'error');
+    } finally {
+      setScanning(false);
+      setScanProgress(0);
+      setScanStatus('');
+    }
   };
 
   // CSV IMPORT
@@ -650,6 +752,16 @@ export default function AdminDashboard() {
 
             {activeTab === 'registry' && (
               <div className="space-y-3">
+                {/* Info about what's displayed */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={16} className="text-blue-600" />
+                    <span className="text-sm text-blue-800">
+                      Showing <strong>{providers.length}</strong> providers with URLs (of {stats.withUrl.toLocaleString()} total scannable). 
+                      <span className="text-blue-600 ml-1">{stats.withoutUrl.toLocaleString()} providers need URLs.</span>
+                    </span>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2 items-center justify-between">
                   <div className="flex gap-2">
                     <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -814,19 +926,19 @@ export default function AdminDashboard() {
       </Modal>
 
       {/* Scan Report Modal */}
-      <Modal isOpen={showScanReport && !!scanResult} onClose={() => setShowScanReport(false)} title="Global Scan Report" size="xl">
+      <Modal isOpen={showScanReport && !!scanResult} onClose={() => setShowScanReport(false)} title="Global Scan Report - Type 2 Providers" size="xl">
         {scanResult && (
           <div className="space-y-4">
             <div className="grid grid-cols-4 gap-3">
-              <div className="bg-slate-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-slate-700">{scanResult.total}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Total Providers</div></div>
-              <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-700">{scanResult.scanned}</div><div className="text-[8px] font-bold text-blue-600 uppercase">Scanned</div></div>
-              <div className="bg-emerald-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-emerald-700">{scanResult.withUrl}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">With URLs</div></div>
-              <div className="bg-red-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-red-700">{scanResult.withoutUrl.length}</div><div className="text-[8px] font-bold text-red-600 uppercase">Missing URLs</div></div>
+              <div className="bg-slate-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-slate-700">{scanResult.total.toLocaleString()}</div><div className="text-[8px] font-bold text-slate-400 uppercase">Total Type 2</div></div>
+              <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-blue-700">{scanResult.scanned.toLocaleString()}</div><div className="text-[8px] font-bold text-blue-600 uppercase">Scanned</div></div>
+              <div className="bg-emerald-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-emerald-700">{scanResult.withUrl.toLocaleString()}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">With URLs</div></div>
+              <div className="bg-red-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-red-700">{scanResult.withoutUrlCount.toLocaleString()}</div><div className="text-[8px] font-bold text-red-600 uppercase">Need URLs</div></div>
             </div>
             
             {scanResult.scanResults.length > 0 && (
               <div className="bg-white border rounded-lg p-3">
-                <h4 className="text-sm font-bold mb-2">Scan Results Summary</h4>
+                <h4 className="text-sm font-bold mb-2">Scan Results Summary ({scanResult.scanned} providers scanned)</h4>
                 <div className="max-h-48 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead><tr className="text-left text-slate-500 border-b"><th className="py-1">Provider</th><th className="py-1">Score</th><th className="py-1">SB1188</th><th className="py-1">HB149</th><th className="py-1">Status</th></tr></thead>
@@ -846,26 +958,16 @@ export default function AdminDashboard() {
               </div>
             )}
             
-            {scanResult.withoutUrl.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-bold text-red-800">Providers Needing URLs ({scanResult.withoutUrl.length})</h4>
-                  <button onClick={handleExportMissingUrls} className="text-[9px] font-bold text-red-600 flex items-center gap-1"><Download size={10} /> Export</button>
-                </div>
-                <div className="max-h-32 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead><tr className="text-left text-red-700"><th className="py-1">NPI</th><th className="py-1">Name</th><th className="py-1">Type</th></tr></thead>
-                    <tbody>
-                      {scanResult.withoutUrl.slice(0, 10).map(p => (
-                        <tr key={p.id} className="border-t border-red-200">
-                          <td className="py-1 font-mono">{p.npi}</td>
-                          <td className="py-1">{p.name}</td>
-                          <td className="py-1">Type {(p as any).provider_type || 2}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {scanResult.withoutUrl.length > 10 && <p className="text-[10px] text-red-600 mt-1">...and {scanResult.withoutUrl.length - 10} more</p>}
+            {scanResult.withoutUrlCount > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-red-800">{scanResult.withoutUrlCount.toLocaleString()} Type 2 Providers Need URLs</h4>
+                    <p className="text-xs text-red-600 mt-1">Export the list, add website URLs, then re-import to enable scanning</p>
+                  </div>
+                  <button onClick={handleExportMissingUrls} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700">
+                    <Download size={14} /> Export CSV
+                  </button>
                 </div>
               </div>
             )}
