@@ -214,9 +214,10 @@ export default function AdminDashboard() {
       const supabase = getSupabase();
       
       // Get total counts first (fast count queries)
+      // Use .gt('url', '') to find non-empty URLs (works better than .neq)
       const [totalResult, withUrlResult] = await Promise.all([
         supabase.from('registry').select('id', { count: 'exact', head: true }),
-        supabase.from('registry').select('id', { count: 'exact', head: true }).not('url', 'is', null).neq('url', '')
+        supabase.from('registry').select('id', { count: 'exact', head: true }).not('url', 'is', null).gt('url', '')
       ]);
       
       const totalCount = totalResult.count || 0;
@@ -232,7 +233,7 @@ export default function AdminDashboard() {
         .from('registry')
         .select('*')
         .not('url', 'is', null)
-        .neq('url', '')
+        .gt('url', '')
         .order('updated_at', { ascending: false })
         .limit(500);
       setProviders(data || []);
@@ -320,7 +321,7 @@ export default function AdminDashboard() {
         .select('*')
         .or('provider_type.eq.2,provider_type.is.null')
         .not('url', 'is', null)
-        .neq('url', '')
+        .gt('url', '')
         .limit(1000); // Limit to 1000 for reasonable scan time
       
       if (error) throw error;

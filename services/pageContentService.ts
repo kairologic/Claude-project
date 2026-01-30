@@ -1,7 +1,7 @@
 /**
  * KairoLogic Page Content CMS Service
  * Manages dynamic website text content without code deployment
- * Version: 11.0.0-FIXED
+ * Version: 12.0.0-FIXED
  */
 
 import { getSupabase } from '@/lib/supabase';
@@ -13,8 +13,9 @@ export interface PageContent {
   content: string;
   content_type: 'text' | 'html' | 'json' | 'markdown' | 'image_url';
   description?: string;
-  last_updated: string;
-  updated_by?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const TABLE_NAME = 'page_content';
@@ -103,8 +104,7 @@ export const updateContentSection = async (
         page,
         section,
         content,
-        updated_by: updatedBy || 'admin',
-        last_updated: new Date().toISOString()
+        updated_at: new Date().toISOString()
       }, {
         onConflict: 'page,section'
       });
