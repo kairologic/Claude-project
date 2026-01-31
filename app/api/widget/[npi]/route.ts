@@ -156,26 +156,6 @@ export async function GET(
   }
 }
 
-    return NextResponse.json(publicData, { 
-      status: 200, 
-      headers: {
-        ...corsHeaders,
-        'Cache-Control': 'public, max-age=300, s-maxage=300', // 5 min cache
-      }
-    });
-
-  } catch (error) {
-    console.error('[Widget API] Error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Server error', 
-        message: 'An unexpected error occurred' 
-      },
-      { status: 500, headers: corsHeaders }
-    );
-  }
-}
-
 /**
  * Determine the widget status based on provider data
  * 
