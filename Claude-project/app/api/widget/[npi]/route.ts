@@ -81,16 +81,19 @@ export async function GET(
 
     const data = await response.json();
 
-    // Provider not found
+    // Provider not found in registry - but still allow scan for new NPIs
     if (!data || data.length === 0) {
       return NextResponse.json(
         { 
-          error: 'Not found', 
-          message: 'Provider not found in registry',
           npi: npi,
-          widget_status: 'inactive'
+          widget_status: 'not_registered',
+          registered: false,
+          message: 'Provider not found in registry - scan available',
+          // Allow them to run a scan
+          scan_url: `/scan?npi=${npi}`,
+          can_scan: true
         },
-        { status: 404, headers: corsHeaders }
+        { status: 200, headers: corsHeaders }  // 200 not 404 - this is valid state
       );
     }
 

@@ -357,6 +357,63 @@
       letter-spacing: 0.3px;
     }
     
+    /* Not Registered / Get Verified Styles */
+    .kl-sentry-not-registered {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+      border: 2px solid #d97706;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    
+    .kl-sentry-nr-icon {
+      width: 48px;
+      height: 48px;
+      background: #d97706;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .kl-sentry-nr-icon svg {
+      width: 28px;
+      height: 28px;
+      color: #ffffff;
+    }
+    
+    .kl-sentry-nr-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    
+    .kl-sentry-nr-label {
+      font-size: 14px;
+      font-weight: 800;
+      color: #92400e;
+      letter-spacing: 0.5px;
+    }
+    
+    .kl-sentry-nr-sublabel {
+      font-size: 10px;
+      font-weight: 600;
+      color: #b45309;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    
+    .kl-sentry-nr-desc {
+      font-size: 12px;
+      color: #78716c;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    
     /* Footer */
     .kl-sentry-footer {
       padding: 8px 16px;
@@ -565,6 +622,44 @@
     // Check if widget should be hidden (score below threshold or inactive)
     if (data.widget_status === 'hidden' || data.widget_status === 'inactive') {
       widget.classList.add('kl-hidden');
+      return;
+    }
+
+    // NPI not in registry yet - show "Run Scan" prompt instead of hiding
+    if (data.widget_status === 'not_registered') {
+      widget.innerHTML = `
+        <div class="kl-sentry-container">
+          <div class="kl-sentry-header">
+            <div class="kl-sentry-logo">${icons.logo}</div>
+            <div>
+              <div class="kl-sentry-title">KairoLogic</div>
+              <div class="kl-sentry-subtitle">Sentry Standard</div>
+            </div>
+          </div>
+          <div class="kl-sentry-body">
+            <div class="kl-sentry-not-registered">
+              <div class="kl-sentry-nr-icon">
+                ${icons.shield}
+              </div>
+              <div class="kl-sentry-nr-text">
+                <span class="kl-sentry-nr-label">GET VERIFIED</span>
+                <span class="kl-sentry-nr-sublabel">Texas SB 1188 & HB 149</span>
+              </div>
+            </div>
+            <p class="kl-sentry-nr-desc">
+              Verify your compliance status with Texas healthcare data sovereignty requirements.
+            </p>
+            <a href="${API_BASE_URL}/scan?npi=${config.npi}" target="_blank" class="kl-sentry-cta">
+              Run Free Compliance Scan
+            </a>
+          </div>
+          <div class="kl-sentry-footer">
+            <a href="${API_BASE_URL}" target="_blank" class="kl-sentry-footer-text">
+              Powered by KairoLogic Sentry Standard
+            </a>
+          </div>
+        </div>
+      `;
       return;
     }
 
