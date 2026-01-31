@@ -245,27 +245,54 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     addLog('💾 Saving to registry...', 'info');
     
     try {
+      // Get the provider name from scanResults or try to fetch from existing record
+      let providerName = scanResults.name || scanResults.providerName;
+      
+      // If no name provided, try to get existing name from registry
+      if (!providerName) {
+        try {
+          const existingResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/registry?npi=eq.${scanResults.npi}&select=name`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+              }
+            }
+          );
+          const existingData = await existingResponse.json();
+          if (existingData && existingData.length > 0 && existingData[0].name) {
+            providerName = existingData[0].name;
+          }
+        } catch (e) {
+          // Ignore errors, will use fallback
+        }
+      }
+      
+      // Fallback to "Provider [NPI]" if still no name
+      if (!providerName) {
+        providerName = `Provider ${scanResults.npi}`;
+      }
+      
       const registryData = {
-        id: scanResults.npi,
-        name: scanResults.url, // Use URL as name for now
+        id: `TX-${scanResults.npi}-${Math.random().toString(36).substr(2, 5)}`,
+        name: providerName,
         npi: scanResults.npi,
         url: scanResults.url,
-        riskScore: scanResults.riskScore,
         risk_score: scanResults.riskScore,
-        riskLevel: scanResults.riskLevel,
-        riskMeterLevel: scanResults.riskMeterLevel,
+        risk_level: scanResults.riskLevel,
         risk_meter_level: scanResults.riskMeterLevel,
-        complianceStatus: scanResults.complianceStatus,
         overall_compliance_status: scanResults.complianceStatus,
-        lastScanTimestamp: scanResults.scanTimestamp,
-        topIssues: scanResults.topIssues
+        last_scan_timestamp: new Date().toISOString(),
+        widget_status: scanResults.riskScore >= 75 ? 'active' : 'warning',
+        updated_at: new Date().toISOString()
       };
 
-      // Try UPDATE first (PATCH), if no rows affected, then INSERT (POST)
+      // Try UPDATE first (PATCH) using NPI as the identifier, if no rows affected, then INSERT (POST)
       addLog('Attempting to update existing registry entry...', 'info');
       
       let response = await fetch(
-        `${SUPABASE_URL}/rest/v1/registry?id=eq.${scanResults.npi}`,
+        `${SUPABASE_URL}/rest/v1/registry?npi=eq.${scanResults.npi}`,
         {
           method: 'PATCH',
           headers: {
@@ -274,7 +301,16 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
             'Prefer': 'return=minimal'
           },
-          body: JSON.stringify(registryData)
+          body: JSON.stringify({
+            url: registryData.url,
+            risk_score: registryData.risk_score,
+            risk_level: registryData.risk_level,
+            risk_meter_level: registryData.risk_meter_level,
+            overall_compliance_status: registryData.overall_compliance_status,
+            last_scan_timestamp: registryData.last_scan_timestamp,
+            widget_status: registryData.widget_status,
+            updated_at: registryData.updated_at
+          })
         }
       );
 
@@ -303,7 +339,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         await delay(500);
         
         const verifyResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/registry?id=eq.${scanResults.npi}`,
+          `${SUPABASE_URL}/rest/v1/registry?npi=eq.${scanResults.npi}`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -397,218 +433,97 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     }
   };
 
-  // Simulated WAF/Firewall detection and evasion
+  // Simulated WAF/Firewall detection - now just a status indicator
   const stealthProbe = async (targetUrl: string) => {
-    addLog('🕵️ Initializing stealth probe...', 'info');
-    await delay(800);
-    
-    // Simulate checking for WAF signatures
-    addLog('Checking for WAF/CDN signatures...', 'info');
-    await delay(600);
-    
-    const wafDetected = Math.random() > 0.7;
-    if (wafDetected) {
-      addLog('[WARN] WAF detected - switching to evasion mode', 'warning');
-      await delay(500);
-      addLog('Using randomized user-agents and request timing', 'info');
-    } else {
-      addLog('[OK] No active WAF detected', 'success');
+    addLog('🕵️ Initializing Sentry Engine v2.0...', 'info');
+    await delay(300);
+    addLog('[OK] Engine initialized', 'success');
+    return { wafDetected: false, canProceed: true };
+  };
+
+  // ─── REAL SCAN via API ─────────────────────────────────
+  // Calls /api/scan which performs actual network forensics:
+  // - DNS resolution + IP geolocation
+  // - HTTP header analysis for CDN/edge nodes
+  // - MX record verification
+  // - Page content crawl for AI disclosures & form analysis
+  
+  const runRealScan = async (targetUrl: string, targetNpi: string) => {
+    setCurrentPhase('Connecting to Sentry API...');
+    addLog('🚀 Dispatching scan request to Sentry Engine v2.0...', 'info');
+    setProgress(15);
+
+    try {
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ npi: targetNpi, url: targetUrl }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Stream progress through findings for UX
+      setProgress(20);
+      setCurrentPhase('Data Sovereignty & Residency (SB 1188)');
+      addLog('📍 Phase 1: Data Sovereignty Checks...', 'info');
+
+      for (const f of data.findings.filter((f: any) => f.id.startsWith('DR-'))) {
+        await delay(400);
+        const icon = f.status === 'pass' ? '[OK]' : f.status === 'fail' ? '✗' : '⚠';
+        const type = f.status === 'pass' ? 'success' : f.status === 'fail' ? 'error' : 'warning';
+        addLog(`${icon} ${f.id}: ${f.detail.substring(0, 100)}${f.detail.length > 100 ? '...' : ''}`, type);
+      }
+
+      setProgress(45);
+      setCurrentPhase('AI Transparency & Disclosure (HB 149)');
+      addLog('🤖 Phase 2: AI Transparency Checks...', 'info');
+
+      for (const f of data.findings.filter((f: any) => f.id.startsWith('AI-'))) {
+        await delay(350);
+        const icon = f.status === 'pass' ? '[OK]' : f.status === 'fail' ? '✗' : '⚠';
+        const type = f.status === 'pass' ? 'success' : f.status === 'fail' ? 'error' : 'warning';
+        addLog(`${icon} ${f.id}: ${f.detail.substring(0, 100)}${f.detail.length > 100 ? '...' : ''}`, type);
+      }
+
+      setProgress(70);
+      setCurrentPhase('EHR System Integrity');
+      addLog('🔒 Phase 3: EHR Integrity Checks...', 'info');
+
+      for (const f of data.findings.filter((f: any) => f.id.startsWith('ER-'))) {
+        await delay(300);
+        const icon = f.status === 'pass' ? '[OK]' : f.status === 'fail' ? '✗' : '⚠';
+        const type = f.status === 'pass' ? 'success' : f.status === 'fail' ? 'error' : 'warning';
+        addLog(`${icon} ${f.id}: ${f.detail.substring(0, 100)}${f.detail.length > 100 ? '...' : ''}`, type);
+      }
+
+      setProgress(85);
+
+      // NPI verification status
+      if (data.npiVerification) {
+        if (data.npiVerification.valid) {
+          addLog(`[OK] NPI Verified: ${data.npiVerification.name} (${data.npiVerification.type}) - ${data.npiVerification.specialty}`, 'success');
+        } else {
+          addLog('⚠ NPI not found in CMS NPPES registry', 'warning');
+        }
+      }
+
+      // Scan metadata
+      if (data.meta) {
+        addLog(`📊 Engine: ${data.meta.engine} | Duration: ${data.meta.duration} | Checks: ${data.meta.checksRun} (${data.meta.checksPass} pass, ${data.meta.checksFail} fail, ${data.meta.checksWarn} warn)`, 'info');
+      }
+
+      return data;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`[ERROR] Sentry API Error: ${errorMessage}`, 'error');
+      addLog('Falling back to limited client-side checks...', 'warning');
+      throw error;
     }
-    
-    return { wafDetected, canProceed: true };
-  };
-
-  // Data Sovereignty Scan (SB 1188)
-  const scanDataSovereignty = async (targetUrl: string) => {
-    setCurrentPhase('Data Sovereignty & Residency');
-    const findings = [];
-
-    addLog('📍 Starting Data Sovereignty scan...', 'info');
-    await delay(1000);
-
-    // DR-01: IP Geo-Location
-    addLog('DR-01: Resolving primary domain IP...', 'info');
-    await delay(800);
-    const ipLocation = Math.random() > 0.2 ? 'US (Virginia)' : 'Dublin, Ireland';
-    const dr01Pass = !ipLocation.includes('Ireland');
-    findings.push({
-      id: 'DR-01',
-      name: 'Primary EHR Domain IP Geo-Location',
-      status: dr01Pass ? 'pass' : 'fail',
-      detail: `Server location: ${ipLocation}`,
-      clause: 'Sec. 183.002(a)'
-    });
-    addLog(`${dr01Pass ? '[OK]' : '✗'} DR-01: ${ipLocation}`, dr01Pass ? 'success' : 'error');
-
-    // DR-02: CDN Analysis
-    addLog('DR-02: Analyzing CDN edge nodes...', 'info');
-    await delay(900);
-    const cdnCompliant = Math.random() > 0.3;
-    findings.push({
-      id: 'DR-02',
-      name: 'CDN & Edge Cache Analysis',
-      status: cdnCompliant ? 'pass' : 'fail',
-      detail: cdnCompliant ? 'All edge nodes in US' : 'Found edge nodes in EU regions',
-      clause: 'Sec. 183.002(a)(2)'
-    });
-    addLog(`${cdnCompliant ? '[OK]' : '✗'} DR-02: CDN compliance`, cdnCompliant ? 'success' : 'error');
-
-    // DR-03: Mail Exchange Pathing
-    addLog('DR-03: Auditing MX records...', 'info');
-    await delay(700);
-    const mxCompliant = Math.random() > 0.25;
-    findings.push({
-      id: 'DR-03',
-      name: 'Mail Exchange (MX) Pathing',
-      status: mxCompliant ? 'pass' : 'fail',
-      detail: mxCompliant ? 'Mail servers within US' : 'Mail routing through OCONUS servers',
-      clause: 'Sec. 183.002(a)'
-    });
-    addLog(`${mxCompliant ? '[OK]' : '✗'} DR-03: MX pathing`, mxCompliant ? 'success' : 'error');
-
-    // DR-04: Sub-Processor Domain Audit
-    addLog('DR-04: Mapping 3rd-party scripts and APIs...', 'info');
-    await delay(1200);
-    const subProcessorCompliant = Math.random() > 0.4;
-    findings.push({
-      id: 'DR-04',
-      name: 'Sub-Processor Domain Audit',
-      status: subProcessorCompliant ? 'pass' : 'fail',
-      detail: subProcessorCompliant ? 'All 3rd-party endpoints US-based' : 'Found analytics endpoint in Singapore',
-      clause: 'Sec. 183.002(a)(1)'
-    });
-    addLog(`${subProcessorCompliant ? '[OK]' : '✗'} DR-04: Sub-processor audit`, subProcessorCompliant ? 'success' : 'error');
-
-    setProgress(25);
-    return findings;
-  };
-
-  // AI Transparency Scan (HB 149)
-  const scanAITransparency = async (targetUrl: string) => {
-    setCurrentPhase('AI Transparency & Disclosure');
-    const findings = [];
-
-    addLog('🤖 Starting AI Transparency scan...', 'info');
-    await delay(1000);
-
-    // AI-01: Conspicuous AI Disclosure Text
-    addLog('AI-01: Scanning for AI disclosure text...', 'info');
-    await delay(900);
-    const hasDisclosure = Math.random() > 0.4;
-    findings.push({
-      id: 'AI-01',
-      name: 'Conspicuous AI Disclosure Text',
-      status: hasDisclosure ? 'pass' : 'fail',
-      detail: hasDisclosure ? 'Found AI disclosure on homepage' : 'No AI disclosure found',
-      clause: 'HB 149 Sec. 551.004'
-    });
-    addLog(`${hasDisclosure ? '[OK]' : '✗'} AI-01: Disclosure text`, hasDisclosure ? 'success' : 'error');
-
-    // AI-02: Disclosure Link Accessibility
-    addLog('AI-02: Checking disclosure visibility (Dark Pattern detection)...', 'info');
-    await delay(1000);
-    const noObscuredLinks = Math.random() > 0.3;
-    findings.push({
-      id: 'AI-02',
-      name: 'Disclosure Link Accessibility',
-      status: noObscuredLinks ? 'pass' : 'fail',
-      detail: noObscuredLinks ? 'Disclosure links clearly visible' : 'Found obscured link (font-size: 8px, opacity: 0.3)',
-      clause: 'HB 149 (d)'
-    });
-    addLog(`${noObscuredLinks ? '[OK]' : '✗'} AI-02: No dark patterns`, noObscuredLinks ? 'success' : 'error');
-
-    // AI-03: Diagnostic AI Disclaimer
-    addLog('AI-03: Auditing diagnostic AI disclaimers...', 'info');
-    await delay(800);
-    const hasDiagnosticDisclaimer = Math.random() > 0.5;
-    findings.push({
-      id: 'AI-03',
-      name: 'Diagnostic AI Disclaimer Audit',
-      status: hasDiagnosticDisclaimer ? 'pass' : 'fail',
-      detail: hasDiagnosticDisclaimer ? 'Practitioner review disclaimer present' : 'Missing practitioner review statement',
-      clause: 'SB 1188 Sec. 183.005'
-    });
-    addLog(`${hasDiagnosticDisclaimer ? '[OK]' : '✗'} AI-03: Diagnostic disclaimer`, hasDiagnosticDisclaimer ? 'success' : 'error');
-
-    // AI-04: Interactive Chatbot Notice
-    addLog('AI-04: Probing chatbot systems...', 'info');
-    await delay(700);
-    const chatbotCompliant = Math.random() > 0.45;
-    findings.push({
-      id: 'AI-04',
-      name: 'Interactive Chatbot Notice',
-      status: chatbotCompliant ? 'pass' : 'fail',
-      detail: chatbotCompliant ? 'Chatbot displays AI notice on init' : 'No chatbot AI disclosure found',
-      clause: 'HB 149 (b)'
-    });
-    addLog(`${chatbotCompliant ? '[OK]' : '✗'} AI-04: Chatbot notice`, chatbotCompliant ? 'success' : 'error');
-
-    setProgress(50);
-    return findings;
-  };
-
-  // EHR System Integrity Scan (SB 1188)
-  const scanEHRIntegrity = async (targetUrl: string) => {
-    setCurrentPhase('EHR System Integrity & Parental Access');
-    const findings = [];
-
-    addLog('🔒 Starting EHR Integrity scan...', 'info');
-    await delay(1000);
-
-    // ER-01: Biological Sex Input Fields
-    addLog('ER-01: Scanning patient intake forms...', 'info');
-    await delay(1000);
-    const hasBioSexField = Math.random() > 0.3;
-    findings.push({
-      id: 'ER-01',
-      name: 'Biological Sex Input Fields',
-      status: hasBioSexField ? 'pass' : 'fail',
-      detail: hasBioSexField ? 'Biological sex field present (Male/Female)' : 'Missing biological sex field in intake form',
-      clause: 'Sec. 183.010'
-    });
-    addLog(`${hasBioSexField ? '[OK]' : '✗'} ER-01: Biological sex field`, hasBioSexField ? 'success' : 'error');
-
-    // ER-02: Minor/Parental Access Portal
-    addLog('ER-02: Detecting guardian/conservator login flow...', 'info');
-    await delay(900);
-    const hasParentalAccess = Math.random() > 0.4;
-    findings.push({
-      id: 'ER-02',
-      name: 'Minor/Parental Access Portal',
-      status: hasParentalAccess ? 'pass' : 'fail',
-      detail: hasParentalAccess ? 'Guardian portal access available' : 'No distinct parental access pathway found',
-      clause: 'Sec. 183.006'
-    });
-    addLog(`${hasParentalAccess ? '[OK]' : '✗'} ER-02: Parental access`, hasParentalAccess ? 'success' : 'error');
-
-    // ER-03: Metabolic Health Options
-    addLog('ER-03: Checking metabolic health documentation...', 'info');
-    await delay(700);
-    const hasMetabolicFields = Math.random() > 0.5;
-    findings.push({
-      id: 'ER-03',
-      name: 'Metabolic Health Options',
-      status: hasMetabolicFields ? 'pass' : 'fail',
-      detail: hasMetabolicFields ? 'Metabolic health fields present' : 'No metabolic/diet documentation fields',
-      clause: 'Sec. 183.003'
-    });
-    addLog(`${hasMetabolicFields ? '[OK]' : '✗'} ER-03: Metabolic health`, hasMetabolicFields ? 'success' : 'error');
-
-    // ER-04: Forbidden Data Field Check
-    addLog('ER-04: Scanning for prohibited data collection...', 'info');
-    await delay(800);
-    const noForbiddenFields = Math.random() > 0.8;
-    findings.push({
-      id: 'ER-04',
-      name: 'Forbidden Data Field Check',
-      status: noForbiddenFields ? 'pass' : 'fail',
-      detail: noForbiddenFields ? 'No prohibited fields detected' : 'WARNING: Found credit score field in registration',
-      clause: 'Sec. 183.003'
-    });
-    addLog(`${noForbiddenFields ? '[OK]' : '✗'} ER-04: Forbidden fields`, noForbiddenFields ? 'success' : 'error');
-
-    setProgress(75);
-    return findings;
   };
 
   const calculateRiskScore = (allFindings: any[]) => {
@@ -616,17 +531,14 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     const passedChecks = allFindings.filter((f: any) => f.status === 'pass').length;
     const score = Math.round((passedChecks / totalChecks) * 100);
     
-    let riskLevel = 'Critical';
-    let riskMeterLevel = 'Critical';
+    let riskLevel = 'High';
+    let riskMeterLevel = 'Violation';
     
-    if (score >= 90) {
+    if (score >= 67) {
       riskLevel = 'Low';
-      riskMeterLevel = 'Compliant';
-    } else if (score >= 75) {
+      riskMeterLevel = 'Sovereign';
+    } else if (score >= 34) {
       riskLevel = 'Moderate';
-      riskMeterLevel = 'Minor Drift';
-    } else if (score >= 50) {
-      riskLevel = 'High';
       riskMeterLevel = 'Drift';
     }
     
@@ -645,140 +557,99 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     setScanLog([]);
 
     try {
-      addLog(`🚀 Starting compliance scan for NPI: ${npi}`, 'info');
+      addLog(`🚀 Starting Sentry compliance scan for NPI: ${npi}`, 'info');
       addLog(`Target: ${url}`, 'info');
       
-      // Stealth probe
+      // Initialize
       const stealthResult = await stealthProbe(url);
       setProgress(10);
 
-      // Run all scans
-      const dataSovereigntyFindings = await scanDataSovereignty(url);
-      const aiTransparencyFindings = await scanAITransparency(url);
-      const ehrIntegrityFindings = await scanEHRIntegrity(url);
+      // ── Call real scan API ──
+      let scanData;
+      let allFindings;
+      let score, riskLevel, riskMeterLevel;
 
-      // Compile results
-      const allFindings = [
-        ...dataSovereigntyFindings,
-        ...aiTransparencyFindings,
-        ...ehrIntegrityFindings
-      ];
+      try {
+        scanData = await runRealScan(url, npi);
+        allFindings = scanData.findings;
+        score = scanData.riskScore;
+        riskLevel = scanData.riskLevel;
+        riskMeterLevel = scanData.riskMeterLevel;
+      } catch {
+        // If API fails, we can't produce real results
+        addLog('[ERROR] Real scan failed. Cannot produce compliance results without server-side analysis.', 'error');
+        setScanning(false);
+        return;
+      }
 
-      const { score, riskLevel, riskMeterLevel } = calculateRiskScore(allFindings);
-      
-      const topIssues = allFindings
+      const topIssues = scanData.topIssues || allFindings
         .filter((f: any) => f.status === 'fail')
-        .slice(0, 3)
+        .slice(0, 5)
         .map((f: any) => ({ id: f.id, name: f.name, clause: f.clause }));
 
       setProgress(90);
-      addLog('📊 Calculating risk score via edge function...', 'info');
+      addLog('📊 Finalizing risk profile...', 'info');
+
+      // Try to get provider name from session storage or NPI verification
+      let providerName = '';
+      try {
+        const storedData = sessionStorage.getItem('scanData');
+        if (storedData) {
+          const parsed = JSON.parse(storedData);
+          providerName = parsed.name || '';
+        }
+      } catch {
+        // Ignore
+      }
+      if (!providerName && scanData.npiVerification?.name) {
+        providerName = scanData.npiVerification.name;
+      }
 
       const scanResults = {
         npi,
         url,
+        name: providerName,
+        providerName,
         riskScore: score,
         riskLevel,
         riskMeterLevel,
-        complianceStatus: score >= 75 ? 'Compliant' : 'Non-Compliant',
+        complianceStatus: scanData.complianceStatus || (score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation'),
         findings: allFindings,
         topIssues,
         scanTimestamp: Date.now(),
+        scanDuration: scanData.scanDuration,
+        engineVersion: scanData.engineVersion,
+        npiVerification: scanData.npiVerification,
         wafDetected: stealthResult.wafDetected
       };
 
-      // Call calculate-risk edge function
+      setProgress(95);
+      addLog('💾 Saving results to registry...', 'info');
+
+      // Save to registry
+      await saveToRegistry(scanResults);
+
+      // Save violations
+      await saveViolationsToSupabase(npi, allFindings);
+
+      // Try edge functions (non-blocking)
       try {
-        const riskResponse = await fetch(
+        await fetch(
           'https://mxrtltezhkxhqizvxvsz.supabase.co/functions/v1/calculate-risk',
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              npi,
-              url,
-              findings: allFindings,
-              scanTimestamp: Date.now()
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ npi, url, findings: allFindings, scanTimestamp: Date.now() })
           }
         );
-
-        if (riskResponse.ok) {
-          const riskData = await riskResponse.json();
-          addLog('[OK] Risk calculation complete', 'success');
-          // Update scan results with server-calculated risk if provided
-          if (riskData.riskScore !== undefined) {
-            scanResults.riskScore = riskData.riskScore;
-            scanResults.riskLevel = riskData.riskLevel;
-            scanResults.riskMeterLevel = riskData.riskMeterLevel;
-          }
-        } else {
-          addLog('[WARN] Risk calculation unavailable, using local calculation', 'warning');
-        }
-      } catch (apiError) {
-        addLog('[WARN] Edge function unavailable, using local calculation', 'warning');
-        console.error('Calculate-risk API error:', apiError);
-      }
-
-      setProgress(95);
-      addLog('💾 Saving results...', 'info');
-
-      // Save to registry first (required for foreign key constraint)
-      await saveToRegistry(scanResults);
-
-      // Call npi-relay edge function as backup/additional processing
-      try {
-        const relayResponse = await fetch(
-          'https://mxrtltezhkxhqizvxvsz.supabase.co/functions/v1/npi-relay',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              id: npi,
-              npi,
-              url,
-              riskScore: scanResults.riskScore,
-              riskLevel: scanResults.riskLevel,
-              riskMeterLevel: scanResults.riskMeterLevel,
-              complianceStatus: scanResults.complianceStatus,
-              overall_compliance_status: scanResults.complianceStatus,
-              lastScanTimestamp: Date.now(),
-              topIssues: topIssues,
-              scanHistory: [{
-                timestamp: Date.now(),
-                findings: allFindings,
-                wafDetected: stealthResult.wafDetected
-              }]
-            })
-          }
-        );
-
-        if (relayResponse.ok) {
-          addLog('[OK] Edge function processing complete', 'success');
-          
-          // Save violation details to violation_evidence table
-          await saveViolationsToSupabase(npi, allFindings);
-        } else {
-          addLog('[WARN] Edge function unavailable, saving directly', 'warning');
-          // Still save violations even if edge function fails
-          await saveViolationsToSupabase(npi, allFindings);
-        }
-      } catch (apiError) {
-        addLog('[WARN] Edge function unavailable, saving directly', 'warning');
-        console.error('NPI-relay API error:', apiError);
-        // Still save violations even if edge function fails
-        await saveViolationsToSupabase(npi, allFindings);
+      } catch {
+        // Non-critical
       }
 
       setProgress(100);
-      addLog('[OK] Scan complete!', 'success');
+      addLog(`[OK] Scan complete! Score: ${score}/100 (${riskMeterLevel})`, 'success');
       setResults(scanResults);
       
-      // Call the callback if provided
       if (onScanComplete) {
         onScanComplete(scanResults);
       }

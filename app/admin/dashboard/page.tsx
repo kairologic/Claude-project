@@ -212,7 +212,7 @@ export default function AdminDashboard() {
   const [showScanReport, setShowScanReport] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
-  const [totalCounts, setTotalCounts] = useState({ total: 0, withUrl: 0, withoutUrl: 0 });
+  const [totalCounts, setTotalCounts] = useState({ total: 0, withUrl: 0, withoutUrl: 0, active: 0 });
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
@@ -227,20 +227,23 @@ export default function AdminDashboard() {
       
       // Get total counts first (fast count queries)
       // Use .gt('url', '') to find non-empty URLs (works better than .neq)
-      const [totalResult, withUrlResult] = await Promise.all([
+      const [totalResult, withUrlResult, activeResult] = await Promise.all([
         supabase.from('registry').select('id', { count: 'exact', head: true }),
-        supabase.from('registry').select('id', { count: 'exact', head: true }).not('url', 'is', null).gt('url', '')
+        supabase.from('registry').select('id', { count: 'exact', head: true }).not('url', 'is', null).gt('url', ''),
+        supabase.from('registry').select('id', { count: 'exact', head: true }).eq('widget_status', 'active')
       ]);
       
       const totalCount = totalResult.count || 0;
       const withUrlCount = withUrlResult.count || 0;
+      const activeCount = activeResult.count || 0;
       setTotalCounts({
         total: totalCount,
         withUrl: withUrlCount,
-        withoutUrl: totalCount - withUrlCount
+        withoutUrl: totalCount - withUrlCount,
+        active: activeCount
       });
       
-      // Only load providers WITH URLs (scannable) - limit to 500 for performance
+      // Only load providers WITH URLs (scannable) - limit to 500 for performance in table view
       const { data } = await supabase
         .from('registry')
         .select('*')
@@ -249,7 +252,8 @@ export default function AdminDashboard() {
         .order('updated_at', { ascending: false })
         .limit(500);
       setProviders(data || []);
-      console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry)`);
+      console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry, ${activeCount} active)`);
+      
       
       // Load email templates from database
       const { data: emailTemplatesData } = await supabase
@@ -315,7 +319,7 @@ export default function AdminDashboard() {
     withUrl: totalCounts.withUrl,
     withoutUrl: totalCounts.withoutUrl,
     loaded: providers.length,
-    active: providers.filter(r => r.widget_status === 'active').length,
+    active: totalCounts.active, // Use count from database, not from loaded providers
     warning: providers.filter(r => r.widget_status === 'warning').length,
     hidden: providers.filter(r => r.widget_status === 'hidden').length,
     paid: providers.filter(r => r.subscription_status === 'active').length,
