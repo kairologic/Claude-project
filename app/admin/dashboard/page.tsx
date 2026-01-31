@@ -125,7 +125,18 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
   );
 };
 
-interface EmailTemplate { id: string; name: string; category: string; subject: string; body: string; event_trigger: string; is_active: boolean; }
+interface EmailTemplate { id: string; name: string; category: string; subject: string; body: string; event_trigger: string; is_active: boolean; html_body?: string; }
+
+interface MarketingTemplate { 
+  id: string; 
+  name: string; 
+  category: string; 
+  description?: string;
+  file_name?: string;
+  file_type?: string;
+  file_data?: string;
+  last_updated?: string;
+}
 interface CalendarSlot { id: string; date: string; time: string; is_booked: boolean; booked_by?: { name: string } | null; }
 
 // Simulated scan function (mimics RiskScanWidget logic)
@@ -183,6 +194,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [providers, setProviders] = useState<Registry[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [marketingTemplates, setMarketingTemplates] = useState<MarketingTemplate[]>([]);
   const [calendarSlots, setCalendarSlots] = useState<CalendarSlot[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [notification, setNotification] = useState<{ msg: string; type: string } | null>(null);
@@ -238,10 +250,49 @@ export default function AdminDashboard() {
         .limit(500);
       setProviders(data || []);
       console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry)`);
-      setTemplates([
-        { id: 'ET-001', name: 'Cure Notice Warning', category: 'marketing', subject: 'URGENT: TX SB 1188 Alert', body: 'Your practice may be at risk.', event_trigger: 'risk_scan_high', is_active: true },
-        { id: 'ET-002', name: 'Verification Complete', category: 'transactional', subject: 'Sentry Verified', body: 'Congratulations! Your practice is verified.', event_trigger: 'verification_complete', is_active: true },
-      ]);
+      
+      // Load email templates from database
+      const { data: emailTemplatesData } = await supabase
+        .from('email_templates')
+        .select('*')
+        .order('name');
+      if (emailTemplatesData && emailTemplatesData.length > 0) {
+        setTemplates(emailTemplatesData.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category || 'transactional',
+          subject: t.subject || '',
+          body: t.body || t.html_body || '',
+          event_trigger: t.name, // Use name as event trigger
+          is_active: t.is_active !== false,
+          html_body: t.html_body
+        })));
+      } else {
+        // Fallback if no data
+        setTemplates([
+          { id: 'ET-001', name: 'Cure Notice Warning', category: 'marketing', subject: 'URGENT: TX SB 1188 Alert', body: 'Your practice may be at risk.', event_trigger: 'risk_scan_high', is_active: true },
+          { id: 'ET-002', name: 'Verification Complete', category: 'transactional', subject: 'Sentry Verified', body: 'Congratulations! Your practice is verified.', event_trigger: 'verification_complete', is_active: true },
+        ]);
+      }
+      
+      // Load marketing/asset templates from templates table
+      const { data: marketingData } = await supabase
+        .from('templates')
+        .select('*')
+        .order('id');
+      if (marketingData) {
+        setMarketingTemplates(marketingData.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          category: t.category || 'General',
+          description: t.description,
+          file_name: t.file_name,
+          file_type: t.file_type,
+          file_data: t.file_data,
+          last_updated: t.last_updated
+        })));
+      }
+      
       generateCalendarSlots();
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -835,19 +886,116 @@ export default function AdminDashboard() {
             )}
 
             {activeTab === 'templates' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between"><h3 className="text-sm font-bold">Email Templates</h3>
-                  <button onClick={() => setEditingTemplate({ id: `ET-${Date.now()}`, name: '', category: 'marketing', subject: '', body: '', event_trigger: '', is_active: true })} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> New</button></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {templates.map(t => (
-                    <div key={t.id} className="bg-white rounded-lg p-3 shadow-sm border">
-                      <div className="flex items-start justify-between mb-2">
-                        <div><h4 className="font-bold text-sm">{t.name}</h4><span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase ${t.category === 'marketing' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{t.category}</span></div>
-                        <button onClick={() => setEditingTemplate(t)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
-                      </div>
-                      <div className="text-xs text-slate-500"><strong>Subject:</strong> {t.subject}</div>
+              <div className="space-y-6">
+                {/* Email Templates Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold flex items-center gap-2"><Mail size={16} className="text-blue-600" /> Email Templates</h3>
+                      <p className="text-[10px] text-slate-500">Transactional emails sent to providers</p>
                     </div>
-                  ))}
+                    <button onClick={() => setEditingTemplate({ id: `ET-${Date.now()}`, name: '', category: 'transactional', subject: '', body: '', event_trigger: '', is_active: true })} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> New Email</button>
+                  </div>
+                  {templates.length === 0 ? (
+                    <div className="bg-slate-50 rounded-lg p-6 text-center">
+                      <Mail size={24} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-500">No email templates found</p>
+                      <p className="text-[10px] text-slate-400">Add templates to the email_templates table in Supabase</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {templates.map(t => (
+                        <div key={t.id} className="bg-white rounded-lg p-3 shadow-sm border hover:border-blue-300 transition-colors">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <h4 className="font-bold text-sm">{t.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</h4>
+                              <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase ${t.category === 'marketing' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{t.category || 'transactional'}</span>
+                            </div>
+                            <button onClick={() => setEditingTemplate(t)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
+                          </div>
+                          <div className="text-xs text-slate-500"><strong>Subject:</strong> {t.subject}</div>
+                          <div className="text-[9px] text-slate-400 mt-1">Trigger: {t.event_trigger || t.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Marketing/Asset Templates Section */}
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold flex items-center gap-2"><FileText size={16} className="text-amber-600" /> Marketing & Report Templates</h3>
+                      <p className="text-[10px] text-slate-500">PDFs, collateral, and downloadable assets ({marketingTemplates.length} templates)</p>
+                    </div>
+                  </div>
+                  {marketingTemplates.length === 0 ? (
+                    <div className="bg-slate-50 rounded-lg p-6 text-center">
+                      <FileText size={24} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-500">No marketing templates found</p>
+                      <p className="text-[10px] text-slate-400">Add templates to the templates table in Supabase</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 text-[9px] font-bold uppercase text-slate-600 border-b">
+                            <th className="px-3 py-2">ID</th>
+                            <th className="px-3 py-2">Name</th>
+                            <th className="px-3 py-2">Category</th>
+                            <th className="px-3 py-2">Description</th>
+                            <th className="px-3 py-2">File</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {marketingTemplates.map(t => (
+                            <tr key={t.id} className="hover:bg-slate-50">
+                              <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{t.id}</code></td>
+                              <td className="px-3 py-2">
+                                <div className="font-medium text-sm">{t.name}</div>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${
+                                  t.category === 'Client Report' ? 'bg-blue-100 text-blue-700' :
+                                  t.category === 'Email Marketing' ? 'bg-purple-100 text-purple-700' :
+                                  t.category === 'Sales Collateral' ? 'bg-green-100 text-green-700' :
+                                  t.category === 'Report' ? 'bg-amber-100 text-amber-700' :
+                                  t.category === 'Operational' ? 'bg-slate-100 text-slate-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{t.category}</span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <div className="text-xs text-slate-500 max-w-xs truncate">{t.description || '-'}</div>
+                              </td>
+                              <td className="px-3 py-2">
+                                {t.file_name ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-slate-400">{t.file_name}</span>
+                                    {t.file_data && (
+                                      <button 
+                                        onClick={() => {
+                                          // Download file
+                                          const link = document.createElement('a');
+                                          link.href = `data:${t.file_type || 'application/octet-stream'};base64,${t.file_data}`;
+                                          link.download = t.file_name || 'download';
+                                          link.click();
+                                        }}
+                                        className="p-1 hover:bg-blue-100 rounded"
+                                      >
+                                        <Download size={12} className="text-blue-600" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-[9px] text-slate-300">No file</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
