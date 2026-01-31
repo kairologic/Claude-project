@@ -3,7 +3,7 @@ import { FileText, Download, Loader2, AlertCircle, CheckCircle, XCircle, Shield 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-// Supabase Configuration-Update these with your actual values
+// Supabase Configuration - Update these with your actual values
 const SUPABASE_URL = 'https://mxrtltezhkxhqizvxvsz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cnRsdGV6aGt4aHFpenZ4dnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzI1ODAsImV4cCI6MjA4NDM0ODU4MH0.pkPlFyHsMOKJKcxuw_eoV5EKkrXG09Vx_0MIDgHn7aw';
 
