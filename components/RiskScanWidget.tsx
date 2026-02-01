@@ -692,7 +692,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       setResults({ ...scanResults, reportId });
       
       if (onScanComplete) {
-        onScanComplete(scanResults);
+        onScanComplete({ ...scanResults, reportId });
       }
 
     } catch (error) {

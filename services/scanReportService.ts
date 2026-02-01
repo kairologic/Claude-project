@@ -94,7 +94,7 @@ export async function getReportsForProvider(npi: string): Promise<ReportListItem
       emailed_at: r.emailed_at,
       payment_confirmed: r.payment_confirmed,
       findings_count: Array.isArray(r.findings) ? r.findings.length : 0,
-      violations_count: Array.isArray(r.findings) ? r.findings.filter((f: Record<string, unknown>) => f.status === 'fail').length : 0,
+      violations_count: Array.isArray(r.findings) ? r.findings.filter((f: unknown) => (f as Record<string, unknown>).status === 'fail').length : 0,
       category_scores: r.category_scores,
     }));
   } catch (e) {
