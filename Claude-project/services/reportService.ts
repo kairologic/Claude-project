@@ -95,7 +95,8 @@ To achieve full compliance:
 
 1. SCHEDULE CONSULTATION
    Contact KairoLogic to discuss remediation strategies
-   Email: support@kairologic.com
+   Email: compliance@kairologic.com
+   Phone: (512) 402-2237
    
 2. IMPLEMENT TECHNICAL FIXES
    Follow the recommended fixes outlined above for each issue
@@ -107,8 +108,13 @@ To achieve full compliance:
 4. VERIFY & CERTIFY
    Complete final attestation to achieve Verified Sovereign status
 
+If you have questions regarding the forensic findings in this report
+or wish to authorize an immediate migration to a Texas-Sovereign Node,
+please contact our Austin Engineering desk at (512) 402-2237.
+
 ${separator}
 KairoLogic Compliance Vanguard | ATX-01 Anchor Node
+compliance@kairologic.com | (512) 402-2237
 Report Generated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })} CST
 ${separator}
 `;
@@ -469,10 +475,14 @@ export const generateHTMLReport = (data: ReportData): string => {
         <a href="https://kairologic.com/contact" class="cta-button cta-primary">Schedule Consultation</a>
         <a href="https://kairologic.com/services" class="cta-button cta-secondary">View Services</a>
       </div>
+      <p style="margin-top: 24px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+        If you have questions regarding the forensic findings in this report or wish to authorize an immediate migration to a Texas-Sovereign Node, please contact our Austin Engineering desk at <strong style="color: #C5A059;">(512) 402-2237</strong>.
+      </p>
     </div>
     
     <div class="footer">
       KairoLogic Compliance Vanguard | ATX-01 Anchor Node<br>
+      compliance@kairologic.com &nbsp;|&nbsp; (512) 402-2237<br>
       Report Generated: ${new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })} CST
     </div>
   </div>
@@ -511,7 +521,8 @@ export const generateJSONReport = (data: ReportData): string => {
       'Complete final attestation for Verified status'
     ],
     contact: {
-      email: 'support@kairologic.com',
+      email: 'compliance@kairologic.com',
+      phone: '(512) 402-2237',
       website: 'https://kairologic.com'
     }
   };

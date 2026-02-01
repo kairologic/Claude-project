@@ -97,6 +97,7 @@ Sent from KairoLogic Sentry Platform
     </div>
     <div class="footer">
       Sent from KairoLogic Sentry Platform<br>
+      compliance@kairologic.com | (512) 402-2237<br>
       ${new Date().toLocaleString()}
     </div>
   </div>
