@@ -114,6 +114,35 @@ Sent from KairoLogic Sentry Platform
       throw new Error('Failed to send email');
     }
 
+    // ── Create prospect record ──
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
+    const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cnRsdGV6aGt4aHFpenZ4dnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzI1ODAsImV4cCI6MjA4NDM0ODU4MH0.pkPlFyHsMOKJKcxuw_eoV5EKkrXG09Vx_0MIDgHn7aw';
+    
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/prospects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          source: 'contact',
+          source_detail: subject,
+          contact_name: contactName,
+          email,
+          practice_name: practiceName,
+          subject,
+          message,
+          priority: subject === 'Remediation Required' ? 'urgent' : 'normal',
+          form_data: { contactName, email, practiceName, subject, message, submitted_at: new Date().toISOString() },
+        }),
+      });
+    } catch (prospectErr) {
+      console.error('[CONTACT] Prospect creation failed (non-critical):', prospectErr);
+    }
+
     return NextResponse.json({ 
       success: true,
       message: 'Email sent successfully' 

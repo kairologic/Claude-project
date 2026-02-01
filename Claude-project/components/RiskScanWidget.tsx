@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, XCircle, Loader2, Shield, Globe, Brain, Lock } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Loader2, Shield, Globe, Brain, Lock, MapPin, AlertTriangle } from 'lucide-react';
 
 // Supabase Configuration - Update these with your actual values
 const SUPABASE_URL = 'https://mxrtltezhkxhqizvxvsz.supabase.co';
@@ -616,6 +616,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         complianceStatus: scanData.complianceStatus || (score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation'),
         findings: allFindings,
         topIssues,
+        categoryScores: scanData.categoryScores || null,
+        dataBorderMap: scanData.dataBorderMap || [],
+        pageContext: scanData.pageContext || null,
         scanTimestamp: Date.now(),
         scanDuration: scanData.scanDuration,
         engineVersion: scanData.engineVersion,
@@ -631,6 +634,73 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Save violations
       await saveViolationsToSupabase(npi, allFindings);
+
+      // Auto-generate forensic report and store in scan_reports table
+      addLog('📄 Generating forensic audit report...', 'info');
+      let reportId = '';
+      try {
+        const reportResponse = await fetch('/api/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            npi,
+            url,
+            riskScore: score,
+            complianceStatus: scanData.complianceStatus || (score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation'),
+            findings: allFindings,
+            categoryScores: scanData.categoryScores,
+            dataBorderMap: scanData.dataBorderMap,
+            pageContext: scanData.pageContext,
+            npiVerification: scanData.npiVerification,
+            engineVersion: scanData.engineVersion,
+            scanDuration: scanData.scanDuration,
+            providerName,
+            name: providerName,
+            meta: scanData.meta
+          })
+        });
+        if (reportResponse.ok) {
+          const reportResult = await reportResponse.json();
+          reportId = reportResult.reportId || '';
+          addLog(`[OK] Forensic report stored: ${reportId}`, 'success');
+        } else {
+          addLog('[WARN] Report storage failed (non-critical)', 'warning');
+        }
+      } catch {
+        addLog('[WARN] Report generation skipped (non-critical)', 'warning');
+      }
+
+      // Create prospect record for admin pipeline
+      try {
+        await fetch('/api/prospects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'scan',
+            source_detail: `Score: ${score}/100 (${riskMeterLevel})`,
+            practice_name: providerName || `Provider ${npi}`,
+            npi,
+            website_url: url,
+            scan_score: score,
+            scan_risk_level: riskMeterLevel,
+            scan_report_id: reportId || undefined,
+            priority: score < 34 ? 'urgent' : score < 67 ? 'high' : 'normal',
+            form_data: {
+              npi,
+              url,
+              score,
+              riskLevel: riskMeterLevel,
+              complianceStatus: scanData.complianceStatus,
+              violationCount: allFindings.filter((f: unknown) => (f as Record<string, unknown>).status === 'fail').length,
+              categoryScores: scanData.categoryScores,
+              scanned_at: new Date().toISOString(),
+            },
+          }),
+        });
+        addLog('[OK] Prospect record created', 'success');
+      } catch {
+        // Non-critical
+      }
 
       // Try edge functions (non-blocking)
       try {
@@ -648,10 +718,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       setProgress(100);
       addLog(`[OK] Scan complete! Score: ${score}/100 (${riskMeterLevel})`, 'success');
-      setResults(scanResults);
+      if (reportId) {
+        addLog(`📋 Report ID: ${reportId}`, 'info');
+      }
+      setResults({ ...scanResults, reportId });
       
       if (onScanComplete) {
-        onScanComplete(scanResults);
+        onScanComplete({ ...scanResults, reportId });
       }
 
     } catch (error) {
@@ -768,69 +841,247 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       {/* Results Section */}
       {results && (
         <div className="bg-white p-6 rounded-lg shadow-sm">
-          {/* Summary Card */}
+
+          {/* Page Context Banner */}
+          {results.pageContext && (
+            <div className="mb-4 px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-2 text-sm text-slate-600">
+              <Globe className="w-4 h-4 text-slate-400" />
+              <span>Scanned page type: <strong className="text-slate-800 capitalize">{results.pageContext.type?.replace(/_/g, ' ') || 'General'}</strong></span>
+              {results.pageContext.pageTitle && results.pageContext.pageTitle !== 'Unknown' && (
+                <span className="text-slate-400 ml-1">— &quot;{results.pageContext.pageTitle.substring(0, 60)}&quot;</span>
+              )}
+              {results.pageContext.hasPatientPortal && <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Portal Detected</span>}
+              {results.pageContext.hasChatbot && <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">Chatbot Detected</span>}
+            </div>
+          )}
+
+          {/* Composite Score + Category Breakdown */}
           <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">Compliance Score</h3>
+                <h3 className="text-xl font-bold text-slate-800">Composite Compliance Score</h3>
                 <p className="text-sm text-slate-600">NPI: {results.npi}</p>
+                {results.engineVersion && <p className="text-xs text-slate-400 mt-0.5">Engine: {results.engineVersion}</p>}
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-blue-600">{results.riskScore}%</div>
-                <div className={`text-sm font-semibold ${
-                  results.riskLevel === 'Low' ? 'text-green-600' :
-                  results.riskLevel === 'Moderate' ? 'text-amber-600' :
+                <div className={`text-4xl font-bold ${
+                  results.riskScore >= 67 ? 'text-green-600' :
+                  results.riskScore >= 34 ? 'text-amber-600' :
                   'text-red-600'
+                }`}>{results.riskScore}%</div>
+                <div className={`text-sm font-semibold px-3 py-0.5 rounded-full inline-block mt-1 ${
+                  results.riskMeterLevel === 'Sovereign' ? 'bg-green-100 text-green-700' :
+                  results.riskMeterLevel === 'Drift' ? 'bg-amber-100 text-amber-700' :
+                  'bg-red-100 text-red-700'
                 }`}>
                   {results.riskMeterLevel}
                 </div>
               </div>
             </div>
 
-            {results.topIssues.length > 0 && (
+            {/* Category Score Breakdown */}
+            {results.categoryScores && (
               <div className="mt-4 pt-4 border-t border-blue-200">
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">Top Issues:</h4>
+                <h4 className="text-sm font-semibold text-slate-700 mb-3">Category Breakdown — Path to 100%</h4>
+                <div className="space-y-3">
+                  {[
+                    { key: 'data_sovereignty', label: 'Data Residency', icon: <Globe className="w-4 h-4" />, weight: '45%' },
+                    { key: 'ai_transparency', label: 'AI Transparency', icon: <Brain className="w-4 h-4" />, weight: '30%' },
+                    { key: 'clinical_integrity', label: 'Clinical Integrity', icon: <Lock className="w-4 h-4" />, weight: '25%' },
+                  ].map((cat) => {
+                    const catScore = results.categoryScores[cat.key];
+                    if (!catScore) return null;
+                    const pct = catScore.percentage;
+                    const barColor = pct >= 67 ? 'bg-green-500' : pct >= 34 ? 'bg-amber-500' : 'bg-red-500';
+                    const textColor = pct >= 67 ? 'text-green-700' : pct >= 34 ? 'text-amber-700' : 'text-red-700';
+                    const bgColor = pct >= 67 ? 'bg-green-50' : pct >= 34 ? 'bg-amber-50' : 'bg-red-50';
+                    return (
+                      <div key={cat.key} className={`p-3 rounded-lg ${bgColor}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                            {cat.icon}
+                            <span>{cat.label}</span>
+                            <span className="text-xs text-slate-400 font-normal">(weight: {cat.weight})</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-lg font-bold ${textColor}`}>{pct}%</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              catScore.level === 'Sovereign' ? 'bg-green-200 text-green-800' :
+                              catScore.level === 'Drift' ? 'bg-amber-200 text-amber-800' :
+                              'bg-red-200 text-red-800'
+                            }`}>{catScore.level}</span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-white/60 rounded-full h-2 mb-1">
+                          <div className={`h-2 rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {catScore.passed}/{catScore.findings} passed
+                          {catScore.failed > 0 && <span className="text-red-600 ml-1">• {catScore.failed} failed</span>}
+                          {catScore.warnings > 0 && <span className="text-amber-600 ml-1">• {catScore.warnings} warning{catScore.warnings > 1 ? 's' : ''}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Top Issues with PHI Risk */}
+            {results.topIssues && results.topIssues.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-blue-200">
+                <h4 className="text-sm font-semibold text-slate-700 mb-2">Priority Issues:</h4>
                 {results.topIssues.map((issue: any, idx: number) => (
-                  <div key={idx} className="text-sm text-slate-600 mb-1">
-                    • {issue.id}: {issue.name}
+                  <div key={idx} className="flex items-center gap-2 text-sm text-slate-600 mb-1.5">
+                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+                      issue.severity === 'critical' ? 'bg-red-500' :
+                      issue.severity === 'high' ? 'bg-orange-500' :
+                      issue.severity === 'medium' ? 'bg-amber-400' : 'bg-blue-400'
+                    }`} />
+                    <span className="font-medium">{issue.id}:</span> {issue.name}
+                    {issue.phiRisk === 'direct' && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">PHI Risk</span>
+                    )}
+                    {issue.severity === 'critical' && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-xs">Fine Risk</span>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
 
+          {/* Data Border Map */}
+          {results.dataBorderMap && results.dataBorderMap.length > 0 && (
+            <div className="mb-6 p-5 border border-slate-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-bold text-slate-800">Data Border Map</h3>
+                <span className="text-xs text-slate-400 ml-2">Where your data touches</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {results.dataBorderMap.map((node: any, idx: number) => {
+                  const isUS = node.isSovereign;
+                  const riskBg = node.phiRisk === 'direct' && !isUS ? 'bg-red-50 border-red-200' :
+                    node.phiRisk === 'indirect' && !isUS ? 'bg-amber-50 border-amber-200' :
+                    isUS ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200';
+                  return (
+                    <div key={idx} className={`p-3 rounded-lg border ${riskBg} text-sm`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-lg">{isUS ? '🇺🇸' : '🌍'}</span>
+                          <span className="font-medium text-slate-800 truncate max-w-[180px]" title={node.domain}>
+                            {node.domain.length > 28 ? node.domain.substring(0, 28) + '...' : node.domain}
+                          </span>
+                        </div>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          node.type === 'primary' ? 'bg-blue-100 text-blue-700' :
+                          node.type === 'mail' ? 'bg-purple-100 text-purple-700' :
+                          node.type === 'cdn' ? 'bg-sky-100 text-sky-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>{node.type}</span>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {node.city}, {node.country}
+                        {node.ip && <span className="text-slate-400 ml-1">({node.ip})</span>}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1">
+                        {node.phiRisk === 'direct' && <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">PHI Handler</span>}
+                        {node.phiRisk === 'indirect' && <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Tracking/Analytics</span>}
+                        {node.phiRisk === 'none' && <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Static Asset</span>}
+                        {node.purpose && <span className="text-xs text-slate-400 ml-1">{node.purpose}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Border Summary */}
+              {(() => {
+                const foreign = results.dataBorderMap.filter((n: any) => !n.isSovereign);
+                const foreignPHI = foreign.filter((n: any) => n.phiRisk === 'direct');
+                const total = results.dataBorderMap.length;
+                return (
+                  <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-3">
+                    <span>{total} endpoint{total !== 1 ? 's' : ''} mapped</span>
+                    <span className="text-green-600">🇺🇸 {total - foreign.length} US</span>
+                    {foreign.length > 0 && <span className="text-amber-600">🌍 {foreign.length} foreign</span>}
+                    {foreignPHI.length > 0 && <span className="text-red-600 font-medium">⚠ {foreignPHI.length} foreign PHI handler{foreignPHI.length > 1 ? 's' : ''}</span>}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Detailed Findings */}
           <div>
             <h3 className="text-lg font-bold text-slate-800 mb-4">Detailed Findings</h3>
             <div className="space-y-3">
-              {['Data Sovereignty & Residency', 'AI Transparency & Disclosure', 'EHR System Integrity & Parental Access'].map((category: string, catIdx: number) => {
-                const categoryFindings = results.findings.filter((f: any) => {
-                  if (category.includes('Data')) return f.id.startsWith('DR-');
-                  if (category.includes('AI')) return f.id.startsWith('AI-');
-                  if (category.includes('EHR')) return f.id.startsWith('ER-');
-                  return false;
-                });
+              {[
+                { prefix: 'DR-', label: 'Data Sovereignty & Residency', catKey: 'data_sovereignty' },
+                { prefix: 'AI-', label: 'AI Transparency & Disclosure', catKey: 'ai_transparency' },
+                { prefix: 'ER-', label: 'EHR System Integrity & Parental Access', catKey: 'clinical_integrity' }
+              ].map((category, catIdx: number) => {
+                const categoryFindings = results.findings.filter((f: any) => f.id.startsWith(category.prefix));
+                const catScore = results.categoryScores?.[category.catKey];
 
                 return (
                   <div key={catIdx} className="border border-slate-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      {getCategoryIcon(category)}
-                      <h4 className="font-semibold text-slate-800">{category}</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {getCategoryIcon(category.label)}
+                        <h4 className="font-semibold text-slate-800">{category.label}</h4>
+                      </div>
+                      {catScore && (
+                        <span className={`text-sm font-bold px-2 py-0.5 rounded ${
+                          catScore.percentage >= 67 ? 'bg-green-100 text-green-700' :
+                          catScore.percentage >= 34 ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>{catScore.percentage}%</span>
+                      )}
                     </div>
                     <div className="space-y-2">
                       {categoryFindings.map((finding: any, idx: number) => (
-                        <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded">
+                        <div key={idx} className={`flex items-start gap-3 p-3 rounded ${
+                          finding.status === 'pass' ? 'bg-green-50/50' :
+                          finding.status === 'fail' ? 'bg-red-50/50' :
+                          finding.status === 'warn' ? 'bg-amber-50/50' : 'bg-slate-50'
+                        }`}>
                           {finding.status === 'pass' ? (
                             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                          ) : finding.status === 'warn' ? (
+                            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                           ) : (
                             <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                           )}
                           <div className="flex-1">
-                            <div className="font-medium text-sm text-slate-800">
-                              {finding.id}: {finding.name}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm text-slate-800">{finding.id}: {finding.name}</span>
+                              {/* Severity Badge */}
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                finding.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                                finding.severity === 'high' ? 'bg-orange-100 text-orange-700' :
+                                finding.severity === 'medium' ? 'bg-amber-100 text-amber-700' :
+                                finding.severity === 'info' ? 'bg-blue-100 text-blue-600' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>{finding.severity}</span>
+                              {/* PHI Risk Badge */}
+                              {finding.phiRisk === 'direct' && (
+                                <span className="text-xs px-1.5 py-0.5 bg-red-50 text-red-600 rounded border border-red-200">PHI Direct</span>
+                              )}
+                              {finding.phiRisk === 'indirect' && (
+                                <span className="text-xs px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-200">PHI Indirect</span>
+                              )}
+                              {/* Page Context Badge */}
+                              {finding.pageContext && finding.status !== 'pass' && (
+                                <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">
+                                  {finding.pageContext.replace(/_/g, ' ')} page
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-slate-600 mt-1">{finding.detail}</div>
-                            <div className="text-xs text-slate-500 mt-1 italic">{finding.clause}</div>
+                            <div className="text-xs text-slate-400 mt-1 italic">{finding.clause}</div>
                           </div>
                         </div>
                       ))}

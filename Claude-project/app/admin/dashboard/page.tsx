@@ -8,14 +8,15 @@ import {
   Shield, Users, Database, Calendar, Mail, 
   Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, 
   CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode, 
-  BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap, Pause, FileWarning
+  BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap, Pause, FileWarning, UserPlus
 } from 'lucide-react';
 
 import { AssetsTab } from '@/components/admin/AssetsTab';
 import { PageContentTab } from '@/components/admin/PageContentTab';
 import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
+import { ProspectsTab } from '@/components/admin/ProspectsTab';
 
-type TabType = 'overview' | 'registry' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
+type TabType = 'overview' | 'registry' | 'prospects' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
 
 // Technical fixes for violations (from RiskScanWidget)
 const TECHNICAL_FIXES: Record<string, any> = {
@@ -687,6 +688,7 @@ export default function AdminDashboard() {
 
   const tabs = [
     { id: 'overview' as TabType, icon: <BarChart3 size={15} />, label: 'Overview' },
+    { id: 'prospects' as TabType, icon: <UserPlus size={15} />, label: 'Prospects' },
     { id: 'registry' as TabType, icon: <Database size={15} />, label: 'Registry' },
     { id: 'widgets' as TabType, icon: <Shield size={15} />, label: 'Widgets' },
     { id: 'templates' as TabType, icon: <Mail size={15} />, label: 'Templates' },
@@ -1036,6 +1038,7 @@ export default function AdminDashboard() {
 
             {activeTab === 'content' && <PageContentTab showNotification={notify} />}
             {activeTab === 'assets' && <AssetsTab showNotification={notify} />}
+            {activeTab === 'prospects' && <ProspectsTab showNotification={notify} />}
           </>
         )}
       </div>
