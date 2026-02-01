@@ -635,6 +635,41 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       // Save violations
       await saveViolationsToSupabase(npi, allFindings);
 
+      // Auto-generate forensic report and store in scan_reports table
+      addLog('📄 Generating forensic audit report...', 'info');
+      let reportId = '';
+      try {
+        const reportResponse = await fetch('/api/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            npi,
+            url,
+            riskScore: score,
+            complianceStatus: scanData.complianceStatus || (score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation'),
+            findings: allFindings,
+            categoryScores: scanData.categoryScores,
+            dataBorderMap: scanData.dataBorderMap,
+            pageContext: scanData.pageContext,
+            npiVerification: scanData.npiVerification,
+            engineVersion: scanData.engineVersion,
+            scanDuration: scanData.scanDuration,
+            providerName,
+            name: providerName,
+            meta: scanData.meta
+          })
+        });
+        if (reportResponse.ok) {
+          const reportResult = await reportResponse.json();
+          reportId = reportResult.reportId || '';
+          addLog(`[OK] Forensic report stored: ${reportId}`, 'success');
+        } else {
+          addLog('[WARN] Report storage failed (non-critical)', 'warning');
+        }
+      } catch {
+        addLog('[WARN] Report generation skipped (non-critical)', 'warning');
+      }
+
       // Try edge functions (non-blocking)
       try {
         await fetch(
@@ -651,7 +686,10 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       setProgress(100);
       addLog(`[OK] Scan complete! Score: ${score}/100 (${riskMeterLevel})`, 'success');
-      setResults(scanResults);
+      if (reportId) {
+        addLog(`📋 Report ID: ${reportId}`, 'info');
+      }
+      setResults({ ...scanResults, reportId });
       
       if (onScanComplete) {
         onScanComplete(scanResults);
