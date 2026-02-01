@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentry Widget Test - Practice Website Simulation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      color: #333;
+    }
+    
+    /* Simulated practice website header */
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+      color: white;
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    .logo span {
+      color: #4CAF50;
+    }
+    
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin-left: 30px;
+      font-weight: 500;
+    }
+    
+    nav a:hover {
+      color: #90CAF9;
+    }
+    
+    /* Hero section */
+    .hero {
+      background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
+                  url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1920') center/cover;
+      color: white;
+      padding: 100px 40px;
+      text-align: center;
+    }
+    
+    .hero h1 {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+    
+    .hero p {
+      font-size: 20px;
+      max-width: 600px;
+      margin: 0 auto 30px;
+      opacity: 0.9;
+    }
+    
+    .cta-button {
+      background: #4CAF50;
+      color: white;
+      padding: 15px 40px;
+      border: none;
+      border-radius: 30px;
+      font-size: 18px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+    }
+    
+    /* Services section */
+    .services {
+      padding: 80px 40px;
+      background: #f5f5f5;
+    }
+    
+    .services h2 {
+      text-align: center;
+      font-size: 36px;
+      margin-bottom: 50px;
+      color: #1e3a5f;
+    }
+    
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .service-card {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .service-card .icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+    
+    .service-card h3 {
+      color: #1e3a5f;
+      margin-bottom: 15px;
+    }
+    
+    /* Footer */
+    footer {
+      background: #1e3a5f;
+      color: white;
+      padding: 60px 40px 30px;
+    }
+    
+    .footer-content {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 40px;
+      max-width: 1200px;
+      margin: 0 auto 40px;
+    }
+    
+    .footer-section h4 {
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+    
+    .footer-section ul {
+      list-style: none;
+    }
+    
+    .footer-section li {
+      margin-bottom: 10px;
+    }
+    
+    .footer-section a {
+      color: #90CAF9;
+      text-decoration: none;
+    }
+    
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,0.1);
+      padding-top: 30px;
+      text-align: center;
+      font-size: 14px;
+      opacity: 0.7;
+    }
+    
+    /* Test controls panel */
+    .test-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      z-index: 10000;
+      max-width: 320px;
+    }
+    
+    .test-panel h3 {
+      margin-bottom: 15px;
+      color: #1e3a5f;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .test-panel label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+    }
+    
+    .test-panel input, .test-panel select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    
+    .test-panel button {
+      width: 100%;
+      padding: 10px;
+      background: #00234E;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    
+    .test-panel button:hover {
+      background: #0a3a7a;
+    }
+    
+    .test-panel button.secondary {
+      background: #6b7280;
+    }
+    
+    .test-panel .info {
+      font-size: 11px;
+      color: #888;
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    
+    .test-panel .toggle-btn {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      width: 24px;
+      height: 24px;
+      background: #1e3a5f;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .test-panel.collapsed {
+      padding: 10px;
+      width: auto;
+    }
+    
+    .test-panel.collapsed > *:not(.toggle-btn):not(h3) {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Test Controls Panel -->
+  <div class="test-panel" id="testPanel">
+    <button class="toggle-btn" onclick="togglePanel()">−</button>
+    <h3>🧪 Widget Test Controls</h3>
+    
+    <label for="testNpi">NPI Number</label>
+    <input type="text" id="testNpi" value="1234567890" placeholder="10-digit NPI">
+    
+    <label for="testPosition">Position</label>
+    <select id="testPosition">
+      <option value="bottom-right">Bottom Right</option>
+      <option value="bottom-left">Bottom Left</option>
+      <option value="inline">Inline (in footer)</option>
+    </select>
+    
+    <label for="testTheme">Theme</label>
+    <select id="testTheme">
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+    
+    <label for="testSize">Size</label>
+    <select id="testSize">
+      <option value="standard">Standard</option>
+      <option value="compact">Compact</option>
+      <option value="badge-only">Badge Only</option>
+    </select>
+    
+    <button onclick="reloadWidget()">Reload Widget</button>
+    <button class="secondary" onclick="window.KairoLogicSentry?.refresh()">Refresh Data</button>
+    
+    <div class="info">
+      <strong>Test NPIs:</strong><br>
+      • Use any 10-digit number<br>
+      • Widget fetches from your KairoLogic API<br>
+      • If not found, shows error state
+    </div>
+  </div>
+
+  <!-- Simulated Practice Website -->
+  <header>
+    <div class="logo">Austin <span>Family</span> Medical</div>
+    <nav>
+      <a href="#">Home</a>
+      <a href="#">Services</a>
+      <a href="#">Providers</a>
+      <a href="#">Patient Portal</a>
+      <a href="#">Contact</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Your Health, Our Priority</h1>
+    <p>Comprehensive family healthcare serving the Austin community for over 25 years. Now accepting new patients.</p>
+    <button class="cta-button">Schedule an Appointment</button>
+  </section>
+
+  <section class="services">
+    <h2>Our Services</h2>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="icon">🩺</div>
+        <h3>Primary Care</h3>
+        <p>Comprehensive health management for patients of all ages.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon">💉</div>
+        <h3>Preventive Care</h3>
+        <p>Vaccinations, screenings, and wellness programs.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon">🏥</div>
+        <h3>Urgent Care</h3>
+        <p>Same-day appointments for non-emergency issues.</p>
+      </div>
+      <div class="service-card">
+        <div class="icon">🧬</div>
+        <h3>Chronic Disease</h3>
+        <p>Management of diabetes, hypertension, and more.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-content">
+      <div class="footer-section">
+        <h4>Contact Us</h4>
+        <p>123 Medical Center Drive<br>Austin, TX 78701</p>
+        <p>Phone: (512) 555-0123<br>Fax: (512) 555-0124</p>
+      </div>
+      <div class="footer-section">
+        <h4>Hours</h4>
+        <p>Monday - Friday: 8am - 6pm<br>Saturday: 9am - 1pm<br>Sunday: Closed</p>
+      </div>
+      <div class="footer-section">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#">Patient Forms</a></li>
+          <li><a href="#">Insurance</a></li>
+          <li><a href="#">Privacy Policy</a></li>
+          <li><a href="#">HIPAA Notice</a></li>
+        </ul>
+      </div>
+      <div class="footer-section" id="inlineWidgetContainer">
+        <h4>Compliance</h4>
+        <p style="font-size: 14px; opacity: 0.8; margin-bottom: 15px;">
+          We maintain the highest standards of data privacy and regulatory compliance.
+        </p>
+        <!-- Inline widget will be inserted here if position is "inline" -->
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2026 Austin Family Medical. All rights reserved. | HIPAA Compliant
+    </div>
+  </footer>
+
+  <!-- Widget Script -->
+  <script>
+    // Configuration
+    let widgetConfig = {
+      npi: '1234567890',
+      position: 'bottom-right',
+      theme: 'light',
+      size: 'standard'
+    };
+
+    // For local testing, override the API URL
+    // Remove this line when testing against production
+    window.KAIROLOGIC_API_URL = 'http://localhost:3000';
+    
+    // Uncomment this for production testing:
+    // window.KAIROLOGIC_API_URL = 'https://kairlogic-website.vercel.app';
+
+    function loadWidget() {
+      // Remove existing widget and styles
+      const existingWidget = document.getElementById('kl-sentry-widget');
+      const existingStyles = document.getElementById('kl-sentry-styles');
+      if (existingWidget) existingWidget.remove();
+      if (existingStyles) existingStyles.remove();
+
+      // Create new script tag
+      const script = document.createElement('script');
+      script.src = window.KAIROLOGIC_API_URL + '/sentry.js';
+      script.setAttribute('data-npi', widgetConfig.npi);
+      script.setAttribute('data-position', widgetConfig.position);
+      script.setAttribute('data-theme', widgetConfig.theme);
+      script.setAttribute('data-size', widgetConfig.size);
+      script.id = 'kl-sentry-script';
+      
+      // Remove old script if exists
+      const existingScript = document.getElementById('kl-sentry-script');
+      if (existingScript) existingScript.remove();
+      
+      document.body.appendChild(script);
+    }
+
+    function reloadWidget() {
+      // Get values from inputs
+      widgetConfig.npi = document.getElementById('testNpi').value;
+      widgetConfig.position = document.getElementById('testPosition').value;
+      widgetConfig.theme = document.getElementById('testTheme').value;
+      widgetConfig.size = document.getElementById('testSize').value;
+      
+      loadWidget();
+    }
+
+    function togglePanel() {
+      const panel = document.getElementById('testPanel');
+      const btn = panel.querySelector('.toggle-btn');
+      panel.classList.toggle('collapsed');
+      btn.textContent = panel.classList.contains('collapsed') ? '+' : '−';
+    }
+
+    // Initial load
+    loadWidget();
+  </script>
+
+</body>
+</html>
