@@ -21,22 +21,23 @@ export default function HomePage() {
               {c('hero_badge', '🟢 SOVEREIGN MODE: ATX-01 ACTIVE')}
             </div>
             <h1 
-              className="text-6xl md:text-7xl font-display font-extrabold mb-6 leading-tight"
+              className="text-5xl md:text-7xl font-display font-extrabold mb-6 leading-tight"
               dangerouslySetInnerHTML={{ 
-                __html: c('hero_title', 'THE <span class="text-gold">SENTRY</span><br/>COMPLIANCE STANDARD') 
+                __html: c('hero_title', 'Texas Healthcare Compliance, <span class="text-gold">Simplified.</span><br/><span class="text-3xl md:text-4xl font-bold text-gray-300">Architecting the Sovereign Fortress for Your Patient Data.</span>') 
               }}
             />
-            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-8">
-              {c('hero_subtitle', 'Navigate SB 1188 and HB 149 with unwavering confidence. Your sovereign health data fortress.')}
+            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-4">
+              {c('hero_subtitle', 'Stop worrying about shifting regulations. KairoLogic provides a secure, US-only infrastructure designed specifically to meet the strict demands of SB 1188 and HB 149. We monitor your compliance 24/7, so you can focus on your patients.')}
             </p>
+            <p className="text-sm text-gray-400 mb-8">Designed for Texas Medical Practices & Independent Providers.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/scan">
                 <button className="btn-primary text-lg px-8 py-4">
-                  {c('hero_cta_primary', 'RUN COMPLIANCE SCAN')}
+                  {c('hero_cta_primary', 'RUN MY COMPLIANCE CHECK')}
                 </button>
               </Link>
               <Link href="/registry">
-                <button className="btn-outline text-lg px-8 py-4 bg-white/10 border-white hover:bg-white">
+                <button className="btn-outline text-lg px-8 py-4 bg-white/10 border-white hover:bg-gold hover:border-gold hover:text-navy transition-all duration-200">
                   {c('hero_cta_secondary', 'VIEW TEXAS REGISTRY')}
                 </button>
               </Link>
@@ -45,28 +46,31 @@ export default function HomePage() {
 
           {/* Trust Indicators */}
           <div className="grid md:grid-cols-3 gap-6 mt-16">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center">
-              <div className="text-4xl font-display font-bold text-gold mb-2">
-                {c('trust_stat_1_value', '480K+')}
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center border border-white/10 hover:border-gold/40 transition-colors">
+              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">The Legal Fix</div>
+              <div className="text-3xl font-display font-bold text-white mb-2">
+                {c('trust_stat_1_value', 'SB 1188 Certified')}
               </div>
-              <div className="text-sm text-gray-300">
-                {c('trust_stat_1_label', 'Texas Providers Monitored')}
-              </div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center">
-              <div className="text-4xl font-display font-bold text-gold mb-2">
-                {c('trust_stat_2_value', '100%')}
-              </div>
-              <div className="text-sm text-gray-300">
-                {c('trust_stat_2_label', 'SB 1188 Compliant')}
+              <div className="text-sm text-gray-300 leading-relaxed">
+                {c('trust_stat_1_label', '100% US-based data sovereignty. No international routing. No legal gray areas.')}
               </div>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center">
-              <div className="text-4xl font-display font-bold text-gold mb-2">
-                {c('trust_stat_3_value', '24/7')}
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center border border-white/10 hover:border-gold/40 transition-colors">
+              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">The Security Standard</div>
+              <div className="text-3xl font-display font-bold text-white mb-2">
+                {c('trust_stat_2_value', 'Zero-Trust Security')}
               </div>
-              <div className="text-sm text-gray-300">
-                {c('trust_stat_3_label', 'Real-Time Monitoring')}
+              <div className="text-sm text-gray-300 leading-relaxed">
+                {c('trust_stat_2_label', 'Built on a modern, encrypted architecture that assumes nothing and protects everything.')}
+              </div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center border border-white/10 hover:border-gold/40 transition-colors">
+              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">The Peace of Mind</div>
+              <div className="text-3xl font-display font-bold text-white mb-2">
+                {c('trust_stat_3_value', '24/7 Guardrails')}
+              </div>
+              <div className="text-sm text-gray-300 leading-relaxed">
+                {c('trust_stat_3_label', 'Real-time monitoring that alerts you before a compliance gap becomes a liability.')}
               </div>
             </div>
           </div>
