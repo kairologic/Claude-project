@@ -141,52 +141,72 @@ interface MarketingTemplate {
 }
 interface CalendarSlot { id: string; date: string; time: string; is_booked: boolean; booked_by?: { name: string } | null; }
 
-// Simulated scan function (mimics RiskScanWidget logic)
-const runComplianceScan = async (url: string): Promise<any> => {
-  // Simulate scan checks for SB1188 and HB149
-  const sb1188Findings = [
-    { id: 'DR-01', name: 'Primary EHR Domain IP Geo-Location', status: Math.random() > 0.3 ? 'pass' : 'fail', clause: 'Sec. 183.002(a)' },
-    { id: 'DR-02', name: 'CDN & Edge Cache Analysis', status: Math.random() > 0.4 ? 'pass' : 'fail', clause: 'Sec. 183.002(a)' },
-    { id: 'DR-03', name: 'MX Record Analysis', status: Math.random() > 0.5 ? 'pass' : 'fail', clause: 'Sec. 183.002(b)' },
-    { id: 'DR-04', name: 'Third-Party Resource Audit', status: Math.random() > 0.4 ? 'pass' : 'fail', clause: 'Sec. 183.002(c)' },
-  ];
-  
-  const hb149Findings = [
-    { id: 'AI-01', name: 'AI Disclosure Presence', status: Math.random() > 0.5 ? 'pass' : 'fail', clause: 'Sec. 101.001(a)' },
-    { id: 'AI-02', name: 'AI Disclosure Visibility', status: Math.random() > 0.6 ? 'pass' : 'fail', clause: 'Sec. 101.001(b)' },
-    { id: 'AI-03', name: 'AI Diagnostic Tool Disclaimer', status: Math.random() > 0.5 ? 'pass' : 'fail', clause: 'Sec. 101.002' },
-  ];
-
-  const sb1188Pass = sb1188Findings.filter(f => f.status === 'pass').length;
-  const sb1188Fail = sb1188Findings.filter(f => f.status === 'fail').length;
-  const hb149Pass = hb149Findings.filter(f => f.status === 'pass').length;
-  const hb149Fail = hb149Findings.filter(f => f.status === 'fail').length;
-  
-  const totalPass = sb1188Pass + hb149Pass;
-  const totalChecks = sb1188Findings.length + hb149Findings.length;
-  const riskScore = Math.round((totalPass / totalChecks) * 100);
-  
-  let riskLevel = 'low';
-  if (riskScore < 50) riskLevel = 'critical';
-  else if (riskScore < 70) riskLevel = 'high';
-  else if (riskScore < 85) riskLevel = 'medium';
-
+// REAL scan function - calls the /api/scan route for actual DNS/IP/header forensics
+const runComplianceScan = async (npi: string, url: string): Promise<any> => {
+  const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+  const res = await fetch('/api/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ npi, url: targetUrl }),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.message || `Scan failed (${res.status})`);
+  }
+  const data = await res.json();
+  // Normalize response to fields used by the dashboard
+  const findings = data.findings || [];
+  const sb1188 = findings.filter((f: any) => f.category === 'data_sovereignty');
+  const hb149 = findings.filter((f: any) => f.category === 'ai_transparency');
   return {
-    url,
-    risk_score: riskScore,
-    risk_level: riskLevel,
-    sb1188_findings: sb1188Findings,
-    sb1188_pass_count: sb1188Pass,
-    sb1188_fail_count: sb1188Fail,
-    hb149_findings: hb149Findings,
-    hb149_pass_count: hb149Pass,
-    hb149_fail_count: hb149Fail,
-    technical_fixes: [...sb1188Findings, ...hb149Findings].filter(f => f.status === 'fail').map(f => ({
-      ...f,
-      ...TECHNICAL_FIXES[f.id]
+    ...data,
+    url: targetUrl,
+    risk_score: data.riskScore ?? 0,
+    risk_level: data.riskLevel ?? 'critical',
+    status_label: data.complianceStatus ?? 'Violation',
+    sb1188_findings: sb1188,
+    sb1188_pass_count: sb1188.filter((f: any) => f.status === 'pass').length,
+    sb1188_fail_count: sb1188.filter((f: any) => f.status === 'fail').length,
+    hb149_findings: hb149,
+    hb149_pass_count: hb149.filter((f: any) => f.status === 'pass').length,
+    hb149_fail_count: hb149.filter((f: any) => f.status === 'fail').length,
+    technical_fixes: findings.filter((f: any) => f.status === 'fail').map((f: any) => ({
+      ...f, ...TECHNICAL_FIXES[f.id]
     }))
   };
 };
+
+// Store a report snapshot via /api/report after a successful scan
+const storeReport = async (provider: Registry, scanData: any): Promise<string | null> => {
+  try {
+    const res = await fetch('/api/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        npi: provider.npi,
+        url: scanData.url,
+        providerName: provider.name,
+        riskScore: scanData.risk_score,
+        riskLevel: scanData.risk_level,
+        complianceStatus: scanData.status_label,
+        findings: scanData.findings || [],
+        categoryScores: scanData.categoryScores,
+        dataBorderMap: scanData.dataBorderMap,
+        pageContext: scanData.pageContext,
+        npiVerification: scanData.npiVerification,
+        engineVersion: scanData.engineVersion,
+        scanDuration: scanData.scanDuration,
+        meta: scanData.meta,
+      }),
+    });
+    if (!res.ok) return null;
+    const result = await res.json();
+    return result.reportId || null;
+  } catch { return null; }
+};
+
+type SortField = 'name' | 'npi' | 'city' | 'zip' | 'risk_score' | 'last_scan_timestamp' | 'report_status' | 'widget_status';
+type SortDir = 'asc' | 'desc';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -199,6 +219,8 @@ export default function AdminDashboard() {
   const [marketingTemplates, setMarketingTemplates] = useState<MarketingTemplate[]>([]);
   const [calendarSlots, setCalendarSlots] = useState<CalendarSlot[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<SortField>('report_status');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [notification, setNotification] = useState<{ msg: string; type: string } | null>(null);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -214,6 +236,8 @@ export default function AdminDashboard() {
   const [showScanReport, setShowScanReport] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
+  const [importedIds, setImportedIds] = useState<string[]>([]);
+  const [showImportScanPrompt, setShowImportScanPrompt] = useState(false);
   const [totalCounts, setTotalCounts] = useState({ total: 0, withUrl: 0, withoutUrl: 0, active: 0 });
 
   useEffect(() => {
@@ -251,7 +275,7 @@ export default function AdminDashboard() {
         .select('*')
         .not('url', 'is', null)
         .gt('url', '')
-        .order('updated_at', { ascending: false })
+        .order('last_scan_timestamp', { ascending: false, nullsFirst: false })
         .limit(500);
       setProviders(data || []);
       console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry, ${activeCount} active)`);
@@ -330,10 +354,55 @@ export default function AdminDashboard() {
   }), [providers, totalCounts]);
 
   const filteredProviders = useMemo(() => {
-    if (!searchTerm.trim()) return providers;
-    const t = searchTerm.toLowerCase();
-    return providers.filter(r => r.name.toLowerCase().includes(t) || r.npi.includes(t) || r.city?.toLowerCase().includes(t));
-  }, [providers, searchTerm]);
+    // Multi-value search: split on spaces/commas, match ALL terms across name/npi/city/zip
+    let results = providers;
+    if (searchTerm.trim()) {
+      const terms = searchTerm.toLowerCase().split(/[\s,]+/).filter(Boolean);
+      results = providers.filter(r => {
+        const haystack = `${r.name} ${r.npi} ${r.city || ''} ${r.zip || ''}`.toLowerCase();
+        return terms.every(t => haystack.includes(t));
+      });
+    }
+    // Sort: default is report_status (generated/sent first) then by last_scan_timestamp desc
+    const sorted = [...results].sort((a, b) => {
+      // Primary sort by selected field
+      let cmp = 0;
+      if (sortField === 'report_status') {
+        const rank: Record<string, number> = { subscriber: 4, sent: 3, generated: 2, none: 0 };
+        cmp = (rank[b.report_status || 'none'] || 0) - (rank[a.report_status || 'none'] || 0);
+        // Secondary: by last_scan_timestamp desc
+        if (cmp === 0) {
+          const aTs = a.last_scan_timestamp ? new Date(a.last_scan_timestamp).getTime() : 0;
+          const bTs = b.last_scan_timestamp ? new Date(b.last_scan_timestamp).getTime() : 0;
+          cmp = bTs - aTs;
+        }
+        return sortDir === 'asc' ? -cmp : cmp;
+      }
+      if (sortField === 'name') cmp = (a.name || '').localeCompare(b.name || '');
+      else if (sortField === 'npi') cmp = (a.npi || '').localeCompare(b.npi || '');
+      else if (sortField === 'city') cmp = (a.city || '').localeCompare(b.city || '');
+      else if (sortField === 'zip') cmp = (a.zip || '').localeCompare(b.zip || '');
+      else if (sortField === 'risk_score') cmp = (a.risk_score || 0) - (b.risk_score || 0);
+      else if (sortField === 'last_scan_timestamp') {
+        const aTs = a.last_scan_timestamp ? new Date(a.last_scan_timestamp).getTime() : 0;
+        const bTs = b.last_scan_timestamp ? new Date(b.last_scan_timestamp).getTime() : 0;
+        cmp = aTs - bTs;
+      }
+      else if (sortField === 'widget_status') cmp = (a.widget_status || '').localeCompare(b.widget_status || '');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [providers, searchTerm, sortField, sortDir]);
+
+  const toggleSort = useCallback((field: SortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir(field === 'name' || field === 'npi' ? 'asc' : 'desc'); }
+  }, [sortField]);
+
+  const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
+    if (sortField !== field) return <span className="ml-0.5 opacity-30 text-[8px]">{'\u2195'}</span>;
+    return <span className="ml-0.5 text-[#C5A059] text-[8px]">{sortDir === 'asc' ? '\u2191' : '\u2193'}</span>;
+  };
 
   const calendarDates = useMemo(() => [...new Set(calendarSlots.map(s => s.date))].sort(), [calendarSlots]);
   const dateSlots = useMemo(() => selectedDate ? calendarSlots.filter(s => s.date === selectedDate) : [], [calendarSlots, selectedDate]);
@@ -417,56 +486,78 @@ export default function AdminDashboard() {
         setScanStatus(`Scanning ${p.name} (${i + 1}/${providersToScan.length})...`);
         setScanProgress(Math.round(((i + 1) / providersToScan.length) * 100));
         
-        try {
-          // Run compliance scan
-          const scanData = await runComplianceScan(p.url!);
-          
-          // Store scan result in database
-          const scanRecord = {
-            registry_id: p.id,
-            npi: p.npi,
-            url: p.url,
-            scan_type: 'global',
-            risk_score: scanData.risk_score,
-            risk_level: scanData.risk_level,
-            sb1188_findings: scanData.sb1188_findings,
-            sb1188_pass_count: scanData.sb1188_pass_count,
-            sb1188_fail_count: scanData.sb1188_fail_count,
-            hb149_findings: scanData.hb149_findings,
-            hb149_pass_count: scanData.hb149_pass_count,
-            hb149_fail_count: scanData.hb149_fail_count,
-            technical_fixes: scanData.technical_fixes,
-            raw_scan_data: scanData
-          };
-          
-          await supabase.from('scan_results').insert(scanRecord);
-          
-          // Update provider record
-          await supabase.from('registry').update({
-            risk_score: scanData.risk_score,
-            risk_level: scanData.risk_level,
-            scan_count: (p.scan_count || 0) + 1,
-            widget_status: scanData.risk_score >= 70 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
-            last_scan_result: scanData,
-            updated_at: new Date().toISOString()
-          }).eq('id', p.id);
-          
-          result.scanResults.push({ provider: p.name, ...scanData });
-          result.scanned++;
-          
-        } catch (scanErr: any) {
-          result.errors.push(`${p.name}: ${scanErr.message}`);
+        let scanData: any = null;
+        // Attempt scan with one retry on failure
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            scanData = await runComplianceScan(p.npi, p.url!);
+            break;
+          } catch (err: any) {
+            if (attempt === 1) {
+              setScanStatus(`Retry ${p.name} in 10s...`);
+              await new Promise(r => setTimeout(r, 10000));
+            } else {
+              result.errors.push(`${p.name}: ${err.message}`);
+            }
+          }
         }
         
-        // Small delay between scans
-        await new Promise(r => setTimeout(r, 500));
+        if (scanData) {
+          try {
+            // Store scan result in database
+            await supabase.from('scan_results').insert({
+              registry_id: p.id, npi: p.npi, url: p.url, scan_type: 'global',
+              risk_score: scanData.risk_score, risk_level: scanData.risk_level,
+              sb1188_findings: scanData.sb1188_findings,
+              sb1188_pass_count: scanData.sb1188_pass_count,
+              sb1188_fail_count: scanData.sb1188_fail_count,
+              hb149_findings: scanData.hb149_findings,
+              hb149_pass_count: scanData.hb149_pass_count,
+              hb149_fail_count: scanData.hb149_fail_count,
+              technical_fixes: scanData.technical_fixes,
+              raw_scan_data: scanData
+            });
+            
+            // Store report snapshot
+            const reportId = await storeReport(p, scanData);
+            const nowIso = new Date().toISOString();
+            
+            // Update provider record with all fields
+            const updatePayload: any = {
+              risk_score: scanData.risk_score,
+              risk_level: scanData.risk_level,
+              status_label: scanData.status_label || (scanData.risk_score >= 67 ? 'Verified Sovereign' : scanData.risk_score >= 34 ? 'Drift Detected' : 'Violation'),
+              scan_count: (p.scan_count || 0) + 1,
+              widget_status: scanData.risk_score >= 67 ? 'active' : scanData.risk_score >= 34 ? 'warning' : 'hidden',
+              last_scan_result: scanData,
+              last_scan_timestamp: nowIso,
+              updated_at: nowIso
+            };
+            if (reportId) {
+              updatePayload.report_status = 'generated';
+              updatePayload.latest_report_url = `/api/report?reportId=${reportId}`;
+            }
+            await supabase.from('registry').update(updatePayload).eq('id', p.id);
+            
+            result.scanResults.push({ provider: p.name, ...scanData });
+            result.scanned++;
+          } catch (dbErr: any) {
+            result.errors.push(`${p.name}: DB save failed - ${dbErr.message}`);
+          }
+        }
+        
+        // 2-second delay between scans to respect ip-api rate limits (45/min)
+        if (i < providersToScan.length - 1) await new Promise(r => setTimeout(r, 2000));
       }
       
       setScanStatus('Scan complete!');
       setScanResult(result);
       setShowScanReport(true);
       await loadData();
-      notify(`Scan complete! ${result.scanned} scanned, ${result.withoutUrlCount.toLocaleString()} need URLs.`);
+      const doneMsg = result.errors.length > 0
+        ? `Done: ${result.scanned} scanned, ${result.errors.length} failed, ${result.withoutUrlCount.toLocaleString()} need URLs.`
+        : `Scan complete! ${result.scanned} scanned, ${result.withoutUrlCount.toLocaleString()} need URLs.`;
+      notify(doneMsg, result.errors.length > 0 ? 'error' : 'success');
       
     } catch (e: any) {
       notify('Scan failed: ' + e.message, 'error');
@@ -490,33 +581,71 @@ export default function AdminDashboard() {
     if (withUrl.length === 0) return;
     
     setScanning(true); setScanProgress(0);
-    setScanStatus(`Scanning ${withUrl.length} provider(s)...`);
+    setScanStatus(`Scanning ${withUrl.length} provider(s)... (~${Math.ceil(withUrl.length * 4 / 60)} min)`);
     
     try {
       const supabase = getSupabase();
+      const nowIso = new Date().toISOString();
+      let scanned = 0, failed = 0;
       for (let i = 0; i < withUrl.length; i++) {
         const p = withUrl[i];
         setScanProgress(Math.round(((i + 1) / withUrl.length) * 100));
-        setScanStatus(`Scanning ${p.name}...`);
+        setScanStatus(`Scanning ${p.name} (${i+1}/${withUrl.length})...`);
         
-        const scanData = await runComplianceScan(p.url!);
+        let scanData: any = null;
+        // Attempt scan with one retry on failure
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            scanData = await runComplianceScan(p.npi, p.url!);
+            break; // success
+          } catch (err: any) {
+            if (attempt === 1) {
+              setScanStatus(`Retry ${p.name} in 10s...`);
+              await new Promise(r => setTimeout(r, 10000));
+            } else {
+              console.error(`Scan failed for ${p.name}: ${err.message}`);
+              failed++;
+            }
+          }
+        }
         
+        if (!scanData) continue; // skip to next provider
+        
+        // Store in scan_results table
         await supabase.from('scan_results').insert({
           registry_id: p.id, npi: p.npi, url: p.url, scan_type: 'manual',
           risk_score: scanData.risk_score, risk_level: scanData.risk_level,
           sb1188_findings: scanData.sb1188_findings, hb149_findings: scanData.hb149_findings,
-          technical_fixes: scanData.technical_fixes
+          technical_fixes: scanData.technical_fixes, raw_scan_data: scanData
         });
         
-        await supabase.from('registry').update({ 
-          risk_score: scanData.risk_score, scan_count: (p.scan_count || 0) + 1,
-          widget_status: scanData.risk_score >= 70 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
-          updated_at: new Date().toISOString() 
-        }).eq('id', p.id);
+        // Store report via /api/report for PDF generation
+        const reportId = await storeReport(p, scanData);
         
-        await new Promise(r => setTimeout(r, 300));
+        // Update registry with all fields
+        const updatePayload: any = { 
+          risk_score: scanData.risk_score,
+          risk_level: scanData.risk_level,
+          status_label: scanData.status_label || (scanData.risk_score >= 67 ? 'Verified Sovereign' : scanData.risk_score >= 34 ? 'Drift Detected' : 'Violation'),
+          scan_count: (p.scan_count || 0) + 1,
+          widget_status: scanData.risk_score >= 67 ? 'active' : scanData.risk_score >= 34 ? 'warning' : 'hidden',
+          last_scan_result: scanData,
+          last_scan_timestamp: nowIso,
+          updated_at: nowIso
+        };
+        if (reportId) {
+          updatePayload.report_status = 'generated';
+          updatePayload.latest_report_url = `/api/report?reportId=${reportId}`;
+        }
+        await supabase.from('registry').update(updatePayload).eq('id', p.id);
+        scanned++;
+        
+        // 2-second delay between scans to respect ip-api rate limits (45/min)
+        if (i < withUrl.length - 1) await new Promise(r => setTimeout(r, 2000));
       }
-      await loadData(); notify('Scan complete!');
+      await loadData();
+      const msg = failed > 0 ? `Done: ${scanned} scanned, ${failed} failed.` : `Scan complete! ${scanned} provider(s) scanned.`;
+      notify(msg, failed > 0 ? 'error' : 'success');
     } catch (e: any) { notify(e.message || 'Scan failed', 'error'); }
     finally { setScanning(false); setScanProgress(0); setScanStatus(''); }
   };
@@ -524,9 +653,9 @@ export default function AdminDashboard() {
   // CSV EXPORT - All providers
   const handleExport = () => {
     const csv = [
-      'NPI,Name,Provider Type,City,Email,Phone,URL,Risk Score,Widget Status,Subscription',
+      'NPI,Name,Provider Type,City,Zip,Email,Phone,URL,Risk Score,Last Scan,Report Status,Widget Status,Subscription',
       ...providers.map(r => 
-        `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city||''},${r.email||''},${r.phone||''},${r.url||''},${r.risk_score||0},${r.widget_status||''},${r.subscription_status||''}`
+        `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city||''},${r.zip||''},${r.email||''},${r.phone||''},${r.url||''},${r.risk_score||0},${r.last_scan_timestamp||''},${r.report_status||'none'},${r.widget_status||''},${r.subscription_status||''}`
       )
     ].join('\n');
     const a = document.createElement('a'); 
@@ -646,6 +775,7 @@ export default function AdminDashboard() {
     try {
       const supabase = getSupabase();
       let imported = 0, updated = 0;
+      const newIds: string[] = [];
       
       for (let i = 0; i < importData.length; i++) {
         const row = importData[i];
@@ -663,14 +793,17 @@ export default function AdminDashboard() {
           if (row.zip) updateData.zip = row.zip;
           if (row.provider_type) updateData.provider_type = row.provider_type;
           await supabase.from('registry').update(updateData).eq('id', existing.id);
+          if (row.url && row.url.trim()) newIds.push(existing.id);
           updated++;
         } else {
+          const newId = `REG-${Date.now()}-${i}`;
           await supabase.from('registry').insert({
-            id: `REG-${Date.now()}-${i}`, npi: row.npi, name: row.name,
+            id: newId, npi: row.npi, name: row.name,
             email: row.email || null, phone: row.phone || null, city: row.city || null,
             zip: row.zip || null, url: row.url || null, provider_type: row.provider_type || 2,
             widget_status: 'hidden', subscription_status: 'trial', is_visible: false, risk_score: 0, scan_count: 0
           });
+          if (row.url && row.url.trim()) newIds.push(newId);
           imported++;
         }
       }
@@ -678,6 +811,12 @@ export default function AdminDashboard() {
       await loadData();
       setShowImportModal(false); setImportData([]);
       notify(`Import complete! ${imported} new, ${updated} updated.`);
+      
+      // Prompt to scan imported providers that have URLs
+      if (newIds.length > 0) {
+        setImportedIds(newIds);
+        setShowImportScanPrompt(true);
+      }
     } catch (e: any) { notify('Import failed: ' + e.message, 'error'); }
     finally { setScanning(false); setScanProgress(0); setScanStatus(''); }
   };
@@ -815,16 +954,17 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-2">
                     <AlertCircle size={16} className="text-blue-600" />
                     <span className="text-sm text-blue-800">
-                      Showing <strong>{providers.length}</strong> providers with URLs (of {stats.withUrl.toLocaleString()} total scannable). 
-                      <span className="text-blue-600 ml-1">{stats.withoutUrl.toLocaleString()} providers need URLs.</span>
+                      Showing <strong>{filteredProviders.length}</strong> of {providers.length} loaded providers ({stats.withUrl.toLocaleString()} scannable). 
+                      <span className="text-blue-600 ml-1">{stats.withoutUrl.toLocaleString()} need URLs.</span>
                     </span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 items-center justify-between">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="pl-9 pr-3 py-1.5 text-sm bg-white border rounded-lg w-48" /></div>
-                    {selectedProviders.length > 0 && <button onClick={() => handleScan(selectedProviders)} className="bg-[#C5A059] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Play size={12} /> Scan ({selectedProviders.length})</button>}
+                      <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search name, NPI, city, zip..." className="pl-9 pr-3 py-1.5 text-sm bg-white border rounded-lg w-72" /></div>
+                    {searchTerm && <button onClick={() => setSearchTerm('')} className="text-[10px] text-slate-400 hover:text-red-500"><X size={14} /></button>}
+                    {selectedProviders.length > 0 && <button onClick={() => handleScan(selectedProviders)} disabled={scanning} className="bg-[#C5A059] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 disabled:opacity-50"><Play size={12} /> Scan ({selectedProviders.length})</button>}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowAddProvider(true)} className="bg-[#00234E] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Plus size={12} /> Add</button>
@@ -832,33 +972,63 @@ export default function AdminDashboard() {
                     <button onClick={handleExport} className="bg-white border px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1"><Download size={12} /> Export</button>
                   </div>
                 </div>
+                {/* Scanning progress bar */}
+                {scanning && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> {scanStatus}</span>
+                      <span className="text-xs font-bold text-amber-600">{scanProgress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-amber-200 rounded-full overflow-hidden"><div className="h-full bg-[#C5A059] rounded-full transition-all duration-300" style={{ width: `${scanProgress}%` }} /></div>
+                  </div>
+                )}
                 <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase">
                       <th className="px-3 py-2 w-8"><input type="checkbox" onChange={e => setSelectedProviders(e.target.checked ? filteredProviders.map(p => p.id) : [])} checked={selectedProviders.length === filteredProviders.length && filteredProviders.length > 0} /></th>
-                      <th className="px-3 py-2">Name</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">NPI</th><th className="px-3 py-2">URL</th><th className="px-3 py-2">Score</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Actions</th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('name')}>Name / City <SortIcon field="name" /></th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('npi')}>NPI <SortIcon field="npi" /></th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('zip')}>Zip <SortIcon field="zip" /></th>
+                      <th className="px-3 py-2">URL</th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('risk_score')}>Score <SortIcon field="risk_score" /></th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('last_scan_timestamp')}>Last Scan <SortIcon field="last_scan_timestamp" /></th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('report_status')}>Report <SortIcon field="report_status" /></th>
+                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('widget_status')}>Status <SortIcon field="widget_status" /></th>
+                      <th className="px-3 py-2 text-right">Actions</th>
                     </tr></thead>
                     <tbody className="divide-y">
-                      {filteredProviders.map(r => (
+                      {filteredProviders.map(r => {
+                        const hasReport = r.report_status && r.report_status !== 'none';
+                        const scanDate = r.last_scan_timestamp ? new Date(r.last_scan_timestamp) : null;
+                        return (
                         <tr key={r.id} className={`hover:bg-slate-50 group ${!r.url ? 'bg-red-50/50' : ''}`}>
                           <td className="px-3 py-2"><input type="checkbox" checked={selectedProviders.includes(r.id)} onChange={() => setSelectedProviders(p => p.includes(r.id) ? p.filter(i => i !== r.id) : [...p, r.id])} /></td>
-                          <td className="px-3 py-2"><div className="font-medium">{r.name}</div><div className="text-[10px] text-slate-400">{r.city || ''}</div></td>
-                          <td className="px-3 py-2"><span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">Type {(r as any).provider_type || 2}</span></td>
+                          <td className="px-3 py-2"><div className="font-medium text-xs">{r.name}</div><div className="text-[10px] text-slate-400">{r.city || ''}{r.city && r.zip ? ', ' : ''}{r.zip || ''}</div></td>
                           <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.npi}</code></td>
-                          <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} />{r.url.replace(/^https?:\/\//, '').substring(0,25)}...</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
-                          <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) > 70 ? 'bg-emerald-500' : (r.risk_score||0) > 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
+                          <td className="px-3 py-2"><span className="text-xs text-slate-500">{r.zip || '-'}</span></td>
+                          <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} />{r.url.replace(/^https?:\/\//, '').substring(0,22)}{r.url.replace(/^https?:\/\//, '').length > 22 ? '...' : ''}</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
+                          <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) >= 67 ? 'bg-emerald-500' : (r.risk_score||0) >= 34 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
+                          <td className="px-3 py-2">{scanDate ? <div className="text-[10px] text-slate-500">{scanDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</div> : <span className="text-[10px] text-slate-300">Never</span>}</td>
+                          <td className="px-3 py-2">{hasReport ? (
+                            <a href={r.latest_report_url || '#'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold hover:bg-emerald-100 transition-colors"><FileText size={10} /> View</a>
+                          ) : (
+                            <span className="text-[10px] text-slate-300">-</span>
+                          )}</td>
                           <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
-                          <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100">
-                            <button onClick={() => setViewingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
-                            <button onClick={() => setEditingProvider(r)} className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
-                            <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} className={`p-1 hover:bg-amber-100 rounded ${!r.url ? 'opacity-30' : ''}`}><Play size={13} className="text-[#C5A059]" /></button>
-                            <button onClick={() => handleDeleteProvider(r.id)} className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
+                          <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => setViewingProvider(r)} title="View Details" className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
+                            <button onClick={() => setEditingProvider(r)} title="Edit" className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
+                            <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} title="Scan" disabled={scanning} className={`p-1 hover:bg-amber-100 rounded ${!r.url ? 'opacity-30' : ''}`}><Play size={13} className="text-[#C5A059]" /></button>
+                            <button onClick={() => handleDeleteProvider(r.id)} title="Delete" className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
                           </div></td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
-                  {filteredProviders.length === 0 && <div className="p-8 text-center"><Database size={32} className="mx-auto text-slate-200 mb-2" /><p className="text-sm text-slate-400">No providers found</p></div>}
+                  </div>
+                  {filteredProviders.length === 0 && <div className="p-8 text-center"><Database size={32} className="mx-auto text-slate-200 mb-2" /><p className="text-sm text-slate-400">{searchTerm ? 'No providers match your search' : 'No providers found'}</p></div>}
                 </div>
               </div>
             )}
@@ -1027,25 +1197,28 @@ export default function AdminDashboard() {
             <>
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                 <h4 className="text-sm font-bold text-emerald-800">Ready to import {importData.length} providers</h4>
+                <p className="text-[10px] text-emerald-600 mt-0.5">{importData.filter((r: any) => r.url).length} have URLs (scannable), {importData.filter((r: any) => !r.url).length} without URLs</p>
               </div>
               <div className="max-h-64 overflow-y-auto bg-slate-50 rounded-lg p-2">
                 <table className="w-full text-xs">
-                  <thead><tr className="text-left font-bold text-slate-600"><th className="py-1 px-2">NPI</th><th className="py-1 px-2">Name</th><th className="py-1 px-2">Type</th><th className="py-1 px-2">URL</th></tr></thead>
+                  <thead><tr className="text-left font-bold text-slate-600"><th className="py-1 px-2">NPI</th><th className="py-1 px-2">Name</th><th className="py-1 px-2">City</th><th className="py-1 px-2">Zip</th><th className="py-1 px-2">URL</th></tr></thead>
                   <tbody>
-                    {importData.slice(0, 15).map((r, i) => (
+                    {importData.slice(0, 20).map((r: any, i: number) => (
                       <tr key={i} className="border-t border-slate-200">
                         <td className="py-1 px-2 font-mono">{r.npi}</td>
                         <td className="py-1 px-2">{r.name}</td>
-                        <td className="py-1 px-2">{r.provider_type || 2}</td>
-                        <td className="py-1 px-2">{r.url ? <span className="text-emerald-600">✓</span> : <span className="text-red-500">-</span>}</td>
+                        <td className="py-1 px-2">{r.city || '-'}</td>
+                        <td className="py-1 px-2">{r.zip || '-'}</td>
+                        <td className="py-1 px-2">{r.url ? <span className="text-emerald-600"><CheckCircle size={10} /></span> : <span className="text-red-500">-</span>}</td>
                       </tr>
                     ))}
+                    {importData.length > 20 && <tr><td colSpan={5} className="py-1 px-2 text-center text-slate-400">...and {importData.length - 20} more</td></tr>}
                   </tbody>
                 </table>
               </div>
               <div className="flex justify-end gap-2">
                 <button onClick={() => { setShowImportModal(false); setImportData([]); }} className="px-4 py-2 text-sm text-slate-500">Cancel</button>
-                <button onClick={executeImport} className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059] flex items-center gap-1.5">
+                <button onClick={executeImport} disabled={scanning} className="px-5 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg hover:bg-[#C5A059] flex items-center gap-1.5 disabled:opacity-50">
                   <Upload size={14} /> Import {importData.length} Providers
                 </button>
               </div>
@@ -1054,9 +1227,27 @@ export default function AdminDashboard() {
             <div className="text-center py-8">
               <Upload size={32} className="mx-auto text-slate-300 mb-2" />
               <p className="text-sm text-slate-500">Select a CSV file to import</p>
+              <p className="text-[10px] text-slate-400 mt-1">CSV columns: NPI, Name, URL, City, Zip, Email, Phone</p>
               <button onClick={() => fileInputRef.current?.click()} className="mt-3 px-4 py-2 bg-[#00234E] text-white text-sm font-bold rounded-lg">Choose File</button>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Post-Import Scan Prompt */}
+      <Modal isOpen={showImportScanPrompt} onClose={() => { setShowImportScanPrompt(false); setImportedIds([]); }} title="Scan Imported Providers?" size="sm">
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+            <Zap size={24} className="mx-auto text-[#C5A059] mb-2" />
+            <h4 className="text-sm font-bold text-slate-800">{importedIds.length} imported provider(s) have URLs</h4>
+            <p className="text-xs text-slate-500 mt-1">Run compliance scans now to generate reports?</p>
+          </div>
+          <div className="flex justify-center gap-3">
+            <button onClick={() => { setShowImportScanPrompt(false); setImportedIds([]); }} className="px-4 py-2 text-sm text-slate-500 border rounded-lg">Skip</button>
+            <button onClick={() => { setShowImportScanPrompt(false); handleScan(importedIds); setImportedIds([]); }} className="px-5 py-2 bg-[#C5A059] text-white text-sm font-bold rounded-lg hover:brightness-110 flex items-center gap-1.5">
+              <Play size={14} /> Scan Now
+            </button>
+          </div>
         </div>
       </Modal>
     </div>
