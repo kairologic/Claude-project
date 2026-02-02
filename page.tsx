@@ -37,7 +37,7 @@ export default function HomePage() {
                 </button>
               </Link>
               <Link href="/registry">
-                <button className="btn-outline text-lg px-8 py-4 bg-white/10 border-white hover:bg-white">
+                <button className="btn-outline text-lg px-8 py-4 bg-white/10 border-white hover:bg-gold hover:border-gold hover:text-navy transition-all duration-200">
                   {c('hero_cta_secondary', 'VIEW TEXAS REGISTRY')}
                 </button>
               </Link>
