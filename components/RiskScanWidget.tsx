@@ -318,22 +318,44 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       const patchData = await response.json().catch(() => []);
       const patchedRows = Array.isArray(patchData) ? patchData.length : 0;
 
-      // If no rows were updated (NPI not in registry), INSERT a new record
+      // If no rows were updated (NPI not in registry), UPSERT a new record
       if (patchedRows === 0) {
         addLog('No existing entry found, creating new provider record...', 'info');
+        
+        // Build UPSERT payload with only known registry columns
+        const insertData: Record<string, any> = {
+          id: `TX-${scanResults.npi}-${Math.random().toString(36).substr(2, 5)}`,
+          name: registryData.name,
+          npi: scanResults.npi,
+          url: scanResults.url,
+          risk_score: registryData.risk_score,
+          risk_level: registryData.risk_level,
+          last_scan_timestamp: registryData.last_scan_timestamp,
+          widget_status: registryData.widget_status,
+          widget_id: `WID-${scanResults.npi}-${Date.now().toString(36)}`,
+          updated_at: registryData.updated_at
+        };
+        
+        addLog(`UPSERT payload: ${JSON.stringify(Object.keys(insertData))}`, 'info');
+        
         response = await fetch(
-          `${SUPABASE_URL}/rest/v1/registry`,
+          `${SUPABASE_URL}/rest/v1/registry?on_conflict=npi`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Prefer': 'return=minimal'
+              'Prefer': 'return=minimal,resolution=merge-duplicates'
             },
-            body: JSON.stringify(registryData)
+            body: JSON.stringify(insertData)
           }
         );
+        
+        if (!response.ok) {
+          const errText = await response.text().catch(() => 'unknown');
+          addLog(`[ERROR] INSERT failed (${response.status}): ${errText}`, 'warning');
+        }
       }
 
       if (response.ok || response.status === 201 || response.status === 204) {
@@ -638,6 +660,36 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Save violations
       await saveViolationsToSupabase(npi, allFindings);
+
+      // Auto-create prospect record for admin pipeline
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/prospects`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            source: 'scan',
+            source_detail: 'public_risk_scan',
+            practice_name: providerName || 'Unknown Provider',
+            npi: npi,
+            website_url: url,
+            scan_score: score,
+            scan_risk_level: scanResults.riskLevel,
+            status: 'new',
+            priority: score < 34 ? 'urgent' : score < 67 ? 'high' : 'normal',
+            is_read: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        });
+        addLog('[OK] Prospect record created', 'success');
+      } catch {
+        addLog('[WARN] Prospect creation skipped (non-critical)', 'warning');
+      }
 
       // Auto-generate forensic report and store in scan_reports table
       addLog('📄 Generating forensic audit report...', 'info');
