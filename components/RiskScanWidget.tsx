@@ -299,7 +299,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Prefer': 'return=minimal'
+            'Prefer': 'return=representation,count=exact'
           },
           body: JSON.stringify({
             url: registryData.url,
@@ -314,9 +314,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         }
       );
 
-      // If update didn't work, try insert
-      if (!response.ok && (response.status === 404 || response.status === 406)) {
-        addLog('No existing entry, creating new...', 'info');
+      // Check if PATCH actually updated any rows
+      const patchData = await response.json().catch(() => []);
+      const patchedRows = Array.isArray(patchData) ? patchData.length : 0;
+
+      // If no rows were updated (NPI not in registry), INSERT a new record
+      if (patchedRows === 0) {
+        addLog('No existing entry found, creating new provider record...', 'info');
         response = await fetch(
           `${SUPABASE_URL}/rest/v1/registry`,
           {
