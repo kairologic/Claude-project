@@ -286,7 +286,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         name: providerName,
         npi: scanResults.npi,
         url: scanResults.url,
-        email: providerEmail || null,
+        email: scanResults.email || initialEmail || null,
         risk_score: scanResults.riskScore,
         risk_level: scanResults.riskLevel,
         risk_meter_level: scanResults.riskMeterLevel,
