@@ -218,12 +218,16 @@ const TECHNICAL_FIXES = {
 interface RiskScanWidgetProps {
   initialNPI?: string;
   initialURL?: string;
+  initialEmail?: string;
+  autoStart?: boolean;
   onScanComplete?: (results: any) => void;
 }
 
 const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({ 
   initialNPI = '', 
   initialURL = '', 
+  initialEmail = '',
+  autoStart = false,
   onScanComplete 
 }) => {
   const [npi, setNpi] = useState(initialNPI);
@@ -237,6 +241,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const addLog = (message: string, type: string = 'info') => {
     setScanLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
   };
+
+  // Auto-start flag — triggers scan after component mounts
+  const [shouldAutoStart, setShouldAutoStart] = useState(autoStart && !!initialNPI && !!initialURL);
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -279,12 +286,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         name: providerName,
         npi: scanResults.npi,
         url: scanResults.url,
+        email: scanResults.email || initialEmail || null,
         risk_score: scanResults.riskScore,
         risk_level: scanResults.riskLevel,
         risk_meter_level: scanResults.riskMeterLevel,
         overall_compliance_status: scanResults.complianceStatus,
         last_scan_timestamp: new Date().toISOString(),
-        widget_status: scanResults.riskScore >= 75 ? 'active' : 'warning',
+        widget_status: scanResults.riskScore >= 90 ? 'active' : 'warning',
         updated_at: new Date().toISOString()
       };
 
@@ -299,7 +307,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Prefer': 'return=minimal'
+            'Prefer': 'return=representation,count=exact'
           },
           body: JSON.stringify({
             url: registryData.url,
@@ -314,22 +322,48 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         }
       );
 
-      // If update didn't work, try insert
-      if (!response.ok && (response.status === 404 || response.status === 406)) {
-        addLog('No existing entry, creating new...', 'info');
+      // Check if PATCH actually updated any rows
+      const patchData = await response.json().catch(() => []);
+      const patchedRows = Array.isArray(patchData) ? patchData.length : 0;
+
+      // If no rows were updated (NPI not in registry), UPSERT a new record
+      if (patchedRows === 0) {
+        addLog('No existing entry found, creating new provider record...', 'info');
+        
+        // Build UPSERT payload with only known registry columns
+        const insertData: Record<string, any> = {
+          id: `TX-${scanResults.npi}-${Math.random().toString(36).substr(2, 5)}`,
+          name: registryData.name,
+          npi: scanResults.npi,
+          url: scanResults.url,
+          risk_score: registryData.risk_score,
+          risk_level: registryData.risk_level,
+          last_scan_timestamp: registryData.last_scan_timestamp,
+          widget_status: registryData.widget_status,
+          widget_id: `WID-${scanResults.npi}-${Date.now().toString(36)}`,
+          updated_at: registryData.updated_at
+        };
+        
+        addLog(`UPSERT payload: ${JSON.stringify(Object.keys(insertData))}`, 'info');
+        
         response = await fetch(
-          `${SUPABASE_URL}/rest/v1/registry`,
+          `${SUPABASE_URL}/rest/v1/registry?on_conflict=npi`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Prefer': 'return=minimal'
+              'Prefer': 'return=minimal,resolution=merge-duplicates'
             },
-            body: JSON.stringify(registryData)
+            body: JSON.stringify(insertData)
           }
         );
+        
+        if (!response.ok) {
+          const errText = await response.text().catch(() => 'unknown');
+          addLog(`[ERROR] INSERT failed (${response.status}): ${errText}`, 'warning');
+        }
       }
 
       if (response.ok || response.status === 201 || response.status === 204) {
@@ -592,11 +626,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Try to get provider name from session storage or NPI verification
       let providerName = '';
+      let providerEmail = '';
       try {
         const storedData = sessionStorage.getItem('scanData');
         if (storedData) {
           const parsed = JSON.parse(storedData);
           providerName = parsed.name || '';
+          providerEmail = parsed.email || '';
         }
       } catch {
         // Ignore
@@ -634,6 +670,37 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Save violations
       await saveViolationsToSupabase(npi, allFindings);
+
+      // Auto-create prospect record for admin pipeline
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/prospects`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            source: 'scan',
+            source_detail: 'public_risk_scan',
+            practice_name: providerName || 'Unknown Provider',
+            npi: npi,
+            email: providerEmail || null,
+            website_url: url,
+            scan_score: score,
+            scan_risk_level: scanResults.riskLevel,
+            status: 'new',
+            priority: score < 34 ? 'urgent' : score < 67 ? 'high' : 'normal',
+            is_read: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        });
+        addLog('[OK] Prospect record created', 'success');
+      } catch {
+        addLog('[WARN] Prospect creation skipped (non-critical)', 'warning');
+      }
 
       // Auto-generate forensic report and store in scan_reports table
       addLog('📄 Generating forensic audit report...', 'info');
@@ -710,6 +777,15 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     if (category.includes('EHR')) return <Lock className="w-5 h-5" />;
     return <Shield className="w-5 h-5" />;
   };
+
+  // Auto-start scan when arriving from input form
+  React.useEffect(() => {
+    if (shouldAutoStart && !scanning && !results) {
+      setShouldAutoStart(false);
+      const timer = setTimeout(() => runScan(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoStart, scanning, results]);
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg">

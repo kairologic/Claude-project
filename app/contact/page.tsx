@@ -98,6 +98,21 @@ export default function ContactPage() {
                   </div>
 
                   <div className="flex items-start gap-3">
+                    <span className="text-2xl">📞</span>
+                    <div>
+                      <div className="text-sm text-gray-600 uppercase tracking-wider mb-1">
+                        PHONE
+                      </div>
+                      <a 
+                        href="tel:+15124022237"
+                        className="text-navy hover:text-orange transition-colors font-semibold"
+                      >
+                        (512) 402-2237
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
                     <span className="text-2xl">🌐</span>
                     <div>
                       <div className="text-sm text-gray-600 uppercase tracking-wider mb-1">
