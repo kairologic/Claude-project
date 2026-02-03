@@ -218,12 +218,16 @@ const TECHNICAL_FIXES = {
 interface RiskScanWidgetProps {
   initialNPI?: string;
   initialURL?: string;
+  initialEmail?: string;
+  autoStart?: boolean;
   onScanComplete?: (results: any) => void;
 }
 
 const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({ 
   initialNPI = '', 
   initialURL = '', 
+  initialEmail = '',
+  autoStart = false,
   onScanComplete 
 }) => {
   const [npi, setNpi] = useState(initialNPI);
@@ -237,6 +241,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const addLog = (message: string, type: string = 'info') => {
     setScanLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
   };
+
+  // Auto-start flag — triggers scan after component mounts
+  const [shouldAutoStart, setShouldAutoStart] = useState(autoStart && !!initialNPI && !!initialURL);
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -279,12 +286,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         name: providerName,
         npi: scanResults.npi,
         url: scanResults.url,
+        email: providerEmail || null,
         risk_score: scanResults.riskScore,
         risk_level: scanResults.riskLevel,
         risk_meter_level: scanResults.riskMeterLevel,
         overall_compliance_status: scanResults.complianceStatus,
         last_scan_timestamp: new Date().toISOString(),
-        widget_status: scanResults.riskScore >= 75 ? 'active' : 'warning',
+        widget_status: scanResults.riskScore >= 90 ? 'active' : 'warning',
         updated_at: new Date().toISOString()
       };
 
@@ -618,11 +626,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Try to get provider name from session storage or NPI verification
       let providerName = '';
+      let providerEmail = '';
       try {
         const storedData = sessionStorage.getItem('scanData');
         if (storedData) {
           const parsed = JSON.parse(storedData);
           providerName = parsed.name || '';
+          providerEmail = parsed.email || '';
         }
       } catch {
         // Ignore
@@ -676,6 +686,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             source_detail: 'public_risk_scan',
             practice_name: providerName || 'Unknown Provider',
             npi: npi,
+            email: providerEmail || null,
             website_url: url,
             scan_score: score,
             scan_risk_level: scanResults.riskLevel,
@@ -766,6 +777,15 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     if (category.includes('EHR')) return <Lock className="w-5 h-5" />;
     return <Shield className="w-5 h-5" />;
   };
+
+  // Auto-start scan when arriving from input form
+  React.useEffect(() => {
+    if (shouldAutoStart && !scanning && !results) {
+      setShouldAutoStart(false);
+      const timer = setTimeout(() => runScan(), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoStart, scanning, results]);
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg">

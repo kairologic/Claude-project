@@ -58,6 +58,12 @@ export default function Footer() {
                 </a>
               </li>
               <li className="flex items-center gap-2">
+                <span>📞</span>
+                <a href="tel:+15124022237" className="hover:text-white transition-colors">
+                  (512) 402-2237
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
                 <span>🌐</span>
                 <span>Austin, TX // ATX-01 Node</span>
               </li>
