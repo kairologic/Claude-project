@@ -1011,7 +1011,7 @@ export default function AdminDashboard() {
                           <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) >= 67 ? 'bg-emerald-500' : (r.risk_score||0) >= 34 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
                           <td className="px-3 py-2">{scanDate ? <div className="text-[10px] text-slate-500">{scanDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</div> : <span className="text-[10px] text-slate-300">Never</span>}</td>
                           <td className="px-3 py-2">{hasReport ? (
-                            <a href={r.latest_report_url || '#'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold hover:bg-emerald-100 transition-colors"><FileText size={10} /> View</a>
+                            <button onClick={() => setViewingProvider(r)} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold hover:bg-emerald-100 transition-colors"><FileText size={10} /> View</button>
                           ) : (
                             <span className="text-[10px] text-slate-300">-</span>
                           )}</td>
