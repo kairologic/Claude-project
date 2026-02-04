@@ -252,10 +252,9 @@ export default function AdminDashboard() {
       const supabase = getSupabase();
       
       // Get total counts first (fast count queries)
-      // Use .gt('url', '') to find non-empty URLs (works better than .neq)
       const [totalResult, withUrlResult, activeResult] = await Promise.all([
         supabase.from('registry').select('id', { count: 'exact', head: true }),
-        supabase.from('registry').select('id', { count: 'exact', head: true }).not('url', 'is', null).gt('url', ''),
+        supabase.from('registry').select('id', { count: 'exact', head: true }).like('url', 'http%'),
         supabase.from('registry').select('id', { count: 'exact', head: true }).eq('widget_status', 'active')
       ]);
       
@@ -270,13 +269,13 @@ export default function AdminDashboard() {
       });
       
       // Only load providers WITH URLs (scannable) - limit to 500 for performance in table view
-      const { data } = await supabase
+      const { data, error: loadError } = await supabase
         .from('registry')
         .select('*')
-        .not('url', 'is', null)
-        .gt('url', '')
+        .like('url', 'http%')
         .order('last_scan_timestamp', { ascending: false, nullsFirst: false })
         .limit(500);
+      if (loadError) console.error('Registry load error:', loadError);
       setProviders(data || []);
       console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry, ${activeCount} active)`);
       
@@ -446,9 +445,8 @@ export default function AdminDashboard() {
         .from('registry')
         .select('*')
         .or('provider_type.eq.2,provider_type.is.null')
-        .not('url', 'is', null)
-        .gt('url', '')
-        .limit(1000); // Limit to 1000 for reasonable scan time
+        .like('url', 'http%')
+        .limit(1000);
       
       if (error) throw error;
       

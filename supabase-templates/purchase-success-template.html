@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; background-color:#f4f5f7; font-family: 'Inter', Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7; padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#00234E; padding:32px 40px; text-align:center;">
+              <h1 style="color:#C5A059; font-size:22px; margin:0 0 6px 0; font-family:'Montserrat',Arial,sans-serif; letter-spacing:1px;">
+                PAYMENT CONFIRMED
+              </h1>
+              <p style="color:#ffffff; font-size:13px; margin:0; opacity:0.7;">
+                KairoLogic Sentry Compliance
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 40px;">
+              <p style="color:#1a1a1a; font-size:16px; line-height:1.6; margin:0 0 20px 0;">
+                Thank you, <strong>{{practice_manager_name}}</strong>.
+              </p>
+
+              <p style="color:#333; font-size:15px; line-height:1.6; margin:0 0 28px 0;">
+                Your payment has been confirmed and your order is being processed. Here are your details:
+              </p>
+
+              <!-- Order Summary Box -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8f9fa; border-radius:8px; border:1px solid #e5e7eb; margin:0 0 28px 0;">
+                <tr>
+                  <td style="padding:24px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; padding-bottom:6px;">Product</td>
+                        <td style="color:#00234E; font-size:15px; font-weight:bold; padding-bottom:6px; text-align:right;">{{productName}}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="border-bottom:1px solid #e5e7eb; padding:8px 0;"></td>
+                      </tr>
+                      <tr>
+                        <td style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; padding-top:12px; padding-bottom:6px;">Amount Paid</td>
+                        <td style="color:#00234E; font-size:15px; font-weight:bold; padding-top:12px; padding-bottom:6px; text-align:right;">${{amount}}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="border-bottom:1px solid #e5e7eb; padding:8px 0;"></td>
+                      </tr>
+                      <tr>
+                        <td style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; padding-top:12px; padding-bottom:6px;">Transaction ID</td>
+                        <td style="color:#00234E; font-size:13px; font-family:monospace; padding-top:12px; padding-bottom:6px; text-align:right;">{{payment_id}}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="border-bottom:1px solid #e5e7eb; padding:8px 0;"></td>
+                      </tr>
+                      <tr>
+                        <td style="color:#666; font-size:12px; text-transform:uppercase; letter-spacing:1px; padding-top:12px;">Date</td>
+                        <td style="color:#00234E; font-size:15px; padding-top:12px; text-align:right;">{{date}}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Receipt Link -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{receiptUrl}}" target="_blank" style="display:inline-block; background-color:#00234E; color:#ffffff; font-size:14px; font-weight:bold; text-decoration:none; padding:14px 32px; border-radius:8px; letter-spacing:0.5px;">
+                      VIEW RECEIPT
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- What Happens Next -->
+              <p style="color:#333; font-size:15px; line-height:1.6; margin:0 0 12px 0; font-weight:bold;">
+                What happens next?
+              </p>
+              <p style="color:#555; font-size:14px; line-height:1.7; margin:0 0 24px 0;">
+                Our compliance team will prepare your deliverables and send them to this email address. If you have any questions in the meantime, reply to this email or call our Austin engineering desk.
+              </p>
+
+              <p style="color:#888; font-size:13px; line-height:1.6; margin:0;">
+                &mdash; The KairoLogic Compliance Team
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8f9fa; padding:24px 40px; border-top:1px solid #e5e7eb;">
+              <p style="color:#999; font-size:11px; line-height:1.6; margin:0; text-align:center;">
+                KairoLogic &bull; Leander, TX &bull; (512) 402-2237<br>
+                <a href="https://kairologic.com" style="color:#C5A059; text-decoration:none;">kairologic.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
