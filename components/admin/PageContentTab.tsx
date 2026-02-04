@@ -23,7 +23,7 @@ interface PageContentTabProps {
 }
 
 // Default pages that should always be available
-const DEFAULT_PAGES = ['Homepage', 'Header', 'Footer', 'Services', 'Compliance', 'Contact', 'Registry'];
+const DEFAULT_PAGES = ['Homepage', 'Header', 'Footer', 'Services', 'Compliance', 'Contact', 'Registry', 'Insights', 'Scan', 'Privacy', 'Terms'];
 
 export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification }) => {
   const [content, setContent] = useState<PageContent[]>([]);

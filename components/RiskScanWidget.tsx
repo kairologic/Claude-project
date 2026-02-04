@@ -232,6 +232,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 }) => {
   const [npi, setNpi] = useState(initialNPI);
   const [url, setUrl] = useState(initialURL);
+  const [email, setEmail] = useState(initialEmail);
   const [scanning, setScanning] = useState(false);
   const [currentPhase, setCurrentPhase] = useState('');
   const [progress, setProgress] = useState<number>(0);
@@ -286,7 +287,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         name: providerName,
         npi: scanResults.npi,
         url: scanResults.url,
-        email: scanResults.email || initialEmail || null,
+        email: scanResults.email || email || initialEmail || null,
         risk_score: scanResults.riskScore,
         risk_level: scanResults.riskLevel,
         risk_meter_level: scanResults.riskMeterLevel,
@@ -311,6 +312,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           },
           body: JSON.stringify({
             url: registryData.url,
+            email: registryData.email || undefined,
             risk_score: registryData.risk_score,
             risk_level: registryData.risk_level,
             risk_meter_level: registryData.risk_meter_level,
@@ -336,6 +338,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           name: registryData.name,
           npi: scanResults.npi,
           url: scanResults.url,
+          email: registryData.email || null,
           risk_score: registryData.risk_score,
           risk_level: registryData.risk_level,
           last_scan_timestamp: registryData.last_scan_timestamp,
@@ -626,13 +629,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Try to get provider name from session storage or NPI verification
       let providerName = '';
-      let providerEmail = '';
+      let providerEmail = email || '';
       try {
         const storedData = sessionStorage.getItem('scanData');
         if (storedData) {
           const parsed = JSON.parse(storedData);
           providerName = parsed.name || '';
-          providerEmail = parsed.email || '';
+          if (!providerEmail) providerEmail = parsed.email || '';
         }
       } catch {
         // Ignore
@@ -644,6 +647,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       const scanResults = {
         npi,
         url,
+        email: providerEmail || email || '',
         name: providerName,
         providerName,
         riskScore: score,
@@ -779,6 +783,47 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         }
       }
       setResults({ ...scanResults, reportId });
+
+      // Send email notifications (non-blocking)
+      try {
+        // Build findings summary for email
+        const topFindingsSummary = topIssues.slice(0, 5).map((f: { name?: string; id?: string; status?: string; detail?: string }) => 
+          `${f.status === 'fail' ? '❌' : f.status === 'warn' ? '⚠️' : '✅'} ${f.name || f.id}: ${(f.detail || '').substring(0, 120)}`
+        ).join('\n');
+
+        const emailPayload = {
+          template_slug: 'immediate-summary',
+          npi,
+          score,
+          url,
+          risk_level: riskLevel,
+          findings_summary: topFindingsSummary,
+          findings_count: allFindings.length,
+          fail_count: allFindings.filter((f: { status?: string }) => f.status === 'fail').length,
+          warn_count: allFindings.filter((f: { status?: string }) => f.status === 'warn').length,
+          pass_count: allFindings.filter((f: { status?: string }) => f.status === 'pass').length,
+        };
+
+        // 1. Send scan results to provider (if email provided)
+        if (providerEmail) {
+          addLog(`📧 Sending results to ${providerEmail}...`, 'info');
+          fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...emailPayload, variables: { email: providerEmail, practice_name: providerName || 'Provider' } })
+          }).then(() => addLog('[OK] Results email sent to provider', 'success'))
+            .catch(() => addLog('[WARN] Provider email failed', 'warning'));
+        }
+
+        // 2. Always send admin notification
+        fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...emailPayload, variables: { email: 'compliance@kairologic.com', practice_name: providerName || `NPI: ${npi}`, _force_internal: 'true' } })
+        }).catch(() => {});
+      } catch {
+        // Non-critical
+      }
       
       if (onScanComplete) {
         onScanComplete({ ...scanResults, reportId });
@@ -821,7 +866,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       {/* Input Section */}
       <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Provider NPI
@@ -844,6 +889,19 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example-practice.com"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={scanning}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Email <span className="text-gray-400 font-normal">(for results)</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="office@yourpractice.com"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={scanning}
             />

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { 
   Shield, Users, Database, Calendar, Mail, 
   Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, 
+  Star,
   CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode, 
   BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap, Pause, FileWarning, UserPlus
 } from 'lucide-react';
@@ -1017,6 +1018,7 @@ export default function AdminDashboard() {
                           <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
                           <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => setViewingProvider(r)} title="View Details" className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
+                            <button onClick={async () => { const nv = !r.is_featured; await supabase.from('registry').update({ is_featured: nv }).eq('id', r.id); setProviders(p => p.map(x => x.id === r.id ? { ...x, is_featured: nv } : x)); notify(nv ? 'Promoted to public registry' : 'Removed from public registry'); }} title={r.is_featured ? 'Remove from public' : 'Promote to public'} className="p-1 hover:bg-amber-50 rounded"><Star size={13} className={r.is_featured ? 'text-[#C5A059] fill-[#C5A059]' : 'text-slate-300'} /></button>
                             <button onClick={() => setEditingProvider(r)} title="Edit" className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
                             <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} title="Scan" disabled={scanning} className={`p-1 hover:bg-amber-100 rounded ${!r.url ? 'opacity-30' : ''}`}><Play size={13} className="text-[#C5A059]" /></button>
                             <button onClick={() => handleDeleteProvider(r.id)} title="Delete" className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
@@ -1111,7 +1113,7 @@ export default function AdminDashboard() {
         {editingProvider && <ProviderForm entry={editingProvider} onSave={handleSaveProvider} onCancel={() => setEditingProvider(null)} />}
       </Modal>
 
-      {viewingProvider && <ProviderDetailModal entry={viewingProvider} onClose={() => setViewingProvider(null)} />}
+      {viewingProvider && <ProviderDetailModal entry={viewingProvider} onClose={() => setViewingProvider(null)} onUpdate={(updated) => { setProviders(prev => prev.map(p => p.npi === updated.npi ? { ...p, ...updated } : p)); setViewingProvider(null); }} />}
 
       <Modal isOpen={!!editingTemplate} onClose={() => setEditingTemplate(null)} title={editingTemplate?.name ? 'Edit Template' : 'New Template'}>
         {editingTemplate && (
