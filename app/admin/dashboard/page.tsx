@@ -252,21 +252,13 @@ export default function AdminDashboard() {
       const supabase = getSupabase();
       
       // Get total counts first (fast count queries)
-      const [totalResult, withUrlResult, activeResult] = await Promise.all([
+      const [totalResult, activeResult] = await Promise.all([
         supabase.from('registry').select('id', { count: 'exact', head: true }),
-        supabase.from('registry').select('id', { count: 'exact', head: true }).like('url', 'http%'),
         supabase.from('registry').select('id', { count: 'exact', head: true }).eq('widget_status', 'active')
       ]);
       
       const totalCount = totalResult.count || 0;
-      const withUrlCount = withUrlResult.count || 0;
       const activeCount = activeResult.count || 0;
-      setTotalCounts({
-        total: totalCount,
-        withUrl: withUrlCount,
-        withoutUrl: totalCount - withUrlCount,
-        active: activeCount
-      });
       
       // Only load providers WITH URLs (scannable) - limit to 500 for performance in table view
       const { data, error: loadError } = await supabase
@@ -277,7 +269,16 @@ export default function AdminDashboard() {
         .limit(500);
       if (loadError) console.error('Registry load error:', loadError);
       setProviders(data || []);
-      console.log(`Loaded ${data?.length || 0} providers with URLs (${withUrlCount} total scannable, ${totalCount} total in registry, ${activeCount} active)`);
+      
+      // Derive WITH URL count from actual loaded data (count queries with .like are unreliable)
+      const withUrlCount = data?.length || 0;
+      setTotalCounts({
+        total: totalCount,
+        withUrl: withUrlCount,
+        withoutUrl: totalCount - withUrlCount,
+        active: activeCount
+      });
+      console.log(`Loaded ${withUrlCount} providers with URLs (${totalCount} total in registry, ${activeCount} active)`);
       
       
       // Load email templates from database

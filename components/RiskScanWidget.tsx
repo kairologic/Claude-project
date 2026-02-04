@@ -755,6 +755,28 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       addLog(`[OK] Scan complete! Score: ${score}/100 (${riskMeterLevel})`, 'success');
       if (reportId) {
         addLog(`📋 Report ID: ${reportId}`, 'info');
+        // Update registry record with report link
+        try {
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                report_status: 'generated',
+                latest_report_url: `/api/report?reportId=${reportId}`
+              })
+            }
+          );
+          addLog('[OK] Registry updated with report link', 'success');
+        } catch {
+          addLog('[WARN] Registry report link update skipped', 'warning');
+        }
       }
       setResults({ ...scanResults, reportId });
       
