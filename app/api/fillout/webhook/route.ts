@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Amazon SES SMTP Configuration
+const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
+const SES_SMTP_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
+const SES_SMTP_USER = process.env.SES_SMTP_USER || '';
+const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
+const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.com';
+const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Sentry';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -26,32 +34,26 @@ export async function POST(request: NextRequest) {
       submittedAt: new Date().toISOString()
     };
 
-    // Send confirmation email via Mailjet
-    const MAILJET_API_KEY = process.env.MAILJET_API_KEY;
-    const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY;
+    // Send confirmation email via Amazon SES
+    if (SES_SMTP_USER && SES_SMTP_PASS) {
+      try {
+        const nodemailer = await import('nodemailer');
 
-    if (MAILJET_API_KEY && MAILJET_SECRET_KEY) {
-      await fetch('https://api.mailjet.com/v3.1/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(`${MAILJET_API_KEY}:${MAILJET_SECRET_KEY}`).toString('base64')}`
-        },
-        body: JSON.stringify({
-          Messages: [
-            {
-              From: {
-                Email: 'compliance@kairologic.com',
-                Name: 'KairoLogic Sentry'
-              },
-              To: [
-                {
-                  Email: 'compliance@kairologic.com',
-                  Name: 'KairoLogic Compliance Team'
-                }
-              ],
-              Subject: `[NEW CONSULTATION] ${consultationData.practiceName}`,
-              TextPart: `
+        const transporter = nodemailer.default.createTransport({
+          host: SES_SMTP_HOST,
+          port: SES_SMTP_PORT,
+          secure: false,
+          auth: {
+            user: SES_SMTP_USER,
+            pass: SES_SMTP_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: `"${SES_FROM_NAME}" <${SES_FROM_EMAIL}>`,
+          to: 'compliance@kairologic.com',
+          subject: `[NEW CONSULTATION] ${consultationData.practiceName}`,
+          text: `
 New Technical Consultation Booking
 ----------------------------------
 
@@ -69,8 +71,8 @@ Submitted: ${consultationData.submittedAt}
 
 ----------------------------------
 Please confirm booking within 24 hours.
-              `,
-              HTMLPart: `
+          `,
+          html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -144,11 +146,15 @@ Please confirm booking within 24 hours.
   </div>
 </body>
 </html>
-              `
-            }
-          ]
-        })
-      });
+          `
+        });
+
+        console.log(`[Fillout Webhook] Consultation email sent for ${consultationData.practiceName}`);
+      } catch (emailErr) {
+        console.error('[Fillout Webhook] Email send error:', emailErr);
+      }
+    } else {
+      console.warn('[Fillout Webhook] SES SMTP credentials not configured — skipping email');
     }
 
     // TODO: Store consultation booking in Supabase
