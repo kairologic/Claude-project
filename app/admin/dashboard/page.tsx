@@ -570,7 +570,19 @@ export default function AdminDashboard() {
 
   // Individual provider scan
   const handleScan = async (ids: string[]) => {
-    const toScan = providers.filter(p => ids.includes(p.id));
+    // Fetch providers directly from DB to ensure we have the latest data
+    const supabase = getSupabase();
+    const { data: fetchedProviders, error: fetchError } = await supabase
+      .from('registry')
+      .select('*')
+      .in('id', ids);
+    
+    if (fetchError || !fetchedProviders) {
+      notify('Failed to fetch providers for scanning', 'error');
+      return;
+    }
+    
+    const toScan = fetchedProviders;
     const withUrl = toScan.filter(p => p.url && p.url.trim());
     const withoutUrl = toScan.filter(p => !p.url || !p.url.trim());
     
@@ -1041,8 +1053,16 @@ export default function AdminDashboard() {
           else if (h.includes('city')) row.city = val;
           else if (h.includes('email')) row.email = val;
           else if (h.includes('phone')) row.phone = val;
-          else if (h.includes('url') || h.includes('website')) row.url = val;
+          else if (h.includes('url') || h.includes('website')) {
+            row.url = val;
+            // Normalize URL with https:// if missing
+            if (val && !val.startsWith('http://') && !val.startsWith('https://')) {
+              row.url = 'https://' + val;
+            }
+          }
           else if (h.includes('zip')) row.zip = val;
+          else if (h.includes('featured')) row.is_featured = val.toLowerCase() === 'true' || val === '1';
+          else if (h.includes('status')) row.status_label = val;
         });
         return row;
       }).filter(r => r.npi && r.name);
@@ -1078,6 +1098,8 @@ export default function AdminDashboard() {
           if (row.city) updateData.city = row.city;
           if (row.zip) updateData.zip = row.zip;
           if (row.provider_type) updateData.provider_type = row.provider_type;
+          if (row.is_featured !== undefined) updateData.is_featured = row.is_featured;
+          if (row.status_label) updateData.status_label = row.status_label;
           await supabase.from('registry').update(updateData).eq('id', existing.id);
           if (row.url && row.url.trim()) newIds.push(existing.id);
           updated++;
@@ -1087,7 +1109,8 @@ export default function AdminDashboard() {
             id: newId, npi: row.npi, name: row.name,
             email: row.email || null, phone: row.phone || null, city: row.city || null,
             zip: row.zip || null, url: row.url || null, provider_type: row.provider_type || 2,
-            widget_status: 'hidden', subscription_status: 'trial', is_visible: false, risk_score: 0, scan_count: 0
+            widget_status: 'hidden', subscription_status: 'trial', is_visible: false, risk_score: 0, scan_count: 0,
+            is_featured: row.is_featured || false, status_label: row.status_label || null
           });
           if (row.url && row.url.trim()) newIds.push(newId);
           imported++;
