@@ -261,11 +261,12 @@ export default function AdminDashboard() {
       const totalCount = totalResult.count || 0;
       const activeCount = activeResult.count || 0;
       
-      // Only load providers WITH URLs (scannable) - limit to 500 for performance in table view
+      // Load providers WITH URLs (scannable) - limit to 500 for performance
       const { data, error: loadError } = await supabase
         .from('registry')
         .select('*')
-        .like('url', 'http%')
+        .not('url', 'is', null)
+        .neq('url', '')
         .order('last_scan_timestamp', { ascending: false, nullsFirst: false })
         .limit(500);
       if (loadError) console.error('Registry load error:', loadError);
@@ -526,9 +527,9 @@ export default function AdminDashboard() {
             const updatePayload: any = {
               risk_score: scanData.risk_score,
               risk_level: scanData.risk_level,
-              status_label: scanData.status_label || (scanData.risk_score >= 67 ? 'Verified Sovereign' : scanData.risk_score >= 34 ? 'Drift Detected' : 'Violation'),
+              status_label: scanData.status_label || (scanData.risk_score >= 75 ? 'Verified Sovereign' : scanData.risk_score >= 50 ? 'Drift Detected' : 'Violation'),
               scan_count: (p.scan_count || 0) + 1,
-              widget_status: scanData.risk_score >= 67 ? 'active' : scanData.risk_score >= 34 ? 'warning' : 'hidden',
+              widget_status: scanData.risk_score >= 75 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
               last_scan_result: scanData,
               last_scan_timestamp: nowIso,
               updated_at: nowIso
@@ -638,9 +639,9 @@ export default function AdminDashboard() {
         const updatePayload: any = { 
           risk_score: scanData.risk_score,
           risk_level: scanData.risk_level,
-          status_label: scanData.status_label || (scanData.risk_score >= 67 ? 'Verified Sovereign' : scanData.risk_score >= 34 ? 'Drift Detected' : 'Violation'),
+          status_label: scanData.status_label || (scanData.risk_score >= 75 ? 'Verified Sovereign' : scanData.risk_score >= 50 ? 'Drift Detected' : 'Violation'),
           scan_count: (p.scan_count || 0) + 1,
-          widget_status: scanData.risk_score >= 67 ? 'active' : scanData.risk_score >= 34 ? 'warning' : 'hidden',
+          widget_status: scanData.risk_score >= 75 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
           last_scan_result: scanData,
           last_scan_timestamp: nowIso,
           updated_at: nowIso
