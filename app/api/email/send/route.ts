@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const MAILJET_API_KEY = process.env.MAILJET_API_KEY || '80e5ddfcab46ef75a9b8d2bf51a5541b';
-const MAILJET_SECRET = process.env.MAILJET_SECRET_KEY || '';
+
+// Amazon SES SMTP Configuration
+const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
+const SES_SMTP_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
+const SES_SMTP_USER = process.env.SES_SMTP_USER || '';
+const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
+const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.com';
+const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Compliance';
 
 function replaceVariables(template: string, vars: Record<string, string>): string {
   let result = template;
@@ -14,34 +20,37 @@ function replaceVariables(template: string, vars: Record<string, string>): strin
   return result;
 }
 
-async function sendMailjet(to: string, toName: string, subject: string, htmlBody: string): Promise<boolean> {
-  if (!MAILJET_SECRET) {
-    console.error('[Email] Mailjet secret not configured');
+async function sendViaSES(to: string, toName: string, subject: string, htmlBody: string, textBody?: string): Promise<boolean> {
+  if (!SES_SMTP_USER || !SES_SMTP_PASS) {
+    console.error('[Email] SES SMTP credentials not configured');
     return false;
   }
 
   try {
-    const response = await fetch('https://api.mailjet.com/v3.1/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + Buffer.from(`${MAILJET_API_KEY}:${MAILJET_SECRET}`).toString('base64')
+    const nodemailer = await import('nodemailer');
+
+    const transporter = nodemailer.default.createTransport({
+      host: SES_SMTP_HOST,
+      port: SES_SMTP_PORT,
+      secure: false, // STARTTLS on port 587
+      auth: {
+        user: SES_SMTP_USER,
+        pass: SES_SMTP_PASS,
       },
-      body: JSON.stringify({
-        Messages: [{
-          From: { Email: 'compliance@kairologic.com', Name: 'KairoLogic Compliance' },
-          To: [{ Email: to, Name: toName }],
-          Subject: subject,
-          HTMLPart: htmlBody
-        }]
-      })
     });
 
-    const result = await response.json();
-    console.log('[Email] Mailjet response:', JSON.stringify(result).substring(0, 300));
-    return response.ok;
+    const info = await transporter.sendMail({
+      from: `"${SES_FROM_NAME}" <${SES_FROM_EMAIL}>`,
+      to: toName ? `"${toName}" <${to}>` : to,
+      subject,
+      html: htmlBody,
+      ...(textBody ? { text: textBody } : {}),
+    });
+
+    console.log(`[Email] SES sent OK — MessageId: ${info.messageId}, to: ${to}`);
+    return true;
   } catch (err) {
-    console.error('[Email] Mailjet send failed:', err);
+    console.error('[Email] SES send failed:', err);
     return false;
   }
 }
@@ -202,19 +211,16 @@ export async function POST(request: NextRequest) {
     };
 
     // 4. Determine if we should use the rich results template
-    // Use it for immediate-summary when scan data is available
     let subject: string;
     let htmlBody: string;
 
     if (template_slug === 'immediate-summary' && score !== undefined) {
-      // Use rich results summary email
       const scoreNum = parseInt(String(score));
       subject = allVars._force_internal === 'true'
         ? `[Scan Alert] ${allVars.practice_name || 'NPI ' + npi} scored ${scoreNum}/100`
         : `Your Compliance Score: ${scoreNum}/100 — ${allVars.practice_name || 'Scan Results'}`;
       htmlBody = buildResultsSummaryHTML(allVars);
     } else {
-      // Use DB template with variable substitution
       subject = replaceVariables(template.subject, allVars);
       htmlBody = replaceVariables(template.html_body, allVars);
     }
@@ -232,8 +238,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Email] Sending "${template_slug}" to ${recipientEmail} (${isInternal ? 'admin' : 'provider'})`);
 
-    // 6. Send via Mailjet
-    const sent = await sendMailjet(
+    // 6. Send via Amazon SES
+    const sent = await sendViaSES(
       recipientEmail,
       allVars.practice_manager_name || allVars.practice_name || 'Provider',
       subject,
