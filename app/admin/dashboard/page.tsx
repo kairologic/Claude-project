@@ -571,49 +571,53 @@ export default function AdminDashboard() {
 
   // Individual provider scan
   const handleScan = async (ids: string[]) => {
-    // Fetch providers directly from DB to ensure we have the latest data
+    // Fetch providers directly from DB in batches (Supabase .in() has limits)
     const supabase = getSupabase();
-    const { data: fetchedProviders, error: fetchError } = await supabase
-      .from('registry')
-      .select('*')
-      .in('id', ids);
+    let allProviders: any[] = [];
+    const batchSize = 50;
+    for (let b = 0; b < ids.length; b += batchSize) {
+      const chunk = ids.slice(b, b + batchSize);
+      const { data, error } = await supabase.from('registry').select('*').in('id', chunk);
+      if (error) { notify(`Failed to fetch batch: ${error.message}`, 'error'); continue; }
+      if (data) allProviders = allProviders.concat(data);
+    }
     
-    if (fetchError || !fetchedProviders) {
-      notify('Failed to fetch providers for scanning', 'error');
+    if (allProviders.length === 0) {
+      notify('No providers found to scan', 'error');
       return;
     }
     
-    const toScan = fetchedProviders;
-    const withUrl = toScan.filter(p => p.url && p.url.trim());
-    const withoutUrl = toScan.filter(p => !p.url || !p.url.trim());
+    const withUrl = allProviders.filter((p: any) => p.url && p.url.trim());
+    const withoutUrl = allProviders.filter((p: any) => !p.url || !p.url.trim());
     
     if (withoutUrl.length > 0) {
-      notify(`${withoutUrl.length} provider(s) have no URL and cannot be scanned`, 'error');
+      notify(`${withoutUrl.length} provider(s) have no URL — skipped`, 'error');
     }
     
     if (withUrl.length === 0) return;
     
     setScanning(true); setScanProgress(0);
-    setScanStatus(`Scanning ${withUrl.length} provider(s)... (~${Math.ceil(withUrl.length * 4 / 60)} min)`);
+    const estMinutes = Math.ceil(withUrl.length * 4 / 60);
+    setScanStatus(`Starting scan of ${withUrl.length} provider(s)... (~${estMinutes} min)`);
     
     try {
-      const supabase = getSupabase();
       const nowIso = new Date().toISOString();
       let scanned = 0, failed = 0;
+      
       for (let i = 0; i < withUrl.length; i++) {
         const p = withUrl[i];
-        setScanProgress(Math.round(((i + 1) / withUrl.length) * 100));
-        setScanStatus(`Scanning ${p.name} (${i+1}/${withUrl.length})...`);
+        const pct = Math.round(((i + 1) / withUrl.length) * 100);
+        setScanProgress(pct);
+        setScanStatus(`[${i+1}/${withUrl.length}] Scanning ${p.name}... (${pct}%)`);
         
         let scanData: any = null;
-        // Attempt scan with one retry on failure
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             scanData = await runComplianceScan(p.npi, p.url!);
-            break; // success
+            break;
           } catch (err: any) {
             if (attempt === 1) {
-              setScanStatus(`Retry ${p.name} in 10s...`);
+              setScanStatus(`[${i+1}/${withUrl.length}] Retrying ${p.name} in 10s...`);
               await new Promise(r => setTimeout(r, 10000));
             } else {
               console.error(`Scan failed for ${p.name}: ${err.message}`);
@@ -622,20 +626,20 @@ export default function AdminDashboard() {
           }
         }
         
-        if (!scanData) continue; // skip to next provider
+        if (!scanData) continue;
         
-        // Store in scan_results table
+        // Store scan result (non-blocking)
         await supabase.from('scan_results').insert({
           registry_id: p.id, npi: p.npi, url: p.url, scan_type: 'manual',
           risk_score: scanData.risk_score, risk_level: scanData.risk_level,
           sb1188_findings: scanData.sb1188_findings, hb149_findings: scanData.hb149_findings,
           technical_fixes: scanData.technical_fixes, raw_scan_data: scanData
-        });
+        }).then(() => {}).catch(() => {});
         
-        // Store report via /api/report for PDF generation
-        const reportId = await storeReport(p, scanData);
+        // Store report
+        const reportId = await storeReport(p, scanData).catch(() => null);
         
-        // Update registry with all fields
+        // Update registry with new thresholds
         const updatePayload: any = { 
           risk_score: scanData.risk_score,
           risk_level: scanData.risk_level,
@@ -653,8 +657,8 @@ export default function AdminDashboard() {
         await supabase.from('registry').update(updatePayload).eq('id', p.id);
         scanned++;
         
-        // 2-second delay between scans to respect ip-api rate limits (45/min)
-        if (i < withUrl.length - 1) await new Promise(r => setTimeout(r, 2000));
+        // 3-second delay between scans to respect ip-api rate limits (45/min)
+        if (i < withUrl.length - 1) await new Promise(r => setTimeout(r, 3000));
       }
       await loadData();
       const msg = failed > 0 ? `Done: ${scanned} scanned, ${failed} failed.` : `Scan complete! ${scanned} provider(s) scanned.`;
@@ -662,6 +666,7 @@ export default function AdminDashboard() {
     } catch (e: any) { notify(e.message || 'Scan failed', 'error'); }
     finally { setScanning(false); setScanProgress(0); setScanStatus(''); }
   };
+
 
   // CSV EXPORT - All providers
   const handleExport = () => {
