@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Amazon SES SMTP Configuration
+const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
+const SES_SMTP_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
+const SES_SMTP_USER = process.env.SES_SMTP_USER || '';
+const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
+const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.com';
+const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Sentry';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -13,32 +21,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mailjet API configuration
-    const MAILJET_API_KEY = process.env.MAILJET_API_KEY || '80e5ddfcab46ef75a9b8d2bf51a5541b';
-    const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY || '';
-    
-    // Send email using Mailjet
-    const mailjetResponse = await fetch('https://api.mailjet.com/v3.1/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${Buffer.from(`${MAILJET_API_KEY}:${MAILJET_SECRET_KEY}`).toString('base64')}`
+    if (!SES_SMTP_USER || !SES_SMTP_PASS) {
+      console.error('[Contact] SES SMTP credentials not configured');
+      return NextResponse.json(
+        { error: 'Email service not configured' },
+        { status: 500 }
+      );
+    }
+
+    const nodemailer = await import('nodemailer');
+
+    const transporter = nodemailer.default.createTransport({
+      host: SES_SMTP_HOST,
+      port: SES_SMTP_PORT,
+      secure: false,
+      auth: {
+        user: SES_SMTP_USER,
+        pass: SES_SMTP_PASS,
       },
-      body: JSON.stringify({
-        Messages: [
-          {
-            From: {
-              Email: 'compliance@kairologic.com',
-              Name: 'KairoLogic Sentry'
-            },
-            To: [
-              {
-                Email: 'compliance@kairologic.com',
-                Name: 'KairoLogic Compliance Team'
-              }
-            ],
-            Subject: `[${subject}] New Contact from ${practiceName}`,
-            TextPart: `
+    });
+
+    await transporter.sendMail({
+      from: `"${SES_FROM_NAME}" <${SES_FROM_EMAIL}>`,
+      to: 'compliance@kairologic.com',
+      replyTo: email,
+      subject: `[${subject}] New Contact from ${practiceName}`,
+      text: `
 New Contact Form Submission
 ----------------------------
 
@@ -52,8 +60,8 @@ ${message}
 
 ----------------------------
 Sent from KairoLogic Sentry Platform
-            `,
-            HTMLPart: `
+      `,
+      html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -102,17 +110,8 @@ Sent from KairoLogic Sentry Platform
   </div>
 </body>
 </html>
-            `
-          }
-        ]
-      })
+      `
     });
-
-    if (!mailjetResponse.ok) {
-      const errorData = await mailjetResponse.json();
-      console.error('Mailjet error:', errorData);
-      throw new Error('Failed to send email');
-    }
 
     return NextResponse.json({ 
       success: true,
