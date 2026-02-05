@@ -629,15 +629,18 @@ export default function AdminDashboard() {
         if (!scanData) continue;
         
         // Store scan result (non-blocking)
-        await supabase.from('scan_results').insert({
-          registry_id: p.id, npi: p.npi, url: p.url, scan_type: 'manual',
-          risk_score: scanData.risk_score, risk_level: scanData.risk_level,
-          sb1188_findings: scanData.sb1188_findings, hb149_findings: scanData.hb149_findings,
-          technical_fixes: scanData.technical_fixes, raw_scan_data: scanData
-        }).then(() => {}).catch(() => {});
+        try {
+          await supabase.from('scan_results').insert({
+            registry_id: p.id, npi: p.npi, url: p.url, scan_type: 'manual',
+            risk_score: scanData.risk_score, risk_level: scanData.risk_level,
+            sb1188_findings: scanData.sb1188_findings, hb149_findings: scanData.hb149_findings,
+            technical_fixes: scanData.technical_fixes, raw_scan_data: scanData
+          });
+        } catch (_) {}
         
         // Store report
-        const reportId = await storeReport(p, scanData).catch(() => null);
+        let reportId: string | null = null;
+        try { reportId = await storeReport(p, scanData); } catch (_) {}
         
         // Update registry with new thresholds
         const updatePayload: any = { 
