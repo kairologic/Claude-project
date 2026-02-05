@@ -685,7 +685,7 @@ export default function AdminDashboard() {
       const catScores = fullReport?.category_scores || {};
       const borderMap = fullReport?.data_border_map || [];
       const score = provider.risk_score || fullReport?.sovereignty_score || 0;
-      const riskLevel = score >= 67 ? 'Low Risk' : score >= 34 ? 'Moderate Risk' : 'High Risk';
+      const riskLevel = score >= 75 ? 'Low Risk' : score >= 50 ? 'Moderate Risk' : 'High Risk';
       const reportId = fullReport?.report_id || `KL-SAR-${Date.now().toString(36).toUpperCase()}`;
       const reportDate = fullReport?.report_date ? new Date(fullReport.report_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       
@@ -697,7 +697,10 @@ export default function AdminDashboard() {
   <title>KairoLogic Compliance Report - ${provider.name}</title>
   <style>
     @page { size: letter; margin: 0.75in; }
-    @media print { body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
+    @media print { 
+      body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      @page { margin-top: 0.5in; margin-bottom: 0.5in; }
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', -apple-system, system-ui, sans-serif; font-size: 11pt; line-height: 1.5; color: #1e293b; background: white; }
     .page { page-break-after: always; padding: 0.5in; }
@@ -713,11 +716,11 @@ export default function AdminDashboard() {
     
     /* Score Section */
     .score-section { display: flex; align-items: center; justify-content: space-between; padding: 24px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; margin-bottom: 24px; }
-    .score-circle { width: 100px; height: 100px; border-radius: 50%; border: 6px solid ${score >= 67 ? '#16a34a' : score >= 34 ? '#d97706' : '#dc2626'}; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-    .score-value { font-size: 32pt; font-weight: 900; color: ${score >= 67 ? '#16a34a' : score >= 34 ? '#d97706' : '#dc2626'}; line-height: 1; }
+    .score-circle { width: 100px; height: 100px; border-radius: 50%; border: 6px solid ${score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626'}; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .score-value { font-size: 32pt; font-weight: 900; color: ${score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626'}; line-height: 1; }
     .score-label { font-size: 8pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
     .score-info { text-align: right; }
-    .risk-badge { display: inline-block; padding: 8px 16px; border-radius: 8px; font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; background: ${score >= 67 ? '#dcfce7' : score >= 34 ? '#fef3c7' : '#fee2e2'}; color: ${score >= 67 ? '#166534' : score >= 34 ? '#92400e' : '#991b1b'}; }
+    .risk-badge { display: inline-block; padding: 8px 16px; border-radius: 8px; font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; background: ${score >= 75 ? '#dcfce7' : score >= 50 ? '#fef3c7' : '#fee2e2'}; color: ${score >= 75 ? '#166534' : score >= 50 ? '#92400e' : '#991b1b'}; }
     .compliance-status { font-size: 9pt; color: #64748b; margin-top: 8px; }
     
     /* Practice Info */
@@ -825,7 +828,7 @@ export default function AdminDashboard() {
       ${Object.entries(catScores).map(([name, data]: [string, any]) => `
         <div class="cat-card">
           <div class="cat-name">${name.replace(/_/g, ' ')}</div>
-          <div class="cat-score" style="color: ${(data.percentage || 0) >= 67 ? '#16a34a' : (data.percentage || 0) >= 34 ? '#d97706' : '#dc2626'}">${data.percentage || 0}%</div>
+          <div class="cat-score" style="color: ${(data.percentage || 0) >= 75 ? '#16a34a' : (data.percentage || 0) >= 50 ? '#d97706' : '#dc2626'}">${data.percentage || 0}%</div>
           <div class="cat-detail">${data.passed || 0} passed / ${data.findings || 0} checks</div>
         </div>
       `).join('')}
@@ -934,23 +937,14 @@ export default function AdminDashboard() {
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       
-      // Open in new window for printing as PDF
-      const printWindow = window.open(url, '_blank');
-      if (printWindow) {
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print();
-          }, 500);
-        };
-      }
-      
-      // Also offer direct HTML download
+      // Download HTML file directly (user can open and print/save as PDF)
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${provider.name.replace(/\s+/g, '_')}_Compliance_Report_${reportId}.html`;
+      a.download = `${provider.name.replace(/\\s+/g, '_')}_Compliance_Report_${reportId}.html`;
       a.click();
+      URL.revokeObjectURL(url);
       
-      notify('Report generated - use Print > Save as PDF for official PDF');
+      notify('Report downloaded - open and print to PDF');
     } catch (err) {
       console.error('Report download error:', err);
       notify('Failed to generate report', 'error');
