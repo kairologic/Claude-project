@@ -130,7 +130,7 @@ export const EmailTemplatesTab: React.FC<Props> = ({ showNotification }) => {
       if (data.sent) {
         showNotification('Test email sent to compliance@kairologic.com', 'success');
       } else {
-        showNotification('Email send returned false - check Mailjet config', 'error');
+        showNotification('Email send returned false - check SES SMTP config', 'error');
       }
     } catch (err) {
       showNotification('Test send failed', 'error');
