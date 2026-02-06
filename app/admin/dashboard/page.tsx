@@ -17,6 +17,8 @@ import { PageContentTab } from '@/components/admin/PageContentTab';
 import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
 import { ProspectsTab } from '@/components/admin/ProspectsTab';
 import { EmailTemplatesTab } from '@/components/admin/EmailTemplatesTab';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 type TabType = 'overview' | 'registry' | 'prospects' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
 
@@ -709,259 +711,248 @@ export default function AdminDashboard() {
       const riskLevel = score >= 75 ? 'Low Risk' : score >= 50 ? 'Moderate Risk' : 'High Risk';
       const reportId = fullReport?.report_id || `KL-SAR-${Date.now().toString(36).toUpperCase()}`;
       const reportDate = fullReport?.report_date ? new Date(fullReport.report_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      
-      // Generate professional HTML report for PDF (print-optimized)
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>KairoLogic Compliance Report - ${provider.name}</title>
-  <style>
-    @page { size: letter; margin: 0.75in; }
-    @media print { 
-      body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      @page { margin-top: 0.5in; margin-bottom: 0.5in; }
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', -apple-system, system-ui, sans-serif; font-size: 11pt; line-height: 1.5; color: #1e293b; background: white; }
-    .page { page-break-after: always; padding: 0.5in; }
-    .page:last-child { page-break-after: auto; }
-    
-    /* Header */
-    .header { background: linear-gradient(135deg, #00234E 0%, #003366 100%); color: white; padding: 32px; margin: -0.5in -0.5in 24px -0.5in; text-align: center; }
-    .header-logo { font-size: 28pt; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
-    .header-logo span { color: #C5A059; }
-    .header-sub { color: #C5A059; font-size: 9pt; letter-spacing: 4px; text-transform: uppercase; font-weight: 700; }
-    .header-title { font-size: 18pt; font-weight: 800; margin-top: 16px; letter-spacing: 1px; }
-    .header-meta { font-size: 9pt; color: rgba(255,255,255,0.7); margin-top: 8px; }
-    
-    /* Score Section */
-    .score-section { display: flex; align-items: center; justify-content: space-between; padding: 24px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; margin-bottom: 24px; }
-    .score-circle { width: 100px; height: 100px; border-radius: 50%; border: 6px solid ${score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626'}; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-    .score-value { font-size: 32pt; font-weight: 900; color: ${score >= 75 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626'}; line-height: 1; }
-    .score-label { font-size: 8pt; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
-    .score-info { text-align: right; }
-    .risk-badge { display: inline-block; padding: 8px 16px; border-radius: 8px; font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; background: ${score >= 75 ? '#dcfce7' : score >= 50 ? '#fef3c7' : '#fee2e2'}; color: ${score >= 75 ? '#166534' : score >= 50 ? '#92400e' : '#991b1b'}; }
-    .compliance-status { font-size: 9pt; color: #64748b; margin-top: 8px; }
-    
-    /* Practice Info */
-    .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
-    .info-item { background: #f8fafc; padding: 12px 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .info-label { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 2px; }
-    .info-value { font-size: 11pt; font-weight: 600; color: #1e293b; }
-    
-    /* Section Headers */
-    .section-title { font-size: 14pt; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #00234E; padding-bottom: 8px; border-bottom: 3px solid #C5A059; margin: 32px 0 16px 0; }
-    
-    /* Category Scores */
-    .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
-    .cat-card { background: #f8fafc; padding: 16px; border-radius: 12px; text-align: center; border: 1px solid #e2e8f0; }
-    .cat-name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px; }
-    .cat-score { font-size: 24pt; font-weight: 900; }
-    .cat-detail { font-size: 8pt; color: #94a3b8; margin-top: 4px; }
-    
-    /* Findings */
-    .finding { background: #ffffff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; page-break-inside: avoid; }
-    .finding-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    .finding-id { font-size: 10pt; font-weight: 900; color: #00234E; }
-    .finding-name { font-size: 11pt; font-weight: 700; color: #1e293b; margin-top: 2px; }
-    .severity { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 8pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-    .severity-critical { background: #fee2e2; color: #991b1b; }
-    .severity-high { background: #ffedd5; color: #9a3412; }
-    .severity-medium { background: #fef3c7; color: #92400e; }
-    .severity-low { background: #dcfce7; color: #166534; }
-    .finding-clause { font-size: 9pt; color: #64748b; font-style: italic; margin: 8px 0; }
-    .finding-detail { font-size: 10pt; color: #475569; line-height: 1.6; margin-bottom: 12px; padding: 12px; background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 0 8px 8px 0; }
-    .tech-fix { background: #ecfdf5; border-left: 4px solid #10b981; padding: 16px; border-radius: 0 12px 12px 0; margin-top: 12px; }
-    .tech-fix-label { font-size: 9pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-    .tech-fix-text { font-size: 10pt; color: #064e3b; font-family: 'Consolas', 'Monaco', monospace; line-height: 1.6; }
-    
-    /* Border Map Table */
-    .border-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 24px; }
-    .border-table th { background: #00234E; color: white; padding: 10px 8px; text-align: left; font-size: 8pt; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
-    .border-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; }
-    .border-table tr:nth-child(even) { background: #f8fafc; }
-    .sovereign { color: #16a34a; font-weight: 700; }
-    .non-sovereign { color: #dc2626; font-weight: 700; }
-    
-    /* Attestation */
-    .attestation { background: linear-gradient(135deg, #00234E 0%, #003366 100%); color: white; padding: 32px; border-radius: 16px; margin-top: 32px; page-break-inside: avoid; }
-    .attestation-title { font-size: 14pt; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #C5A059; margin-bottom: 16px; text-align: center; }
-    .attestation-text { font-size: 10pt; line-height: 1.8; color: rgba(255,255,255,0.9); margin-bottom: 24px; }
-    .attestation-sig { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 24px; }
-    .sig-block { text-align: center; }
-    .sig-line { width: 180px; border-bottom: 2px solid #C5A059; margin-bottom: 8px; height: 40px; display: flex; align-items: flex-end; justify-content: center; }
-    .sig-name { font-size: 11pt; font-weight: 700; color: #C5A059; font-style: italic; }
-    .sig-title { font-size: 8pt; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-    .seal { width: 80px; height: 80px; border: 3px solid #C5A059; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-    .seal-text { font-size: 7pt; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #C5A059; text-align: center; line-height: 1.2; }
-    
-    /* Footer */
-    .footer { text-align: center; font-size: 8pt; color: #94a3b8; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
-    .footer-logo { font-weight: 900; color: #00234E; }
-    
-    /* CTA */
-    .cta { background: #f8fafc; border: 2px solid #C5A059; border-radius: 12px; padding: 24px; text-align: center; margin-top: 24px; }
-    .cta-title { font-size: 12pt; font-weight: 800; color: #00234E; margin-bottom: 8px; }
-    .cta-text { font-size: 10pt; color: #64748b; margin-bottom: 16px; }
-    .cta-url { font-size: 11pt; font-weight: 700; color: #C5A059; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <!-- Header -->
-    <div class="header">
-      <div class="header-logo">Kairo<span>Logic</span></div>
-      <div class="header-sub">Statutory Vanguard • ATX-01 Anchor Node</div>
-      <div class="header-title">Texas Healthcare Compliance Report</div>
-      <div class="header-meta">SB 1188 Data Sovereignty & HB 149 AI Transparency Assessment</div>
-    </div>
-    
-    <!-- Score Section -->
-    <div class="score-section">
-      <div class="score-circle">
-        <div class="score-value">${score}</div>
-        <div class="score-label">Score</div>
-      </div>
-      <div style="flex: 1; padding: 0 24px;">
-        <div style="font-size: 16pt; font-weight: 800; color: #00234E;">${provider.name}</div>
-        <div style="font-size: 10pt; color: #64748b; margin-top: 4px;">NPI: ${provider.npi}</div>
-      </div>
-      <div class="score-info">
-        <div class="risk-badge">${riskLevel}</div>
-        <div class="compliance-status">Report ID: ${reportId}</div>
-        <div class="compliance-status">${reportDate}</div>
-      </div>
-    </div>
-    
-    <!-- Practice Info -->
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">Practice Name</div><div class="info-value">${provider.name}</div></div>
-      <div class="info-item"><div class="info-label">NPI</div><div class="info-value">${provider.npi}</div></div>
-      <div class="info-item"><div class="info-label">Location</div><div class="info-value">${provider.city || 'Texas'}, TX</div></div>
-      <div class="info-item"><div class="info-label">Website Scanned</div><div class="info-value">${provider.url || 'Not provided'}</div></div>
-    </div>
-    
-    <!-- Category Scores -->
-    ${Object.keys(catScores).length > 0 ? `
-    <div class="section-title">Compliance Category Breakdown</div>
-    <div class="cat-grid">
-      ${Object.entries(catScores).map(([name, data]: [string, any]) => `
-        <div class="cat-card">
-          <div class="cat-name">${name.replace(/_/g, ' ')}</div>
-          <div class="cat-score" style="color: ${(data.percentage || 0) >= 75 ? '#16a34a' : (data.percentage || 0) >= 50 ? '#d97706' : '#dc2626'}">${data.percentage || 0}%</div>
-          <div class="cat-detail">${data.passed || 0} passed / ${data.findings || 0} checks</div>
-        </div>
-      `).join('')}
-    </div>` : ''}
-    
-    <!-- Findings Section -->
-    <div class="section-title">Statutory Drift Analysis (${findings.length} Findings)</div>
-    ${findings.length === 0 ? `
-      <div class="finding" style="text-align: center; padding: 40px;">
-        <div style="font-size: 32pt; color: #16a34a; margin-bottom: 12px;">✓</div>
-        <div style="font-size: 14pt; font-weight: 700; color: #16a34a;">No Compliance Violations Detected</div>
-        <div style="font-size: 10pt; color: #64748b; margin-top: 8px;">Your practice infrastructure is aligned with Texas SB 1188 and HB 149 requirements.</div>
-      </div>
-    ` : findings.map((f: any, i: number) => `
-      <div class="finding">
-        <div class="finding-header">
-          <div>
-            <div class="finding-id">${f.id || `DRIFT-${String(i + 1).padStart(2, '0')}`}</div>
-            <div class="finding-name">${f.name || 'Compliance Finding'}</div>
-          </div>
-          <span class="severity severity-${(f.severity || 'medium').toLowerCase()}">${f.severity || 'MEDIUM'}</span>
-        </div>
-        ${f.clause ? `<div class="finding-clause">📜 Legal Reference: ${f.clause}</div>` : ''}
-        <div class="finding-detail">
-          <strong>Technical Finding:</strong> ${f.detail || f.description || f.technical_finding || 'Infrastructure deviation detected requiring remediation.'}
-        </div>
-        ${f.technicalFix || f.recommended_fix || f.recommendedFix ? `
-        <div class="tech-fix">
-          <div class="tech-fix-label">✅ Recommended Technical Fix</div>
-          <div class="tech-fix-text">${f.technicalFix || f.recommended_fix || f.recommendedFix}</div>
-        </div>` : ''}
-      </div>
-    `).join('')}
-  </div>
-  
-  <div class="page">
-    <!-- Data Border Map -->
-    ${borderMap.length > 0 ? `
-    <div class="section-title">Data Border Map (${borderMap.length} Endpoints Analyzed)</div>
-    <table class="border-table">
-      <thead>
-        <tr>
-          <th>Domain</th>
-          <th>IP Address</th>
-          <th>Location</th>
-          <th>Purpose</th>
-          <th>Sovereignty</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${borderMap.map((e: any) => `
-          <tr>
-            <td>${e.domain || '-'}</td>
-            <td style="font-family: monospace; font-size: 8pt;">${e.ip || '-'}</td>
-            <td>${e.city || ''}, ${e.country || e.countryCode || ''}</td>
-            <td>${e.purpose || e.type || '-'}</td>
-            <td class="${e.isSovereign !== false ? 'sovereign' : 'non-sovereign'}">${e.isSovereign !== false ? '✓ US Sovereign' : '⚠ Foreign/OCONUS'}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>` : ''}
-    
-    <!-- Official Attestation -->
-    <div class="attestation">
-      <div class="attestation-title">Official Compliance Attestation</div>
-      <div class="attestation-text">
-        This document certifies that the above-named healthcare practice has been assessed for compliance with Texas Senate Bill 1188 (Data Sovereignty Requirements) and House Bill 149 (AI Transparency Mandates) as of the scan date indicated. The findings, technical recommendations, and remediation guidance contained herein represent the current compliance posture based on automated infrastructure analysis.
-        <br><br>
-        ${score >= 75 ? 
-          'This practice demonstrates <strong>Substantial Compliance</strong> with Texas healthcare data sovereignty requirements. Continued monitoring is recommended to maintain this status.' :
-          'This practice requires <strong>Technical Remediation</strong> to achieve full compliance. The drift items identified above must be addressed to meet Texas statutory requirements and avoid potential regulatory penalties.'}
-      </div>
-      <div class="attestation-sig">
-        <div class="sig-block">
-          <div class="sig-line"><div class="sig-name">KairoLogic Compliance Team</div></div>
-          <div class="sig-title">Statutory Vanguard Division</div>
-          <div class="sig-title">Austin, Texas</div>
-        </div>
-        <div class="seal">
-          <div class="seal-text">SENTRY<br>ASSESSED<br>TX-2026</div>
-        </div>
-        <div class="sig-block">
-          <div class="sig-line"><div class="sig-name">${reportDate}</div></div>
-          <div class="sig-title">Assessment Date</div>
-          <div class="sig-title">Report ID: ${reportId}</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Footer -->
-    <div class="footer">
-      <div class="footer-logo">KairoLogic Compliance Vanguard</div>
-      <div>ATX-01 Anchor Node • Austin, Texas</div>
-      <div>Report Generated: ${new Date().toISOString()} • TX SB 1188 & HB 149 Statutory Alignment</div>
-      <div style="margin-top: 8px; font-size: 7pt; color: #cbd5e1;">This report is provided for informational purposes. KairoLogic makes no warranty regarding regulatory outcomes. Consult legal counsel for compliance decisions.</div>
-    </div>
-  </div>
-</body>
-</html>`;
-      
-      // Create blob and trigger print dialog (which allows Save as PDF)
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      
-      // Download HTML file directly (user can open and print/save as PDF)
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${provider.name.replace(/\\s+/g, '_')}_Compliance_Report_${reportId}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-      
-      notify('Report downloaded - open and print to PDF');
+
+      // ── jsPDF Generation ──
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 18;
+      const contentW = pageW - margin * 2;
+      let y = 0;
+
+      const navy: [number, number, number] = [0, 35, 78];
+      const gold: [number, number, number] = [197, 160, 89];
+      const green: [number, number, number] = [22, 163, 74];
+      const red: [number, number, number] = [220, 38, 38];
+      const amber: [number, number, number] = [217, 119, 6];
+      const gray: [number, number, number] = [100, 116, 139];
+      const darkText: [number, number, number] = [30, 41, 59];
+      const scoreColor = score >= 75 ? green : score >= 50 ? amber : red;
+
+      const checkPage = (need: number) => {
+        if (y + need > pageH - 20) { doc.addPage(); y = 20; return true; }
+        return false;
+      };
+
+      // ═══ HEADER ═══
+      doc.setFillColor(...navy);
+      doc.rect(0, 0, pageW, 48, 'F');
+      doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text('KAIRO', pageW / 2 - 14, 16, { align: 'center' });
+      doc.setTextColor(...gold);
+      doc.text('LOGIC', pageW / 2 + 17, 16, { align: 'center' });
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...gold);
+      doc.text('TEXAS HEALTHCARE COMPLIANCE INTELLIGENCE', pageW / 2, 23, { align: 'center' });
+      doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text('Statutory Audit Report', pageW / 2, 33, { align: 'center' });
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 200, 200);
+      doc.text(`Report ID: ${reportId}  \u2022  Generated: ${reportDate}`, pageW / 2, 40, { align: 'center' });
+      y = 58;
+
+      // ═══ SCORE ═══
+      doc.setDrawColor(...scoreColor); doc.setLineWidth(1.5);
+      doc.circle(margin + 16, y + 12, 12);
+      doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(...scoreColor);
+      doc.text(`${score}`, margin + 16, y + 14, { align: 'center' });
+      doc.setFontSize(6); doc.setTextColor(...gray);
+      doc.text('/ 100', margin + 16, y + 19, { align: 'center' });
+      // Risk badge
+      const badgeBg = score >= 75 ? [220, 252, 231] : score >= 50 ? [254, 243, 199] : [254, 226, 226];
+      doc.setFillColor(badgeBg[0], badgeBg[1], badgeBg[2]);
+      doc.roundedRect(margin + 36, y + 2, 40, 8, 2, 2, 'F');
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...scoreColor);
+      doc.text(riskLevel.toUpperCase(), margin + 56, y + 7.5, { align: 'center' });
+      doc.setFontSize(8); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal');
+      doc.text(`Compliance: ${score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation'}`, margin + 36, y + 18);
+      doc.setFontSize(6);
+      doc.text(`Engine: ${fullReport?.engine_version || 'SENTRY-3.1.0'}`, pageW - margin, y + 4, { align: 'right' });
+      y += 30;
+
+      // ═══ PRACTICE INFO ═══
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, y, contentW, 22, 2, 2, 'F');
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
+      doc.text('PRACTICE', margin + 4, y + 5);
+      doc.text('NPI', margin + 4, y + 13);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...darkText); doc.setFontSize(9);
+      doc.text(provider.name || 'Unknown', margin + 28, y + 5);
+      doc.text(provider.npi || 'N/A', margin + 28, y + 13);
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
+      doc.text('URL', pageW / 2, y + 5);
+      doc.text('CITY / ZIP', pageW / 2, y + 13);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...darkText); doc.setFontSize(8);
+      const urlDisp = (provider.url || 'N/A').length > 35 ? (provider.url || '').substring(0, 35) + '...' : (provider.url || 'N/A');
+      doc.text(urlDisp, pageW / 2 + 20, y + 5);
+      doc.text(`${provider.city || ''} ${provider.zip || ''}`.trim() || 'N/A', pageW / 2 + 20, y + 13);
+      y += 28;
+
+      // ═══ CATEGORY SCORES ═══
+      const cats = [
+        { key: 'data_sovereignty', label: 'Data Residency', icon: 'DR' },
+        { key: 'ai_transparency', label: 'AI Transparency', icon: 'AI' },
+        { key: 'clinical_integrity', label: 'Clinical Integrity', icon: 'CI' },
+      ];
+      const catW = (contentW - 8) / 3;
+      cats.forEach((cat, i) => {
+        const cs = catScores[cat.key] || { percentage: 0, passed: 0, findings: 0 };
+        const cx = margin + i * (catW + 4);
+        const cc = (cs.percentage || 0) >= 67 ? green : (cs.percentage || 0) >= 34 ? amber : red;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(cx, y, catW, 20, 2, 2, 'F');
+        doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
+        doc.text(`[${cat.icon}] ${cat.label.toUpperCase()}`, cx + 3, y + 5);
+        doc.setFontSize(16); doc.setTextColor(...cc);
+        doc.text(`${cs.percentage || 0}`, cx + 3, y + 15);
+        doc.setFontSize(6); doc.setTextColor(...gray);
+        doc.text(`${cs.passed || 0} pass / ${cs.findings || 0} checks`, cx + catW - 3, y + 15, { align: 'right' });
+      });
+      y += 28;
+
+      // ═══ FINDINGS ═══
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
+      doc.text(`STATUTORY DRIFT ANALYSIS (${findings.length} Findings)`, margin, y);
+      doc.setDrawColor(...gold); doc.setLineWidth(0.8);
+      doc.line(margin, y + 2, margin + 90, y + 2);
+      y += 8;
+
+      if (findings.length === 0) {
+        checkPage(20);
+        doc.setFontSize(14); doc.setTextColor(...green);
+        doc.text('No Compliance Violations Detected', pageW / 2, y + 5, { align: 'center' });
+        y += 15;
+      } else {
+        findings.forEach((f: any) => {
+          const status = (f.status || 'fail').toLowerCase();
+          const isPassed = status === 'pass';
+          const isWarn = status === 'warn';
+          const borderColor = isPassed ? green : isWarn ? amber : red;
+
+          // Calculate card height
+          doc.setFontSize(7);
+          const detailText = f.detail || f.description || 'Infrastructure deviation detected.';
+          const dLines = doc.splitTextToSize(detailText, contentW - 12);
+          const fixText = f.technicalFix || f.recommended_fix || f.recommendedFix || '';
+          const fLines = fixText ? doc.splitTextToSize(fixText, contentW - 12) : [];
+          const cardH = 22 + dLines.length * 3.5 + (fLines.length > 0 ? 10 + fLines.length * 3.5 : 0);
+
+          checkPage(cardH + 4);
+
+          // Card
+          const bgC = isPassed ? [240, 253, 244] : isWarn ? [255, 251, 235] : [255, 255, 255];
+          doc.setFillColor(bgC[0], bgC[1], bgC[2]);
+          doc.setDrawColor(...borderColor); doc.setLineWidth(0.4);
+          doc.roundedRect(margin, y, contentW, cardH, 2, 2, 'FD');
+
+          // ID + Name
+          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
+          doc.text(f.id || 'DRIFT', margin + 4, y + 6);
+          doc.setFontSize(8); doc.setTextColor(...darkText);
+          doc.text(f.name || 'Compliance Finding', margin + 20, y + 6);
+
+          // Badge
+          const bLabel = isPassed ? 'PASS' : isWarn ? (f.severity || 'MEDIUM').toUpperCase() : (f.severity || 'MEDIUM').toUpperCase();
+          const bFill = isPassed ? [220, 252, 231] : isWarn ? [254, 243, 199] : (f.severity || '').toLowerCase() === 'critical' ? [254, 226, 226] : [255, 237, 213];
+          const bText = isPassed ? green : isWarn ? amber : (f.severity || '').toLowerCase() === 'critical' ? red : [154, 52, 18] as [number, number, number];
+          doc.setFillColor(bFill[0], bFill[1], bFill[2]);
+          doc.roundedRect(pageW - margin - 28, y + 2, 24, 6, 1.5, 1.5, 'F');
+          doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...bText);
+          doc.text(bLabel, pageW - margin - 16, y + 6, { align: 'center' });
+
+          // Clause
+          if (f.clause) {
+            doc.setFontSize(6.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(...gray);
+            doc.text(f.clause, margin + 4, y + 12);
+          }
+
+          // Detail box with left border
+          const dY = y + 16;
+          const dH = dLines.length * 3.5 + 2;
+          const dBg = isPassed ? [240, 253, 244] : isWarn ? [255, 251, 235] : [254, 242, 242];
+          doc.setFillColor(dBg[0], dBg[1], dBg[2]);
+          doc.rect(margin + 3, dY - 2, contentW - 6, dH, 'F');
+          doc.setFillColor(...borderColor);
+          doc.rect(margin + 3, dY - 2, 1, dH, 'F');
+          doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...darkText);
+          doc.text('Technical Finding:', margin + 6, dY + 2);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+          doc.text(dLines, margin + 6, dY + 6);
+
+          // Recommended fix
+          if (fLines.length > 0) {
+            const fY = dY + dH + 3;
+            const fH = fLines.length * 3.5 + 6;
+            doc.setFillColor(236, 253, 245);
+            doc.rect(margin + 3, fY - 2, contentW - 6, fH, 'F');
+            doc.setFillColor(16, 185, 129);
+            doc.rect(margin + 3, fY - 2, 1, fH, 'F');
+            doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(5, 150, 105);
+            doc.text('RECOMMENDED TECHNICAL FIX', margin + 6, fY + 2);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(6, 78, 59);
+            doc.text(fLines, margin + 6, fY + 7);
+          }
+
+          y += cardH + 4;
+        });
+      }
+
+      // ═══ DATA BORDER MAP ═══
+      if (borderMap.length > 0) {
+        checkPage(30);
+        y += 4;
+        doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
+        doc.text(`DATA BORDER MAP (${borderMap.length} Endpoints)`, margin, y);
+        doc.setDrawColor(...gold); doc.setLineWidth(0.8);
+        doc.line(margin, y + 2, margin + 70, y + 2);
+        y += 6;
+
+        (doc as any).autoTable({
+          startY: y,
+          head: [['Domain', 'IP', 'Location', 'Type', 'Sovereign', 'PHI Risk']],
+          body: borderMap.map((b: any) => [
+            b.domain || '', b.ip || '\u2014', `${b.city || ''}, ${b.country || ''}`,
+            b.type || '', b.isSovereign ? '\u2713 US' : '\u2717 Foreign', b.phiRisk || 'none',
+          ]),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 6.5, cellPadding: 2 },
+          headStyles: { fillColor: navy, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6 },
+          didParseCell: (data: any) => {
+            if (data.section === 'body' && data.column.index === 4) {
+              data.cell.styles.textColor = String(data.cell.raw).includes('\u2713') ? [22, 163, 74] : [220, 38, 38];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          },
+        });
+        y = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // ═══ ATTESTATION ═══
+      checkPage(50);
+      doc.setFillColor(...navy);
+      doc.roundedRect(margin, y, contentW, 45, 3, 3, 'F');
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...gold);
+      doc.text('COMPLIANCE ATTESTATION', pageW / 2, y + 10, { align: 'center' });
+      doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 220, 220);
+      const attText = `This document certifies that ${provider.name || 'the above-named practice'} has been assessed for compliance with Texas SB 1188 (Data Sovereignty) and HB 149 (AI Transparency) as of ${reportDate}.`;
+      const attLines = doc.splitTextToSize(attText, contentW - 16);
+      doc.text(attLines, margin + 8, y + 17);
+      doc.setDrawColor(...gold); doc.setLineWidth(0.3);
+      doc.line(margin + 10, y + 35, margin + 55, y + 35);
+      doc.setFontSize(6); doc.setTextColor(...gold);
+      doc.text('KairoLogic Compliance Engine', margin + 12, y + 39);
+      doc.line(pageW - margin - 55, y + 35, pageW - margin - 10, y + 35);
+      doc.text(reportDate, pageW - margin - 53, y + 39);
+
+      // ═══ FOOTERS ═══
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(5.5); doc.setTextColor(180, 180, 180);
+        doc.text(`KairoLogic Compliance Report  \u2022  ${reportId}  \u2022  Page ${i} of ${totalPages}`, pageW / 2, pageH - 8, { align: 'center' });
+        doc.text('CONFIDENTIAL \u2014 FOR AUTHORIZED USE ONLY', pageW / 2, pageH - 4, { align: 'center' });
+      }
+
+      doc.save(`${provider.name.replace(/\s+/g, '_')}_Compliance_Report_${reportId}.pdf`);
+      notify('PDF report downloaded');
     } catch (err) {
       console.error('Report download error:', err);
       notify('Failed to generate report', 'error');
