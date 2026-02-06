@@ -38,6 +38,8 @@ interface ScanFinding {
   /** Page context where finding was detected */
   pageContext?: string;
   evidence?: Record<string, unknown>;
+  /** Context-specific remediation recommendation */
+  recommendedFix?: string;
 }
 
 interface CategoryScore {
@@ -291,6 +293,7 @@ async function scanDR01(domain: string, borderMap: DataBorderNode[]): Promise<Sc
       status: 'warn', severity: 'high', category: 'data_sovereignty', phiRisk: 'direct',
       detail: `Unable to resolve IP geolocation for ${domain}. Manual verification recommended.`,
       clause: 'SB 1188 Sec. 183.002(a)', evidence: { domain, resolution: 'failed' },
+      recommendedFix: `Manually verify server hosting location for ${domain}. Confirm primary hosting is within US borders using your hosting provider's control panel or by running 'dig ${domain}' and checking the resolved IP against a geo-IP service.`,
     };
   }
   borderMap.push({
@@ -307,6 +310,9 @@ async function scanDR01(domain: string, borderMap: DataBorderNode[]): Promise<Sc
       : `Server resolved to ${geo.ip} in ${geo.city}, ${geo.country} (${geo.org}). PHI may transit non-sovereign infrastructure.`,
     clause: 'SB 1188 Sec. 183.002(a)',
     evidence: { ip: geo.ip, country: geo.countryCode, city: geo.city, org: geo.org, isSovereign: geo.isSovereign },
+    recommendedFix: geo.isSovereign
+      ? undefined
+      : `Migrate primary hosting to a US-based data center. Current server is in ${geo.city}, ${geo.country} (${geo.org}). Consider AWS us-east-1/us-west-2, Azure US regions, or a Texas-based hosting provider to ensure SB 1188 data residency compliance.`,
   };
 }
 
@@ -318,6 +324,7 @@ async function scanDR02(targetUrl: string, borderMap: DataBorderNode[]): Promise
       status: 'warn', severity: 'medium', category: 'data_sovereignty', phiRisk: 'indirect',
       detail: 'Unable to connect to target URL.', clause: 'SB 1188 Sec. 183.002(a)(2)',
       evidence: { url: targetUrl, connection: 'failed' },
+      recommendedFix: 'Verify the website URL is correct and accessible. If the site uses firewall rules or IP allowlisting, ensure scan traffic can reach it. Re-run the scan once connectivity is restored.',
     };
   }
 
@@ -361,6 +368,9 @@ async function scanDR02(targetUrl: string, borderMap: DataBorderNode[]): Promise
       : `CDN detected: ${cdnProvider}. Foreign edge indicators: ${foreignEdges.join(', ')}. CDN edges typically serve static assets (HTML, images) and do not process PHI directly — lower compliance risk than direct data handlers.`,
     clause: 'SB 1188 Sec. 183.002(a)(2)',
     evidence: { cdnProvider, foreignEdges },
+    recommendedFix: pass
+      ? undefined
+      : `Configure ${cdnProvider} to restrict edge caching to US-only Points of Presence (PoPs). Foreign edge nodes detected: ${foreignEdges.join(', ')}. In ${cdnProvider === 'Cloudflare' ? 'Cloudflare dashboard → Speed → Tiered Cache, restrict to US PoPs' : cdnProvider === 'Amazon CloudFront' ? 'CloudFront distribution settings → Price Class, select "Use Only US, Canada" to limit edge locations' : 'your CDN provider settings, restrict geographic distribution to US-only regions'}.`,
   };
 }
 
@@ -372,6 +382,7 @@ async function scanDR03(domain: string, borderMap: DataBorderNode[]): Promise<Sc
       status: 'warn', severity: 'medium', category: 'data_sovereignty', phiRisk: 'direct',
       detail: `No MX records found for ${domain}. Domain may not handle email. If practice sends PHI via email from this domain, manual verification required.`,
       clause: 'SB 1188 Sec. 183.002(a)', evidence: { domain, mxRecords: [] },
+      recommendedFix: `Verify whether ${domain} is used for email communication containing PHI. If yes, configure MX records pointing to a US-based HIPAA-compliant email provider (e.g., Microsoft 365 with US data residency, Google Workspace US region, or Paubox).`,
     };
   }
 
@@ -406,6 +417,9 @@ async function scanDR03(domain: string, borderMap: DataBorderNode[]): Promise<Sc
       mxRecords: mxRecords.map(r => r.exchange),
       geoResults: mxGeo.map(r => ({ exchange: r.exchange, country: r.geo?.countryCode || 'UNRESOLVED', isSovereign: r.geo?.isSovereign })),
     },
+    recommendedFix: pass
+      ? undefined
+      : `Migrate email infrastructure to US-based mail servers. Non-US mail servers detected: ${foreignMX.map(f => `${f.exchange} (${f.geo?.city}, ${f.geo?.country})`).join('; ')}. PHI transmitted via email must remain within US borders. Switch to a US-hosted HIPAA-compliant provider and update MX records accordingly.`,
   };
 }
 
@@ -451,6 +465,7 @@ async function scanDR04(targetUrl: string, pageHtml: string, borderMap: DataBord
       category: 'data_sovereignty', phiRisk: 'none',
       detail: 'No external third-party domains detected. Site appears self-contained.',
       clause: 'SB 1188 Sec. 183.002(a)(1)', evidence: { externalDomains: [], foreignDomains: [] },
+      recommendedFix: undefined,
     };
   }
 
@@ -499,6 +514,13 @@ async function scanDR04(targetUrl: string, pageHtml: string, borderMap: DataBord
     }
   }
 
+  let recommendedFix: string | undefined;
+  if (foreignPHI.length > 0) {
+    recommendedFix = `URGENT: ${foreignPHI.length} foreign sub-processor(s) handle PHI-capable endpoints: ${foreignPHI.map(f => `${f.domain} (${f.geo?.country})`).join(', ')}. Replace with US-based alternatives or obtain BAAs confirming US-only data processing. Audit form actions and API calls referencing these domains.`;
+  } else if (foreignStatic.length > 0) {
+    recommendedFix = `${foreignStatic.length} foreign domain(s) serve static assets: ${foreignStatic.map(f => `${f.domain} (${f.geo?.country})`).join(', ')}. While lower risk (no PHI transit), consider self-hosting critical assets or using a US-only CDN to eliminate foreign data touchpoints.`;
+  }
+
   return {
     id: 'DR-04', name: 'Sub-Processor Domain Audit', status, severity,
     category: 'data_sovereignty', phiRisk, detail,
@@ -508,6 +530,7 @@ async function scanDR04(targetUrl: string, pageHtml: string, borderMap: DataBord
       foreignPHI: foreignPHI.map(f => ({ domain: f.domain, country: f.geo?.country })),
       foreignStatic: foreignStatic.map(f => ({ domain: f.domain, country: f.geo?.country })),
     },
+    recommendedFix,
   };
 }
 
@@ -525,6 +548,9 @@ function scanAI01(pageHtml: string, pageText: string): ScanFinding {
       : `No AI disclosure found. HB 149 requires "clear and conspicuous" disclosure when AI contributes to patient care. ${found.length > 0 ? `Partial: "${found[0]}" — insufficient.` : 'Zero keywords detected.'} Note: If practice does not use AI in clinical care, this may not apply.`,
     clause: 'HB 149 Sec. 551.004',
     evidence: { foundKeywords: found, threshold: 2 },
+    recommendedFix: pass
+      ? undefined
+      : `Add a clear and conspicuous AI disclosure statement to the website. HB 149 requires patients be informed when AI contributes to their care. Include language such as: "This practice uses artificial intelligence tools to assist in [diagnosis/treatment planning/scheduling]. All AI-assisted decisions are reviewed by a licensed provider." Place this on the homepage footer, About page, and any pages describing services.`,
   };
 }
 
@@ -546,6 +572,9 @@ function scanAI02(pageHtml: string): ScanFinding {
       ? 'No dark pattern indicators found near AI disclosure content.'
       : `Dark patterns detected near AI disclosure: ${[...new Set(detected)].join(', ')}. Disclosure may be intentionally obscured.`,
     clause: 'HB 149 (d)', evidence: { detectedPatterns: [...new Set(detected)] },
+    recommendedFix: pass
+      ? undefined
+      : `Remove CSS dark patterns obscuring AI disclosure content. Detected: ${[...new Set(detected)].join(', ')}. Ensure AI disclosure text uses visible, readable styling (minimum 12px font, standard contrast, no hidden overflow). HB 149 requires disclosures be "clear and conspicuous" — hiding them violates the statute's intent.`,
   };
 }
 
@@ -556,6 +585,7 @@ function scanAI03(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       status: 'pass', severity: 'info', category: 'ai_transparency', phiRisk: 'none',
       detail: `No AI diagnostic tools on this ${pageCtx.type} page. Not applicable here. If used on patient portal, manual audit recommended.`,
       clause: 'SB 1188 Sec. 183.005', evidence: { hasDiagnosticTool: false, pageType: pageCtx.type },
+      recommendedFix: undefined,
     };
   }
   const lowerText = pageText.toLowerCase();
@@ -569,6 +599,9 @@ function scanAI03(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
     detail: has ? 'AI diagnostic tool with practitioner review disclaimer present.'
       : 'AI diagnostic tool WITHOUT practitioner review disclaimer. SB 1188 requires licensed practitioner review statement.',
     clause: 'SB 1188 Sec. 183.005', evidence: { hasDiagnosticTool: true, hasDisclaimer: has },
+    recommendedFix: has
+      ? undefined
+      : `Add a practitioner review disclaimer adjacent to all AI diagnostic tools. Required language must indicate that AI-generated results are "reviewed and approved by a licensed healthcare provider." Place the disclaimer directly above or below the tool interface, not buried in Terms of Service.`,
   };
 }
 
@@ -582,6 +615,7 @@ function scanAI04(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       status: 'pass', severity: 'info', category: 'ai_transparency', phiRisk: 'none',
       detail: `No chatbot detected on this ${pageCtx.type} page. Not applicable.`,
       clause: 'HB 149 (b)', evidence: { chatbotDetected: false },
+      recommendedFix: undefined,
     };
   }
   const lowerText = pageText.toLowerCase();
@@ -594,6 +628,9 @@ function scanAI04(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
     detail: has ? `Chatbot (${platforms.join(', ')}) with AI notice present.`
       : `Chatbot (${platforms.join(', ')}) WITHOUT AI disclosure. HB 149 requires notification.`,
     clause: 'HB 149 (b)', evidence: { detectedPlatforms: platforms, hasNotice: has },
+    recommendedFix: has
+      ? undefined
+      : `Add an AI disclosure notice to the chatbot (${platforms.join(', ')}). Before or during the first interaction, display: "You are communicating with an AI assistant. To speak with a human, [contact method]." Configure this in your ${platforms[0]} dashboard under chat widget settings → welcome message or pre-chat survey.`,
   };
 }
 
@@ -606,6 +643,7 @@ function scanER01(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       detail: `Page type: "${pageCtx.type}" — no patient intake forms detected. This check applies to registration/intake pages only. EHR portal should be audited separately.`,
       clause: 'SB 1188 Sec. 183.010',
       evidence: { hasIntakeForms: false, pageType: pageCtx.type },
+      recommendedFix: undefined,
     };
   }
   const lowerHtml = pageHtml.toLowerCase();
@@ -621,6 +659,9 @@ function scanER01(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       : `Patient registration on ${pageCtx.type} page — NO biological sex field found. Texas statute requires "Biological Sex" (Male/Female) on intake forms.`,
     clause: 'SB 1188 Sec. 183.010',
     evidence: { hasBioSex: has, hasFormField: hasField, pageType: pageCtx.type },
+    recommendedFix: (has || hasField)
+      ? undefined
+      : `Add a "Biological Sex" field (Male/Female) to patient intake/registration forms. Texas SB 1188 Sec. 183.010 requires collection of biological sex on all patient registration forms. Add a required select field with options "Male" and "Female" to your intake form template.`,
   };
 }
 
@@ -632,6 +673,7 @@ function scanER02(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       pageContext: pageCtx.type,
       detail: `No patient portal detected on this ${pageCtx.type} page. EHR system should be audited separately.`,
       clause: 'SB 1188 Sec. 183.006', evidence: { hasPortal: false, pageType: pageCtx.type },
+      recommendedFix: undefined,
     };
   }
   const lowerText = pageText.toLowerCase();
@@ -648,6 +690,9 @@ function scanER02(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       : `Portal (${portal}) WITHOUT parental/guardian access. Texas requires distinct auth for parents/guardians of minors.`,
     clause: 'SB 1188 Sec. 183.006',
     evidence: { hasPortal: true, hasParentalAccess: has, portalType: portal },
+    recommendedFix: has
+      ? undefined
+      : `Configure parent/guardian proxy access in your patient portal (${portal}). Texas SB 1188 Sec. 183.006 requires a distinct authentication pathway for parents and guardians of minor patients. Contact your EHR vendor to enable dependent/proxy access roles with appropriate consent workflows.`,
   };
 }
 
@@ -665,6 +710,9 @@ function scanER03(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       ? `Metabolic health references: "${found.slice(0, 3).join('", "')}".`
       : `No metabolic/nutrition references on this ${pageCtx.type} page.`,
     clause: 'SB 1188 Sec. 183.003', evidence: { foundKeywords: found },
+    recommendedFix: found.length >= 1
+      ? undefined
+      : `Add metabolic health and nutrition service references to the website. If the practice offers weight management, dietary counseling, or metabolic screening, these should be listed on service pages. If not applicable, document that metabolic health services are referred out.`,
   };
 }
 
@@ -689,6 +737,9 @@ function scanER04(pageHtml: string, pageText: string, pageCtx: ReturnType<typeof
       ? 'No prohibited data collection fields detected.'
       : `VIOLATION: ${detected.map(f => f.field).join(', ')} detected. Texas law forbids non-healthcare data collection.`,
     clause: 'SB 1188 Sec. 183.003', evidence: { detectedFields: detected.map(f => f.field) },
+    recommendedFix: pass
+      ? undefined
+      : `URGENT: Remove prohibited data collection fields immediately. Detected: ${detected.map(f => f.field).join(', ')}. Texas law forbids healthcare providers from collecting non-healthcare data such as credit scores, voter registration, or political affiliation. Audit all forms and remove these fields from both the front-end HTML and back-end database schema.`,
   };
 }
 
@@ -798,7 +849,7 @@ export async function POST(request: NextRequest) {
       ['AI-01', 'AI-02', 'AI-03', 'AI-04'].forEach((id, i) => {
         const n = ['Conspicuous AI Disclosure Text', 'Disclosure Link Accessibility', 'Diagnostic AI Disclaimer Audit', 'Interactive Chatbot Notice'];
         const c = ['HB 149 Sec. 551.004', 'HB 149 (d)', 'SB 1188 Sec. 183.005', 'HB 149 (b)'];
-        findings.push({ id, name: n[i], status: 'warn', severity: 'medium', category: 'ai_transparency', phiRisk: 'none', detail: `Unable to fetch content. Manual audit required.`, clause: c[i] });
+        findings.push({ id, name: n[i], status: 'warn', severity: 'medium', category: 'ai_transparency', phiRisk: 'none', detail: `Unable to fetch content. Manual audit required.`, clause: c[i], recommendedFix: `Page content could not be fetched for automated scanning. Manually review the website for ${n[i].toLowerCase()} compliance, or re-run the scan when the site is accessible.` });
       });
     }
 
@@ -812,7 +863,7 @@ export async function POST(request: NextRequest) {
       ['ER-01', 'ER-02', 'ER-03', 'ER-04'].forEach((id, i) => {
         const n = ['Biological Sex Input Fields', 'Minor/Parental Access Portal', 'Metabolic Health Options', 'Forbidden Data Field Check'];
         const c = ['SB 1188 Sec. 183.010', 'SB 1188 Sec. 183.006', 'SB 1188 Sec. 183.003', 'SB 1188 Sec. 183.003'];
-        findings.push({ id, name: n[i], status: 'warn', severity: 'low', category: 'clinical_integrity', phiRisk: 'none', detail: `Unable to fetch content. Manual audit required.`, clause: c[i] });
+        findings.push({ id, name: n[i], status: 'warn', severity: 'low', category: 'clinical_integrity', phiRisk: 'none', detail: `Unable to fetch content. Manual audit required.`, clause: c[i], recommendedFix: `Page content could not be fetched for automated scanning. Manually review the website for ${n[i].toLowerCase()} compliance, or re-run the scan when the site is accessible.` });
       });
     }
 
