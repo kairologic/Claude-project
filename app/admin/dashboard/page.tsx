@@ -4,11 +4,11 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import { getSupabase, Registry } from '@/lib/supabase';
 import Link from 'next/link';
-import { 
-  Shield, Users, Database, Calendar, Mail, 
-  Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, 
+import {
+  Shield, Users, Database, Calendar, Mail,
+  Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play,
   Star,
-  CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode, 
+  CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode,
   BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap, Pause, FileWarning, UserPlus
 } from 'lucide-react';
 
@@ -63,22 +63,22 @@ const StatusBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({ status,
   );
 };
 
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }> = 
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }> =
   ({ isOpen, onClose, title, children, size = 'md' }) => {
-  if (!isOpen) return null;
-  const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
-      <div className={`${widths[size]} w-full bg-white rounded-xl shadow-2xl max-h-[85vh] flex flex-col`} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50 rounded-t-xl">
-          <h3 className="text-sm font-bold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg"><X size={16} className="text-slate-400" /></button>
+    if (!isOpen) return null;
+    const widths = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' };
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+        <div className={`${widths[size]} w-full bg-white rounded-xl shadow-2xl max-h-[85vh] flex flex-col`} onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+            <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+            <button onClick={onClose} className="p-1.5 hover:bg-slate-200 rounded-lg"><X size={16} className="text-slate-400" /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-5">{children}</div>
         </div>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 interface ProviderFormData {
   id: string; npi: string; name: string; contact_first_name: string; contact_last_name: string;
@@ -93,10 +93,10 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
     contact_first_name: entry?.contact_first_name || '', contact_last_name: entry?.contact_last_name || '',
     email: entry?.email || '', phone: entry?.phone || '', city: entry?.city || '', zip: entry?.zip || '',
     url: entry?.url || '', widget_status: (entry?.widget_status as any) || 'hidden',
-    subscription_status: (entry?.subscription_status as any) || 'trial', is_visible: entry?.is_visible ?? false, 
+    subscription_status: (entry?.subscription_status as any) || 'trial', is_visible: entry?.is_visible ?? false,
     risk_score: entry?.risk_score || 0, provider_type: (entry as any)?.provider_type || 2
   });
-  
+
   return (
     <form onSubmit={e => { e.preventDefault(); onSave(form); }} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -132,10 +132,10 @@ const ProviderForm: React.FC<{ entry?: Registry | null; onSave: (data: ProviderF
 
 interface EmailTemplate { id: string; name: string; category: string; subject: string; body: string; event_trigger: string; is_active: boolean; html_body?: string; }
 
-interface MarketingTemplate { 
-  id: string; 
-  name: string; 
-  category: string; 
+interface MarketingTemplate {
+  id: string;
+  name: string;
+  category: string;
   description?: string;
   file_name?: string;
   file_type?: string;
@@ -253,16 +253,16 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const supabase = getSupabase();
-      
+
       // Get total counts first (fast count queries)
       const [totalResult, activeResult] = await Promise.all([
         supabase.from('registry').select('id', { count: 'exact', head: true }),
         supabase.from('registry').select('id', { count: 'exact', head: true }).eq('widget_status', 'active')
       ]);
-      
+
       const totalCount = totalResult.count || 0;
       const activeCount = activeResult.count || 0;
-      
+
       // Load providers WITH URLs (scannable) - limit to 500 for performance
       const { data, error: loadError } = await supabase
         .from('registry')
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
         .limit(500);
       if (loadError) console.error('Registry load error:', loadError);
       setProviders(data || []);
-      
+
       // Derive WITH URL count from actual loaded data (count queries with .like are unreliable)
       const withUrlCount = data?.length || 0;
       setTotalCounts({
@@ -283,8 +283,8 @@ export default function AdminDashboard() {
         active: activeCount
       });
       console.log(`Loaded ${withUrlCount} providers with URLs (${totalCount} total in registry, ${activeCount} active)`);
-      
-      
+
+
       // Load email templates from database
       const { data: emailTemplatesData } = await supabase
         .from('email_templates')
@@ -308,7 +308,7 @@ export default function AdminDashboard() {
           { id: 'ET-002', name: 'Verification Complete', category: 'transactional', subject: 'Sentry Verified', body: 'Congratulations! Your practice is verified.', event_trigger: 'verification_complete', is_active: true },
         ]);
       }
-      
+
       // Load marketing/asset templates from templates table
       const { data: marketingData } = await supabase
         .from('templates')
@@ -326,7 +326,7 @@ export default function AdminDashboard() {
           last_updated: t.last_updated
         })));
       }
-      
+
       generateCalendarSlots();
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
@@ -336,7 +336,7 @@ export default function AdminDashboard() {
     for (let d = 0; d < 7; d++) {
       const date = new Date(); date.setDate(date.getDate() + d);
       if (date.getDay() === 0 || date.getDay() === 6) continue;
-      ['09:00','10:00','11:00','14:00','15:00','16:00'].forEach(time => {
+      ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'].forEach(time => {
         slots.push({ id: `${date.toISOString().split('T')[0]}-${time}`, date: date.toISOString().split('T')[0], time, is_booked: Math.random() > 0.8, booked_by: Math.random() > 0.8 ? { name: 'Dr. Sample' } : null });
       });
     }
@@ -432,19 +432,19 @@ export default function AdminDashboard() {
 
   // GLOBAL SCAN - Scans Type 2 providers WITH URLs, stores results
   const handleGlobalScan = async () => {
-    setScanning(true); 
-    setScanProgress(0); 
+    setScanning(true);
+    setScanProgress(0);
     setScanStatus('Fetching Type 2 providers...');
-    
+
     try {
       const supabase = getSupabase();
-      
+
       // Step 1: Get count of all Type 2 providers
       const { count: totalType2 } = await supabase
         .from('registry')
         .select('id', { count: 'exact', head: true })
         .or('provider_type.eq.2,provider_type.is.null'); // Type 2 or null (default)
-      
+
       // Step 2: Fetch Type 2 providers WITH URLs (scannable)
       const { data: providersToScan, error } = await supabase
         .from('registry')
@@ -452,16 +452,16 @@ export default function AdminDashboard() {
         .or('provider_type.eq.2,provider_type.is.null')
         .like('url', 'http%')
         .limit(1000);
-      
+
       if (error) throw error;
-      
+
       // Step 3: Get count of Type 2 providers WITHOUT URLs
       const { count: type2WithoutUrl } = await supabase
         .from('registry')
         .select('id', { count: 'exact', head: true })
         .or('provider_type.eq.2,provider_type.is.null')
         .or('url.is.null,url.eq.');
-      
+
       const result: ScanResult = {
         total: totalType2 || 0,
         scanned: 0,
@@ -483,12 +483,12 @@ export default function AdminDashboard() {
         notify('No Type 2 providers with URLs to scan', 'info');
         return;
       }
-      
+
       for (let i = 0; i < providersToScan.length; i++) {
         const p = providersToScan[i];
         setScanStatus(`Scanning ${p.name} (${i + 1}/${providersToScan.length})...`);
         setScanProgress(Math.round(((i + 1) / providersToScan.length) * 100));
-        
+
         let scanData: any = null;
         // Attempt scan with one retry on failure
         for (let attempt = 1; attempt <= 2; attempt++) {
@@ -504,7 +504,7 @@ export default function AdminDashboard() {
             }
           }
         }
-        
+
         if (scanData) {
           try {
             // Store scan result in database
@@ -520,11 +520,11 @@ export default function AdminDashboard() {
               technical_fixes: scanData.technical_fixes,
               raw_scan_data: scanData
             });
-            
+
             // Store report snapshot
             const reportId = await storeReport(p, scanData);
             const nowIso = new Date().toISOString();
-            
+
             // Update provider record with all fields
             const updatePayload: any = {
               risk_score: scanData.risk_score,
@@ -541,18 +541,18 @@ export default function AdminDashboard() {
               updatePayload.latest_report_url = `/api/report?reportId=${reportId}`;
             }
             await supabase.from('registry').update(updatePayload).eq('id', p.id);
-            
+
             result.scanResults.push({ provider: p.name, ...scanData });
             result.scanned++;
           } catch (dbErr: any) {
             result.errors.push(`${p.name}: DB save failed - ${dbErr.message}`);
           }
         }
-        
+
         // 2-second delay between scans to respect ip-api rate limits (45/min)
         if (i < providersToScan.length - 1) await new Promise(r => setTimeout(r, 2000));
       }
-      
+
       setScanStatus('Scan complete!');
       setScanResult(result);
       setShowScanReport(true);
@@ -561,7 +561,7 @@ export default function AdminDashboard() {
         ? `Done: ${result.scanned} scanned, ${result.errors.length} failed, ${result.withoutUrlCount.toLocaleString()} need URLs.`
         : `Scan complete! ${result.scanned} scanned, ${result.withoutUrlCount.toLocaleString()} need URLs.`;
       notify(doneMsg, result.errors.length > 0 ? 'error' : 'success');
-      
+
     } catch (e: any) {
       notify('Scan failed: ' + e.message, 'error');
     } finally {
@@ -583,35 +583,35 @@ export default function AdminDashboard() {
       if (error) { notify(`Failed to fetch batch: ${error.message}`, 'error'); continue; }
       if (data) allProviders = allProviders.concat(data);
     }
-    
+
     if (allProviders.length === 0) {
       notify('No providers found to scan', 'error');
       return;
     }
-    
+
     const withUrl = allProviders.filter((p: any) => p.url && p.url.trim());
     const withoutUrl = allProviders.filter((p: any) => !p.url || !p.url.trim());
-    
+
     if (withoutUrl.length > 0) {
       notify(`${withoutUrl.length} provider(s) have no URL — skipped`, 'error');
     }
-    
+
     if (withUrl.length === 0) return;
-    
+
     setScanning(true); setScanProgress(0);
     const estMinutes = Math.ceil(withUrl.length * 4 / 60);
     setScanStatus(`Starting scan of ${withUrl.length} provider(s)... (~${estMinutes} min)`);
-    
+
     try {
       const nowIso = new Date().toISOString();
       let scanned = 0, failed = 0;
-      
+
       for (let i = 0; i < withUrl.length; i++) {
         const p = withUrl[i];
         const pct = Math.round(((i + 1) / withUrl.length) * 100);
         setScanProgress(pct);
-        setScanStatus(`[${i+1}/${withUrl.length}] Scanning ${p.name}... (${pct}%)`);
-        
+        setScanStatus(`[${i + 1}/${withUrl.length}] Scanning ${p.name}... (${pct}%)`);
+
         let scanData: any = null;
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
@@ -619,7 +619,7 @@ export default function AdminDashboard() {
             break;
           } catch (err: any) {
             if (attempt === 1) {
-              setScanStatus(`[${i+1}/${withUrl.length}] Retrying ${p.name} in 10s...`);
+              setScanStatus(`[${i + 1}/${withUrl.length}] Retrying ${p.name} in 10s...`);
               await new Promise(r => setTimeout(r, 10000));
             } else {
               console.error(`Scan failed for ${p.name}: ${err.message}`);
@@ -627,9 +627,9 @@ export default function AdminDashboard() {
             }
           }
         }
-        
+
         if (!scanData) continue;
-        
+
         // Store scan result (non-blocking)
         try {
           await supabase.from('scan_results').insert({
@@ -638,14 +638,14 @@ export default function AdminDashboard() {
             sb1188_findings: scanData.sb1188_findings, hb149_findings: scanData.hb149_findings,
             technical_fixes: scanData.technical_fixes, raw_scan_data: scanData
           });
-        } catch (_) {}
-        
+        } catch (_) { }
+
         // Store report
         let reportId: string | null = null;
-        try { reportId = await storeReport(p, scanData); } catch (_) {}
-        
+        try { reportId = await storeReport(p, scanData); } catch (_) { }
+
         // Update registry with new thresholds
-        const updatePayload: any = { 
+        const updatePayload: any = {
           risk_score: scanData.risk_score,
           risk_level: scanData.risk_level,
           status_label: scanData.status_label || (scanData.risk_score >= 75 ? 'Verified Sovereign' : scanData.risk_score >= 50 ? 'Drift Detected' : 'Violation'),
@@ -661,7 +661,7 @@ export default function AdminDashboard() {
         }
         await supabase.from('registry').update(updatePayload).eq('id', p.id);
         scanned++;
-        
+
         // 3-second delay between scans to respect ip-api rate limits (45/min)
         if (i < withUrl.length - 1) await new Promise(r => setTimeout(r, 3000));
       }
@@ -677,14 +677,14 @@ export default function AdminDashboard() {
   const handleExport = () => {
     const csv = [
       'NPI,Name,Provider Type,City,Zip,Email,Phone,URL,Risk Score,Last Scan,Report Status,Widget Status,Subscription',
-      ...providers.map(r => 
-        `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city||''},${r.zip||''},${r.email||''},${r.phone||''},${r.url||''},${r.risk_score||0},${r.last_scan_timestamp||''},${r.report_status||'none'},${r.widget_status||''},${r.subscription_status||''}`
+      ...providers.map(r =>
+        `${r.npi},"${r.name}",${(r as any).provider_type || 2},${r.city || ''},${r.zip || ''},${r.email || ''},${r.phone || ''},${r.url || ''},${r.risk_score || 0},${r.last_scan_timestamp || ''},${r.report_status || 'none'},${r.widget_status || ''},${r.subscription_status || ''}`
       )
     ].join('\n');
-    const a = document.createElement('a'); 
+    const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `registry-${new Date().toISOString().split('T')[0]}.csv`; 
-    a.click(); 
+    a.download = `registry-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
     notify('Exported to CSV');
   };
 
@@ -696,14 +696,14 @@ export default function AdminDashboard() {
       const res = await fetch(`/api/report?npi=${provider.npi}`);
       const data = await res.json();
       const report = data.reports?.[0] || null;
-      
+
       // Fetch full report if we have a report_id
       let fullReport = report;
       if (report?.report_id) {
         const fullRes = await fetch(`/api/report?reportId=${report.report_id}`);
         if (fullRes.ok) fullReport = await fullRes.json();
       }
-      
+
       const findings = fullReport?.findings || [];
       const catScores = fullReport?.category_scores || {};
       const borderMap = fullReport?.data_border_map || [];
@@ -734,79 +734,140 @@ export default function AdminDashboard() {
         return false;
       };
 
-      // ═══ HEADER ═══
+      // ═══ FULL-WIDTH NAVY EXECUTIVE BANNER ═══
+      // This combines header + score + practice info + categories into one premium block
+      const bannerH = 115;
       doc.setFillColor(...navy);
-      doc.rect(0, 0, pageW, 48, 'F');
-      doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-      doc.text('KAIRO', pageW / 2 - 14, 16, { align: 'center' });
+      doc.rect(0, 0, pageW, bannerH, 'F');
+
+      // Subtle gold accent line at top
+      doc.setFillColor(...gold);
+      doc.rect(0, 0, pageW, 1.5, 'F');
+
+      // ── Top: Logo + Report Title ──
+      doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text('KAIRO', margin, 14);
       doc.setTextColor(...gold);
-      doc.text('LOGIC', pageW / 2 + 17, 16, { align: 'center' });
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...gold);
-      doc.text('TEXAS HEALTHCARE COMPLIANCE INTELLIGENCE', pageW / 2, 23, { align: 'center' });
-      doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-      doc.text('Statutory Audit Report', pageW / 2, 33, { align: 'center' });
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 200, 200);
-      doc.text(`Report ID: ${reportId}  \u2022  Generated: ${reportDate}`, pageW / 2, 40, { align: 'center' });
-      y = 58;
+      doc.text('LOGIC', margin + 28, 14);
 
-      // ═══ SCORE ═══
-      doc.setDrawColor(...scoreColor); doc.setLineWidth(1.5);
-      doc.circle(margin + 16, y + 12, 12);
-      doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(...scoreColor);
-      doc.text(`${score}`, margin + 16, y + 14, { align: 'center' });
-      doc.setFontSize(6); doc.setTextColor(...gray);
-      doc.text('/ 100', margin + 16, y + 19, { align: 'center' });
-      // Risk badge
-      const badgeBg = score >= 75 ? [220, 252, 231] : score >= 50 ? [254, 243, 199] : [254, 226, 226];
-      doc.setFillColor(badgeBg[0], badgeBg[1], badgeBg[2]);
-      doc.roundedRect(margin + 36, y + 2, 40, 8, 2, 2, 'F');
+      // Right-aligned report meta
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 170, 190);
+      doc.text(`Report: ${reportId}`, pageW - margin, 10, { align: 'right' });
+      doc.text(reportDate, pageW - margin, 15, { align: 'right' });
+      doc.text(`Engine: ${fullReport?.engine_version || 'SENTRY-3.1.0'}`, pageW - margin, 20, { align: 'right' });
+
+      // Thin separator
+      doc.setDrawColor(255, 255, 255, 0.15);
+      doc.setLineWidth(0.2);
+      doc.line(margin, 22, pageW - margin, 22);
+
+      // ── Middle: Score block (left) + Practice info (right) ──
+      const midY = 28;
+
+      // Score — large centered number with arc indicator
+      const scoreCx = margin + 22;
+      const scoreCy = midY + 18;
+      const scoreR = 16;
+
+      // Score background ring (dark)
+      doc.setDrawColor(40, 60, 100); doc.setLineWidth(2.5);
+      doc.circle(scoreCx, scoreCy, scoreR);
+      // Score foreground ring (colored)
+      doc.setDrawColor(...scoreColor); doc.setLineWidth(2.5);
+      doc.circle(scoreCx, scoreCy, scoreR);
+
+      // Score number
+      doc.setFontSize(28); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(`${score}`, scoreCx, scoreCy + 2, { align: 'center' });
+      doc.setFontSize(7); doc.setTextColor(160, 170, 190);
+      doc.text('/ 100', scoreCx, scoreCy + 8, { align: 'center' });
+
+      // Risk level label below score circle
       doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...scoreColor);
-      doc.text(riskLevel.toUpperCase(), margin + 56, y + 7.5, { align: 'center' });
-      doc.setFontSize(8); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal');
-      doc.text(`Compliance: ${score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation'}`, margin + 36, y + 18);
-      doc.setFontSize(6);
-      doc.text(`Engine: ${fullReport?.engine_version || 'SENTRY-3.1.0'}`, pageW - margin, y + 4, { align: 'right' });
-      y += 30;
+      doc.text(riskLevel.toUpperCase(), scoreCx, scoreCy + scoreR + 6, { align: 'center' });
+      doc.setFontSize(6); doc.setTextColor(160, 170, 190); doc.setFont('helvetica', 'normal');
+      const complianceLabel = score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation';
+      doc.text(complianceLabel, scoreCx, scoreCy + scoreR + 11, { align: 'center' });
 
-      // ═══ PRACTICE INFO ═══
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(margin, y, contentW, 22, 2, 2, 'F');
-      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
-      doc.text('PRACTICE', margin + 4, y + 5);
-      doc.text('NPI', margin + 4, y + 13);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(...darkText); doc.setFontSize(9);
-      doc.text(provider.name || 'Unknown', margin + 28, y + 5);
-      doc.text(provider.npi || 'N/A', margin + 28, y + 13);
-      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
-      doc.text('URL', pageW / 2, y + 5);
-      doc.text('CITY / ZIP', pageW / 2, y + 13);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(...darkText); doc.setFontSize(8);
-      const urlDisp = (provider.url || 'N/A').length > 35 ? (provider.url || '').substring(0, 35) + '...' : (provider.url || 'N/A');
-      doc.text(urlDisp, pageW / 2 + 20, y + 5);
-      doc.text(`${provider.city || ''} ${provider.zip || ''}`.trim() || 'N/A', pageW / 2 + 20, y + 13);
-      y += 28;
+      // Practice info — right side of score
+      const infoX = margin + 52;
+      const infoY = midY + 4;
 
-      // ═══ CATEGORY SCORES ═══
+      // Practice name (large)
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      const nameDisp = (provider.name || 'Unknown Provider').length > 40 ? (provider.name || '').substring(0, 40) + '...' : (provider.name || 'Unknown Provider');
+      doc.text(nameDisp, infoX, infoY);
+
+      // Info grid in two rows
+      doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(...gold);
+      doc.text('NPI', infoX, infoY + 8);
+      doc.text('URL', infoX + 50, infoY + 8);
+      doc.setTextColor(200, 210, 225); doc.setFontSize(8);
+      doc.text(provider.npi || 'N/A', infoX, infoY + 13);
+      const urlDisplay = (provider.url || 'N/A').length > 40 ? (provider.url || '').substring(0, 40) + '...' : (provider.url || 'N/A');
+      doc.text(urlDisplay, infoX + 50, infoY + 13);
+
+      doc.setFontSize(6); doc.setTextColor(...gold);
+      doc.text('CITY / ZIP', infoX, infoY + 20);
+      doc.text('REPORT TYPE', infoX + 50, infoY + 20);
+      doc.setTextColor(200, 210, 225); doc.setFontSize(8);
+      doc.text(`${provider.city || ''} ${provider.zip || ''}`.trim() || 'N/A', infoX, infoY + 25);
+      doc.text('Statutory Audit Report', infoX + 50, infoY + 25);
+
+      // ── Bottom: Category score cards (inside the navy banner) ──
+      const catY = bannerH - 26;
+      // Darker strip for category cards
+      doc.setFillColor(0, 25, 60);
+      doc.rect(0, catY - 6, pageW, 32, 'F');
+
       const cats = [
-        { key: 'data_sovereignty', label: 'Data Residency', icon: 'DR' },
-        { key: 'ai_transparency', label: 'AI Transparency', icon: 'AI' },
-        { key: 'clinical_integrity', label: 'Clinical Integrity', icon: 'CI' },
+        { key: 'data_sovereignty', label: 'DATA RESIDENCY', icon: '\u{1F6E1}' },
+        { key: 'ai_transparency', label: 'AI TRANSPARENCY', icon: '\u{1F916}' },
+        { key: 'clinical_integrity', label: 'CLINICAL INTEGRITY', icon: '\u{1F512}' },
       ];
-      const catW = (contentW - 8) / 3;
+      const catCardW = (contentW - 12) / 3;
       cats.forEach((cat, i) => {
         const cs = catScores[cat.key] || { percentage: 0, passed: 0, findings: 0 };
-        const cx = margin + i * (catW + 4);
-        const cc = (cs.percentage || 0) >= 67 ? green : (cs.percentage || 0) >= 34 ? amber : red;
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(cx, y, catW, 20, 2, 2, 'F');
-        doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
-        doc.text(`[${cat.icon}] ${cat.label.toUpperCase()}`, cx + 3, y + 5);
-        doc.setFontSize(16); doc.setTextColor(...cc);
-        doc.text(`${cs.percentage || 0}`, cx + 3, y + 15);
-        doc.setFontSize(6); doc.setTextColor(...gray);
-        doc.text(`${cs.passed || 0} pass / ${cs.findings || 0} checks`, cx + catW - 3, y + 15, { align: 'right' });
+        const pct = cs.percentage || 0;
+        const cx = margin + i * (catCardW + 6);
+        const cc = pct >= 67 ? green : pct >= 34 ? amber : red;
+
+        // Card background — slightly lighter navy
+        doc.setFillColor(10, 40, 85);
+        doc.roundedRect(cx, catY - 2, catCardW, 22, 2, 2, 'F');
+
+        // Colored accent bar at top of card
+        doc.setFillColor(...cc);
+        doc.rect(cx, catY - 2, catCardW, 1.5, 'F');
+
+        // Category label
+        doc.setFontSize(5.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(160, 170, 190);
+        doc.text(cat.label, cx + 4, catY + 4);
+
+        // Score number (large)
+        doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor(...cc);
+        doc.text(`${pct}%`, cx + 4, catY + 15);
+
+        // Pass count
+        doc.setFontSize(6); doc.setTextColor(130, 140, 160); doc.setFont('helvetica', 'normal');
+        doc.text(`${cs.passed || 0}/${cs.findings || 0} pass`, cx + catCardW - 4, catY + 15, { align: 'right' });
+
+        // Mini bar showing pass ratio
+        const barW = catCardW - 8;
+        const barH = 1.5;
+        const barY = catY + 17;
+        doc.setFillColor(30, 50, 80);
+        doc.rect(cx + 4, barY, barW, barH, 'F');
+        const fillW = (cs.findings || 0) > 0 ? (barW * (cs.passed || 0) / (cs.findings || 1)) : 0;
+        doc.setFillColor(...cc);
+        doc.rect(cx + 4, barY, fillW, barH, 'F');
       });
-      y += 28;
+
+      // Gold accent line at bottom of banner
+      doc.setFillColor(...gold);
+      doc.rect(0, bannerH - 0.8, pageW, 0.8, 'F');
+
+      y = bannerH + 6;
 
       // ═══ FINDINGS ═══
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(...navy);
@@ -964,27 +1025,27 @@ export default function AdminDashboard() {
     setScanning(true);
     setScanStatus('Fetching Type 2 providers without URLs...');
     setScanProgress(0);
-    
+
     try {
       const supabase = getSupabase();
       const allMissing: any[] = [];
       const batchSize = 10000;
       let offset = 0;
       let hasMore = true;
-      
+
       // Fetch in batches to handle large datasets
       while (hasMore) {
         setScanStatus(`Fetching records ${offset + 1} to ${offset + batchSize}...`);
-        
+
         const { data, error } = await supabase
           .from('registry')
           .select('npi, name, city, email, phone, provider_type')
           .or('provider_type.eq.2,provider_type.is.null')
           .or('url.is.null,url.eq.')
           .range(offset, offset + batchSize - 1);
-        
+
         if (error) throw error;
-        
+
         if (data && data.length > 0) {
           allMissing.push(...data);
           offset += batchSize;
@@ -992,32 +1053,32 @@ export default function AdminDashboard() {
         } else {
           hasMore = false;
         }
-        
+
         // Stop if we've fetched enough or no more data
         if (!data || data.length < batchSize) hasMore = false;
-        
+
         // Safety limit
         if (allMissing.length >= 100000) {
           notify('Export limited to 100,000 records', 'info');
           hasMore = false;
         }
       }
-      
+
       setScanStatus('Generating CSV...');
       setScanProgress(95);
-      
+
       const csv = [
         'NPI,Name,Provider Type,City,Email,Phone,URL (ADD THIS)',
-        ...allMissing.map(r => `${r.npi},"${(r.name || '').replace(/"/g, '""')}",${r.provider_type || 2},${r.city||''},${r.email||''},${r.phone||''},`)
+        ...allMissing.map(r => `${r.npi},"${(r.name || '').replace(/"/g, '""')}",${r.provider_type || 2},${r.city || ''},${r.email || ''},${r.phone || ''},`)
       ].join('\n');
-      
-      const a = document.createElement('a'); 
+
+      const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      a.download = `type2-providers-needing-urls-${new Date().toISOString().split('T')[0]}.csv`; 
-      a.click(); 
-      
+      a.download = `type2-providers-needing-urls-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+
       notify(`Exported ${allMissing.length.toLocaleString()} Type 2 providers needing URLs`);
-      
+
     } catch (e: any) {
       notify('Export failed: ' + e.message, 'error');
     } finally {
@@ -1031,13 +1092,13 @@ export default function AdminDashboard() {
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
       const lines = text.split('\n').filter(l => l.trim());
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
-      
+
       const data = lines.slice(1).map(line => {
         const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
         const row: any = {};
@@ -1062,7 +1123,7 @@ export default function AdminDashboard() {
         });
         return row;
       }).filter(r => r.npi && r.name);
-      
+
       setImportData(data);
       setShowImportModal(true);
     };
@@ -1073,19 +1134,19 @@ export default function AdminDashboard() {
   const executeImport = async () => {
     if (importData.length === 0) return;
     setScanning(true); setScanStatus('Importing providers...'); setScanProgress(0);
-    
+
     try {
       const supabase = getSupabase();
       let imported = 0, updated = 0;
       const newIds: string[] = [];
-      
+
       for (let i = 0; i < importData.length; i++) {
         const row = importData[i];
         setScanProgress(Math.round(((i + 1) / importData.length) * 100));
         setScanStatus(`Importing ${row.name}...`);
-        
+
         const existing = providers.find(p => p.npi === row.npi);
-        
+
         if (existing) {
           const updateData: any = { updated_at: new Date().toISOString() };
           if (row.url && row.url.trim()) updateData.url = row.url;
@@ -1112,11 +1173,11 @@ export default function AdminDashboard() {
           imported++;
         }
       }
-      
+
       await loadData();
       setShowImportModal(false); setImportData([]);
       notify(`Import complete! ${imported} new, ${updated} updated.`);
-      
+
       // Prompt to scan imported providers that have URLs
       if (newIds.length > 0) {
         setImportedIds(newIds);
@@ -1210,7 +1271,7 @@ export default function AdminDashboard() {
                   <div className="bg-white rounded-xl p-4 shadow-sm border"><FileWarning size={18} className="text-red-600 mb-2" /><div className="text-2xl font-bold text-red-600">{stats.withoutUrl}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Need URLs</div></div>
                   <div className="bg-white rounded-xl p-4 shadow-sm border"><Shield size={18} className="text-emerald-600 mb-2" /><div className="text-2xl font-bold text-emerald-600">{stats.active}</div><div className="text-[9px] font-bold text-slate-400 uppercase">Compliant</div></div>
                 </div>
-                
+
                 {stats.withoutUrl > 0 && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                     <div className="flex items-center justify-between">
@@ -1259,7 +1320,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-2">
                     <AlertCircle size={16} className="text-blue-600" />
                     <span className="text-sm text-blue-800">
-                      Showing <strong>{filteredProviders.length}</strong> of {providers.length} loaded providers ({stats.withUrl.toLocaleString()} scannable). 
+                      Showing <strong>{filteredProviders.length}</strong> of {providers.length} loaded providers ({stats.withUrl.toLocaleString()} scannable).
                       <span className="text-blue-600 ml-1">{stats.withoutUrl.toLocaleString()} need URLs.</span>
                     </span>
                   </div>
@@ -1289,50 +1350,50 @@ export default function AdminDashboard() {
                 )}
                 <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
                   <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase">
-                      <th className="px-3 py-2 w-8"><input type="checkbox" onChange={e => setSelectedProviders(e.target.checked ? filteredProviders.map(p => p.id) : [])} checked={selectedProviders.length === filteredProviders.length && filteredProviders.length > 0} /></th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('name')}>Name / City <SortIcon field="name" /></th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('npi')}>NPI <SortIcon field="npi" /></th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('zip')}>Zip <SortIcon field="zip" /></th>
-                      <th className="px-3 py-2">URL</th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('risk_score')}>Score <SortIcon field="risk_score" /></th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('last_scan_timestamp')}>Last Scan <SortIcon field="last_scan_timestamp" /></th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('report_status')}>Report <SortIcon field="report_status" /></th>
-                      <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('widget_status')}>Status <SortIcon field="widget_status" /></th>
-                      <th className="px-3 py-2 text-right">Actions</th>
-                    </tr></thead>
-                    <tbody className="divide-y">
-                      {filteredProviders.map(r => {
-                        const hasReport = r.report_status && r.report_status !== 'none';
-                        const scanDate = r.last_scan_timestamp ? new Date(r.last_scan_timestamp) : null;
-                        return (
-                        <tr key={r.id} className={`hover:bg-slate-50 group ${!r.url ? 'bg-red-50/50' : ''}`}>
-                          <td className="px-3 py-2"><input type="checkbox" checked={selectedProviders.includes(r.id)} onChange={() => setSelectedProviders(p => p.includes(r.id) ? p.filter(i => i !== r.id) : [...p, r.id])} /></td>
-                          <td className="px-3 py-2"><div className="font-medium text-xs">{r.name}</div><div className="text-[10px] text-slate-400">{r.city || ''}{r.city && r.zip ? ', ' : ''}{r.zip || ''}</div></td>
-                          <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.npi}</code></td>
-                          <td className="px-3 py-2"><span className="text-xs text-slate-500">{r.zip || '-'}</span></td>
-                          <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} />{r.url.replace(/^https?:\/\//, '').substring(0,22)}{r.url.replace(/^https?:\/\//, '').length > 22 ? '...' : ''}</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
-                          <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score||0) >= 67 ? 'bg-emerald-500' : (r.risk_score||0) >= 34 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score||0}%` }} /></div><span className="text-xs font-bold">{r.risk_score||0}</span></div></td>
-                          <td className="px-3 py-2">{scanDate ? <div className="text-[10px] text-slate-500">{scanDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</div> : <span className="text-[10px] text-slate-300">Never</span>}</td>
-                          <td className="px-3 py-2">{hasReport ? (
-                            <button onClick={() => handleDownloadReport(r)} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold hover:bg-emerald-100 transition-colors"><Download size={10} /> Report</button>
-                          ) : (
-                            <span className="text-[10px] text-slate-300">-</span>
-                          )}</td>
-                          <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
-                          <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => setViewingProvider(r)} title="View Details" className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
-                            <button onClick={async () => { const nv = !r.is_featured; const sb = getSupabase(); await sb.from('registry').update({ is_featured: nv }).eq('id', r.id); setProviders(p => p.map(x => x.id === r.id ? { ...x, is_featured: nv } : x)); notify(nv ? 'Promoted to public registry' : 'Removed from public registry'); }} title={r.is_featured ? 'Remove from public' : 'Promote to public'} className="p-1 hover:bg-amber-50 rounded"><Star size={13} className={r.is_featured ? 'text-[#C5A059] fill-[#C5A059]' : 'text-slate-300'} /></button>
-                            <button onClick={() => setEditingProvider(r)} title="Edit" className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
-                            <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} title="Scan" disabled={scanning} className={`p-1 hover:bg-amber-100 rounded ${!r.url ? 'opacity-30' : ''}`}><Play size={13} className="text-[#C5A059]" /></button>
-                            <button onClick={() => handleDeleteProvider(r.id)} title="Delete" className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
-                          </div></td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                    <table className="w-full text-left text-sm">
+                      <thead><tr className="bg-[#00234E] text-white text-[9px] font-bold uppercase">
+                        <th className="px-3 py-2 w-8"><input type="checkbox" onChange={e => setSelectedProviders(e.target.checked ? filteredProviders.map(p => p.id) : [])} checked={selectedProviders.length === filteredProviders.length && filteredProviders.length > 0} /></th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('name')}>Name / City <SortIcon field="name" /></th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('npi')}>NPI <SortIcon field="npi" /></th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('zip')}>Zip <SortIcon field="zip" /></th>
+                        <th className="px-3 py-2">URL</th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('risk_score')}>Score <SortIcon field="risk_score" /></th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('last_scan_timestamp')}>Last Scan <SortIcon field="last_scan_timestamp" /></th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('report_status')}>Report <SortIcon field="report_status" /></th>
+                        <th className="px-3 py-2 cursor-pointer hover:text-[#C5A059] select-none" onClick={() => toggleSort('widget_status')}>Status <SortIcon field="widget_status" /></th>
+                        <th className="px-3 py-2 text-right">Actions</th>
+                      </tr></thead>
+                      <tbody className="divide-y">
+                        {filteredProviders.map(r => {
+                          const hasReport = r.report_status && r.report_status !== 'none';
+                          const scanDate = r.last_scan_timestamp ? new Date(r.last_scan_timestamp) : null;
+                          return (
+                            <tr key={r.id} className={`hover:bg-slate-50 group ${!r.url ? 'bg-red-50/50' : ''}`}>
+                              <td className="px-3 py-2"><input type="checkbox" checked={selectedProviders.includes(r.id)} onChange={() => setSelectedProviders(p => p.includes(r.id) ? p.filter(i => i !== r.id) : [...p, r.id])} /></td>
+                              <td className="px-3 py-2"><div className="font-medium text-xs">{r.name}</div><div className="text-[10px] text-slate-400">{r.city || ''}{r.city && r.zip ? ', ' : ''}{r.zip || ''}</div></td>
+                              <td className="px-3 py-2"><code className="text-xs font-mono bg-slate-50 px-1 rounded">{r.npi}</code></td>
+                              <td className="px-3 py-2"><span className="text-xs text-slate-500">{r.zip || '-'}</span></td>
+                              <td className="px-3 py-2">{r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"><Globe size={9} />{r.url.replace(/^https?:\/\//, '').substring(0, 22)}{r.url.replace(/^https?:\/\//, '').length > 22 ? '...' : ''}</a> : <span className="text-[10px] text-red-500 font-bold">MISSING</span>}</td>
+                              <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-10 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${(r.risk_score || 0) >= 67 ? 'bg-emerald-500' : (r.risk_score || 0) >= 34 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${r.risk_score || 0}%` }} /></div><span className="text-xs font-bold">{r.risk_score || 0}</span></div></td>
+                              <td className="px-3 py-2">{scanDate ? <div className="text-[10px] text-slate-500">{scanDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</div> : <span className="text-[10px] text-slate-300">Never</span>}</td>
+                              <td className="px-3 py-2">{hasReport ? (
+                                <button onClick={() => handleDownloadReport(r)} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold hover:bg-emerald-100 transition-colors"><Download size={10} /> Report</button>
+                              ) : (
+                                <span className="text-[10px] text-slate-300">-</span>
+                              )}</td>
+                              <td className="px-3 py-2"><StatusBadge status={r.widget_status || 'hidden'} size="sm" /></td>
+                              <td className="px-3 py-2"><div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => setViewingProvider(r)} title="View Details" className="p-1 hover:bg-slate-100 rounded"><Eye size={13} className="text-slate-400" /></button>
+                                <button onClick={async () => { const nv = !r.is_featured; const sb = getSupabase(); await sb.from('registry').update({ is_featured: nv }).eq('id', r.id); setProviders(p => p.map(x => x.id === r.id ? { ...x, is_featured: nv } : x)); notify(nv ? 'Promoted to public registry' : 'Removed from public registry'); }} title={r.is_featured ? 'Remove from public' : 'Promote to public'} className="p-1 hover:bg-amber-50 rounded"><Star size={13} className={r.is_featured ? 'text-[#C5A059] fill-[#C5A059]' : 'text-slate-300'} /></button>
+                                <button onClick={() => setEditingProvider(r)} title="Edit" className="p-1 hover:bg-slate-100 rounded"><Edit size={13} className="text-slate-400" /></button>
+                                <button onClick={() => r.url ? handleScan([r.id]) : notify('Add URL first', 'error')} title="Scan" disabled={scanning} className={`p-1 hover:bg-amber-100 rounded ${!r.url ? 'opacity-30' : ''}`}><Play size={13} className="text-[#C5A059]" /></button>
+                                <button onClick={() => handleDeleteProvider(r.id)} title="Delete" className="p-1 hover:bg-red-50 rounded"><Trash2 size={13} className="text-red-400" /></button>
+                              </div></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                   {filteredProviders.length === 0 && <div className="p-8 text-center"><Database size={32} className="mx-auto text-slate-200 mb-2" /><p className="text-sm text-slate-400">{searchTerm ? 'No providers match your search' : 'No providers found'}</p></div>}
                 </div>
@@ -1456,7 +1517,7 @@ export default function AdminDashboard() {
               <div className="bg-emerald-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-emerald-700">{scanResult.withUrl.toLocaleString()}</div><div className="text-[8px] font-bold text-emerald-600 uppercase">With URLs</div></div>
               <div className="bg-red-50 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-red-700">{scanResult.withoutUrlCount.toLocaleString()}</div><div className="text-[8px] font-bold text-red-600 uppercase">Need URLs</div></div>
             </div>
-            
+
             {scanResult.scanResults.length > 0 && (
               <div className="bg-white border rounded-lg p-3">
                 <h4 className="text-sm font-bold mb-2">Scan Results Summary ({scanResult.scanned} providers scanned)</h4>
@@ -1478,7 +1539,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
-            
+
             {scanResult.withoutUrlCount > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
