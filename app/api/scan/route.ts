@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { crawlPage, stripHtmlToText } from '@/lib/crawler';
 
 /**
- * KairoLogic Sentry Scanner API v3.0
+ * KairoLogic Sentry Scanner API v3.1
  * ===================================
  * REAL compliance scans with intelligent risk weighting.
  * 
- * v3.0 IMPROVEMENTS:
+ * v3.1 IMPROVEMENTS:
+ * 1. Adaptive web crawler — direct fetch + Browserless.io for JS-rendered sites
+ * 2. Context-specific remediation recommendations per finding
+ * 3. Crawl metadata in response (strategy used, JS-rendered flag)
+ * 
+ * v3.0 FEATURES:
  * 1. Priority Matrix scoring (not all failures equal)
  * 2. PHI context classification (static asset vs form handler)
  * 3. Page context detection (contact page vs patient intake)
@@ -68,7 +74,7 @@ interface DataBorderNode {
 
 // ─── CONSTANTS ──────────────────────────────────────────
 
-const ENGINE_VERSION = 'SENTRY-3.0.0';
+const ENGINE_VERSION = 'SENTRY-3.1.0';
 
 // Category weights for composite score (must sum to 1.0)
 const CATEGORY_WEIGHTS = {
@@ -316,9 +322,9 @@ async function scanDR01(domain: string, borderMap: DataBorderNode[]): Promise<Sc
   };
 }
 
-async function scanDR02(targetUrl: string, borderMap: DataBorderNode[]): Promise<ScanFinding> {
-  const response = await safeFetch(targetUrl, { method: 'HEAD' });
-  if (!response) {
+function scanDR02(targetUrl: string, prefetchedHeaders: Record<string, string>, borderMap: DataBorderNode[]): ScanFinding {
+  const headers = prefetchedHeaders;
+  if (Object.keys(headers).length === 0) {
     return {
       id: 'DR-02', name: 'CDN & Edge Cache Analysis',
       status: 'warn', severity: 'medium', category: 'data_sovereignty', phiRisk: 'indirect',
@@ -327,9 +333,6 @@ async function scanDR02(targetUrl: string, borderMap: DataBorderNode[]): Promise
       recommendedFix: 'Verify the website URL is correct and accessible. If the site uses firewall rules or IP allowlisting, ensure scan traffic can reach it. Re-run the scan once connectivity is restored.',
     };
   }
-
-  const headers: Record<string, string> = {};
-  response.headers.forEach((v, k) => { headers[k.toLowerCase()] = v.toLowerCase(); });
 
   let cdnProvider = 'None detected';
   if (headers['cf-ray']) cdnProvider = 'Cloudflare';
@@ -817,25 +820,37 @@ export async function POST(request: NextRequest) {
 
     const npiResult = await verifyNPI(npi);
 
-    let pageHtml = '', pageText = '', fetchSuccess = false;
-    const pageRes = await safeFetch(targetUrl, {}, 15000);
-    if (pageRes && pageRes.ok) {
-      pageHtml = await pageRes.text();
-      pageText = pageHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      fetchSuccess = true;
-    }
+    // ── Adaptive page crawl (direct fetch → Browserless for JS sites) ──
+    const crawl = await crawlPage(targetUrl);
+    const pageHtml = crawl.html;
+    const pageText = crawl.text;
+    const fetchSuccess = crawl.success && pageText.length > 0;
 
     const pageCtx = fetchSuccess ? detectPageContext(pageHtml, pageText)
       : { type: 'unknown', hasPatientPortal: false, hasIntakeForms: false, hasDiagnosticTools: false, hasChatbot: false, pageTitle: 'Unknown' };
+
+    // We still need response headers for DR-02 CDN analysis.
+    // If the crawler got them (from direct fetch), use those.
+    // Otherwise do a lightweight HEAD request just for headers.
+    // DR-02 expects both keys AND values lowercased.
+    const responseHeaders: Record<string, string> = {};
+    if (Object.keys(crawl.headers).length > 0) {
+      for (const [k, v] of Object.entries(crawl.headers)) {
+        responseHeaders[k.toLowerCase()] = v.toLowerCase();
+      }
+    } else {
+      const headRes = await safeFetch(targetUrl, { method: 'HEAD' });
+      if (headRes) {
+        headRes.headers.forEach((v, k) => { responseHeaders[k.toLowerCase()] = v.toLowerCase(); });
+      }
+    }
 
     const findings: ScanFinding[] = [];
     const dataBorderMap: DataBorderNode[] = [];
 
     // Data Sovereignty
     findings.push(await scanDR01(domain, dataBorderMap));
-    findings.push(await scanDR02(targetUrl, dataBorderMap));
+    findings.push(scanDR02(targetUrl, responseHeaders, dataBorderMap));
     findings.push(await scanDR03(domain, dataBorderMap));
     findings.push(await scanDR04(targetUrl, pageHtml, dataBorderMap));
 
@@ -901,6 +916,10 @@ export async function POST(request: NextRequest) {
         checksPass: findings.filter(f => f.status === 'pass').length,
         checksFail: findings.filter(f => f.status === 'fail').length,
         checksWarn: findings.filter(f => f.status === 'warn').length,
+        crawlStrategy: crawl.strategy,
+        crawlDuration: `${crawl.duration}ms`,
+        isJSRendered: crawl.isJSRendered,
+        crawlError: crawl.error || null,
       },
     });
   } catch (error) {
