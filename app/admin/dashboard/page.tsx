@@ -876,15 +876,11 @@ export default function AdminDashboard() {
         <div class="finding-detail">
           <strong>Technical Finding:</strong> ${f.detail || f.description || f.technical_finding || 'Infrastructure deviation detected requiring remediation.'}
         </div>
-        ${f.technicalFix || f.recommended_fix ? `
+        ${f.technicalFix || f.recommended_fix || f.recommendedFix ? `
         <div class="tech-fix">
           <div class="tech-fix-label">✅ Recommended Technical Fix</div>
-          <div class="tech-fix-text">${f.technicalFix || f.recommended_fix}</div>
-        </div>` : `
-        <div class="tech-fix">
-          <div class="tech-fix-label">✅ Recommended Technical Fix</div>
-          <div class="tech-fix-text">Contact KairoLogic engineering to provision a Texas-anchored remediation for this drift vector. Reference: ATX-01-SECURE // PROTOCOL-TX-2026</div>
-        </div>`}
+          <div class="tech-fix-text">${f.technicalFix || f.recommended_fix || f.recommendedFix}</div>
+        </div>` : ''}
       </div>
     `).join('')}
   </div>
