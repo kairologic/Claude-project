@@ -233,6 +233,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const [npi, setNpi] = useState(initialNPI);
   const [url, setUrl] = useState(initialURL);
   const [email, setEmail] = useState(initialEmail);
+  const [contactName, setContactName] = useState('');
   const [scanning, setScanning] = useState(false);
   const [currentPhase, setCurrentPhase] = useState('');
   const [progress, setProgress] = useState<number>(0);
@@ -689,6 +690,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             source: 'scan',
             source_detail: 'public_risk_scan',
             practice_name: providerName || 'Unknown Provider',
+            contact_name: contactName || null,
             npi: npi,
             email: providerEmail || null,
             website_url: url,
@@ -866,10 +868,10 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       {/* Input Section */}
       <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Provider NPI
+              Provider NPI <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -882,13 +884,26 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Website URL
+              Website URL <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example-practice.com"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={scanning}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Contact Name
+            </label>
+            <input
+              type="text"
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Dr. Jane Smith"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={scanning}
             />
@@ -1051,168 +1066,165 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
               </div>
             )}
 
-            {/* Top Issues with PHI Risk */}
-            {results.topIssues && results.topIssues.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-blue-200">
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">Priority Issues:</h4>
-                {results.topIssues.map((issue: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2 text-sm text-slate-600 mb-1.5">
-                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
-                      issue.severity === 'critical' ? 'bg-red-500' :
-                      issue.severity === 'high' ? 'bg-orange-500' :
-                      issue.severity === 'medium' ? 'bg-amber-400' : 'bg-blue-400'
-                    }`} />
-                    <span className="font-medium">{issue.id}:</span> {issue.name}
-                    {issue.phiRisk === 'direct' && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">PHI Risk</span>
-                    )}
-                    {issue.severity === 'critical' && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-xs">Fine Risk</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Data Border Map */}
-          {results.dataBorderMap && results.dataBorderMap.length > 0 && (
-            <div className="mb-6 p-5 border border-slate-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <MapPin className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-bold text-slate-800">Data Border Map</h3>
-                <span className="text-xs text-slate-400 ml-2">Where your data touches</span>
-              </div>
+          {/* Data Border Map — snippet with category counts */}
+          {results.dataBorderMap && results.dataBorderMap.length > 0 && (() => {
+            const nodes = results.dataBorderMap;
+            const total = nodes.length;
+            const usCount = nodes.filter((n: any) => n.isSovereign).length;
+            const foreign = nodes.filter((n: any) => !n.isSovereign);
+            const foreignPHI = foreign.filter((n: any) => n.phiRisk === 'direct');
+            const byType: Record<string, number> = {};
+            nodes.forEach((n: any) => { byType[n.type || 'other'] = (byType[n.type || 'other'] || 0) + 1; });
+            const preview = nodes.slice(0, 3);
+            const remaining = total - preview.length;
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {results.dataBorderMap.map((node: any, idx: number) => {
-                  const isUS = node.isSovereign;
-                  const riskBg = node.phiRisk === 'direct' && !isUS ? 'bg-red-50 border-red-200' :
-                    node.phiRisk === 'indirect' && !isUS ? 'bg-amber-50 border-amber-200' :
-                    isUS ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200';
-                  return (
-                    <div key={idx} className={`p-3 rounded-lg border ${riskBg} text-sm`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-lg">{isUS ? '🇺🇸' : '🌍'}</span>
-                          <span className="font-medium text-slate-800 truncate max-w-[180px]" title={node.domain}>
-                            {node.domain.length > 28 ? node.domain.substring(0, 28) + '...' : node.domain}
+            return (
+              <div className="mb-6 border border-slate-200 rounded-lg overflow-hidden">
+                {/* Header bar */}
+                <div className="bg-slate-800 text-white px-5 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-blue-400" />
+                    <span className="font-bold text-sm">Data Border Map</span>
+                    <span className="text-slate-400 text-xs ml-1">{total} endpoints analyzed</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-green-400 font-semibold">🇺🇸 {usCount} US</span>
+                    {foreign.length > 0 && <span className="text-amber-400 font-semibold">🌍 {foreign.length} foreign</span>}
+                    {foreignPHI.length > 0 && <span className="text-red-400 font-bold">⚠ {foreignPHI.length} PHI risk</span>}
+                  </div>
+                </div>
+
+                {/* Type counts bar */}
+                <div className="bg-slate-50 px-5 py-2 flex items-center gap-3 border-b border-slate-200 text-xs">
+                  {Object.entries(byType).map(([type, count]) => (
+                    <span key={type} className={`px-2 py-0.5 rounded-full font-medium ${
+                      type === 'primary' ? 'bg-blue-100 text-blue-700' :
+                      type === 'mail' ? 'bg-purple-100 text-purple-700' :
+                      type === 'cdn' ? 'bg-sky-100 text-sky-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {count} {type}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Preview items */}
+                <div className="divide-y divide-slate-100">
+                  {preview.map((node: any, idx: number) => {
+                    const isUS = node.isSovereign;
+                    return (
+                      <div key={idx} className="px-5 py-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{isUS ? '🇺🇸' : '🌍'}</span>
+                          <span className="font-medium text-sm text-slate-800 truncate max-w-[200px]">{node.domain}</span>
+                          <span className="text-xs text-slate-400">{node.city}, {node.country}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            node.type === 'primary' ? 'bg-blue-50 text-blue-600' :
+                            node.type === 'cdn' ? 'bg-sky-50 text-sky-600' :
+                            node.type === 'mail' ? 'bg-purple-50 text-purple-600' :
+                            'bg-slate-50 text-slate-500'
+                          }`}>{node.type}</span>
+                          <span className={`font-semibold text-xs ${isUS ? 'text-green-600' : 'text-red-600'}`}>
+                            {isUS ? '✓' : '✗'}
                           </span>
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                          node.type === 'primary' ? 'bg-blue-100 text-blue-700' :
-                          node.type === 'mail' ? 'bg-purple-100 text-purple-700' :
-                          node.type === 'cdn' ? 'bg-sky-100 text-sky-700' :
-                          'bg-slate-100 text-slate-700'
-                        }`}>{node.type}</span>
                       </div>
-                      <div className="text-xs text-slate-500">
-                        {node.city}, {node.country}
-                        {node.ip && <span className="text-slate-400 ml-1">({node.ip})</span>}
-                      </div>
-                      <div className="flex items-center gap-1 mt-1">
-                        {node.phiRisk === 'direct' && <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">PHI Handler</span>}
-                        {node.phiRisk === 'indirect' && <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">Tracking/Analytics</span>}
-                        {node.phiRisk === 'none' && <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Static Asset</span>}
-                        {node.purpose && <span className="text-xs text-slate-400 ml-1">{node.purpose}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
 
-              {/* Border Summary */}
-              {(() => {
-                const foreign = results.dataBorderMap.filter((n: any) => !n.isSovereign);
-                const foreignPHI = foreign.filter((n: any) => n.phiRisk === 'direct');
-                const total = results.dataBorderMap.length;
-                return (
-                  <div className="mt-3 pt-3 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-3">
-                    <span>{total} endpoint{total !== 1 ? 's' : ''} mapped</span>
-                    <span className="text-green-600">🇺🇸 {total - foreign.length} US</span>
-                    {foreign.length > 0 && <span className="text-amber-600">🌍 {foreign.length} foreign</span>}
-                    {foreignPHI.length > 0 && <span className="text-red-600 font-medium">⚠ {foreignPHI.length} foreign PHI handler{foreignPHI.length > 1 ? 's' : ''}</span>}
+                {/* Footer with remaining count */}
+                {remaining > 0 && (
+                  <div className="bg-slate-50 px-5 py-2.5 text-center border-t border-slate-200">
+                    <span className="text-xs text-slate-500">+ {remaining} more endpoint{remaining > 1 ? 's' : ''} analyzed</span>
+                    <span className="text-xs text-slate-400 ml-2">•</span>
+                    <span className="text-xs text-blue-600 font-medium ml-2">Full map available in detailed report</span>
                   </div>
-                );
-              })()}
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })()}
 
-          {/* Detailed Findings */}
+          {/* Category Summary Cards — no individual violation details */}
           <div>
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Detailed Findings</h3>
-            <div className="space-y-3">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Compliance Summary by Category</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { prefix: 'DR-', label: 'Data Sovereignty & Residency', catKey: 'data_sovereignty' },
-                { prefix: 'AI-', label: 'AI Transparency & Disclosure', catKey: 'ai_transparency' },
-                { prefix: 'ER-', label: 'EHR System Integrity & Parental Access', catKey: 'clinical_integrity' }
-              ].map((category, catIdx: number) => {
-                const categoryFindings = results.findings.filter((f: any) => f.id.startsWith(category.prefix));
+                { prefix: 'DR-', label: 'Data Sovereignty & Residency', catKey: 'data_sovereignty', icon: <Globe className="w-6 h-6" />, statute: 'SB 1188' },
+                { prefix: 'AI-', label: 'AI Transparency & Disclosure', catKey: 'ai_transparency', icon: <Brain className="w-6 h-6" />, statute: 'HB 149' },
+                { prefix: 'ER-', label: 'Clinical Integrity', catKey: 'clinical_integrity', icon: <Lock className="w-6 h-6" />, statute: 'SB 1188' }
+              ].map((category) => {
+                const categoryFindings = results.findings?.filter((f: any) => f.id.startsWith(category.prefix)) || [];
                 const catScore = results.categoryScores?.[category.catKey];
+                const pct = catScore?.percentage || 0;
+                const passed = categoryFindings.filter((f: any) => f.status === 'pass').length;
+                const failed = categoryFindings.filter((f: any) => f.status === 'fail').length;
+                const warned = categoryFindings.filter((f: any) => f.status === 'warn').length;
+                const total = categoryFindings.length;
+                const statusColor = pct >= 67 ? 'green' : pct >= 34 ? 'amber' : 'red';
+                const statusBg = pct >= 67 ? 'from-green-50 to-emerald-50 border-green-200' : pct >= 34 ? 'from-amber-50 to-yellow-50 border-amber-200' : 'from-red-50 to-rose-50 border-red-200';
+                const scoreTextColor = pct >= 67 ? 'text-green-700' : pct >= 34 ? 'text-amber-700' : 'text-red-700';
+                const scoreBgColor = pct >= 67 ? 'bg-green-100' : pct >= 34 ? 'bg-amber-100' : 'bg-red-100';
+                const barColor = pct >= 67 ? 'bg-green-500' : pct >= 34 ? 'bg-amber-500' : 'bg-red-500';
 
                 return (
-                  <div key={catIdx} className="border border-slate-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        {getCategoryIcon(category.label)}
-                        <h4 className="font-semibold text-slate-800">{category.label}</h4>
-                      </div>
-                      {catScore && (
-                        <span className={`text-sm font-bold px-2 py-0.5 rounded ${
-                          catScore.percentage >= 67 ? 'bg-green-100 text-green-700' :
-                          catScore.percentage >= 34 ? 'bg-amber-100 text-amber-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>{catScore.percentage}%</span>
-                      )}
+                  <div key={category.catKey} className={`bg-gradient-to-br ${statusBg} border rounded-xl p-5 relative overflow-hidden`}>
+                    {/* Score badge - top right */}
+                    <div className={`absolute top-3 right-3 ${scoreBgColor} ${scoreTextColor} text-2xl font-black px-3 py-1 rounded-lg`}>
+                      {pct}%
                     </div>
-                    <div className="space-y-2">
-                      {categoryFindings.map((finding: any, idx: number) => (
-                        <div key={idx} className={`flex items-start gap-3 p-3 rounded ${
-                          finding.status === 'pass' ? 'bg-green-50/50' :
-                          finding.status === 'fail' ? 'bg-red-50/50' :
-                          finding.status === 'warn' ? 'bg-amber-50/50' : 'bg-slate-50'
-                        }`}>
-                          {finding.status === 'pass' ? (
-                            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                          ) : finding.status === 'warn' ? (
-                            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-sm text-slate-800">{finding.id}: {finding.name}</span>
-                              {/* Severity Badge */}
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                finding.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                                finding.severity === 'high' ? 'bg-orange-100 text-orange-700' :
-                                finding.severity === 'medium' ? 'bg-amber-100 text-amber-700' :
-                                finding.severity === 'info' ? 'bg-blue-100 text-blue-600' :
-                                'bg-slate-100 text-slate-600'
-                              }`}>{finding.severity}</span>
-                              {/* PHI Risk Badge */}
-                              {finding.phiRisk === 'direct' && (
-                                <span className="text-xs px-1.5 py-0.5 bg-red-50 text-red-600 rounded border border-red-200">PHI Direct</span>
-                              )}
-                              {finding.phiRisk === 'indirect' && (
-                                <span className="text-xs px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-200">PHI Indirect</span>
-                              )}
-                              {/* Page Context Badge */}
-                              {finding.pageContext && finding.status !== 'pass' && (
-                                <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">
-                                  {finding.pageContext.replace(/_/g, ' ')} page
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-slate-600 mt-1">{finding.detail}</div>
-                            <div className="text-xs text-slate-400 mt-1 italic">{finding.clause}</div>
-                          </div>
+
+                    {/* Icon + label */}
+                    <div className={`${scoreTextColor} mb-3`}>
+                      {category.icon}
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-sm mb-0.5">{category.label}</h4>
+                    <p className="text-xs text-slate-400 mb-4">{category.statute}</p>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-white/70 rounded-full h-2.5 mb-4">
+                      <div className={`h-2.5 rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${pct}%` }} />
+                    </div>
+
+                    {/* Pass / Fail / Warn counters */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center">
+                          <span className="text-green-700 font-black text-sm">{passed}</span>
                         </div>
-                      ))}
+                        <span className="text-xs text-slate-500">Pass</span>
+                      </div>
+                      {failed > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
+                            <span className="text-red-700 font-black text-sm">{failed}</span>
+                          </div>
+                          <span className="text-xs text-slate-500">Fail</span>
+                        </div>
+                      )}
+                      {warned > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
+                            <span className="text-amber-700 font-black text-sm">{warned}</span>
+                          </div>
+                          <span className="text-xs text-slate-500">Warn</span>
+                        </div>
+                      )}
+                      <span className="text-xs text-slate-400 ml-auto">{total} checks</span>
                     </div>
                   </div>
                 );
               })}
+            </div>
+
+            {/* CTA for full report */}
+            <div className="mt-6 p-4 bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl text-center">
+              <p className="text-white font-semibold text-sm mb-1">Want the full detailed report with remediation steps?</p>
+              <p className="text-slate-400 text-xs">Contact KairoLogic for your complete compliance audit with technical fixes and regulatory references.</p>
             </div>
           </div>
         </div>
