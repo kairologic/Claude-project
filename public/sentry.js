@@ -70,14 +70,14 @@
 
     /* ── Badge (collapsed) ── */
     .kl-badge {
-      display: flex; align-items: center; gap: 12px;
-      padding: 10px 14px;
-      border-radius: 12px;
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px;
+      border-radius: 10px;
       cursor: pointer;
       user-select: none;
       -webkit-user-select: none;
       transition: all 0.25s ease;
-      max-width: 320px;
+      max-width: 240px;
     }
     .kl-badge:hover { transform: translateY(-1px); }
 
@@ -105,19 +105,19 @@
 
     /* Shield icon box */
     .kl-icon-box {
-      width: 40px; height: 40px;
+      width: 30px; height: 30px;
       background: #0A192F;
-      border-radius: 10px;
+      border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
       position: relative;
     }
-    .kl-icon-box svg { width: 22px; height: 22px; color: #fff; }
+    .kl-icon-box svg { width: 16px; height: 16px; color: #fff; }
 
     /* Live pulse (Shield only) */
     .kl-pulse-dot {
-      position: absolute; top: -3px; right: -3px;
-      width: 10px; height: 10px;
+      position: absolute; top: -2px; right: -2px;
+      width: 8px; height: 8px;
     }
     .kl-pulse-ring {
       position: absolute; inset: 0;
@@ -128,7 +128,7 @@
     }
     .kl-pulse-core {
       position: relative;
-      width: 10px; height: 10px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       background: #22c55e;
       border: 1.5px solid #fff;
@@ -143,8 +143,8 @@
 
     /* Watch dot (static, no pulse) */
     .kl-watch-dot {
-      position: absolute; top: -2px; right: -2px;
-      width: 8px; height: 8px;
+      position: absolute; top: -1px; right: -1px;
+      width: 7px; height: 7px;
       border-radius: 50%;
       background: #3b82f6;
       border: 1.5px solid #fff;
@@ -154,12 +154,12 @@
     /* Text area */
     .kl-badge-text { flex: 1; min-width: 0; }
     .kl-badge-brand {
-      font-size: 9px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 1.5px;
+      font-size: 8px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.2px;
       color: #FF6700;
     }
     .kl-badge-status {
-      font-size: 13px; font-weight: 700;
+      font-size: 11px; font-weight: 700;
       line-height: 1.2;
     }
     .kl-light .kl-badge-status { color: #0A192F; }
@@ -167,21 +167,21 @@
 
     .kl-badge-id {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 9px;
-      margin-top: 2px;
+      font-size: 8px;
+      margin-top: 1px;
     }
     .kl-light .kl-badge-id { color: #94a3b8; }
     .kl-dark  .kl-badge-id { color: #64748b; }
 
     /* Info button */
     .kl-info-btn {
-      padding-left: 12px;
-      border-left: 1px solid rgba(128,128,128,0.15);
+      padding-left: 8px;
+      border-left: 1px solid rgba(128,128,128,0.12);
       display: flex; align-items: center;
       flex-shrink: 0;
     }
     .kl-info-btn svg {
-      width: 16px; height: 16px;
+      width: 12px; height: 12px;
       transition: color 0.2s, transform 0.3s;
     }
     .kl-light .kl-info-btn svg { color: #94a3b8; }
@@ -419,7 +419,7 @@
       +   '<div class="kl-badge-text">'
       +     '<div class="kl-badge-brand">KairoLogic\u2122 ' + (opts.status === 'verified' ? 'Certified' : 'Sentry') + '</div>'
       +     '<div class="kl-badge-status">' + opts.statusText + '</div>'
-      +     '<div class="kl-badge-id">' + opts.id + '</div>'
+      +     '<div class="kl-badge-id">TX-SB1188-' + cfg.npi.slice(-6) + '</div>'
       +   '</div>'
       +   '<div class="kl-info-btn" id="kl-info-btn">' + ico.chevron + '</div>'
       + '</div>';
@@ -432,6 +432,12 @@
     return ''
       + '<div class="kl-pane" id="kl-pane">'
       +   '<div class="kl-pane-inner">'
+
+      // Scan timestamp header
+      +     '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid rgba(128,128,128,0.1);">'
+      +       '<span class="kl-trust-label" style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;">Compliance Status</span>'
+      +       '<span class="kl-badge-id" style="font-size:9px;font-weight:600;">Scanned: ' + lastScan + '</span>'
+      +     '</div>'
 
       // Trust items
       +     '<div class="kl-trust-item">'
