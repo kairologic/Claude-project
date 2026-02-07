@@ -421,7 +421,7 @@ export default function ServicesPage() {
                   <ul className="space-y-2 text-xs text-gray-600">
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Automated monthly re-scans</li>
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Compliance drift alerts</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Live sovereignty dashboard</li>
+                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Monthly compliance reports</li>
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Infrastructure heartbeat</li>
                   </ul>
                 </div>
@@ -514,7 +514,7 @@ export default function ServicesPage() {
                     { feature: 'Professional PDF Report', vals: ['—', '✓', '—', '—', '✓ Quarterly'] },
                     { feature: 'Statutory Clause Mapping', vals: ['—', '✓', '✓', '✓', '✓'] },
                     { feature: 'Compliance Drift Alerts', vals: ['—', '—', '—', '✓', '✓'] },
-                    { feature: 'Live Dashboard', vals: ['—', '—', '—', '✓', '✓'] },
+                    { feature: 'Live Dashboard', vals: ['—', '—', '—', '—', '✓'] },
                     { feature: 'SB 1188 Policy Pack', vals: ['—', '—', '✓', '—', '—'] },
                     { feature: 'AI Disclosure Kit (Code + Copy)', vals: ['—', '—', '✓', '—', '—'] },
                     { feature: 'Evidence Ledger Templates', vals: ['—', '—', '✓', '—', '—'] },
