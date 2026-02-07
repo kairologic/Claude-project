@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KairoLogic Sentry Widget v2 — Embed Test Harness</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #f0f2f5; color: #333; }
+
+    /* Toolbar */
+    .toolbar {
+      position: sticky; top: 0; z-index: 1000;
+      background: linear-gradient(135deg, #0A192F, #112240);
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+    .toolbar h1 { color: #fff; font-size: 15px; font-weight: 700; }
+    .toolbar h1 span { color: #FF6700; }
+    .toolbar-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .toolbar-controls label { color: #94a3b8; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .toolbar-controls input, .toolbar-controls select {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: 'Inter', sans-serif;
+    }
+    .toolbar-controls input::placeholder { color: rgba(255,255,255,0.3); }
+    .toolbar-controls select option { color: #333; background: #fff; }
+    .btn-go {
+      background: #FF6700; color: #fff; border: none; padding: 8px 18px; border-radius: 6px;
+      font-size: 12px; font-weight: 700; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-go:hover { background: #e55a00; }
+
+    .status-bar {
+      text-align: center; padding: 6px; font-size: 10px; letter-spacing: 0.4px;
+      background: rgba(10,25,47,0.95); color: #C5A059;
+    }
+
+    /* Sections */
+    .section { text-align: center; padding: 40px 20px 20px; }
+    .section h2 { font-size: 22px; font-weight: 700; color: #0A192F; margin-bottom: 4px; }
+    .section p { font-size: 13px; color: #64748b; }
+
+    /* Site frame */
+    .site-frame { max-width: 880px; margin: 0 auto 40px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+    .chrome { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #e5e7eb; }
+    .chrome .dots { display: flex; gap: 5px; }
+    .chrome .dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .chrome .dots span:nth-child(1) { background: #ef4444; }
+    .chrome .dots span:nth-child(2) { background: #f59e0b; }
+    .chrome .dots span:nth-child(3) { background: #22c55e; }
+    .chrome .url { flex: 1; background: #fff; border-radius: 4px; padding: 4px 12px; font-size: 11px; color: #94a3b8; font-family: monospace; }
+
+    .page { padding: 28px; }
+    .page .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 14px; border-bottom: 1px solid rgba(128,128,128,0.12); }
+    .page .nav .logo { font-size: 16px; font-weight: 700; }
+    .page .nav .links { display: flex; gap: 14px; font-size: 12px; }
+    .page .hero { height: 100px; border-radius: 8px; margin-bottom: 20px; opacity: 0.15; }
+    .page .lines .line { height: 9px; border-radius: 4px; margin-bottom: 8px; opacity: 0.25; }
+    .page .lines .line:nth-child(1) { width: 100%; }
+    .page .lines .line:nth-child(2) { width: 82%; }
+    .page .lines .line:nth-child(3) { width: 65%; }
+
+    .footer { padding: 20px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+    .footer-text { font-size: 11px; opacity: 0.5; }
+    .widget-slot {
+      border: 2px dashed rgba(59,130,246,0.35); border-radius: 10px; padding: 8px;
+      background: rgba(59,130,246,0.02); position: relative; min-width: 260px;
+    }
+    .widget-slot-tag {
+      position: absolute; top: -10px; left: 12px;
+      background: #3b82f6; color: #fff; font-size: 8px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 10px;
+    }
+
+    /* Themes */
+    .t-white { background: #fff; color: #1f2937; }
+    .t-white .line { background: #e5e7eb; }
+    .t-white .hero { background: #6366f1; }
+    .t-white .footer { background: #f8fafc; border-top: 1px solid #e5e7eb; }
+    .t-white .nav .logo { color: #1f2937; }
+
+    .t-dark { background: #111827; color: #e5e7eb; }
+    .t-dark .line { background: #374151; }
+    .t-dark .hero { background: #3b82f6; }
+    .t-dark .footer { background: #0f172a; border-top: 1px solid #1e293b; }
+    .t-dark .nav .logo { color: #f9fafb; }
+    .t-dark .nav .links, .t-dark .footer-text { color: #9ca3af; }
+
+    .t-blue { background: #f0f9ff; color: #0c4a6e; }
+    .t-blue .line { background: #bae6fd; }
+    .t-blue .hero { background: #0284c7; }
+    .t-blue .footer { background: #e0f2fe; border-top: 1px solid #bae6fd; }
+    .t-blue .nav .logo { color: #0369a1; }
+
+    .t-warm { background: #fefce8; color: #713f12; }
+    .t-warm .line { background: #fde68a; }
+    .t-warm .hero { background: #d97706; }
+    .t-warm .footer { background: #fef9c3; border-top: 1px solid #fde68a; }
+    .t-warm .nav .logo { color: #92400e; }
+
+    .t-green { background: #f0fdf4; color: #14532d; }
+    .t-green .line { background: #bbf7d0; }
+    .t-green .hero { background: #16a34a; }
+    .t-green .footer { background: #dcfce7; border-top: 1px solid #bbf7d0; }
+    .t-green .nav .logo { color: #166534; }
+
+    .t-purple { background: #1e1b4b; color: #e0e7ff; }
+    .t-purple .line { background: #3730a3; }
+    .t-purple .hero { background: #7c3aed; }
+    .t-purple .footer { background: #172554; border-top: 1px solid #312e81; }
+    .t-purple .nav .logo { color: #c7d2fe; }
+    .t-purple .nav .links, .t-purple .footer-text { color: #a5b4fc; }
+
+    /* Embed code */
+    .code-block {
+      max-width: 700px; margin: 0 auto 60px; padding: 0 20px;
+    }
+    .code-block pre {
+      background: #0f172a; color: #4ade80; padding: 20px; border-radius: 12px;
+      font-size: 12px; line-height: 1.7; overflow-x: auto; cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; border: 1px solid rgba(255,255,255,0.06);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ TOOLBAR ═══ -->
+  <div class="toolbar">
+    <h1>KAIRO<span>LOGIC</span> — Sentry v2 Test Harness</h1>
+    <div class="toolbar-controls">
+      <label>NPI:</label>
+      <input type="text" id="npiInput" placeholder="1234567890" maxlength="10" style="width:120px">
+      <label>Mode:</label>
+      <select id="modeSelect"><option value="shield">Shield</option><option value="watch">Watch</option></select>
+      <label>Position:</label>
+      <select id="posSelect"><option value="inline">Inline</option><option value="bottom-right">Float Right</option><option value="bottom-left">Float Left</option></select>
+      <button class="btn-go" onclick="render()">Render</button>
+    </div>
+  </div>
+  <div class="status-bar" id="status">Enter an NPI or click Render to see demo widgets across 6 site themes. Click the badge to expand the Trust Pane.</div>
+
+  <!-- ═══ SECTION 1: FOOTER PLACEMENT ═══ -->
+  <div class="section">
+    <h2>Glassmorphism Badge — 6 Site Themes</h2>
+    <p>Click any badge to expand the Trust Pane with compliance details</p>
+  </div>
+
+  <!-- Site 1: White -->
+  <div class="site-frame"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">austinfamilydental.com</div></div>
+    <div class="t-white"><div class="page"><div class="nav"><div class="logo">Austin Family Dental</div><div class="links"><span>Home</span><span>Services</span><span>Contact</span></div></div><div class="hero"></div><div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div></div>
+      <div class="footer"><div class="footer-text">&copy; 2026 Austin Family Dental</div><div class="widget-slot"><div class="widget-slot-tag">Widget</div><div class="wm" data-theme="light"></div></div></div>
+    </div>
+  </div>
+
+  <!-- Site 2: Dark -->
+  <div class="site-frame"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">precisionmedgroup.com</div></div>
+    <div class="t-dark"><div class="page"><div class="nav"><div class="logo">Precision Med Group</div><div class="links"><span>Home</span><span>Providers</span><span>Portal</span></div></div><div class="hero"></div><div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div></div>
+      <div class="footer"><div class="footer-text">&copy; 2026 Precision Med Group</div><div class="widget-slot"><div class="widget-slot-tag">Widget</div><div class="wm" data-theme="dark"></div></div></div>
+    </div>
+  </div>
+
+  <!-- Site 3: Medical Blue -->
+  <div class="site-frame"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">lakewayhealth.com</div></div>
+    <div class="t-blue"><div class="page"><div class="nav"><div class="logo">Lakeway Health Partners</div><div class="links"><span>Home</span><span>Doctors</span><span>Book</span></div></div><div class="hero"></div><div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div></div>
+      <div class="footer"><div class="footer-text">&copy; 2026 Lakeway Health</div><div class="widget-slot"><div class="widget-slot-tag">Widget</div><div class="wm" data-theme="light"></div></div></div>
+    </div>
+  </div>
+
+  <!-- Site 4: Warm -->
+  <div class="site-frame"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">cedarparksmiledental.com</div></div>
+    <div class="t-warm"><div class="page"><div class="nav"><div class="logo">Cedar Park Smile Dental</div><div class="links"><span>Home</span><span>Services</span><span>Team</span></div></div><div class="hero"></div><div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div></div>
+      <div class="footer"><div class="footer-text">&copy; 2026 Cedar Park Smile</div><div class="widget-slot"><div class="widget-slot-tag">Widget</div><div class="wm" data-theme="light"></div></div></div>
+    </div>
+  </div>
+
+  <!-- Site 5: Green -->
+  <div class="site-frame"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">hillcountrychiro.com</div></div>
+    <div class="t-green"><div class="page"><div class="nav"><div class="logo">Hill Country Chiropractic</div><div class="links"><span>Home</span><span>Care</span><span>Book</span></div></div><div class="hero"></div><div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div></div>
+      <div class="footer"><div class="footer-text">&copy; 2026 Hill Country Chiro</div><div class="widget-slot"><div class="widget-slot-tag">Widget</div><div class="wm" data-theme="light"></div></div></div>
+    </div>
+  </div>
+
+  <!-- Site 6: Dark Purple -->
+  <div class="site-frame"><div class="chrome"><div class="dots"><span></span><span></span><span></span></div><div class="url">nexgenpsychiatry.com</div></div>
+    <div class="t-purple"><div class="page"><div class="nav"><div class="logo">NexGen Psychiatry</div><div class="links"><span>Home</span><span>Services</span><span>Portal</span></div></div><div class="hero"></div><div class="lines"><div class="line"></div><div class="line"></div><div class="line"></div></div></div>
+      <div class="footer"><div class="footer-text">&copy; 2026 NexGen Psychiatry</div><div class="widget-slot"><div class="widget-slot-tag">Widget</div><div class="wm" data-theme="dark"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ TIER COMPARISON ═══ -->
+  <div class="section">
+    <h2>Watch vs Shield — Side by Side</h2>
+    <p>Watch: static blue dot, "Monitored" — Shield: pulsing green dot, "Verified Sovereign"</p>
+  </div>
+  <div style="max-width:880px;margin:0 auto 40px;display:flex;gap:24px;flex-wrap:wrap;justify-content:center;padding:0 20px;">
+    <div style="flex:1;min-width:300px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+      <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Sentry Watch — $39/mo</div>
+      <div class="wm" data-theme="light" data-mode-override="watch"></div>
+    </div>
+    <div style="flex:1;min-width:300px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+      <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Sentry Shield — $79/mo</div>
+      <div class="wm" data-theme="light" data-mode-override="shield"></div>
+    </div>
+  </div>
+
+  <!-- ═══ EMBED CODE ═══ -->
+  <div class="section"><h2>Embed Code</h2><p>Copy & paste before &lt;/body&gt;</p></div>
+  <div class="code-block">
+    <pre id="codeBlock" onclick="copyCode()"><span style="color:#64748b">&lt;!-- KairoLogic Sentry Compliance Widget --&gt;</span>
+&lt;script
+  src="<span style="color:#fbbf24">https://kairologic.com/sentry.js</span>"
+  data-npi="<span style="color:#38bdf8" id="codeNpi">YOUR_NPI</span>"
+  data-mode="<span style="color:#38bdf8" id="codeMode">shield</span>"
+  data-position="<span style="color:#38bdf8" id="codePos">inline</span>"
+  async&gt;
+&lt;/script&gt;</pre>
+    <p id="copyMsg" style="text-align:center;font-size:11px;color:#16a34a;margin-top:8px;opacity:0;transition:opacity 0.3s;">✓ Copied to clipboard</p>
+  </div>
+
+<script>
+  // ═══ WIDGET RENDERER ═══
+  var API = window.location.origin;
+
+  function cfg() {
+    return {
+      npi: document.getElementById('npiInput').value || '',
+      mode: document.getElementById('modeSelect').value,
+      pos: document.getElementById('posSelect').value,
+    };
+  }
+
+  function badge(theme, mode, data) {
+    var isShield = mode === 'shield';
+    var status = data.verified ? (isShield ? 'Verified Sovereign' : 'Monitored') : 'Not Verified';
+    var npi = data.npi || cfg().npi || 'XXXXXXXXXX';
+    var id = 'w-' + Math.random().toString(36).substr(2,5);
+
+    var dot = '';
+    if (data.verified && isShield) {
+      dot = '<div style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;">'
+        + '<span style="position:absolute;inset:0;border-radius:50%;background:#22c55e;opacity:0.6;animation:klp 2s ease-out infinite;"></span>'
+        + '<span style="position:relative;display:block;width:10px;height:10px;border-radius:50%;background:#22c55e;border:1.5px solid '+(theme==='dark'?'#0f172a':'#fff')+';"></span></div>';
+    } else if (data.verified) {
+      dot = '<div style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#3b82f6;border:1.5px solid '+(theme==='dark'?'#0f172a':'#fff')+';"></div>';
+    }
+
+    var glass = theme === 'dark'
+      ? 'background:rgba(15,23,42,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-left:4px solid #FF6700;box-shadow:0 4px 24px rgba(0,0,0,0.3);'
+      : 'background:rgba(255,255,255,0.95);backdrop-filter:blur(12px);border:1px solid rgba(10,25,47,0.08);border-left:4px solid #FF6700;box-shadow:0 4px 24px rgba(0,0,0,0.08);';
+
+    var txtCol = theme === 'dark' ? '#f1f5f9' : '#0A192F';
+    var subCol = theme === 'dark' ? '#64748b' : '#94a3b8';
+    var chevCol = theme === 'dark' ? '#475569' : '#94a3b8';
+
+    // Trust Pane content
+    var paneGlass = theme === 'dark'
+      ? 'background:rgba(15,23,42,0.95);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);box-shadow:0 4px 24px rgba(0,0,0,0.3);'
+      : 'background:rgba(255,255,255,0.97);backdrop-filter:blur(12px);border:1px solid rgba(10,25,47,0.06);box-shadow:0 4px 24px rgba(0,0,0,0.08);';
+    var lblCol = theme === 'dark' ? '#e2e8f0' : '#1e293b';
+    var valCol = theme === 'dark' ? '#94a3b8' : '#64748b';
+    var divCol = theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(10,25,47,0.06)';
+    var barBg  = theme === 'dark' ? '#334155' : '#e2e8f0';
+    var ctaBg  = theme === 'dark' ? '#FF6700' : '#0A192F';
+
+    var lastScan = data.last_scan_timestamp ? fmtTime(data.last_scan_timestamp) : 'Recently';
+    var score = data.compliance_score || 92;
+
+    var html = ''
+    // Badge
+    + '<div id="'+id+'-badge" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;cursor:pointer;user-select:none;transition:all 0.25s;max-width:320px;'+glass+'" onclick="klToggle(\''+id+'\')" role="button" tabindex="0" aria-expanded="false">'
+    +   '<div style="width:40px;height:40px;background:#0A192F;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;">'
+    +     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>'
+    +     dot
+    +   '</div>'
+    +   '<div style="flex:1;min-width:0;">'
+    +     '<div style="font-size:9px;font-weight:700;color:#FF6700;text-transform:uppercase;letter-spacing:1.5px;">KairoLogic\u2122 '+(data.verified?'Certified':'Sentry')+'</div>'
+    +     '<div style="font-size:13px;font-weight:700;color:'+txtCol+';line-height:1.2;">'+status+'</div>'
+    +     '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:'+subCol+';margin-top:2px;">ID: TX-SB1188-'+npi+'</div>'
+    +   '</div>'
+    +   '<div id="'+id+'-chev" style="padding-left:12px;border-left:1px solid rgba(128,128,128,0.15);display:flex;align-items:center;flex-shrink:0;transition:transform 0.3s;color:'+chevCol+';">'
+    +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
+    +   '</div>'
+    + '</div>'
+
+    // Trust Pane
+    + '<div id="'+id+'-pane" style="max-height:0;overflow:hidden;opacity:0;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1),opacity 0.3s ease,margin 0.3s ease;margin-top:0;">'
+    +   '<div style="border-radius:12px;padding:14px;margin-top:8px;'+paneGlass+'">'
+
+    // Data Residency
+    +     '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;">'
+    +       '<div style="width:28px;height:28px;border-radius:8px;background:rgba(59,130,246,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">\uD83D\uDDA5\uFE0F</div>'
+    +       '<div style="flex:1;">'
+    +         '<div style="font-size:11px;font-weight:600;color:'+lblCol+';">Data Residency</div>'
+    +         '<div style="font-size:10px;color:'+valCol+';margin-top:1px;">Data hosted on US-based sovereign infrastructure</div>'
+    +         '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><div style="flex:1;height:4px;border-radius:2px;background:'+barBg+';overflow:hidden;"><div style="height:100%;width:'+Math.min(score+6,100)+'%;background:#3b82f6;border-radius:2px;transition:width 0.8s;"></div></div><span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;color:#3b82f6;min-width:28px;text-align:right;">'+Math.min(score+6,100)+'%</span></div>'
+    +       '</div>'
+    +     '</div>'
+
+    // AI Transparency
+    +     '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid '+divCol+';">'
+    +       '<div style="width:28px;height:28px;border-radius:8px;background:rgba(245,158,11,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">\uD83E\uDD16</div>'
+    +       '<div style="flex:1;">'
+    +         '<div style="font-size:11px;font-weight:600;color:'+lblCol+';">AI Transparency</div>'
+    +         '<div style="font-size:10px;color:'+valCol+';margin-top:1px;">AI interactions verified and properly disclosed</div>'
+    +         '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><div style="flex:1;height:4px;border-radius:2px;background:'+barBg+';overflow:hidden;"><div style="height:100%;width:'+Math.max(score-4,0)+'%;background:#f59e0b;border-radius:2px;transition:width 0.8s;"></div></div><span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;color:#f59e0b;min-width:28px;text-align:right;">'+Math.max(score-4,0)+'%</span></div>'
+    +       '</div>'
+    +     '</div>'
+
+    // Last Verification
+    +     '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid '+divCol+';">'
+    +       '<div style="width:28px;height:28px;border-radius:8px;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">\u23F0</div>'
+    +       '<div>'
+    +         '<div style="font-size:11px;font-weight:600;color:'+lblCol+';">Last Verification</div>'
+    +         '<div style="font-size:10px;color:'+valCol+';margin-top:1px;"><span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;">'+lastScan+'</span> \u2022 '+(isShield?'Live monitoring active':'Monthly scans')+'</div>'
+    +       '</div>'
+    +     '</div>'
+
+    // Stats
+    +     '<div style="display:flex;justify-content:center;gap:20px;padding-top:10px;margin-top:8px;border-top:1px solid '+divCol+';">'
+    +       '<div style="text-align:center;"><div style="font-size:16px;font-weight:800;color:#16a34a;line-height:1;">8</div><div style="font-size:7px;text-transform:uppercase;letter-spacing:0.5px;color:'+subCol+';margin-top:2px;">Passed</div></div>'
+    +       '<div style="text-align:center;"><div style="font-size:16px;font-weight:800;color:#d97706;line-height:1;">2</div><div style="font-size:7px;text-transform:uppercase;letter-spacing:0.5px;color:'+subCol+';margin-top:2px;">Advisory</div></div>'
+    +       '<div style="text-align:center;"><div style="font-size:16px;font-weight:800;color:#dc2626;line-height:1;">1</div><div style="font-size:7px;text-transform:uppercase;letter-spacing:0.5px;color:'+subCol+';margin-top:2px;">Issues</div></div>'
+    +       '<div style="text-align:center;"><div style="font-size:16px;font-weight:800;color:#0A192F;line-height:1;">'+score+'</div><div style="font-size:7px;text-transform:uppercase;letter-spacing:0.5px;color:'+subCol+';margin-top:2px;">Score</div></div>'
+    +     '</div>'
+
+    // CTA
+    +     '<a href="'+API+'/scan/results?npi='+npi+'&mode=verified" target="_blank" style="display:block;text-align:center;margin-top:12px;padding:8px 12px;border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;text-decoration:none;background:'+ctaBg+';color:#fff;transition:opacity 0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">View Full Compliance Report</a>'
+    +     '<div style="text-align:center;margin-top:8px;font-size:8px;"><a href="'+API+'" target="_blank" style="color:'+subCol+';text-decoration:none;">Powered by KairoLogic Sentry '+(isShield?'Shield':'Watch')+'</a></div>'
+    +   '</div>'
+    + '</div>';
+
+    return html;
+  }
+
+  function fmtTime(d) {
+    if (!d) return 'Recently';
+    var dt = new Date(d), now = new Date();
+    var hrs = Math.floor((now - dt) / 3600000);
+    if (hrs < 1) return 'Just now';
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return days + 'd ago';
+    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+
+  // Toggle pane
+  window.klToggle = function(id) {
+    var pane = document.getElementById(id + '-pane');
+    var chev = document.getElementById(id + '-chev');
+    if (!pane) return;
+    var open = pane.style.maxHeight !== '0px' && pane.style.opacity !== '0';
+    if (open) {
+      pane.style.maxHeight = '0px'; pane.style.opacity = '0'; pane.style.marginTop = '0';
+      if (chev) chev.style.transform = '';
+    } else {
+      pane.style.maxHeight = '500px'; pane.style.opacity = '1'; pane.style.marginTop = '8px';
+      if (chev) chev.style.transform = 'rotate(180deg)';
+    }
+  };
+
+  // Render all widgets
+  async function render() {
+    var c = cfg();
+    document.getElementById('codeNpi').textContent = c.npi || 'YOUR_NPI';
+    document.getElementById('codeMode').textContent = c.mode;
+    document.getElementById('codePos').textContent = c.pos;
+
+    var mounts = document.querySelectorAll('.wm');
+    var data = { npi: c.npi || '0000000000', verified: true, compliance_score: 92, last_scan_timestamp: new Date().toISOString() };
+
+    if (c.npi && c.npi.length === 10) {
+      document.getElementById('status').textContent = 'Fetching NPI ' + c.npi + '...';
+      try {
+        var res = await fetch(API + '/api/widget/' + c.npi);
+        var d = await res.json();
+        if (d.widget_status === 'verified') {
+          data = d;
+          document.getElementById('status').textContent = '\u2713 Loaded: ' + d.name + ' \u2014 Score: ' + d.compliance_score;
+          document.getElementById('status').style.color = '#4ade80';
+        } else {
+          document.getElementById('status').textContent = '\u26A0 ' + (d.message || d.widget_status);
+          document.getElementById('status').style.color = '#f59e0b';
+        }
+      } catch(e) {
+        document.getElementById('status').textContent = '\u2717 API error: ' + e.message;
+        document.getElementById('status').style.color = '#ef4444';
+      }
+    } else {
+      document.getElementById('status').textContent = 'Showing demo data (score: 92). Enter a real NPI for live data.';
+    }
+
+    mounts.forEach(function(m) {
+      var theme = m.getAttribute('data-theme') || 'light';
+      var modeOverride = m.getAttribute('data-mode-override');
+      var mode = modeOverride || c.mode;
+      m.innerHTML = badge(theme, mode, data);
+    });
+  }
+
+  function copyCode() {
+    var c = cfg();
+    var code = '<!-- KairoLogic Sentry Compliance Widget -->\n<script\n  src="https://kairologic.com/sentry.js"\n  data-npi="'+(c.npi||'YOUR_NPI')+'"\n  data-mode="'+c.mode+'"\n  data-position="'+c.pos+'"\n  async>\n<\/script>';
+    navigator.clipboard.writeText(code);
+    var msg = document.getElementById('copyMsg');
+    msg.style.opacity = '1';
+    setTimeout(function() { msg.style.opacity = '0'; }, 2000);
+  }
+
+  // Inject keyframe for pulse
+  var s = document.createElement('style');
+  s.textContent = '@keyframes klp { 0% { transform:scale(1);opacity:0.6; } 70% { transform:scale(2.2);opacity:0; } 100% { transform:scale(2.2);opacity:0; } }';
+  document.head.appendChild(s);
+
+  render();
+</script>
+</body>
+</html>

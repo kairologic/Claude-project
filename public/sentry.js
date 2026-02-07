@@ -1,775 +1,600 @@
 /**
- * KairoLogic Sentry Compliance Widget
- * Embeddable script for healthcare practice websites
- * Version: 1.0.0
+ * KairoLogic Sentry Compliance Widget v2.0
+ * Glassmorphism design — embeddable on any healthcare practice site
  * 
  * Usage:
- * <script src="https://yoursite.com/sentry.js" data-npi="1234567890"></script>
+ * <script src="https://kairologic.com/sentry.js" data-npi="1234567890" data-mode="shield"></script>
  * 
- * Optional attributes:
- * - data-npi: Required. The 10-digit NPI number
- * - data-position: "bottom-right" (default), "bottom-left", "inline"
- * - data-theme: "light" (default), "dark"
- * - data-size: "standard" (default), "compact", "badge-only"
+ * Attributes:
+ *   data-npi       Required. 10-digit NPI.
+ *   data-mode      "watch" (default) or "shield"
+ *   data-position  "bottom-right" (default), "bottom-left", "inline"
+ *   data-theme     "auto" (default), "light", "dark"
  */
-
 (function() {
   'use strict';
 
-  // Configuration
-  const WIDGET_VERSION = '1.0.0';
-  const API_BASE_URL = window.KAIROLOGIC_API_URL || 'https://kairlogic-website.vercel.app';
-  
-  // Find the script tag to get configuration
-  const scriptTag = document.currentScript || (function() {
-    const scripts = document.getElementsByTagName('script');
-    for (let i = scripts.length - 1; i >= 0; i--) {
-      if (scripts[i].src && scripts[i].src.includes('sentry.js')) {
-        return scripts[i];
-      }
+  var VERSION = '2.0.0';
+  var API_BASE = window.KAIROLOGIC_API_URL || 'https://kairlogic-website.vercel.app';
+
+  // ── Find script tag ──
+  var scriptTag = document.currentScript || (function() {
+    var s = document.getElementsByTagName('script');
+    for (var i = s.length - 1; i >= 0; i--) {
+      if (s[i].src && s[i].src.indexOf('sentry') !== -1) return s[i];
     }
     return null;
   })();
 
-  if (!scriptTag) {
-    console.error('[KairoLogic Sentry] Could not find script tag');
-    return;
-  }
+  if (!scriptTag) { console.error('[KairoLogic] Script tag not found'); return; }
 
-  // Get configuration from data attributes
-  const config = {
-    npi: scriptTag.getAttribute('data-npi'),
-    position: scriptTag.getAttribute('data-position') || 'bottom-right',
-    theme: scriptTag.getAttribute('data-theme') || 'light',
-    size: scriptTag.getAttribute('data-size') || 'standard'
+  var cfg = {
+    npi:      scriptTag.getAttribute('data-npi') || '',
+    mode:     scriptTag.getAttribute('data-mode') || 'watch',         // watch | shield
+    position: scriptTag.getAttribute('data-position') || 'bottom-right', // bottom-right | bottom-left | inline
+    theme:    scriptTag.getAttribute('data-theme') || 'auto'          // auto | light | dark
   };
 
-  if (!config.npi || config.npi.length !== 10) {
-    console.error('[KairoLogic Sentry] Invalid or missing NPI. Please provide a valid 10-digit NPI.');
+  if (!cfg.npi || cfg.npi.length !== 10) {
+    console.error('[KairoLogic] Invalid NPI:', cfg.npi);
     return;
   }
 
-  // Styles
-  const styles = `
-    .kl-sentry-widget {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.4;
-      box-sizing: border-box;
-      z-index: 9999;
-    }
-    
-    .kl-sentry-widget * {
-      box-sizing: border-box;
-    }
-    
-    /* Position variants */
-    .kl-sentry-widget.kl-position-bottom-right {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-    }
-    
-    .kl-sentry-widget.kl-position-bottom-left {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-    }
-    
-    .kl-sentry-widget.kl-position-inline {
-      position: relative;
-      display: inline-block;
-    }
-    
-    /* Main container */
-    .kl-sentry-container {
-      background: #ffffff;
+  var isShield = cfg.mode === 'shield';
+
+  // ── Detect dark background (for auto theme) ──
+  function detectTheme() {
+    if (cfg.theme !== 'auto') return cfg.theme;
+    try {
+      var bg = window.getComputedStyle(document.body).backgroundColor;
+      var m = bg.match(/\d+/g);
+      if (m) {
+        var lum = (parseInt(m[0]) * 299 + parseInt(m[1]) * 587 + parseInt(m[2]) * 114) / 1000;
+        return lum < 128 ? 'dark' : 'light';
+      }
+    } catch(e) {}
+    return 'light';
+  }
+
+  // ── Styles ──
+  var css = `
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+    #kl-sentry { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.4; box-sizing: border-box; z-index: 99999; }
+    #kl-sentry * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Position */
+    #kl-sentry.kl-pos-bottom-right { position: fixed; bottom: 16px; right: 16px; }
+    #kl-sentry.kl-pos-bottom-left  { position: fixed; bottom: 16px; left: 16px; }
+    #kl-sentry.kl-pos-inline        { position: relative; display: inline-block; }
+
+    /* ── Badge (collapsed) ── */
+    .kl-badge {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px;
       border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
-      transition: all 0.3s ease;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: all 0.25s ease;
       max-width: 320px;
-      min-width: 280px;
     }
-    
-    .kl-sentry-container:hover {
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
-      transform: translateY(-2px);
+    .kl-badge:hover { transform: translateY(-1px); }
+
+    /* Light glass */
+    .kl-light .kl-badge {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(10,25,47,0.08);
+      border-left: 4px solid #FF6700;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
     }
-    
-    /* Dark theme */
-    .kl-theme-dark .kl-sentry-container {
-      background: #1a1a2e;
-      color: #ffffff;
+    .kl-light .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+
+    /* Dark glass */
+    .kl-dark .kl-badge {
+      background: rgba(15,23,42,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-left: 4px solid #FF6700;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
     }
-    
-    /* Header */
-    .kl-sentry-header {
-      background: linear-gradient(135deg, #00234E 0%, #0a3a7a 100%);
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .kl-sentry-logo {
-      width: 32px;
-      height: 32px;
-      flex-shrink: 0;
-    }
-    
-    .kl-sentry-logo svg {
-      width: 100%;
-      height: 100%;
-    }
-    
-    .kl-sentry-title {
-      color: #ffffff;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .kl-sentry-subtitle {
-      color: #C5A059;
-      font-size: 9px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    
-    /* Body */
-    .kl-sentry-body {
-      padding: 16px;
-    }
-    
-    /* Status row */
-    .kl-sentry-status-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    
-    .kl-sentry-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .kl-sentry-status-icon {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .kl-sentry-status-icon.kl-status-compliant {
-      background: #dcfce7;
-      color: #16a34a;
-    }
-    
-    .kl-sentry-status-icon.kl-status-warning {
-      background: #fef3c7;
-      color: #d97706;
-    }
-    
-    .kl-sentry-status-icon.kl-status-critical {
-      background: #fee2e2;
-      color: #dc2626;
-    }
-    
-    .kl-sentry-status-icon svg {
-      width: 14px;
-      height: 14px;
-    }
-    
-    .kl-sentry-status-text {
-      font-size: 13px;
-      font-weight: 600;
-      color: #1f2937;
-    }
-    
-    .kl-theme-dark .kl-sentry-status-text {
-      color: #f3f4f6;
-    }
-    
-    /* Score */
-    .kl-sentry-score {
-      text-align: right;
-    }
-    
-    .kl-sentry-score-value {
-      font-size: 28px;
-      font-weight: 800;
-      line-height: 1;
-    }
-    
-    .kl-sentry-score-value.kl-score-high {
-      color: #16a34a;
-    }
-    
-    .kl-sentry-score-value.kl-score-medium {
-      color: #d97706;
-    }
-    
-    .kl-sentry-score-value.kl-score-low {
-      color: #dc2626;
-    }
-    
-    .kl-sentry-score-label {
-      font-size: 9px;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-    }
-    
-    /* Progress bar */
-    .kl-sentry-progress {
-      height: 6px;
-      background: #e5e7eb;
-      border-radius: 3px;
-      overflow: hidden;
-      margin-bottom: 12px;
-    }
-    
-    .kl-sentry-progress-bar {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.5s ease;
-    }
-    
-    .kl-sentry-progress-bar.kl-score-high {
-      background: linear-gradient(90deg, #16a34a, #22c55e);
-    }
-    
-    .kl-sentry-progress-bar.kl-score-medium {
-      background: linear-gradient(90deg, #d97706, #f59e0b);
-    }
-    
-    .kl-sentry-progress-bar.kl-score-low {
-      background: linear-gradient(90deg, #dc2626, #ef4444);
-    }
-    
-    /* Info row */
-    .kl-sentry-info {
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      color: #6b7280;
-      margin-bottom: 12px;
-    }
-    
-    .kl-sentry-info-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    
-    .kl-sentry-info-item svg {
-      width: 12px;
-      height: 12px;
-    }
-    
-    /* CTA Button */
-    .kl-sentry-cta {
-      display: block;
-      width: 100%;
-      padding: 10px 16px;
-      background: linear-gradient(135deg, #FF6600 0%, #ff8533 100%);
-      color: #ffffff;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      text-align: center;
-      text-decoration: none;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .kl-sentry-cta:hover {
-      background: linear-gradient(135deg, #e65c00 0%, #ff6600 100%);
-      transform: translateY(-1px);
-    }
-    
-    /* Verified CTA - Green theme */
-    .kl-sentry-cta.kl-cta-verified {
-      background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
-    }
-    
-    .kl-sentry-cta.kl-cta-verified:hover {
-      background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
-    }
-    
-    /* Verified Badge Styles */
-    .kl-sentry-verified-badge {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
-      border: 2px solid #16a34a;
+    .kl-dark .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+
+    /* Shield icon box */
+    .kl-icon-box {
+      width: 40px; height: 40px;
+      background: #0A192F;
       border-radius: 10px;
-      margin-bottom: 14px;
-    }
-    
-    .kl-sentry-verified-icon {
-      width: 48px;
-      height: 48px;
-      background: #16a34a;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
+      position: relative;
     }
-    
-    .kl-sentry-verified-icon svg {
-      width: 28px;
-      height: 28px;
-      color: #ffffff;
+    .kl-icon-box svg { width: 22px; height: 22px; color: #fff; }
+
+    /* Live pulse (Shield only) */
+    .kl-pulse-dot {
+      position: absolute; top: -3px; right: -3px;
+      width: 10px; height: 10px;
     }
-    
-    .kl-sentry-verified-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    
-    .kl-sentry-verified-label {
-      font-size: 14px;
-      font-weight: 800;
-      color: #16a34a;
-      letter-spacing: 0.5px;
-    }
-    
-    .kl-sentry-verified-sublabel {
-      font-size: 10px;
-      font-weight: 600;
-      color: #166534;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    
-    /* Not Registered / Get Verified Styles */
-    .kl-sentry-not-registered {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
-      border: 2px solid #d97706;
-      border-radius: 10px;
-      margin-bottom: 12px;
-    }
-    
-    .kl-sentry-nr-icon {
-      width: 48px;
-      height: 48px;
-      background: #d97706;
+    .kl-pulse-ring {
+      position: absolute; inset: 0;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      background: #22c55e;
+      opacity: 0.6;
+      animation: klPulse 2s ease-out infinite;
     }
-    
-    .kl-sentry-nr-icon svg {
-      width: 28px;
-      height: 28px;
-      color: #ffffff;
+    .kl-pulse-core {
+      position: relative;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 1.5px solid #fff;
     }
-    
-    .kl-sentry-nr-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    .kl-dark .kl-pulse-core { border-color: #0f172a; }
+
+    @keyframes klPulse {
+      0%   { transform: scale(1); opacity: 0.6; }
+      70%  { transform: scale(2.2); opacity: 0; }
+      100% { transform: scale(2.2); opacity: 0; }
     }
-    
-    .kl-sentry-nr-label {
-      font-size: 14px;
-      font-weight: 800;
-      color: #92400e;
-      letter-spacing: 0.5px;
+
+    /* Watch dot (static, no pulse) */
+    .kl-watch-dot {
+      position: absolute; top: -2px; right: -2px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 1.5px solid #fff;
     }
-    
-    .kl-sentry-nr-sublabel {
-      font-size: 10px;
-      font-weight: 600;
-      color: #b45309;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
+    .kl-dark .kl-watch-dot { border-color: #0f172a; }
+
+    /* Text area */
+    .kl-badge-text { flex: 1; min-width: 0; }
+    .kl-badge-brand {
+      font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1.5px;
+      color: #FF6700;
     }
-    
-    .kl-sentry-nr-desc {
-      font-size: 12px;
-      color: #78716c;
-      margin-bottom: 14px;
-      line-height: 1.5;
+    .kl-badge-status {
+      font-size: 13px; font-weight: 700;
+      line-height: 1.2;
     }
-    
-    /* Footer */
-    .kl-sentry-footer {
-      padding: 8px 16px;
-      background: #f9fafb;
-      border-top: 1px solid #e5e7eb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-    
-    .kl-theme-dark .kl-sentry-footer {
-      background: #16162a;
-      border-top-color: #2d2d4a;
-    }
-    
-    .kl-sentry-footer-text {
+    .kl-light .kl-badge-status { color: #0A192F; }
+    .kl-dark  .kl-badge-status { color: #f1f5f9; }
+
+    .kl-badge-id {
+      font-family: 'JetBrains Mono', monospace;
       font-size: 9px;
-      color: #9ca3af;
-      text-decoration: none;
+      margin-top: 2px;
     }
-    
-    .kl-sentry-footer-text:hover {
-      color: #C5A059;
+    .kl-light .kl-badge-id { color: #94a3b8; }
+    .kl-dark  .kl-badge-id { color: #64748b; }
+
+    /* Info button */
+    .kl-info-btn {
+      padding-left: 12px;
+      border-left: 1px solid rgba(128,128,128,0.15);
+      display: flex; align-items: center;
+      flex-shrink: 0;
     }
-    
-    /* Compact size */
-    .kl-size-compact .kl-sentry-container {
-      min-width: 200px;
-      max-width: 240px;
+    .kl-info-btn svg {
+      width: 16px; height: 16px;
+      transition: color 0.2s, transform 0.3s;
     }
-    
-    .kl-size-compact .kl-sentry-header {
-      padding: 8px 12px;
+    .kl-light .kl-info-btn svg { color: #94a3b8; }
+    .kl-dark  .kl-info-btn svg { color: #475569; }
+    .kl-badge:hover .kl-info-btn svg { color: #0A192F; }
+    .kl-dark .kl-badge:hover .kl-info-btn svg { color: #e2e8f0; }
+    .kl-info-btn.kl-open svg { transform: rotate(180deg); }
+
+    /* ── Trust Pane (expanded) ── */
+    .kl-pane {
+      max-height: 0; overflow: hidden; opacity: 0;
+      transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, margin 0.3s ease;
+      margin-top: 0;
     }
-    
-    .kl-size-compact .kl-sentry-logo {
-      width: 24px;
-      height: 24px;
+    .kl-pane.kl-open {
+      max-height: 500px; opacity: 1; margin-top: 8px;
     }
-    
-    .kl-size-compact .kl-sentry-body {
-      padding: 12px;
+    .kl-pane-inner {
+      border-radius: 12px;
+      padding: 16px;
     }
-    
-    .kl-size-compact .kl-sentry-score-value {
-      font-size: 22px;
+    .kl-light .kl-pane-inner {
+      background: rgba(255,255,255,0.97);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(10,25,47,0.06);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
     }
-    
-    /* Badge only */
-    .kl-size-badge-only .kl-sentry-container {
-      min-width: auto;
-      max-width: none;
+    .kl-dark .kl-pane-inner {
+      background: rgba(15,23,42,0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
     }
-    
-    .kl-size-badge-only .kl-sentry-body,
-    .kl-size-badge-only .kl-sentry-footer {
-      display: none;
+
+    /* Trust items */
+    .kl-trust-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0;
     }
-    
-    .kl-size-badge-only .kl-sentry-header {
+    .kl-trust-item + .kl-trust-item {
+      border-top: 1px solid rgba(128,128,128,0.1);
+    }
+    .kl-trust-icon {
+      width: 28px; height: 28px;
       border-radius: 8px;
-      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
     }
-    
-    /* Loading state */
-    .kl-sentry-loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      color: #6b7280;
-      font-size: 12px;
+    .kl-trust-label {
+      font-size: 11px; font-weight: 600;
     }
-    
-    .kl-sentry-spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid #e5e7eb;
-      border-top-color: #00234E;
-      border-radius: 50%;
-      animation: kl-spin 0.8s linear infinite;
-      margin-right: 10px;
+    .kl-light .kl-trust-label { color: #1e293b; }
+    .kl-dark  .kl-trust-label { color: #e2e8f0; }
+
+    .kl-trust-value {
+      font-size: 10px;
+      margin-top: 1px;
     }
-    
-    @keyframes kl-spin {
-      to { transform: rotate(360deg); }
+    .kl-light .kl-trust-value { color: #64748b; }
+    .kl-dark  .kl-trust-value { color: #94a3b8; }
+
+    /* Category bars */
+    .kl-cat-bar-track {
+      flex: 1; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 4px;
     }
-    
-    /* Error state */
-    .kl-sentry-error {
-      padding: 16px;
-      text-align: center;
-      color: #6b7280;
-      font-size: 11px;
+    .kl-light .kl-cat-bar-track { background: #e2e8f0; }
+    .kl-dark  .kl-cat-bar-track { background: #334155; }
+
+    .kl-cat-bar-fill {
+      height: 100%; border-radius: 2px;
+      transition: width 0.8s ease;
     }
-    
-    /* Hidden state */
-    .kl-sentry-widget.kl-hidden {
-      display: none !important;
+
+    .kl-cat-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 700;
+      min-width: 28px; text-align: right;
     }
-    
-    /* Mobile responsive */
+
+    /* Summary row */
+    .kl-summary-row {
+      display: flex; justify-content: center; gap: 20px;
+      padding-top: 10px; margin-top: 8px;
+    }
+    .kl-light .kl-summary-row { border-top: 1px solid rgba(10,25,47,0.06); }
+    .kl-dark  .kl-summary-row { border-top: 1px solid rgba(255,255,255,0.06); }
+
+    .kl-stat { text-align: center; }
+    .kl-stat-val { font-size: 16px; font-weight: 800; line-height: 1; }
+    .kl-stat-lbl { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .kl-light .kl-stat-lbl { color: #94a3b8; }
+    .kl-dark  .kl-stat-lbl { color: #64748b; }
+
+    /* CTA link */
+    .kl-pane-cta {
+      display: block; text-align: center;
+      margin-top: 12px; padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .kl-light .kl-pane-cta { background: #0A192F; color: #fff; }
+    .kl-light .kl-pane-cta:hover { background: #0f2744; }
+    .kl-dark  .kl-pane-cta { background: #FF6700; color: #fff; }
+    .kl-dark  .kl-pane-cta:hover { background: #e55a00; }
+
+    /* Footer */
+    .kl-pane-footer {
+      text-align: center; margin-top: 8px;
+      font-size: 8px; letter-spacing: 0.3px;
+    }
+    .kl-pane-footer a { text-decoration: none; transition: color 0.2s; }
+    .kl-light .kl-pane-footer a { color: #94a3b8; }
+    .kl-light .kl-pane-footer a:hover { color: #FF6700; }
+    .kl-dark  .kl-pane-footer a { color: #475569; }
+    .kl-dark  .kl-pane-footer a:hover { color: #FF6700; }
+
+    /* Hidden */
+    #kl-sentry.kl-hidden { display: none !important; }
+
+    /* Mobile */
     @media (max-width: 480px) {
-      .kl-sentry-widget.kl-position-bottom-right,
-      .kl-sentry-widget.kl-position-bottom-left {
-        bottom: 10px;
-        right: 10px;
-        left: 10px;
+      #kl-sentry.kl-pos-bottom-right, #kl-sentry.kl-pos-bottom-left {
+        right: 8px; left: 8px; bottom: 8px;
       }
-      
-      .kl-sentry-container {
-        max-width: none;
-        min-width: auto;
-      }
+      .kl-badge { max-width: none; }
     }
   `;
 
-  // Icons
-  const icons = {
-    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
-    shieldCheck: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>`,
-    alertTriangle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
-    xCircle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`,
-    clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
-    externalLink: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`,
-    logo: `<svg viewBox="0 0 48 48" fill="none"><defs><linearGradient id="klGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#C5A059"/><stop offset="100%" style="stop-color:#D4B068"/></linearGradient></defs><path d="M24 4L44 14V22C44 33.5 35.5 43.5 24 46C12.5 43.5 4 33.5 4 22V14L24 4Z" fill="#00234E" stroke="#C5A059" stroke-width="2"/><path d="M24 12L34 17V23C34 29.5 30 35 24 37C18 35 14 29.5 14 23V17L24 12Z" fill="url(#klGrad)" fill-opacity="0.3"/><path d="M18 24L22 28L30 20" stroke="#C5A059" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  // ── Icons ──
+  var ico = {
+    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+    server: '\uD83D\uDDA5\uFE0F',   // 🖥️
+    ai: '\uD83E\uDD16',              // 🤖
+    clock: '\u23F0',                  // ⏰
+    check: '\u2705',                  // ✅
   };
 
-  // Create widget container
-  function createWidget() {
-    // Inject styles
-    const styleElement = document.createElement('style');
-    styleElement.id = 'kl-sentry-styles';
-    styleElement.textContent = styles;
-    document.head.appendChild(styleElement);
-
-    // Create widget element
-    const widget = document.createElement('div');
-    widget.id = 'kl-sentry-widget';
-    widget.className = `kl-sentry-widget kl-position-${config.position} kl-theme-${config.theme} kl-size-${config.size}`;
-    
-    // Show loading state
-    widget.innerHTML = `
-      <div class="kl-sentry-container">
-        <div class="kl-sentry-header">
-          <div class="kl-sentry-logo">${icons.logo}</div>
-          <div>
-            <div class="kl-sentry-title">KairoLogic</div>
-            <div class="kl-sentry-subtitle">Sentry Verified</div>
-          </div>
-        </div>
-        <div class="kl-sentry-loading">
-          <div class="kl-sentry-spinner"></div>
-          Verifying compliance...
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(widget);
-    return widget;
-  }
-
-  // Fetch widget data
-  async function fetchWidgetData(npi) {
+  // ── Helpers ──
+  function fmtDate(d) {
+    if (!d) return 'Recently';
     try {
-      const response = await fetch(`${API_BASE_URL}/api/widget/${npi}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('[KairoLogic Sentry] Failed to fetch widget data:', error);
-      return null;
-    }
+      var dt = new Date(d), now = new Date();
+      var diff = Math.floor((now - dt) / 3600000); // hours
+      if (diff < 1) return 'Just now';
+      if (diff < 24) return diff + 'h ago';
+      var days = Math.floor(diff / 24);
+      if (days === 1) return 'Yesterday';
+      if (days < 7) return days + 'd ago';
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch(e) { return 'Recently'; }
   }
 
-  // Render widget with data
-  function renderWidget(widget, data) {
-    if (!data) {
-      widget.innerHTML = `
-        <div class="kl-sentry-container">
-          <div class="kl-sentry-header">
-            <div class="kl-sentry-logo">${icons.logo}</div>
-            <div>
-              <div class="kl-sentry-title">KairoLogic</div>
-              <div class="kl-sentry-subtitle">Sentry Verified</div>
-            </div>
-          </div>
-          <div class="kl-sentry-error">
-            Unable to load compliance status.<br>
-            <a href="${API_BASE_URL}/scan" style="color: #C5A059;">Run a scan →</a>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    // Check if widget should be hidden (score below threshold or inactive)
-    if (data.widget_status === 'hidden' || data.widget_status === 'inactive') {
-      widget.classList.add('kl-hidden');
-      return;
-    }
-
-    // NPI not in registry yet - show "Run Scan" prompt instead of hiding
-    if (data.widget_status === 'not_registered') {
-      widget.innerHTML = `
-        <div class="kl-sentry-container">
-          <div class="kl-sentry-header">
-            <div class="kl-sentry-logo">${icons.logo}</div>
-            <div>
-              <div class="kl-sentry-title">KairoLogic</div>
-              <div class="kl-sentry-subtitle">Sentry Standard</div>
-            </div>
-          </div>
-          <div class="kl-sentry-body">
-            <div class="kl-sentry-not-registered">
-              <div class="kl-sentry-nr-icon">
-                ${icons.shield}
-              </div>
-              <div class="kl-sentry-nr-text">
-                <span class="kl-sentry-nr-label">GET VERIFIED</span>
-                <span class="kl-sentry-nr-sublabel">Texas SB 1188 & HB 149</span>
-              </div>
-            </div>
-            <p class="kl-sentry-nr-desc">
-              Verify your compliance status with Texas healthcare data sovereignty requirements.
-            </p>
-            <a href="${API_BASE_URL}/scan?npi=${config.npi}" target="_blank" class="kl-sentry-cta">
-              Run Free Compliance Scan
-            </a>
-          </div>
-          <div class="kl-sentry-footer">
-            <a href="${API_BASE_URL}" target="_blank" class="kl-sentry-footer-text">
-              Powered by KairoLogic Sentry Standard
-            </a>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    // Widget is VERIFIED (only shown when score >= threshold)
-    // Always display as green/verified status
-    const isVerified = data.verified || data.widget_status === 'verified';
-    
-    // Format last scan date
-    const lastScan = data.last_scan_timestamp || data.updated_at;
-    const lastScanFormatted = lastScan ? formatDate(lastScan) : 'Recently';
-
-    // Build VERIFIED widget HTML - simplified green status
-    widget.innerHTML = `
-      <div class="kl-sentry-container">
-        <div class="kl-sentry-header">
-          <div class="kl-sentry-logo">${icons.logo}</div>
-          <div>
-            <div class="kl-sentry-title">KairoLogic</div>
-            <div class="kl-sentry-subtitle">Sentry Standard</div>
-          </div>
-        </div>
-        <div class="kl-sentry-body">
-          <div class="kl-sentry-verified-badge">
-            <div class="kl-sentry-verified-icon">
-              ${icons.shieldCheck}
-            </div>
-            <div class="kl-sentry-verified-text">
-              <span class="kl-sentry-verified-label">COMPLIANCE VERIFIED</span>
-              <span class="kl-sentry-verified-sublabel">Texas SB 1188 & HB 149</span>
-            </div>
-          </div>
-          <div class="kl-sentry-info">
-            <div class="kl-sentry-info-item">
-              ${icons.clock}
-              <span>Verified: ${lastScanFormatted}</span>
-            </div>
-            <div class="kl-sentry-info-item">
-              ${icons.shield}
-              <span>NPI: ****${config.npi.slice(-4)}</span>
-            </div>
-          </div>
-          <a href="${API_BASE_URL}/scan/results?npi=${config.npi}&mode=verified" target="_blank" class="kl-sentry-cta kl-cta-verified">
-            View Compliance Report
-          </a>
-        </div>
-        <div class="kl-sentry-footer">
-          <a href="${API_BASE_URL}" target="_blank" class="kl-sentry-footer-text">
-            Powered by KairoLogic Sentry Standard
-          </a>
-        </div>
-      </div>
-    `;
-  }
-
-  // Helper: Format date
-  function formatDate(dateString) {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now - date;
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays < 7) return `${diffDays} days ago`;
-      
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      });
-    } catch (e) {
-      return 'Unknown';
-    }
-  }
-
-  // Initialize widget
-  async function init() {
-    // Wait for DOM ready
+  // ── Build widget ──
+  function init() {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', init);
       return;
     }
 
-    const widget = createWidget();
-    const data = await fetchWidgetData(config.npi);
-    renderWidget(widget, data);
+    // Inject styles
+    var styleEl = document.createElement('style');
+    styleEl.id = 'kl-sentry-css';
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
+
+    // Create root
+    var theme = detectTheme();
+    var root = document.createElement('div');
+    root.id = 'kl-sentry';
+    root.className = 'kl-pos-' + cfg.position + ' kl-' + theme;
+
+    // Show loading badge
+    root.innerHTML = buildBadge(theme, {
+      status: 'loading',
+      statusText: 'Verifying\u2026',
+      id: 'TX-SB1188-' + cfg.npi,
+      mode: cfg.mode
+    });
+
+    document.body.appendChild(root);
+
+    // Fetch data
+    fetchData(cfg.npi).then(function(data) {
+      if (!data) {
+        root.classList.add('kl-hidden');
+        return;
+      }
+      if (data.widget_status === 'hidden') {
+        root.classList.add('kl-hidden');
+        return;
+      }
+      if (data.widget_status === 'not_registered') {
+        root.innerHTML = buildBadge(theme, {
+          status: 'unregistered',
+          statusText: 'Not Verified',
+          id: 'TX-SB1188-' + cfg.npi,
+          mode: cfg.mode
+        }) + buildUnregisteredPane(theme);
+        wireToggle(root);
+        return;
+      }
+
+      // Verified
+      var lastScan = fmtDate(data.last_scan_timestamp || data.updated_at);
+      root.innerHTML = buildBadge(theme, {
+        status: 'verified',
+        statusText: isShield ? 'Verified Sovereign' : 'Monitored',
+        id: 'TX-SB1188-' + cfg.npi,
+        mode: cfg.mode
+      }) + buildTrustPane(theme, data, lastScan);
+      wireToggle(root);
+    });
   }
+
+  // ── Badge HTML ──
+  function buildBadge(theme, opts) {
+    var dotHtml = '';
+    if (opts.mode === 'shield' && opts.status === 'verified') {
+      dotHtml = '<div class="kl-pulse-dot"><span class="kl-pulse-ring"></span><span class="kl-pulse-core"></span></div>';
+    } else if (opts.status === 'verified') {
+      dotHtml = '<div class="kl-watch-dot"></div>';
+    }
+
+    return ''
+      + '<div class="kl-badge" id="kl-badge" role="button" tabindex="0" aria-expanded="false">'
+      +   '<div class="kl-icon-box">'
+      +     ico.shield
+      +     dotHtml
+      +   '</div>'
+      +   '<div class="kl-badge-text">'
+      +     '<div class="kl-badge-brand">KairoLogic\u2122 ' + (opts.status === 'verified' ? 'Certified' : 'Sentry') + '</div>'
+      +     '<div class="kl-badge-status">' + opts.statusText + '</div>'
+      +     '<div class="kl-badge-id">' + opts.id + '</div>'
+      +   '</div>'
+      +   '<div class="kl-info-btn" id="kl-info-btn">' + ico.chevron + '</div>'
+      + '</div>';
+  }
+
+  // ── Trust Pane (verified) ──
+  function buildTrustPane(theme, data, lastScan) {
+    var score = data.compliance_score || 0;
+
+    return ''
+      + '<div class="kl-pane" id="kl-pane">'
+      +   '<div class="kl-pane-inner">'
+
+      // Trust items
+      +     '<div class="kl-trust-item">'
+      +       '<div class="kl-trust-icon" style="background:rgba(59,130,246,0.1)">' + ico.server + '</div>'
+      +       '<div style="flex:1">'
+      +         '<div class="kl-trust-label">Data Residency</div>'
+      +         '<div class="kl-trust-value">Data hosted on US-based sovereign infrastructure</div>'
+      +         '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
+      +           '<div class="kl-cat-bar-track"><div class="kl-cat-bar-fill" id="kl-bar-dr" style="width:0%;background:#3b82f6;"></div></div>'
+      +           '<span class="kl-cat-score" id="kl-val-dr" style="color:#3b82f6;">\u2014</span>'
+      +         '</div>'
+      +       '</div>'
+      +     '</div>'
+
+      +     '<div class="kl-trust-item">'
+      +       '<div class="kl-trust-icon" style="background:rgba(245,158,11,0.1)">' + ico.ai + '</div>'
+      +       '<div style="flex:1">'
+      +         '<div class="kl-trust-label">AI Transparency</div>'
+      +         '<div class="kl-trust-value">AI interactions verified and properly disclosed</div>'
+      +         '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
+      +           '<div class="kl-cat-bar-track"><div class="kl-cat-bar-fill" id="kl-bar-ai" style="width:0%;background:#f59e0b;"></div></div>'
+      +           '<span class="kl-cat-score" id="kl-val-ai" style="color:#f59e0b;">\u2014</span>'
+      +         '</div>'
+      +       '</div>'
+      +     '</div>'
+
+      +     '<div class="kl-trust-item">'
+      +       '<div class="kl-trust-icon" style="background:rgba(34,197,94,0.1)">' + ico.clock + '</div>'
+      +       '<div>'
+      +         '<div class="kl-trust-label">Last Verification</div>'
+      +         '<div class="kl-trust-value">'
+      +           '<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + lastScan + '</span>'
+      +           (isShield ? ' \u2022 Live monitoring active' : ' \u2022 Monthly scans')
+      +         '</div>'
+      +       '</div>'
+      +     '</div>'
+
+      // Pass/Warn/Fail summary
+      +     '<div class="kl-summary-row">'
+      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#16a34a" id="kl-s-pass">\u2014</div><div class="kl-stat-lbl">Passed</div></div>'
+      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#d97706" id="kl-s-warn">\u2014</div><div class="kl-stat-lbl">Advisory</div></div>'
+      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#dc2626" id="kl-s-fail">\u2014</div><div class="kl-stat-lbl">Issues</div></div>'
+      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#0A192F" id="kl-s-score">' + score + '</div><div class="kl-stat-lbl">Score</div></div>'
+      +     '</div>'
+
+      // CTA
+      +     '<a class="kl-pane-cta" href="' + API_BASE + '/scan/results?npi=' + cfg.npi + '&mode=verified" target="_blank" rel="noopener">View Full Compliance Report</a>'
+      +     '<div class="kl-pane-footer"><a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic Sentry ' + (isShield ? 'Shield' : 'Watch') + '</a></div>'
+      +   '</div>'
+      + '</div>';
+  }
+
+  // ── Unregistered Pane ──
+  function buildUnregisteredPane(theme) {
+    return ''
+      + '<div class="kl-pane" id="kl-pane">'
+      +   '<div class="kl-pane-inner" style="text-align:center;padding:20px;">'
+      +     '<div style="font-size:11px;font-weight:600;margin-bottom:6px;" class="kl-trust-label">This practice has not yet been verified</div>'
+      +     '<div style="font-size:10px;margin-bottom:12px;" class="kl-trust-value">Run a free compliance scan to verify SB 1188 & HB 149 compliance.</div>'
+      +     '<a class="kl-pane-cta" href="' + API_BASE + '/scan?npi=' + cfg.npi + '" target="_blank" rel="noopener">Run Free Scan</a>'
+      +     '<div class="kl-pane-footer"><a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic</a></div>'
+      +   '</div>'
+      + '</div>';
+  }
+
+  // ── Wire toggle ──
+  function wireToggle(root) {
+    var badge = root.querySelector('#kl-badge');
+    var pane = root.querySelector('#kl-pane');
+    var btn = root.querySelector('#kl-info-btn');
+    if (!badge || !pane) return;
+
+    var loaded = false;
+    function toggle() {
+      var isOpen = pane.classList.contains('kl-open');
+      if (isOpen) {
+        pane.classList.remove('kl-open');
+        if (btn) btn.classList.remove('kl-open');
+        badge.setAttribute('aria-expanded', 'false');
+      } else {
+        pane.classList.add('kl-open');
+        if (btn) btn.classList.add('kl-open');
+        badge.setAttribute('aria-expanded', 'true');
+        if (!loaded) {
+          loaded = true;
+          loadDetails(cfg.npi);
+        }
+      }
+    }
+    badge.addEventListener('click', toggle);
+    badge.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  }
+
+  // ── Lazy-load detailed report data ──
+  function loadDetails(npi) {
+    fetch(API_BASE + '/api/report?npi=' + npi, { headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(reports) {
+        if (!reports || !Array.isArray(reports) || !reports.length) return;
+        var rpt = reports[0];
+
+        // Category bars
+        if (rpt.category_scores) {
+          var cs = rpt.category_scores;
+          setBar('kl-bar-dr', 'kl-val-dr', cs.dataResidency && cs.dataResidency.percentage || 0);
+          setBar('kl-bar-ai', 'kl-val-ai', cs.aiTransparency && cs.aiTransparency.percentage || 0);
+        }
+
+        // Pass / warn / fail counts
+        if (rpt.findings && Array.isArray(rpt.findings)) {
+          var p = 0, w = 0, f = 0;
+          rpt.findings.forEach(function(fi) {
+            if (fi.status === 'pass') p++;
+            else if (fi.status === 'warn') w++;
+            else if (fi.status === 'fail') f++;
+          });
+          setText('kl-s-pass', p);
+          setText('kl-s-warn', w);
+          setText('kl-s-fail', f);
+        }
+      })
+      .catch(function() {});
+  }
+
+  function setBar(barId, valId, pct) {
+    var bar = document.getElementById(barId);
+    var val = document.getElementById(valId);
+    if (bar) bar.style.width = pct + '%';
+    if (val) val.textContent = pct + '%';
+  }
+  function setText(id, v) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = v;
+  }
+
+  // ── Fetch widget data ──
+  function fetchData(npi) {
+    return fetch(API_BASE + '/api/widget/' + npi, { headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .catch(function() { return null; });
+  }
+
+  // ── Public API ──
+  window.KairoLogicSentry = {
+    version: VERSION,
+    refresh: function() {
+      var el = document.getElementById('kl-sentry');
+      if (el) el.remove();
+      init();
+    },
+    hide: function() {
+      var el = document.getElementById('kl-sentry');
+      if (el) el.classList.add('kl-hidden');
+    },
+    show: function() {
+      var el = document.getElementById('kl-sentry');
+      if (el) el.classList.remove('kl-hidden');
+    }
+  };
 
   // Start
   init();
-
-  // Expose API for manual refresh
-  window.KairoLogicSentry = {
-    refresh: async function() {
-      const widget = document.getElementById('kl-sentry-widget');
-      if (widget) {
-        const data = await fetchWidgetData(config.npi);
-        renderWidget(widget, data);
-      }
-    },
-    hide: function() {
-      const widget = document.getElementById('kl-sentry-widget');
-      if (widget) widget.classList.add('kl-hidden');
-    },
-    show: function() {
-      const widget = document.getElementById('kl-sentry-widget');
-      if (widget) widget.classList.remove('kl-hidden');
-    },
-    version: WIDGET_VERSION
-  };
 
 })();
