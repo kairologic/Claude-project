@@ -439,6 +439,7 @@ export default function ServicesPage() {
                   </div>
                   <ul className="space-y-2 text-xs text-gray-600">
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Everything in Watch</li>
+                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Live compliance dashboard</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Quarterly forensic reports</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Annual certification seal</strong></li>
                     <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Priority support</strong></li>
@@ -531,8 +532,8 @@ export default function ServicesPage() {
                       {row.vals.map((v, j) => (
                         <td key={j} className={`px-3 py-3 text-center ${j === 1 ? 'bg-orange/5' : j === 2 ? 'bg-amber-50/50' : j === 4 ? 'bg-gold/5' : ''}`}>
                           {v === '✓' ? <CheckCircle size={16} className="text-green-500 mx-auto" /> :
-                            v === '—' ? <span className="text-slate-300">—</span> :
-                              <span className={`text-xs font-medium ${v === 'Maximum' || v === 'Strong' ? 'text-green-600 font-bold' : v === 'None' ? 'text-slate-400' : v.startsWith('✓') ? 'text-green-600' : 'text-slate-600'}`}>{v}</span>}
+                           v === '—' ? <span className="text-slate-300">—</span> :
+                           <span className={`text-xs font-medium ${v === 'Maximum' || v === 'Strong' ? 'text-green-600 font-bold' : v === 'None' ? 'text-slate-400' : v.startsWith('✓') ? 'text-green-600' : 'text-slate-600'}`}>{v}</span>}
                         </td>
                       ))}
                     </tr>
