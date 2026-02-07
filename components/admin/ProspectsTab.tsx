@@ -47,19 +47,19 @@ interface ProspectsTabProps {
 // ── Helpers ──
 
 const SOURCE_CONFIG: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
-  scan:      { icon: <Shield size={11} />,   label: 'Risk Scan',    color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  contact:   { icon: <Mail size={11} />,     label: 'Contact Form', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-  calendar:  { icon: <Calendar size={11} />, label: 'Calendar',     color: 'bg-purple-50 border-purple-200 text-purple-700' },
-  discovery: { icon: <FileText size={11} />, label: 'Discovery',    color: 'bg-amber-50 border-amber-200 text-amber-700' },
-  manual:    { icon: <UserPlus size={11} />, label: 'Manual',       color: 'bg-slate-50 border-slate-200 text-slate-600' },
+  scan: { icon: <Shield size={11} />, label: 'Risk Scan', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+  contact: { icon: <Mail size={11} />, label: 'Contact Form', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  calendar: { icon: <Calendar size={11} />, label: 'Calendar', color: 'bg-purple-50 border-purple-200 text-purple-700' },
+  discovery: { icon: <FileText size={11} />, label: 'Discovery', color: 'bg-amber-50 border-amber-200 text-amber-700' },
+  manual: { icon: <UserPlus size={11} />, label: 'Manual', color: 'bg-slate-50 border-slate-200 text-slate-600' },
 };
 
 const STATUS_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
-  new:       { icon: <Zap size={11} />,          color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  contacted: { icon: <Mail size={11} />,         color: 'bg-amber-50 border-amber-200 text-amber-700' },
-  qualified: { icon: <CheckCircle size={11} />,  color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-  converted: { icon: <Shield size={11} />,       color: 'bg-green-50 border-green-200 text-green-800' },
-  archived:  { icon: <Archive size={11} />,      color: 'bg-slate-50 border-slate-200 text-slate-500' },
+  new: { icon: <Zap size={11} />, color: 'bg-blue-50 border-blue-200 text-blue-700' },
+  contacted: { icon: <Mail size={11} />, color: 'bg-amber-50 border-amber-200 text-amber-700' },
+  qualified: { icon: <CheckCircle size={11} />, color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+  converted: { icon: <Shield size={11} />, color: 'bg-green-50 border-green-200 text-green-800' },
+  archived: { icon: <Archive size={11} />, color: 'bg-slate-50 border-slate-200 text-slate-500' },
 };
 
 const PRIORITY_CONFIG: Record<string, string> = {
@@ -318,10 +318,12 @@ export const ProspectsTab: React.FC<ProspectsTabProps> = ({ showNotification }) 
                         <td className="px-4 py-3">
                           <div className="font-bold text-sm text-slate-800">
                             {!p.is_read && <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1.5 animate-pulse" />}
-                            {p.practice_name || p.contact_name || 'Unknown'}
+                            {p.practice_name || 'Unknown Practice'}
                           </div>
+                          {p.contact_name && (
+                            <div className="text-xs text-slate-600 font-medium mt-0.5">{p.contact_name}</div>
+                          )}
                           <div className="text-[10px] text-slate-400 mt-0.5">
-                            {p.contact_name && p.practice_name ? `${p.contact_name} · ` : ''}
                             {p.email || ''}
                             {p.npi ? ` · NPI: ${p.npi}` : ''}
                           </div>
