@@ -223,12 +223,12 @@ interface RiskScanWidgetProps {
   onScanComplete?: (results: any) => void;
 }
 
-const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
-  initialNPI = '',
-  initialURL = '',
+const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({ 
+  initialNPI = '', 
+  initialURL = '', 
   initialEmail = '',
   autoStart = false,
-  onScanComplete
+  onScanComplete 
 }) => {
   const [npi, setNpi] = useState(initialNPI);
   const [url, setUrl] = useState(initialURL);
@@ -238,7 +238,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const [currentPhase, setCurrentPhase] = useState('');
   const [progress, setProgress] = useState<number>(0);
   const [results, setResults] = useState<any>(null);
-  const [scanLog, setScanLog] = useState<Array<{ message: string, type: string, timestamp: number }>>([]);
+  const [scanLog, setScanLog] = useState<Array<{message: string, type: string, timestamp: number}>>([]);
 
   const addLog = (message: string, type: string = 'info') => {
     setScanLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
@@ -252,11 +252,11 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   // Save to registry table first
   const saveToRegistry = async (scanResults: any) => {
     addLog('💾 Saving to registry...', 'info');
-
+    
     try {
       // Get the provider name from scanResults or try to fetch from existing record
       let providerName = scanResults.name || scanResults.providerName;
-
+      
       // If no name provided, try to get existing name from registry
       if (!providerName) {
         try {
@@ -277,12 +277,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           // Ignore errors, will use fallback
         }
       }
-
+      
       // Fallback to "Provider [NPI]" if still no name
       if (!providerName) {
         providerName = `Provider ${scanResults.npi}`;
       }
-
+      
       const registryData = {
         id: `TX-${scanResults.npi}-${Math.random().toString(36).substr(2, 5)}`,
         name: providerName,
@@ -300,7 +300,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       // Try UPDATE first (PATCH) using NPI as the identifier, if no rows affected, then INSERT (POST)
       addLog('Attempting to update existing registry entry...', 'info');
-
+      
       let response = await fetch(
         `${SUPABASE_URL}/rest/v1/registry?npi=eq.${scanResults.npi}`,
         {
@@ -332,7 +332,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       // If no rows were updated (NPI not in registry), UPSERT a new record
       if (patchedRows === 0) {
         addLog('No existing entry found, creating new provider record...', 'info');
-
+        
         // Build UPSERT payload with only known registry columns
         const insertData: Record<string, any> = {
           id: `TX-${scanResults.npi}-${Math.random().toString(36).substr(2, 5)}`,
@@ -347,9 +347,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           widget_id: `WID-${scanResults.npi}-${Date.now().toString(36)}`,
           updated_at: registryData.updated_at
         };
-
+        
         addLog(`UPSERT payload: ${JSON.stringify(Object.keys(insertData))}`, 'info');
-
+        
         response = await fetch(
           `${SUPABASE_URL}/rest/v1/registry?on_conflict=npi`,
           {
@@ -363,7 +363,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             body: JSON.stringify(insertData)
           }
         );
-
+        
         if (!response.ok) {
           const errText = await response.text().catch(() => 'unknown');
           addLog(`[ERROR] INSERT failed (${response.status}): ${errText}`, 'warning');
@@ -372,10 +372,10 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
       if (response.ok || response.status === 201 || response.status === 204) {
         addLog('[OK] Registry entry saved', 'success');
-
+        
         // Verify the entry exists
         await delay(500);
-
+        
         const verifyResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/registry?npi=eq.${scanResults.npi}`,
           {
@@ -385,9 +385,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             }
           }
         );
-
+        
         const verification = await verifyResponse.json();
-
+        
         if (verification && verification.length > 0) {
           addLog('[OK] Registry entry verified', 'success');
           return true;
@@ -412,7 +412,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   // Save violations to Supabase
   const saveViolationsToSupabase = async (registryId: string, findings: any[]) => {
     const failedFindings = findings.filter(f => f.status === 'fail');
-
+    
     if (failedFindings.length === 0) {
       addLog('[OK] No violations to save', 'success');
       return;
@@ -485,7 +485,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   // - HTTP header analysis for CDN/edge nodes
   // - MX record verification
   // - Page content crawl for AI disclosures & form analysis
-
+  
   const runRealScan = async (targetUrl: string, targetNpi: string) => {
     setCurrentPhase('Connecting to Sentry API...');
     addLog('🚀 Dispatching scan request to Sentry Engine v2.0...', 'info');
@@ -568,10 +568,10 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     const totalChecks = allFindings.length;
     const passedChecks = allFindings.filter((f: any) => f.status === 'pass').length;
     const score = Math.round((passedChecks / totalChecks) * 100);
-
+    
     let riskLevel = 'High';
     let riskMeterLevel = 'Violation';
-
+    
     if (score >= 67) {
       riskLevel = 'Low';
       riskMeterLevel = 'Sovereign';
@@ -579,7 +579,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       riskLevel = 'Moderate';
       riskMeterLevel = 'Drift';
     }
-
+    
     return { score, riskLevel, riskMeterLevel };
   };
 
@@ -597,7 +597,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     try {
       addLog(`🚀 Starting Sentry compliance scan for NPI: ${npi}`, 'info');
       addLog(`Target: ${url}`, 'info');
-
+      
       // Initialize
       const stealthResult = await stealthProbe(url);
       setProgress(10);
@@ -789,7 +789,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       // Send email notifications (non-blocking)
       try {
         // Build findings summary for email
-        const topFindingsSummary = topIssues.slice(0, 5).map((f: { name?: string; id?: string; status?: string; detail?: string }) =>
+        const topFindingsSummary = topIssues.slice(0, 5).map((f: { name?: string; id?: string; status?: string; detail?: string }) => 
           `${f.status === 'fail' ? '❌' : f.status === 'warn' ? '⚠️' : '✅'} ${f.name || f.id}: ${(f.detail || '').substring(0, 120)}`
         ).join('\n');
 
@@ -822,11 +822,11 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...emailPayload, variables: { email: 'compliance@kairologic.com', practice_name: providerName || `NPI: ${npi}`, _force_internal: 'true' } })
-        }).catch(() => { });
+        }).catch(() => {});
       } catch {
         // Non-critical
       }
-
+      
       if (onScanComplete) {
         onScanComplete({ ...scanResults, reportId });
       }
@@ -963,11 +963,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             {scanLog.map((log: any, idx: number) => (
               <div
                 key={idx}
-                className={`mb-1 ${log.type === 'error' ? 'text-red-600' :
-                    log.type === 'success' ? 'text-green-600' :
-                      log.type === 'warning' ? 'text-amber-600' :
-                        'text-slate-600'
-                  }`}
+                className={`mb-1 ${
+                  log.type === 'error' ? 'text-red-600' :
+                  log.type === 'success' ? 'text-green-600' :
+                  log.type === 'warning' ? 'text-amber-600' :
+                  'text-slate-600'
+                }`}
               >
                 {log.message}
               </div>
@@ -1002,14 +1003,16 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                 {results.engineVersion && <p className="text-xs text-slate-400 mt-0.5">Engine: {results.engineVersion}</p>}
               </div>
               <div className="text-right">
-                <div className={`text-4xl font-bold ${results.riskScore >= 67 ? 'text-green-600' :
-                    results.riskScore >= 34 ? 'text-amber-600' :
-                      'text-red-600'
-                  }`}>{results.riskScore}%</div>
-                <div className={`text-sm font-semibold px-3 py-0.5 rounded-full inline-block mt-1 ${results.riskMeterLevel === 'Sovereign' ? 'bg-green-100 text-green-700' :
-                    results.riskMeterLevel === 'Drift' ? 'bg-amber-100 text-amber-700' :
-                      'bg-red-100 text-red-700'
-                  }`}>
+                <div className={`text-4xl font-bold ${
+                  results.riskScore >= 67 ? 'text-green-600' :
+                  results.riskScore >= 34 ? 'text-amber-600' :
+                  'text-red-600'
+                }`}>{results.riskScore}%</div>
+                <div className={`text-sm font-semibold px-3 py-0.5 rounded-full inline-block mt-1 ${
+                  results.riskMeterLevel === 'Sovereign' ? 'bg-green-100 text-green-700' :
+                  results.riskMeterLevel === 'Drift' ? 'bg-amber-100 text-amber-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
                   {results.riskMeterLevel}
                 </div>
               </div>
@@ -1041,10 +1044,11 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`text-lg font-bold ${textColor}`}>{pct}%</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catScore.level === 'Sovereign' ? 'bg-green-200 text-green-800' :
-                                catScore.level === 'Drift' ? 'bg-amber-200 text-amber-800' :
-                                  'bg-red-200 text-red-800'
-                              }`}>{catScore.level}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              catScore.level === 'Sovereign' ? 'bg-green-200 text-green-800' :
+                              catScore.level === 'Drift' ? 'bg-amber-200 text-amber-800' :
+                              'bg-red-200 text-red-800'
+                            }`}>{catScore.level}</span>
                           </div>
                         </div>
                         <div className="w-full bg-white/60 rounded-full h-2 mb-1">
@@ -1095,11 +1099,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                 {/* Type counts bar */}
                 <div className="bg-slate-50 px-5 py-2 flex items-center gap-3 border-b border-slate-200 text-xs">
                   {Object.entries(byType).map(([type, count]) => (
-                    <span key={type} className={`px-2 py-0.5 rounded-full font-medium ${type === 'primary' ? 'bg-blue-100 text-blue-700' :
-                        type === 'mail' ? 'bg-purple-100 text-purple-700' :
-                          type === 'cdn' ? 'bg-sky-100 text-sky-700' :
-                            'bg-slate-100 text-slate-600'
-                      }`}>
+                    <span key={type} className={`px-2 py-0.5 rounded-full font-medium ${
+                      type === 'primary' ? 'bg-blue-100 text-blue-700' :
+                      type === 'mail' ? 'bg-purple-100 text-purple-700' :
+                      type === 'cdn' ? 'bg-sky-100 text-sky-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
                       {count} {type}
                     </span>
                   ))}
@@ -1117,11 +1122,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                           <span className="text-xs text-slate-400">{node.city}, {node.country}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${node.type === 'primary' ? 'bg-blue-50 text-blue-600' :
-                              node.type === 'cdn' ? 'bg-sky-50 text-sky-600' :
-                                node.type === 'mail' ? 'bg-purple-50 text-purple-600' :
-                                  'bg-slate-50 text-slate-500'
-                            }`}>{node.type}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            node.type === 'primary' ? 'bg-blue-50 text-blue-600' :
+                            node.type === 'cdn' ? 'bg-sky-50 text-sky-600' :
+                            node.type === 'mail' ? 'bg-purple-50 text-purple-600' :
+                            'bg-slate-50 text-slate-500'
+                          }`}>{node.type}</span>
                           <span className={`font-semibold text-xs ${isUS ? 'text-green-600' : 'text-red-600'}`}>
                             {isUS ? '✓' : '✗'}
                           </span>
@@ -1229,6 +1235,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                 safeHarbor: `https://buy.stripe.com/test_8x2bJ14UHbJO30b93S4ko03${clientRef}`,
                 watch: `https://buy.stripe.com/test_9B614n2Mz0168kv0xm4ko01${clientRef}`,
                 shield: `https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00${clientRef}`,
+                safeHarborWatch: `https://buy.stripe.com/test_28EfZh4UH3di30ba7W4ko05${clientRef}`,
+                safeHarborShield: `https://buy.stripe.com/test_fZuaEX5YLcNS6cn6VK4ko04${clientRef}`,
               };
 
               // ── TIER 1: Sovereign (80-100) ──
@@ -1316,7 +1324,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                       </a>
 
                       {/* Option 3: Safe Harbor + Monitoring */}
-                      <a href={LINKS.watch} target="_blank" rel="noopener noreferrer"
+                      <a href={LINKS.safeHarborWatch} target="_blank" rel="noopener noreferrer"
                         className="block border border-slate-700 bg-slate-800 rounded-xl p-4 transition-all hover:bg-slate-700 cursor-pointer">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -1394,7 +1402,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                     </a>
 
                     {/* Option 3: Safe Harbor + Shield — Recommended */}
-                    <a href={LINKS.shield} target="_blank" rel="noopener noreferrer"
+                    <a href={LINKS.safeHarborShield} target="_blank" rel="noopener noreferrer"
                       className="block border-2 border-red-500 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-4 transition-all hover:shadow-lg relative cursor-pointer">
                       <div className="absolute -top-2.5 left-4 bg-red-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
                         Recommended for Your Score
