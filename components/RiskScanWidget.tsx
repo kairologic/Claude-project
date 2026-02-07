@@ -1245,20 +1245,23 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                       </p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <a href={LINKS.watch} target="_blank" rel="noopener noreferrer"
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm text-center transition-colors flex items-center justify-center gap-2">
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors flex items-center justify-center gap-2">
                           <Shield className="w-4 h-4" />
                           Sentry Watch — $39/mo
                         </a>
-                        <a href={LINKS.shield} target="_blank" rel="noopener noreferrer"
-                          className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-lg text-sm text-center transition-colors flex items-center justify-center gap-2">
-                          Upgrade to Shield — $79/mo
+                        <a href={LINKS.report} target="_blank" rel="noopener noreferrer"
+                          className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors flex items-center justify-center gap-2">
+                          Full Audit Report — $149
                         </a>
                       </div>
-                      <p className="text-[10px] text-green-600 mt-2 text-center">Includes live dashboard, drift alerts, and automated re-scans</p>
+                      <p className="text-[10px] text-green-600 mt-2 text-center">Watch includes drift alerts, automated re-scans, and monthly reports</p>
                     </div>
-                    <a href={LINKS.report} target="_blank" rel="noopener noreferrer"
-                      className="block w-full border border-slate-200 hover:border-slate-300 text-slate-600 font-medium py-2.5 rounded-lg text-xs text-center transition-colors">
-                      Want audit documentation? Get the full report — $149
+
+                    {/* Shield upsell — prominent */}
+                    <a href={LINKS.shield} target="_blank" rel="noopener noreferrer"
+                      className="block w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 border border-slate-600 text-white font-semibold py-3.5 px-4 rounded-xl text-center transition-all">
+                      <span className="text-sm">Upgrade to Sentry Shield — $79/mo</span>
+                      <span className="block text-[11px] text-slate-400 font-normal mt-0.5">Adds live dashboard, quarterly forensic reports &amp; annual certification seal</span>
                     </a>
                   </div>
                 );
