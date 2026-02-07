@@ -513,14 +513,14 @@ export default function ServicesPage() {
                     { feature: 'Data Border Map (Full)', vals: ['Summary', '✓ Full', '—', '✓ Full', '✓ Full'] },
                     { feature: 'Professional PDF Report', vals: ['—', '✓', '—', '—', '✓ Quarterly'] },
                     { feature: 'Statutory Clause Mapping', vals: ['—', '✓', '✓', '✓', '✓'] },
-                    { feature: 'SB 1188 Policy Pack', vals: ['—', '—', '✓', '—', '✓'] },
-                    { feature: 'AI Disclosure Kit (Code + Copy)', vals: ['—', '—', '✓', '—', '✓'] },
-                    { feature: 'Evidence Ledger Templates', vals: ['—', '—', '✓', '—', '✓'] },
+                    { feature: 'Compliance Drift Alerts', vals: ['—', '—', '—', '✓', '✓'] },
+                    { feature: 'Live Dashboard', vals: ['—', '—', '—', '✓', '✓'] },
+                    { feature: 'SB 1188 Policy Pack', vals: ['—', '—', '✓', '—', '—'] },
+                    { feature: 'AI Disclosure Kit (Code + Copy)', vals: ['—', '—', '✓', '—', '—'] },
+                    { feature: 'Evidence Ledger Templates', vals: ['—', '—', '✓', '—', '—'] },
                     { feature: 'Staff Training Guide', vals: ['—', '—', '✓', '—', '—'] },
                     { feature: 'Implementation Blueprint', vals: ['—', '—', '✓', '—', '—'] },
                     { feature: 'Automated Re-Scans', vals: ['—', '—', '—', 'Monthly', 'Monthly'] },
-                    { feature: 'Compliance Drift Alerts', vals: ['—', '—', '—', '✓', '✓'] },
-                    { feature: 'Live Dashboard', vals: ['—', '—', '—', '✓', '✓'] },
                     { feature: 'Quarterly Forensic Reports', vals: ['—', '—', '—', '—', '✓'] },
                     { feature: 'Annual Certification Seal', vals: ['—', '—', '—', '—', '✓'] },
                     { feature: 'Priority Support', vals: ['—', '—', '—', '—', '✓'] },
@@ -531,8 +531,8 @@ export default function ServicesPage() {
                       {row.vals.map((v, j) => (
                         <td key={j} className={`px-3 py-3 text-center ${j === 1 ? 'bg-orange/5' : j === 2 ? 'bg-amber-50/50' : j === 4 ? 'bg-gold/5' : ''}`}>
                           {v === '✓' ? <CheckCircle size={16} className="text-green-500 mx-auto" /> :
-                           v === '—' ? <span className="text-slate-300">—</span> :
-                           <span className={`text-xs font-medium ${v === 'Maximum' || v === 'Strong' ? 'text-green-600 font-bold' : v === 'None' ? 'text-slate-400' : v.startsWith('✓') ? 'text-green-600' : 'text-slate-600'}`}>{v}</span>}
+                            v === '—' ? <span className="text-slate-300">—</span> :
+                              <span className={`text-xs font-medium ${v === 'Maximum' || v === 'Strong' ? 'text-green-600 font-bold' : v === 'None' ? 'text-slate-400' : v.startsWith('✓') ? 'text-green-600' : 'text-slate-600'}`}>{v}</span>}
                         </td>
                       ))}
                     </tr>
