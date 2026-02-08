@@ -195,9 +195,9 @@ function SuccessPageInner() {
       if (report.category_scores) {
         const cats = report.category_scores;
         const catList = [
-          { name: 'Data Residency', score: cats.dataResidency?.percentage || 0, color: [0, 100, 200] as [number, number, number] },
-          { name: 'AI Transparency', score: cats.aiTransparency?.percentage || 0, color: [180, 100, 0] as [number, number, number] },
-          { name: 'Clinical Integrity', score: cats.ehrIntegrity?.percentage || 0, color: [0, 150, 80] as [number, number, number] },
+          { name: 'Data Residency', score: cats.data_sovereignty?.percentage || cats.dataResidency?.percentage || 0, color: [0, 100, 200] as [number, number, number] },
+          { name: 'AI Transparency', score: cats.ai_transparency?.percentage || cats.aiTransparency?.percentage || 0, color: [180, 100, 0] as [number, number, number] },
+          { name: 'Clinical Integrity', score: cats.clinical_integrity?.percentage || cats.ehrIntegrity?.percentage || 0, color: [0, 150, 80] as [number, number, number] },
         ];
         catList.forEach((cat, i) => {
           const cx = 15 + i * 62;
