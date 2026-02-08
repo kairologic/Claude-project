@@ -441,13 +441,13 @@ export default function RegistryPage() {
                   {/* Personalized findings list */}
                   {(() => {
                     const { critical, warnings, passes } = generateFindingsSummary(claimModal);
-                    const hasFindings = critical.length > 0 || warnings.length > 0;
+                    const hasFindings = critical.length > 0 || warnings.length > 0 || passes.length > 0;
                     return hasFindings ? (
                       <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-5 space-y-3">
-                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Preliminary Findings</div>
-                        {critical.length > 0 && (<div><div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1.5">Critical Exposures ({critical.length})</div>{critical.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-red-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />{f}</div>))}</div>)}
-                        {warnings.length > 0 && (<div><div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5">Warnings ({warnings.length})</div>{warnings.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-amber-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />{f}</div>))}</div>)}
-                        {passes.length > 0 && (<div><div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">Passing ({passes.length})</div>{passes.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-emerald-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />{f}</div>))}</div>)}
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Scan Summary</div>
+                        {critical.length > 0 && (<div className="flex items-center gap-2 text-[11px] text-red-300 py-1"><span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" /><span className="font-bold text-red-400">{critical.length} critical exposure{critical.length !== 1 ? "s" : ""} detected</span><span className="text-slate-600 ml-auto text-[10px]">Details in full report</span></div>)}
+                        {warnings.length > 0 && (<div className="flex items-center gap-2 text-[11px] text-amber-300 py-1"><span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" /><span className="font-bold text-amber-400">{warnings.length} warning{warnings.length !== 1 ? "s" : ""} flagged</span><span className="text-slate-600 ml-auto text-[10px]">Details in full report</span></div>)}
+                        {passes.length > 0 && (<div><div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5 mt-2">Passing ({passes.length})</div>{passes.slice(0, 3).map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-emerald-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />{f}</div>))}{passes.length > 3 && <div className="text-[10px] text-slate-500 mt-1">+{passes.length - 3} more passing checks</div>}</div>)}
                       </div>
                     ) : null;
                   })()}
