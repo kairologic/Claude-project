@@ -142,24 +142,34 @@ export default function RegistryPage() {
       let q = supabase.from("registry")
         .select("id,npi,name,city,zip,risk_score,risk_level,status_label,last_scan_timestamp,last_scan_result,updated_at,is_paid,is_visible,subscription_status,url,email", { count: "exact" })
         .eq("is_visible", true);
+
+      // City filter
       if (activeCity !== "all") {
         const tab = CITY_TABS.find(t => t.key === activeCity);
         if (tab) q = q.or(tab.filter.map(c => `city.ilike.%${c}%`).join(","));
       }
+
+      // Search filter
       if (debouncedSearch.trim()) {
         const s = debouncedSearch.trim();
         q = q.or(`name.ilike.%${s}%,city.ilike.%${s}%,zip.ilike.%${s}%`);
       }
-      // Tier filter
-      if (activeTier === "sovereign") q = q.gte("risk_score", 80);
-      else if (activeTier === "moderate") q = q.gte("risk_score", 60).lt("risk_score", 80);
-      else if (activeTier === "atRisk") q = q.gt("risk_score", 0).lt("risk_score", 60);
-      else if (activeTier === "pending") q = q.or("risk_score.is.null,risk_score.eq.0");
 
-      const { data, error, count } = await q.order("risk_score", { ascending: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      // Tier filter — use .filter() to avoid conflicting .or() calls
+      if (activeTier === "sovereign") {
+        q = q.gte("risk_score", 80);
+      } else if (activeTier === "moderate") {
+        q = q.gte("risk_score", 60).lt("risk_score", 80);
+      } else if (activeTier === "atRisk") {
+        q = q.gt("risk_score", 0).lt("risk_score", 60);
+      } else if (activeTier === "pending") {
+        q = q.filter("risk_score", "is", null);
+      }
+
+      const { data, error, count } = await q.order("risk_score", { ascending: false, nullsFirst: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
 
-      // Interleaved sort: S-S-I-S-R pattern (only when no tier filter active)
+      // Interleaved sort: S-S-I-S-R pattern (only when no tier filter/search active)
       let sorted: ProviderRow[] = (data || []) as ProviderRow[];
       if (!activeTier && !debouncedSearch.trim()) {
         const sovereign = sorted.filter(p => (p.risk_score ?? 0) >= 80);
@@ -168,7 +178,6 @@ export default function RegistryPage() {
         const pending = sorted.filter(p => !p.risk_score || p.risk_score === 0);
         const interleaved: ProviderRow[] = [];
         let si = 0, mi = 0, ri = 0, pi = 0;
-        // Pattern: S, S, I, S, R — repeat
         while (si < sovereign.length || mi < moderate.length || ri < atRisk.length || pi < pending.length) {
           if (si < sovereign.length) interleaved.push(sovereign[si++]);
           if (si < sovereign.length) interleaved.push(sovereign[si++]);
@@ -176,7 +185,6 @@ export default function RegistryPage() {
           if (si < sovereign.length) interleaved.push(sovereign[si++]);
           if (ri < atRisk.length) interleaved.push(atRisk[ri++]);
         }
-        // Append any remaining
         while (si < sovereign.length) interleaved.push(sovereign[si++]);
         while (mi < moderate.length) interleaved.push(moderate[mi++]);
         while (ri < atRisk.length) interleaved.push(atRisk[ri++]);
