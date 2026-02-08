@@ -1276,7 +1276,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
               }
 
               // ── TIER 2: Drift (50-79) ──
-              if (score >= 50) {
+              if (score >= 60) {
                 return (
                   <div className="mt-6">
                     <div className="mb-3">
