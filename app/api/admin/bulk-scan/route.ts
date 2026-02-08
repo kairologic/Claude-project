@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
           provider_type: 2,
           widget_status: 'hidden',
           subscription_status: 'trial',
-          is_visible: false,
+          is_visible: true,
           risk_score: 0,
           scan_count: 0,
           created_at: nowIso,
