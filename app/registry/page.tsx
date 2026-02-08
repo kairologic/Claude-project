@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
 import { Search, Shield, ShieldCheck, Eye, Lock, ChevronRight, X, AlertTriangle, CheckCircle, Loader2, FileText, ChevronLeft, ExternalLink, AlertCircle } from "lucide-react";
@@ -110,7 +110,6 @@ export default function RegistryPage() {
   const [stats, setStats] = useState({ sovereign: 0, moderate: 0, atRisk: 0, pending: 0 });
   const [cityCounts, setCityCounts] = useState<Record<CityTab, number>>({ all: 0, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 });
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -118,89 +117,82 @@ export default function RegistryPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchTerm]);
 
-  const loadStats = useCallback(async () => {
-    try {
-      const supabase = getSupabase();
-      const { data, count } = await supabase.from("registry").select("risk_score,city", { count: "exact" }).eq("is_visible", true);
-      const all = data || [];
-      setTotalCount(count || 0);
-      setStats({
-        sovereign: all.filter(p => (p.risk_score ?? 0) >= 80).length,
-        moderate: all.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80).length,
-        atRisk: all.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60).length,
-        pending: all.filter(p => !p.risk_score || p.risk_score === 0).length,
-      });
-      const c: Record<CityTab, number> = { all: all.length, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 };
-      CITY_TABS.forEach(t => { if (t.key !== "all") c[t.key] = all.filter(p => t.filter.some(f => (p.city||"").toLowerCase().includes(f))).length; });
-      setCityCounts(c);
-    } catch (e) { console.error(e); }
+  // Load stats once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = getSupabase();
+        const { data, count } = await supabase.from("registry").select("risk_score,city", { count: "exact" }).eq("is_visible", true);
+        const all = data || [];
+        setTotalCount(count || 0);
+        setStats({
+          sovereign: all.filter(p => (p.risk_score ?? 0) >= 80).length,
+          moderate: all.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80).length,
+          atRisk: all.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60).length,
+          pending: all.filter(p => !p.risk_score || p.risk_score === 0).length,
+        });
+        const c: Record<CityTab, number> = { all: all.length, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 };
+        CITY_TABS.forEach(t => { if (t.key !== "all") c[t.key] = all.filter(p => t.filter.some(f => (p.city||"").toLowerCase().includes(f))).length; });
+        setCityCounts(c);
+      } catch (e) { console.error(e); }
+    })();
   }, []);
 
-  const loadProviders = useCallback(async () => {
-    try {
-      setLoading(true);
-      const supabase = getSupabase();
-      let q = supabase.from("registry")
-        .select("id,npi,name,city,zip,risk_score,risk_level,status_label,last_scan_timestamp,last_scan_result,updated_at,is_paid,is_visible,subscription_status,url,email", { count: "exact" })
-        .eq("is_visible", true);
+  // Load providers whenever filters change
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const supabase = getSupabase();
+        let q = supabase.from("registry")
+          .select("id,npi,name,city,zip,risk_score,risk_level,status_label,last_scan_timestamp,last_scan_result,updated_at,is_paid,is_visible,subscription_status,url,email", { count: "exact" })
+          .eq("is_visible", true);
 
-      // City filter
-      if (activeCity !== "all") {
-        const tab = CITY_TABS.find(t => t.key === activeCity);
-        if (tab) q = q.or(tab.filter.map(c => `city.ilike.%${c}%`).join(","));
-      }
-
-      // Search filter
-      if (debouncedSearch.trim()) {
-        const s = debouncedSearch.trim();
-        q = q.or(`name.ilike.%${s}%,city.ilike.%${s}%,zip.ilike.%${s}%`);
-      }
-
-      // Tier filter — use .filter() to avoid conflicting .or() calls
-      if (activeTier === "sovereign") {
-        q = q.gte("risk_score", 80);
-      } else if (activeTier === "moderate") {
-        q = q.gte("risk_score", 60).lt("risk_score", 80);
-      } else if (activeTier === "atRisk") {
-        q = q.gt("risk_score", 0).lt("risk_score", 60);
-      } else if (activeTier === "pending") {
-        q = q.filter("risk_score", "is", null);
-      }
-
-      const { data, error, count } = await q.order("risk_score", { ascending: false, nullsFirst: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-      if (error) throw error;
-
-      // Interleaved sort: S-S-I-S-R pattern (only when no tier filter/search active)
-      let sorted: ProviderRow[] = (data || []) as ProviderRow[];
-      if (!activeTier && !debouncedSearch.trim()) {
-        const sovereign = sorted.filter(p => (p.risk_score ?? 0) >= 80);
-        const moderate = sorted.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80);
-        const atRisk = sorted.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60);
-        const pending = sorted.filter(p => !p.risk_score || p.risk_score === 0);
-        const interleaved: ProviderRow[] = [];
-        let si = 0, mi = 0, ri = 0, pi = 0;
-        while (si < sovereign.length || mi < moderate.length || ri < atRisk.length || pi < pending.length) {
-          if (si < sovereign.length) interleaved.push(sovereign[si++]);
-          if (si < sovereign.length) interleaved.push(sovereign[si++]);
-          if (mi < moderate.length) interleaved.push(moderate[mi++]);
-          if (si < sovereign.length) interleaved.push(sovereign[si++]);
-          if (ri < atRisk.length) interleaved.push(atRisk[ri++]);
+        if (activeCity !== "all") {
+          const tab = CITY_TABS.find(t => t.key === activeCity);
+          if (tab) q = q.or(tab.filter.map(c => `city.ilike.%${c}%`).join(","));
         }
-        while (si < sovereign.length) interleaved.push(sovereign[si++]);
-        while (mi < moderate.length) interleaved.push(moderate[mi++]);
-        while (ri < atRisk.length) interleaved.push(atRisk[ri++]);
-        while (pi < pending.length) interleaved.push(pending[pi++]);
-        sorted = interleaved;
-      }
+        if (debouncedSearch.trim()) {
+          const s = debouncedSearch.trim();
+          q = q.or(`name.ilike.%${s}%,city.ilike.%${s}%,zip.ilike.%${s}%`);
+        }
+        if (activeTier === "sovereign") q = q.gte("risk_score", 80);
+        else if (activeTier === "moderate") q = q.gte("risk_score", 60).lt("risk_score", 80);
+        else if (activeTier === "atRisk") q = q.gt("risk_score", 0).lt("risk_score", 60);
+        else if (activeTier === "pending") q = q.filter("risk_score", "is", null);
 
-      setProviders(sorted);
-      setTotalCount(count || 0);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [page, activeCity, debouncedSearch, activeTier, refreshKey]);
+        const { data, error, count } = await q.order("risk_score", { ascending: false, nullsFirst: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (cancelled || error) return;
 
-  useEffect(() => { loadStats(); }, [loadStats]);
-  useEffect(() => { loadProviders(); }, [loadProviders]);
-  useEffect(() => { setPage(0); setRefreshKey(k => k + 1); }, [activeCity, activeTier]);
+        let sorted: ProviderRow[] = (data || []) as ProviderRow[];
+        if (!activeTier && !debouncedSearch.trim()) {
+          const sovereign = sorted.filter(p => (p.risk_score ?? 0) >= 80);
+          const moderate = sorted.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80);
+          const atRisk = sorted.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60);
+          const pending = sorted.filter(p => !p.risk_score || p.risk_score === 0);
+          const interleaved: ProviderRow[] = [];
+          let si = 0, mi = 0, ri = 0, pi = 0;
+          while (si < sovereign.length || mi < moderate.length || ri < atRisk.length || pi < pending.length) {
+            if (si < sovereign.length) interleaved.push(sovereign[si++]);
+            if (si < sovereign.length) interleaved.push(sovereign[si++]);
+            if (mi < moderate.length) interleaved.push(moderate[mi++]);
+            if (si < sovereign.length) interleaved.push(sovereign[si++]);
+            if (ri < atRisk.length) interleaved.push(atRisk[ri++]);
+          }
+          while (si < sovereign.length) interleaved.push(sovereign[si++]);
+          while (mi < moderate.length) interleaved.push(moderate[mi++]);
+          while (ri < atRisk.length) interleaved.push(atRisk[ri++]);
+          while (pi < pending.length) interleaved.push(pending[pi++]);
+          sorted = interleaved;
+        }
+
+        setProviders(sorted);
+        setTotalCount(count || 0);
+      } catch (e) { console.error(e); } finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [page, activeCity, debouncedSearch, activeTier]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const showFrom = totalCount > 0 ? page * PAGE_SIZE + 1 : 0;
@@ -220,7 +212,7 @@ export default function RegistryPage() {
     return "";
   };
 
-  const closeModal = () => { setClaimModal(null); setRefreshKey(k => k + 1); };
+  const closeModal = () => { setClaimModal(null); };
 
   const handleClaim = async () => {
     if (!claimForm.email || !claimForm.name) return;
@@ -280,7 +272,7 @@ export default function RegistryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="grid grid-cols-4 gap-4">
             {[{ l:"Sovereign",k:"sovereign",v:stats.sovereign,c:"text-emerald-400",d:"bg-emerald-400" },{ l:"Inconclusive",k:"moderate",v:stats.moderate,c:"text-amber-400",d:"bg-amber-400" },{ l:"At Risk",k:"atRisk",v:stats.atRisk,c:"text-red-400",d:"bg-red-400" },{ l:"Pre-Audited",k:"pending",v:stats.pending,c:"text-slate-400",d:"bg-slate-500" }].map(s=>(
-              <button key={s.l} onClick={()=>setActiveTier(activeTier===s.k?null:s.k)} className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-left ${activeTier===s.k?"bg-white/[0.08] ring-1 ring-white/[0.15]":"hover:bg-white/[0.04]"}`}><span className={`w-2.5 h-2.5 rounded-full ${s.d}`} /><div><div className={`text-xl font-bold font-mono ${s.c}`}>{s.v}</div><div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{s.l}</div></div></button>
+              <button key={s.l} onClick={()=>{setActiveTier(activeTier===s.k?null:s.k);setPage(0);}} className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-left ${activeTier===s.k?"bg-white/[0.08] ring-1 ring-white/[0.15]":"hover:bg-white/[0.04]"}`}><span className={`w-2.5 h-2.5 rounded-full ${s.d}`} /><div><div className={`text-xl font-bold font-mono ${s.c}`}>{s.v}</div><div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{s.l}</div></div></button>
             ))}
           </div>
         </div>
@@ -291,7 +283,7 @@ export default function RegistryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1 overflow-x-auto py-2 -mb-px">
             {CITY_TABS.map(tab=>(
-              <button key={tab.key} onClick={()=>setActiveCity(tab.key)} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all rounded-t-lg ${activeCity===tab.key?"bg-white/[0.08] text-gold border-b-2 border-gold":"text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"}`}>
+              <button key={tab.key} onClick={()=>{setActiveCity(tab.key);setPage(0);}} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all rounded-t-lg ${activeCity===tab.key?"bg-white/[0.08] text-gold border-b-2 border-gold":"text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"}`}>
                 {tab.label}<span className={`ml-2 text-[10px] font-mono ${activeCity===tab.key?"text-gold/80":"text-slate-500"}`}>{cityCounts[tab.key]}</span>
               </button>
             ))}
@@ -307,7 +299,7 @@ export default function RegistryPage() {
               <span className="text-[11px] text-slate-400">Filtered by:</span>
               <span className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.1] text-white text-[11px] font-bold px-3 py-1 rounded-lg">
                 {activeTier === "sovereign" ? "Sovereign" : activeTier === "moderate" ? "Inconclusive" : activeTier === "atRisk" ? "At Risk" : "Pre-Audited"}
-                <button onClick={() => setActiveTier(null)} className="text-slate-400 hover:text-white ml-1"><X size={12} /></button>
+                <button onClick={() => {setActiveTier(null);setPage(0);}} className="text-slate-400 hover:text-white ml-1"><X size={12} /></button>
               </span>
             </div>
           )}
