@@ -113,6 +113,8 @@ function ClaimContent() {
       });
       if (form.npi) {
         await supabase.from("registry").update({ email: form.email, npi: form.npi, updated_at: new Date().toISOString() }).eq("id", provider.id);
+      } else {
+        await supabase.from("registry").update({ email: form.email, updated_at: new Date().toISOString() }).eq("id", provider.id);
       }
       setStep("result");
     } catch (e) { console.error(e); } finally { setSubmitting(false); }

@@ -71,7 +71,6 @@ export default function RegistryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeCity, setActiveCity] = useState<CityTab>("all");
-  const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
   const [activeTier, setActiveTier] = useState<string | null>(null);
@@ -244,7 +243,7 @@ export default function RegistryPage() {
                 {providers.map(p => {
                   const st = getSovStatus(p); const res = getResidencySignal(p); const tr = getTransparencySignal(p);
                   const hr = isHighRisk(p); const paid = p.is_paid || p.subscription_status === "active";
-                  const claimed = claimedIds.has(p.id);
+                  const claimed = !!p.email;
                   return (
                     <div key={p.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_140px] gap-0 px-5 py-3.5 items-center hover:bg-white/[0.03] transition-colors">
                       <div><div className={`font-semibold text-sm ${hr?"text-slate-400":"text-white"}`}>{hr?maskName(p.name):p.name}</div><div className="text-[11px] text-slate-500 mt-0.5">{p.city||"\u2014"}{p.zip?`, ${p.zip}`:""}</div></div>
