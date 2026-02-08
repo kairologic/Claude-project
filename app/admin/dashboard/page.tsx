@@ -684,15 +684,34 @@ export default function AdminDashboard() {
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
-      const lines = text.split('\n').filter(l => l.trim());
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const headerLine = lines[0];
+      
+      // Proper CSV parsing that handles quoted fields
+      const parseCSVLine = (line: string): string[] => {
+        const fields: string[] = [];
+        let current = '', inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') {
+            if (inQuotes && line[j + 1] === '"') { current += '"'; j++; }
+            else inQuotes = !inQuotes;
+          } else if (ch === ',' && !inQuotes) {
+            fields.push(current.trim()); current = '';
+          } else { current += ch; }
+        }
+        fields.push(current.trim());
+        return fields;
+      };
+      
+      const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().replace(/['"]/g, ''));
 
       // Parse CSV rows
       const parsed = lines.slice(1).map(line => {
-        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        const values = parseCSVLine(line);
         const row: any = {};
         headers.forEach((h, i) => {
-          const val = values[i]?.replace(/^"|"$/g, '').trim() || '';
+          const val = (values[i] || '').trim();
           if (h.includes('npi')) row.npi = val;
           else if (h.includes('name') || h.includes('practice')) row.name = val;
           else if (h.includes('url') || h.includes('website')) {
@@ -704,10 +723,17 @@ export default function AdminDashboard() {
           else if (h.includes('phone')) row.phone = val;
         });
         return row;
-      }).filter((r: any) => r.npi && r.name && r.url);
+      }).filter((r: any) => r.name && r.url);
+
+      // Auto-generate placeholder NPIs if CSV doesn't have NPI column
+      parsed.forEach((r: any, i: number) => {
+        if (!r.npi) {
+          r.npi = `KL${String(Date.now()).slice(-6)}${String(i).padStart(4, '0')}`;
+        }
+      });
 
       if (parsed.length === 0) {
-        notify('No valid rows found. CSV needs: npi, name, url columns.', 'error');
+        notify('No valid rows found. CSV needs at minimum: name, url columns.', 'error');
         return;
       }
 
