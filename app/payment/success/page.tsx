@@ -56,10 +56,10 @@ const PRODUCT_CONFIG: Record<string, { title: string; icon: any; color: string; 
     includes: ['Automated monthly re-scans', 'Compliance drift alerts', 'Monthly compliance reports', 'Infrastructure heartbeat'],
   },
   'shield': {
-    title: 'Sentry Shield',
+    title: 'Sentry Shield + Free Audit Report',
     icon: Shield,
     color: 'text-green-600',
-    includes: ['Everything in Sentry Watch', 'Live compliance dashboard', 'Quarterly forensic reports', 'Annual certification seal', 'Priority support'],
+    includes: ['Free Sovereignty Audit Report (PDF)', 'Everything in Sentry Watch', 'Live compliance dashboard', 'Quarterly forensic reports', 'Annual certification seal', 'Priority support'],
   },
   'safe-harbor-watch': {
     title: 'Safe Harbor\u2122 + Sentry Watch',
@@ -296,7 +296,7 @@ function SuccessPageInner() {
 
   const product = purchaseInfo?.product || 'unknown';
   const config = PRODUCT_CONFIG[product] || PRODUCT_CONFIG['report'];
-  const hasReport = ['report', 'safe-harbor', 'safe-harbor-watch', 'safe-harbor-shield'].includes(product);
+  const hasReport = ['report', 'safe-harbor', 'safe-harbor-watch', 'safe-harbor-shield', 'shield'].includes(product);
   const hasSafeHarbor = ['safe-harbor', 'safe-harbor-watch', 'safe-harbor-shield'].includes(product);
   const hasMonitoring = ['watch', 'shield', 'safe-harbor-watch', 'safe-harbor-shield'].includes(product);
   const monitoringMode: 'watch' | 'shield' = ['shield', 'safe-harbor-shield'].includes(product) ? 'shield' : 'watch';
@@ -497,25 +497,69 @@ function SuccessPageInner() {
             </div>
           </div>
 
-          {/* ── UPSELL (if no monitoring) ── */}
-          {!hasMonitoring && (
-            <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-6 text-center">
-              <h3 className="text-white font-bold text-sm mb-2">Fixes don&apos;t stay fixed</h3>
-              <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Plugin updates, hosting changes, and new scripts can silently break your compliance. Add monitoring to get alerted instantly.</p>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-md mx-auto">
-                <a href={`https://buy.stripe.com/test_9B614n2Mz0168kv0xm4ko01?client_reference_id=${purchaseInfo?.npi}&prefilled_email=${encodeURIComponent(purchaseInfo?.email || '')}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors">
+          {/* ── UPSELL — ALWAYS PUSH RECURRING REVENUE ── */}
+          {(() => {
+            const npiRef = purchaseInfo?.npi || '';
+            const emailRef = encodeURIComponent(purchaseInfo?.email || '');
+            const watchLink = `https://buy.stripe.com/test_9B614n2Mz0168kv0xm4ko01?client_reference_id=${npiRef}&prefilled_email=${emailRef}`;
+            const shieldLink = `https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=${npiRef}&prefilled_email=${emailRef}`;
+
+            // Audit Report buyer → upsell Watch
+            if (purchaseInfo?.product === 'report') return (
+              <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-xl p-6 text-center">
+                <h3 className="text-white font-bold text-sm mb-1">Your report is a snapshot. Compliance is ongoing.</h3>
+                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Plugin updates, hosting changes, and new scripts can silently break your compliance. Sentry Watch monitors your site 24/7 and alerts you the moment something drifts.</p>
+                <a href={watchLink} target="_blank" rel="noopener noreferrer"
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
                   Add Sentry Watch — $39/mo
                 </a>
-                <a href={`https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=${purchaseInfo?.npi}&prefilled_email=${encodeURIComponent(purchaseInfo?.email || '')}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors border border-white/10">
-                  Add Sentry Shield — $79/mo
-                </a>
+                <p className="text-[10px] text-slate-500 mt-2">Drift alerts • Monthly re-scans • Compliance reports</p>
               </div>
-            </div>
-          )}
+            );
+
+            // Safe Harbor buyer → upsell Watch
+            if (purchaseInfo?.product === 'safe-harbor') return (
+              <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-xl p-6 text-center">
+                <h3 className="text-white font-bold text-sm mb-1">You&apos;ve fixed the issues. Now stay protected.</h3>
+                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Your Safe Harbor remediation gets you compliant today. Sentry Watch ensures you stay compliant tomorrow — automatically.</p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-md mx-auto">
+                  <a href={watchLink} target="_blank" rel="noopener noreferrer"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-lg text-sm transition-colors">
+                    Add Sentry Watch — $39/mo
+                  </a>
+                  <a href={shieldLink} target="_blank" rel="noopener noreferrer"
+                    className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-5 rounded-lg text-sm transition-colors border border-white/20">
+                    Upgrade to Shield — $79/mo
+                  </a>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2">Shield adds live dashboard, quarterly forensic reports, and annual certification seal</p>
+              </div>
+            );
+
+            // Watch buyer → upsell Shield
+            if (purchaseInfo?.product === 'watch' || purchaseInfo?.product === 'safe-harbor-watch') return (
+              <div className="bg-gradient-to-r from-green-900 to-slate-900 rounded-xl p-6 text-center">
+                <h3 className="text-white font-bold text-sm mb-1">Want full visibility? Upgrade to Shield.</h3>
+                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Get a live compliance dashboard, quarterly forensic reports, annual certification seal, and priority support.</p>
+                <a href={shieldLink} target="_blank" rel="noopener noreferrer"
+                  className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
+                  Upgrade to Sentry Shield — $79/mo
+                </a>
+                <p className="text-[10px] text-slate-500 mt-2">Only $40/mo more for full enterprise-grade compliance management</p>
+              </div>
+            );
+
+            // Shield / Safe Harbor + Shield buyer → no upsell, reinforcement
+            if (purchaseInfo?.product === 'shield' || purchaseInfo?.product === 'safe-harbor-shield') return (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 text-center">
+                <div className="text-3xl mb-2">🏆</div>
+                <h3 className="text-green-800 font-bold text-sm mb-1">You have the highest level of protection</h3>
+                <p className="text-green-600 text-xs max-w-lg mx-auto">Sentry Shield provides continuous monitoring, quarterly forensic reports, live dashboard access, and annual certification. Your compliance is in expert hands.</p>
+              </div>
+            );
+
+            return null;
+          })()}
 
           {/* ── SUPPORT ── */}
           <div className="text-center py-4">
