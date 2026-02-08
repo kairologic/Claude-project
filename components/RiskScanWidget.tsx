@@ -239,6 +239,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const [progress, setProgress] = useState<number>(0);
   const [results, setResults] = useState<any>(null);
   const [scanLog, setScanLog] = useState<Array<{message: string, type: string, timestamp: number}>>([]);
+  const [urlError, setUrlError] = useState('');
+  const [emailHint, setEmailHint] = useState('');
 
   const addLog = (message: string, type: string = 'info') => {
     setScanLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
@@ -589,6 +591,39 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       return;
     }
 
+    // Validate URL format
+    const urlTrimmed = url.trim();
+    const urlWithProtocol = urlTrimmed.startsWith('http') ? urlTrimmed : `https://${urlTrimmed}`;
+    try {
+      const parsed = new URL(urlWithProtocol);
+      if (!parsed.hostname.includes('.')) {
+        setUrlError('Please enter a valid website URL (e.g., https://yourpractice.com)');
+        addLog('[ERROR] Invalid URL — must be a website address, not a practice name', 'error');
+        return;
+      }
+      // Auto-fix: update the URL state with the validated version
+      if (url !== urlWithProtocol) setUrl(urlWithProtocol);
+      setUrlError('');
+    } catch {
+      setUrlError('Please enter a valid website URL (e.g., https://yourpractice.com)');
+      addLog('[ERROR] Invalid URL format — enter a website address like https://yourpractice.com', 'error');
+      return;
+    }
+
+    // Email-to-domain hint (non-blocking)
+    if (email && email.includes('@')) {
+      const emailDomain = email.split('@')[1]?.toLowerCase();
+      const freeProviders = ['gmail.com','yahoo.com','hotmail.com','outlook.com','aol.com','icloud.com','protonmail.com'];
+      if (freeProviders.includes(emailDomain)) {
+        try {
+          const urlDomain = new URL(urlWithProtocol).hostname.replace(/^www\./, '');
+          setEmailHint(`Tip: Use your practice email (${urlDomain}) to receive results directly`);
+        } catch { /* ignore */ }
+      } else {
+        setEmailHint('');
+      }
+    }
+
     setScanning(true);
     setProgress(0);
     setResults(null);
@@ -889,11 +924,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             <input
               type="text"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => { setUrl(e.target.value); setUrlError(''); }}
               placeholder="https://example-practice.com"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${urlError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
               disabled={scanning}
             />
+            {urlError && <p className="text-xs text-red-500 mt-1">{urlError}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -915,11 +951,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setEmailHint(''); }}
               placeholder="office@yourpractice.com"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={scanning}
             />
+            {emailHint && <p className="text-xs text-amber-600 mt-1">{emailHint}</p>}
           </div>
         </div>
 
