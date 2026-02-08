@@ -220,7 +220,7 @@ export default function RegistryPage() {
     return "";
   };
 
-  const closeModal = () => { closeModal(); setRefreshKey(k => k + 1); };
+  const closeModal = () => { setClaimModal(null); setRefreshKey(k => k + 1); };
 
   const handleClaim = async () => {
     if (!claimForm.email || !claimForm.name) return;
