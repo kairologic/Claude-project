@@ -620,15 +620,19 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       return;
     }
 
-    // Email-to-domain hint (non-blocking, just a tip)
+    // Email domain validation - must match website domain, not free email
     if (email && email.includes('@')) {
       const emailDomain = email.split('@')[1]?.toLowerCase();
-      const freeProviders = ['gmail.com','yahoo.com','hotmail.com','outlook.com','aol.com','icloud.com','protonmail.com'];
+      const freeProviders = ['gmail.com','yahoo.com','hotmail.com','outlook.com','aol.com','icloud.com','mail.com','protonmail.com'];
       if (freeProviders.includes(emailDomain)) {
         try {
           const urlDomain = new URL(validatedUrl).hostname.replace(/^www\./, '');
-          setEmailHint(`Tip: Use your practice email (${urlDomain}) to receive results directly`);
-        } catch { /* ignore */ }
+          setEmailHint(`Please use your practice email (e.g., you@${urlDomain}) to verify ownership`);
+        } catch {
+          setEmailHint('Please use your practice email, not a free email provider');
+        }
+        addLog('[ERROR] Practice email required — free email providers are not accepted for compliance verification', 'error');
+        return;
       } else {
         setEmailHint('');
       }
@@ -965,10 +969,10 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
               value={email}
               onChange={(e) => { setEmail(e.target.value); setEmailHint(''); }}
               placeholder="office@yourpractice.com"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${emailHint ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
               disabled={scanning}
             />
-            {emailHint && <p className="text-xs text-amber-600 mt-1">{emailHint}</p>}
+            {emailHint && <p className="text-xs text-red-500 mt-1">{emailHint}</p>}
           </div>
         </div>
 
