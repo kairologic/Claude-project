@@ -283,7 +283,7 @@ export default function RegistryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1 overflow-x-auto py-2 -mb-px">
             {CITY_TABS.map(tab=>(
-              <button key={tab.key} onClick={()=>{setActiveCity(tab.key);setPage(0);}} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all rounded-t-lg ${activeCity===tab.key?"bg-white/[0.08] text-gold border-b-2 border-gold":"text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"}`}>
+              <button key={tab.key} onClick={()=>{setActiveCity(tab.key);setActiveTier(null);setPage(0);}} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all rounded-t-lg ${activeCity===tab.key?"bg-white/[0.08] text-gold border-b-2 border-gold":"text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"}`}>
                 {tab.label}<span className={`ml-2 text-[10px] font-mono ${activeCity===tab.key?"text-gold/80":"text-slate-500"}`}>{cityCounts[tab.key]}</span>
               </button>
             ))}
