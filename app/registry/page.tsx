@@ -336,7 +336,40 @@ export default function RegistryPage() {
                 <p className="text-slate-400 text-xs mt-1">{claimModal.city}{claimModal.zip?`, ${claimModal.zip}`:""}</p>
               </div>
               <div className="px-6 py-4">
-                <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-4 mb-5"><div className="flex items-start gap-3"><AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" /><div><p className="text-amber-200 text-sm font-semibold">We have identified potential statutory exposures for this entity.</p><p className="text-slate-400 text-xs mt-1">Please verify your identity to unlock the Preliminary Forensic Scan.</p></div></div></div>
+                {(() => {
+                  const score = claimModal.risk_score ?? 0;
+                  const cs = claimModal.last_scan_result?.categoryScores;
+                  const dr = cs?.data_sovereignty?.percentage ?? null;
+                  const ai = cs?.ai_transparency?.percentage ?? null;
+                  const failCount = (claimModal.last_scan_result?.findings || []).filter((f:any) => f.status === "fail").length;
+                  // Build personalized alert
+                  let alertTitle = "";
+                  let alertDetail = "";
+                  if (score === 0 || !cs) {
+                    alertTitle = `${claimModal.name} has not yet been audited under SB 1188.`;
+                    alertDetail = "Verify your identity to initiate a Preliminary Forensic Scan of your digital infrastructure.";
+                  } else if (score < 60) {
+                    alertTitle = `Our scan detected ${failCount} statutory exposure${failCount !== 1 ? "s" : ""} for ${claimModal.name}.`;
+                    alertDetail = `Sovereignty Score: ${score}/100.${dr !== null && dr < 65 ? " Data residency signals indicate potential out-of-state PHI routing." : ""}${ai !== null && ai < 60 ? " No compliant AI disclosure was detected." : ""} Verify your identity to review the full findings.`;
+                  } else if (score < 80) {
+                    alertTitle = `${claimModal.name} shows partial compliance with ${failCount} item${failCount !== 1 ? "s" : ""} requiring attention.`;
+                    alertDetail = `Sovereignty Score: ${score}/100.${dr !== null && dr < 80 ? " Data residency anchoring is incomplete." : ""}${ai !== null && ai < 80 ? " AI transparency disclosures need strengthening." : ""} Verify to unlock your detailed findings.`;
+                  } else {
+                    alertTitle = `${claimModal.name} demonstrates strong sovereignty signals.`;
+                    alertDetail = `Sovereignty Score: ${score}/100. Verify your identity to claim this listing and access your full compliance certificate.`;
+                  }
+                  return (
+                    <div className={`${score > 0 && score < 60 ? "bg-red-500/5 border-red-500/15" : score < 80 ? "bg-amber-500/5 border-amber-500/15" : "bg-emerald-500/5 border-emerald-500/15"} border rounded-lg p-4 mb-5`}>
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${score > 0 && score < 60 ? "text-red-400" : score < 80 ? "text-amber-400" : "text-emerald-400"}`} />
+                        <div>
+                          <p className={`text-sm font-semibold ${score > 0 && score < 60 ? "text-red-200" : score < 80 ? "text-amber-200" : "text-emerald-200"}`}>{alertTitle}</p>
+                          <p className="text-slate-400 text-xs mt-1">{alertDetail}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="space-y-3">
                   <div><label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Your Name</label><input type="text" value={claimForm.name} onChange={e=>setClaimForm({...claimForm,name:e.target.value})} placeholder="Dr. Jane Smith" className="w-full px-3.5 py-2.5 bg-white/[0.06] border border-white/[0.12] rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/20" /></div>
                   <div><label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Work Email</label>
