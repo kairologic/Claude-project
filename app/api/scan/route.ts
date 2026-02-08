@@ -783,7 +783,7 @@ function calculateCategoryScore(findings: ScanFinding[], category: string): Cate
 
   return {
     name: category, score, maxScore: 100, percentage: score,
-    level: score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation',
+    level: score >= 80 ? 'Sovereign' : score >= 60 ? 'Moderate' : 'Violation',
     findings: catF.length,
     passed: catF.filter(f => f.status === 'pass').length,
     failed: catF.filter(f => f.status === 'fail').length,
@@ -799,11 +799,20 @@ function calculateCompositeScore(cats: Record<string, CategoryScore>): { score: 
     wTotal += w;
   }
   const score = Math.round(wTotal > 0 ? wSum / wTotal : 0);
-  return {
-    score,
-    riskLevel: score >= 67 ? 'Low' : score >= 34 ? 'Moderate' : 'High',
-    riskMeterLevel: score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation',
-  };
+
+  // Data Residency score drives elevated risk due to SB 1188 severity
+  const drScore = cats.data_sovereignty?.percentage ?? 100;
+
+  // High Risk: overall <60 OR Data Residency <65
+  if (score < 60 || drScore < 65) {
+    return { score, riskLevel: 'High', riskMeterLevel: 'Violation' };
+  }
+  // Moderate Risk: overall <80 OR Data Residency <75
+  if (score < 80 || drScore < 75) {
+    return { score, riskLevel: 'Moderate', riskMeterLevel: 'Drift' };
+  }
+  // Sovereign: overall ≥80 AND Data Residency ≥75
+  return { score, riskLevel: 'Low', riskMeterLevel: 'Sovereign' };
 }
 
 // ─── MAIN API HANDLER ───────────────────────────────────
@@ -903,9 +912,12 @@ export async function POST(request: NextRequest) {
       .slice(0, 5)
       .map(f => ({ id: f.id, name: f.name, clause: f.clause, severity: f.severity, phiRisk: f.phiRisk }));
 
+    const drScore = catScores.data_sovereignty?.percentage ?? 100;
+    const complianceStatus = (score < 60 || drScore < 65) ? 'Violation' : (score < 80 || drScore < 75) ? 'Drift' : 'Sovereign';
+
     return NextResponse.json({
       npi, url: targetUrl, riskScore: score, riskLevel, riskMeterLevel,
-      complianceStatus: score >= 67 ? 'Sovereign' : score >= 34 ? 'Drift' : 'Violation',
+      complianceStatus,
       findings, topIssues, categoryScores: catScores, dataBorderMap,
       scanTimestamp: Date.now(), scanDuration: Date.now() - startTime,
       engineVersion: ENGINE_VERSION, npiVerification: npiResult, pageContext: pageCtx,
