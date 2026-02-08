@@ -141,7 +141,7 @@ INSERT INTO page_content (page, section, content, content_type, description) VAL
 ('Footer', 'tagline', 'The Sentry Compliance Standard', 'text', 'Company tagline'),
 ('Footer', 'copyright', '© 2026 KairoLogic. All rights reserved.', 'text', 'Copyright text'),
 ('Footer', 'address', 'Austin, Texas', 'text', 'Company address'),
-('Footer', 'email', 'compliance@kairologic.com', 'text', 'Contact email'),
+('Footer', 'email', 'compliance@kairologic.net', 'text', 'Contact email'),
 ('Footer', 'phone', '(512) 555-0149', 'text', 'Contact phone'),
 
 -- Services Page
@@ -199,7 +199,7 @@ INSERT INTO assets (name, type, content, metadata) VALUES
 '<script>
   (function(){
     var e=document.createElement("script");
-    e.src="https://widget.kairologic.com/sentry.js";
+    e.src="https://widget.kairologic.net/sentry.js";
     e.async=true;
     e.dataset.npi="YOUR_NPI_HERE";
     document.body.appendChild(e);
@@ -235,3 +235,4 @@ DO $$
 BEGIN 
   RAISE NOTICE 'KairoLogic database migration v2 completed! Page content seeded with sample data.';
 END $$;
+

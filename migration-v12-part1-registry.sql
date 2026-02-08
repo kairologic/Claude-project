@@ -22,3 +22,4 @@ FROM information_schema.columns
 WHERE table_name = 'registry'
   AND column_name IN ('is_featured','status_label','report_status','latest_report_url','last_scan_timestamp','stripe_customer_id')
 ORDER BY column_name;
+

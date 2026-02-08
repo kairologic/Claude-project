@@ -379,7 +379,7 @@ function SuccessPageInner() {
       y += 8;
 
       const nextSteps = [
-        { num: '1', title: 'Schedule Consultation', desc: 'Contact KairoLogic to discuss remediation strategies — support@kairologic.com' },
+        { num: '1', title: 'Schedule Consultation', desc: 'Contact KairoLogic to discuss remediation strategies — support@kairologic.net' },
         { num: '2', title: 'Implement Technical Fixes', desc: 'Follow the recommended fixes outlined in this report for each finding' },
         { num: '3', title: 'Activate Monitoring', desc: 'Purchase Sentry Shield for ongoing compliance monitoring — $299/month' },
         { num: '4', title: 'Verify & Certify', desc: 'Complete final attestation to achieve Verified Sovereign status' },
@@ -431,7 +431,7 @@ function SuccessPageInner() {
   // ── Widget embed code ──
   const getWidgetCode = (mode: 'watch' | 'shield') => {
     const npiVal = purchaseInfo?.npi || 'YOUR_NPI';
-    return `<!-- KairoLogic Sentry ${mode === 'shield' ? 'Shield' : 'Watch'} Widget -->\n<script\n  src="https://kairologic.com/widget/sentry.js"\n  data-npi="${npiVal}"\n  data-mode="${mode}"\n  data-theme="light"\n  async>\n</script>\n<noscript>\n  <a href="https://kairologic.com/scan?npi=${npiVal}">\n    Compliance verified by KairoLogic\n  </a>\n</noscript>`;
+    return `<!-- KairoLogic Sentry ${mode === 'shield' ? 'Shield' : 'Watch'} Widget -->\n<script\n  src="https://kairologic.net/widget/sentry.js"\n  data-npi="${npiVal}"\n  data-mode="${mode}"\n  data-theme="light"\n  async>\n</script>\n<noscript>\n  <a href="https://kairologic.net/scan?npi=${npiVal}">\n    Compliance verified by KairoLogic\n  </a>\n</noscript>`;
   };
 
   const handleCopyCode = (code: string) => {
@@ -722,7 +722,7 @@ function SuccessPageInner() {
           {/* ── SUPPORT ── */}
           <div className="text-center py-4">
             <p className="text-slate-400 text-xs">
-              Questions? Email <a href="mailto:compliance@kairologic.com" className="text-blue-600 hover:underline">compliance@kairologic.com</a> or call (512) 402-2237
+              Questions? Email <a href="mailto:compliance@kairologic.net" className="text-blue-600 hover:underline">compliance@kairologic.net</a> or call (512) 402-2237
             </p>
             <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-navy mt-2 transition-colors">
               <ArrowRight className="w-3 h-3" /> Return to KairoLogic
@@ -746,3 +746,4 @@ export default function PaymentSuccessPage() {
     </Suspense>
   );
 }
+

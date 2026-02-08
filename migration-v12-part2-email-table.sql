@@ -55,3 +55,4 @@ CREATE POLICY "Allow update email_templates" ON email_templates
 -- Verify table exists
 SELECT column_name, data_type FROM information_schema.columns
 WHERE table_name = 'email_templates' ORDER BY ordinal_position;
+

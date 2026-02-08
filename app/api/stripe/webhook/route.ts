@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
       // ── 5. Send product-specific email ──
       if (customerEmail) {
         try {
-          const origin = request.headers.get('origin') || request.nextUrl.origin || 'https://kairologic.com';
+          const origin = request.headers.get('origin') || request.nextUrl.origin || 'https://kairologic.net';
           await fetch(`${origin}/api/email/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -552,3 +552,4 @@ export async function OPTIONS() {
     },
   });
 }
+

@@ -60,8 +60,8 @@ export default function PrivacyPage() {
           <h2>6. Contact Us</h2>
           <p>
             For privacy-related inquiries, contact us at{' '}
-            <a href="mailto:compliance@kairologic.com" className="text-orange hover:underline">
-              compliance@kairologic.com
+            <a href="mailto:compliance@kairologic.net" className="text-orange hover:underline">
+              compliance@kairologic.net
             </a>
           </p>
         </div>
@@ -69,3 +69,4 @@ export default function PrivacyPage() {
     </div>
   );
 }
+

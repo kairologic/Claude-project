@@ -95,7 +95,7 @@ To achieve full compliance:
 
 1. SCHEDULE CONSULTATION
    Contact KairoLogic to discuss remediation strategies
-   Email: support@kairologic.com
+   Email: support@kairologic.net
    
 2. IMPLEMENT TECHNICAL FIXES
    Follow the recommended fixes outlined above for each issue
@@ -466,8 +466,8 @@ export const generateHTMLReport = (data: ReportData): string => {
       <h2>Ready to Achieve Full Compliance?</h2>
       <p>Contact KairoLogic to implement these technical fixes and secure your Verified Sovereign status.</p>
       <div class="cta-buttons">
-        <a href="https://kairologic.com/contact" class="cta-button cta-primary">Schedule Consultation</a>
-        <a href="https://kairologic.com/services" class="cta-button cta-secondary">View Services</a>
+        <a href="https://kairologic.net/contact" class="cta-button cta-primary">Schedule Consultation</a>
+        <a href="https://kairologic.net/services" class="cta-button cta-secondary">View Services</a>
       </div>
     </div>
     
@@ -511,8 +511,8 @@ export const generateJSONReport = (data: ReportData): string => {
       'Complete final attestation for Verified status'
     ],
     contact: {
-      email: 'support@kairologic.com',
-      website: 'https://kairologic.com'
+      email: 'support@kairologic.net',
+      website: 'https://kairologic.net'
     }
   };
 
@@ -605,3 +605,4 @@ export const downloadJSONReport = (entry: Registry) => {
   const filename = `${entry.name.replace(/\s+/g, '_')}_Compliance_Report.json`;
   downloadReport(content, filename, 'application/json');
 };
+

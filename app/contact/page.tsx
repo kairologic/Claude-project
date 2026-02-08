@@ -43,7 +43,7 @@ export default function ContactPage() {
       }, 3000);
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again or email us directly at compliance@kairologic.com');
+      alert('Failed to send message. Please try again or email us directly at compliance@kairologic.net');
     }
   };
 
@@ -89,10 +89,10 @@ export default function ContactPage() {
                         EMAIL
                       </div>
                       <a 
-                        href="mailto:compliance@kairologic.com"
+                        href="mailto:compliance@kairologic.net"
                         className="text-navy hover:text-orange transition-colors font-semibold"
                       >
-                        compliance@kairologic.com
+                        compliance@kairologic.net
                       </a>
                     </div>
                   </div>
@@ -249,3 +249,4 @@ export default function ContactPage() {
     </div>
   );
 }
+

@@ -939,3 +939,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Scan failed', message: msg, engineVersion: ENGINE_VERSION }, { status: 500 });
   }
 }
+

@@ -8,7 +8,7 @@ const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazona
 const SES_SMTP_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
 const SES_SMTP_USER = process.env.SES_SMTP_USER || '';
 const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
-const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.com';
+const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.net';
 const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Compliance';
 
 function replaceVariables(template: string, vars: Record<string, string>): string {
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
     // 5. Determine recipient
     const isInternal = template.recipient_type === 'internal' || allVars._force_internal === 'true';
     const recipientEmail = isInternal
-      ? 'compliance@kairologic.com'
+      ? 'compliance@kairologic.net'
       : (variables.email || allVars.email || '');
 
     if (!recipientEmail) {
@@ -253,3 +253,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Email send failed' }, { status: 500 });
   }
 }
+

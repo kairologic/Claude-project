@@ -8,3 +8,4 @@ export default function ConsultationRedirect() {
   useEffect(() => { router.replace("/registry"); }, [router]);
   return null;
 }
+

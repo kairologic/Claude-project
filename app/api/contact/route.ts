@@ -5,7 +5,7 @@ const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazona
 const SES_SMTP_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
 const SES_SMTP_USER = process.env.SES_SMTP_USER || '';
 const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
-const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.com';
+const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.net';
 const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Sentry';
 
 export async function POST(request: NextRequest) {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     await transporter.sendMail({
       from: `"${SES_FROM_NAME}" <${SES_FROM_EMAIL}>`,
-      to: 'compliance@kairologic.com',
+      to: 'compliance@kairologic.net',
       replyTo: email,
       subject: `[${subject}] New Contact from ${practiceName}`,
       text: `
@@ -126,3 +126,4 @@ Sent from KairoLogic Sentry Platform
     );
   }
 }
+

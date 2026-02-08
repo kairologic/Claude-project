@@ -153,3 +153,4 @@ export const CMSHtml: React.FC<{
   const content = useCMSContent(page, section, fallback);
   return <div className={className} dangerouslySetInnerHTML={{ __html: content }} />;
 };
+

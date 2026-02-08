@@ -1268,7 +1268,7 @@ export default function AdminDashboard() {
       y += 10;
 
       const nextSteps = [
-        { num: '1', title: 'Schedule Consultation', desc: 'Contact KairoLogic to discuss remediation strategies \u2014 support@kairologic.com' },
+        { num: '1', title: 'Schedule Consultation', desc: 'Contact KairoLogic to discuss remediation strategies \u2014 support@kairologic.net' },
         { num: '2', title: 'Implement Technical Fixes', desc: 'Follow the recommended fixes outlined in this report for each finding' },
         { num: '3', title: 'Activate Monitoring', desc: 'Purchase Sentry Shield for ongoing compliance monitoring \u2014 $299/month' },
         { num: '4', title: 'Verify & Certify', desc: 'Complete final attestation to achieve Verified Sovereign status' },
@@ -1798,9 +1798,9 @@ export default function AdminDashboard() {
             <div className="bg-slate-50 rounded-lg p-3">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[9px] font-bold text-slate-500 uppercase">Embed Code</span>
-                <button onClick={() => { navigator.clipboard.writeText(`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`); notify('Copied!'); }} className="text-[9px] font-bold text-[#C5A059] flex items-center gap-0.5"><Copy size={10} /> Copy</button>
+                <button onClick={() => { navigator.clipboard.writeText(`<script src="https://widget.kairologic.net/sentry.js" data-npi="${widgetModal.npi}"></script>`); notify('Copied!'); }} className="text-[9px] font-bold text-[#C5A059] flex items-center gap-0.5"><Copy size={10} /> Copy</button>
               </div>
-              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`}</pre>
+              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<script src="https://widget.kairologic.net/sentry.js" data-npi="${widgetModal.npi}"></script>`}</pre>
             </div>
           </div>
         )}
@@ -2003,3 +2003,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

@@ -117,7 +117,7 @@ export const EmailTemplatesTab: React.FC<Props> = ({ showNotification }) => {
           variables: {
             practice_name: 'Test Practice',
             practice_manager_name: 'Test Manager',
-            email: 'compliance@kairologic.com',
+            email: 'compliance@kairologic.net',
             npi: '1234567890',
             status_label: 'Critical Drift',
             report_id: 'KL-TEST-999999-TX',
@@ -128,7 +128,7 @@ export const EmailTemplatesTab: React.FC<Props> = ({ showNotification }) => {
       });
       const data = await res.json();
       if (data.sent) {
-        showNotification('Test email sent to compliance@kairologic.com', 'success');
+        showNotification('Test email sent to compliance@kairologic.net', 'success');
       } else {
         showNotification('Email send returned false - check SES SMTP config', 'error');
       }
@@ -300,3 +300,4 @@ export const EmailTemplatesTab: React.FC<Props> = ({ showNotification }) => {
     </div>
   );
 };
+

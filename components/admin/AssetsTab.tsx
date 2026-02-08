@@ -460,3 +460,4 @@ export const AssetsTab: React.FC<AssetsTabProps> = ({ showNotification }) => {
     </div>
   );
 };
+

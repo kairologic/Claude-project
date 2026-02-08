@@ -122,3 +122,4 @@ export type CalendarSlot = {
   google_meet_link?: string;
   created_at?: string;
 };
+

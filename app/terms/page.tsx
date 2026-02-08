@@ -76,8 +76,8 @@ export default function TermsPage() {
           <h2>10. Contact</h2>
           <p>
             Questions about these Terms? Contact us at{' '}
-            <a href="mailto:compliance@kairologic.com" className="text-orange hover:underline">
-              compliance@kairologic.com
+            <a href="mailto:compliance@kairologic.net" className="text-orange hover:underline">
+              compliance@kairologic.net
             </a>
           </p>
         </div>
@@ -85,3 +85,4 @@ export default function TermsPage() {
     </div>
   );
 }
+

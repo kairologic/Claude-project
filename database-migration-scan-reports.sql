@@ -108,3 +108,4 @@ CREATE TRIGGER trigger_scan_reports_updated_at
 --     ON storage.objects FOR SELECT
 --     TO anon
 --     USING (bucket_id = 'audit-reports');
+

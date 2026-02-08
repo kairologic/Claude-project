@@ -371,3 +371,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Bulk scan failed', message: msg }, { status: 500 });
   }
 }
+

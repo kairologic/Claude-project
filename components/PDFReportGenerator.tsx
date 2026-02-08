@@ -490,3 +490,4 @@ const PDFReportGenerator: React.FC<PDFReportGeneratorProps> = ({ npi, registryId
 };
 
 export default PDFReportGenerator;
+

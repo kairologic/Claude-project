@@ -873,7 +873,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         fetch('/api/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...emailPayload, variables: { email: 'compliance@kairologic.com', practice_name: providerName || `NPI: ${npi}`, _force_internal: 'true' } })
+          body: JSON.stringify({ ...emailPayload, variables: { email: 'compliance@kairologic.net', practice_name: providerName || `NPI: ${npi}`, _force_internal: 'true' } })
         }).catch(() => {});
       } catch {
         // Non-critical

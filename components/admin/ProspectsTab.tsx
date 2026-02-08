@@ -568,3 +568,4 @@ export const ProspectsTab: React.FC<ProspectsTabProps> = ({ showNotification }) 
     </div>
   );
 };
+

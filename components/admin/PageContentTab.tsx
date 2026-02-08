@@ -470,3 +470,4 @@ export const PageContentTab: React.FC<PageContentTabProps> = ({ showNotification
     </div>
   );
 };
+

@@ -53,8 +53,8 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-gray-400">
               <li className="flex items-center gap-2">
                 <span>📧</span>
-                <a href="mailto:compliance@kairologic.com" className="hover:text-white transition-colors">
-                  compliance@kairologic.com
+                <a href="mailto:compliance@kairologic.net" className="hover:text-white transition-colors">
+                  compliance@kairologic.net
                 </a>
               </li>
               <li className="flex items-center gap-2">
@@ -81,3 +81,4 @@ export default function Footer() {
     </footer>
   );
 }
+

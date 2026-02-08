@@ -1132,9 +1132,9 @@ export default function AdminDashboard() {
             <div className="bg-slate-50 rounded-lg p-3">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[9px] font-bold text-slate-500 uppercase">Embed Code</span>
-                <button onClick={() => { navigator.clipboard.writeText(`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`); notify('Copied!'); }} className="text-[9px] font-bold text-[#C5A059] flex items-center gap-0.5"><Copy size={10} /> Copy</button>
+                <button onClick={() => { navigator.clipboard.writeText(`<script src="https://widget.kairologic.net/sentry.js" data-npi="${widgetModal.npi}"></script>`); notify('Copied!'); }} className="text-[9px] font-bold text-[#C5A059] flex items-center gap-0.5"><Copy size={10} /> Copy</button>
               </div>
-              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<script src="https://widget.kairologic.com/sentry.js" data-npi="${widgetModal.npi}"></script>`}</pre>
+              <pre className="text-[10px] font-mono text-slate-600 bg-white p-2 rounded border overflow-x-auto">{`<script src="https://widget.kairologic.net/sentry.js" data-npi="${widgetModal.npi}"></script>`}</pre>
             </div>
           </div>
         )}
@@ -1253,3 +1253,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

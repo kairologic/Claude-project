@@ -98,7 +98,7 @@ const PRODUCTS = [
 export default function StripeTestPage() {
   const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[1]); // Default to Safe Harbor
   const [npi, setNpi] = useState('2422423223');
-  const [email, setEmail] = useState('test@kairologic.com');
+  const [email, setEmail] = useState('test@kairologic.net');
   const [practiceName, setPracticeName] = useState('August Dental');
   const [testMode, setTestMode] = useState<'link' | 'simulate'>('simulate');
   const [showIncludes, setShowIncludes] = useState<string | null>(null);
@@ -322,7 +322,7 @@ export default function StripeTestPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="test@kairologic.com"
+                  placeholder="test@kairologic.net"
                   className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#C5A059] focus:border-transparent transition-all"
                 />
               </div>
@@ -598,3 +598,4 @@ export default function StripeTestPage() {
     </div>
   );
 }
+

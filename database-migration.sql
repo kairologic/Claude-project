@@ -242,3 +242,4 @@ DO $$
 BEGIN 
   RAISE NOTICE 'KairoLogic database migration completed successfully!';
 END $$;
+

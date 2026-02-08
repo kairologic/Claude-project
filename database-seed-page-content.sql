@@ -223,7 +223,7 @@ INSERT INTO page_content (page, section, content, content_type, description) VAL
 -- Hub Details Card
 ('Contact', 'hub_title', 'Hub Details', 'text', 'Contact info card title'),
 ('Contact', 'email_label', 'EMAIL', 'text', 'Email field label'),
-('Contact', 'email_address', 'compliance@kairologic.com', 'text', 'Contact email address'),
+('Contact', 'email_address', 'compliance@kairologic.net', 'text', 'Contact email address'),
 ('Contact', 'hq_label', 'HQ', 'text', 'HQ field label'),
 ('Contact', 'hq_address', 'Austin, TX // ATX-01 Node', 'text', 'HQ address display'),
 
@@ -347,3 +347,4 @@ SELECT page, COUNT(*) as sections FROM page_content GROUP BY page ORDER BY page;
 
 -- Show total
 SELECT 'Total content sections:' as label, COUNT(*) as count FROM page_content;
+
