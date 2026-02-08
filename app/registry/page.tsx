@@ -116,6 +116,8 @@ export default function RegistryPage() {
   const [claimForm, setClaimForm] = useState({ name: '', email: '', npi: '' });
   const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [totalScanned, setTotalScanned] = useState(0);
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 50;
 
   const loadProviders = useCallback(async () => {
     try {
@@ -234,7 +236,7 @@ export default function RegistryPage() {
           <div className="max-w-2xl">
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-gold transition-colors" size={18} />
-              <input type="text" placeholder="Search by practice name, city, or ZIP code..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              <input type="text" placeholder="Search by practice name, city, or ZIP code..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
                 className="w-full pl-12 pr-10 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-gold/40 focus:bg-white/[0.06] transition-all text-sm" />
               {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"><X size={16} /></button>}
             </div>
@@ -265,7 +267,7 @@ export default function RegistryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1 overflow-x-auto py-2 -mb-px">
             {CITY_TABS.map(tab => (
-              <button key={tab.key} onClick={() => setActiveCity(tab.key)}
+              <button key={tab.key} onClick={() => { setActiveCity(tab.key); setPage(1); }}
                 className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all rounded-t-lg ${activeCity === tab.key ? 'bg-white/[0.06] text-gold border-b-2 border-gold' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'}`}>
                 {tab.label}<span className={`ml-2 text-[10px] font-mono ${activeCity === tab.key ? 'text-gold/70' : 'text-slate-600'}`}>{cityCounts[tab.key]}</span>
               </button>
@@ -297,7 +299,7 @@ export default function RegistryPage() {
 
               {/* Rows */}
               <div className="divide-y divide-white/[0.04]">
-                {filtered.map(p => {
+                {filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE).map(p => {
                   const st = getStatus(p); const res = getResidencySignal(p); const tr = getTransparencySignal(p);
                   const hr = isHighRisk(p); const paid = p.is_paid || p.subscription_status === 'active';
                   return (
@@ -324,7 +326,61 @@ export default function RegistryPage() {
                   );
                 })}
               </div>
-              {filtered.length >= 50 && <div className="text-center py-3 border-t border-white/[0.04] text-[11px] text-slate-600">Showing {filtered.length} of {totalScanned.toLocaleString()} indexed entities</div>}
+
+              {/* Pagination */}
+              {filtered.length > PER_PAGE && (() => {
+                const totalPages = Math.ceil(filtered.length / PER_PAGE);
+                const startItem = (page - 1) * PER_PAGE + 1;
+                const endItem = Math.min(page * PER_PAGE, filtered.length);
+                return (
+                  <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-white/[0.02]">
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {startItem}–{endItem} of {filtered.length} entities
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => { setPage(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={page === 1}
+                        className="px-2 py-1 text-[11px] font-bold text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                        ««
+                      </button>
+                      <button onClick={() => { setPage(p => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={page === 1}
+                        className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                        ‹ Prev
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                        .reduce<(number | string)[]>((acc, p, i, arr) => {
+                          if (i > 0 && (p - (arr[i - 1] as number)) > 1) acc.push('...');
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((p, i) =>
+                          p === '...' ? (
+                            <span key={`dot-${i}`} className="px-1 text-slate-600 text-[11px]">…</span>
+                          ) : (
+                            <button key={p} onClick={() => { setPage(p as number); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                              className={`w-7 h-7 rounded text-[11px] font-bold transition-all ${page === p ? 'bg-gold/20 text-gold border border-gold/30' : 'text-slate-500 hover:text-white hover:bg-white/[0.04]'}`}>
+                              {p}
+                            </button>
+                          )
+                        )}
+                      <button onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={page === totalPages}
+                        className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                        Next ›
+                      </button>
+                      <button onClick={() => { setPage(totalPages); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={page === totalPages}
+                        className="px-2 py-1 text-[11px] font-bold text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                        »»
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {filtered.length <= PER_PAGE && filtered.length > 0 && (
+                <div className="text-center py-3 border-t border-white/[0.04] text-[11px] text-slate-600">
+                  Showing {filtered.length} of {totalScanned.toLocaleString()} indexed entities
+                </div>
+              )}
             </div>
           )}
 
