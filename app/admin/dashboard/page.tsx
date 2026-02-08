@@ -532,9 +532,9 @@ export default function AdminDashboard() {
             const updatePayload: any = {
               risk_score: scanData.risk_score,
               risk_level: scanData.risk_level,
-              status_label: scanData.status_label || (scanData.risk_score >= 75 ? 'Verified Sovereign' : scanData.risk_score >= 50 ? 'Drift Detected' : 'Violation'),
+              status_label: scanData.status_label || (scanData.risk_score >= 80 ? 'Verified Sovereign' : scanData.risk_score >= 60 ? 'Drift Detected' : 'Violation'),
               scan_count: (p.scan_count || 0) + 1,
-              widget_status: scanData.risk_score >= 75 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
+              widget_status: scanData.risk_score >= 80 ? 'active' : scanData.risk_score >= 60 ? 'warning' : 'hidden',
               last_scan_result: scanData,
               last_scan_timestamp: nowIso,
               updated_at: nowIso
@@ -651,9 +651,9 @@ export default function AdminDashboard() {
         const updatePayload: any = { 
           risk_score: scanData.risk_score,
           risk_level: scanData.risk_level,
-          status_label: scanData.status_label || (scanData.risk_score >= 75 ? 'Verified Sovereign' : scanData.risk_score >= 50 ? 'Drift Detected' : 'Violation'),
+          status_label: scanData.status_label || (scanData.risk_score >= 80 ? 'Verified Sovereign' : scanData.risk_score >= 60 ? 'Drift Detected' : 'Violation'),
           scan_count: (p.scan_count || 0) + 1,
-          widget_status: scanData.risk_score >= 75 ? 'active' : scanData.risk_score >= 50 ? 'warning' : 'hidden',
+          widget_status: scanData.risk_score >= 80 ? 'active' : scanData.risk_score >= 60 ? 'warning' : 'hidden',
           last_scan_result: scanData,
           last_scan_timestamp: nowIso,
           updated_at: nowIso
@@ -841,7 +841,7 @@ export default function AdminDashboard() {
       const catScores = fullReport?.category_scores || {};
       const borderMap = fullReport?.data_border_map || [];
       const score = provider.risk_score || fullReport?.sovereignty_score || 0;
-      const riskLevel = score >= 75 ? 'Low Risk' : score >= 50 ? 'Moderate Risk' : 'High Risk';
+      const riskLevel = score >= 80 ? 'Low Risk' : score >= 60 ? 'Moderate Risk' : 'High Risk';
       const reportId = fullReport?.report_id || `KL-SAR-${Date.now().toString(36).toUpperCase()}`;
       const reportDate = fullReport?.report_date ? new Date(fullReport.report_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -860,7 +860,7 @@ export default function AdminDashboard() {
       const amber: [number, number, number] = [217, 119, 6];
       const gray: [number, number, number] = [100, 116, 139];
       const darkText: [number, number, number] = [30, 41, 59];
-      const scoreColor = score >= 75 ? green : score >= 50 ? amber : red;
+      const scoreColor = score >= 80 ? green : score >= 60 ? amber : red;
 
       const checkPage = (need: number) => {
         if (y + need > pageH - 20) { doc.addPage(); y = 20; return true; }
@@ -881,7 +881,7 @@ export default function AdminDashboard() {
       doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
       doc.text('KAIRO', margin, 14);
       doc.setTextColor(...gold);
-      doc.text('LOGIC', margin + 28, 14);
+      doc.text('LOGIC', margin + doc.getTextWidth('KAIRO') + 2, 14);
       
       // Right-aligned report meta
       doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 170, 190);
@@ -1913,7 +1913,7 @@ export default function AdminDashboard() {
                     <td className="p-2 text-slate-500 font-mono">{l.npi}</td>
                     <td className="p-2 text-center">
                       {l.success ? (
-                        <span className={`font-bold ${(l.score || 0) >= 75 ? 'text-green-600' : (l.score || 0) >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                        <span className={`font-bold ${(l.score || 0) >= 80 ? 'text-green-600' : (l.score || 0) >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
                           {l.score}
                         </span>
                       ) : '—'}
