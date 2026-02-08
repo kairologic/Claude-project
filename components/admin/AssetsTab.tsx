@@ -1,610 +1,462 @@
-/**
- * KairoLogic Assets Management Tab
- * Admin interface for managing images, code snippets, and documents
- * Version: 11.0.0
- */
+'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Image, 
-  Code, 
-  FileText, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Copy, 
-  Download,
-  Search,
-  Filter,
-  X,
-  CheckCircle,
-  AlertCircle,
-  Upload,
-  Save
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  getAllAssets,
-  getAssetsByType,
-  getCategories,
-  createAsset,
-  updateAsset,
-  deleteAsset,
-  searchAssets,
-  getAssetStats,
-  formatFileSize,
-  Asset
-} from '@/services/assetsService';
+  FolderOpen, FileText, FileSpreadsheet, Download, RefreshCw,
+  CheckCircle, Clock, AlertTriangle, Loader2, Shield, ChevronRight,
+  ChevronDown, ExternalLink, HardDrive, Package, FileCheck
+} from 'lucide-react';
+
+// ════════════════════════════════════════════════
+// Types
+// ════════════════════════════════════════════════
+
+interface AssetFile {
+  id: string;
+  name: string;
+  filename: string;
+  type: 'pdf' | 'xlsx';
+  description: string;
+  version: string;
+  pages?: string;
+  icon: React.ReactNode;
+}
+
+interface AssetFolder {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  assets: AssetFile[];
+}
+
+interface AssetStatus {
+  exists: boolean;
+  sizeKB?: number;
+  modified?: string;
+  url?: string;
+}
+
+// ════════════════════════════════════════════════
+// Asset Registry
+// ════════════════════════════════════════════════
+
+const ASSET_FOLDERS: AssetFolder[] = [
+  {
+    id: 'safe-harbor',
+    name: 'Safe Harbor™ Policy Bundle',
+    description: 'Complete compliance documentation package for Texas SB 1188 + HB 149',
+    icon: <Shield size={18} />,
+    color: 'from-navy to-navy-dark',
+    assets: [
+      {
+        id: 'sb1188-policy-pack',
+        name: 'SB 1188 Data Sovereignty Policy Pack',
+        filename: 'SB1188_Data_Sovereignty_Policy_Pack.pdf',
+        type: 'pdf',
+        description: '12 policy sections + 3 appendices. Covers data residency, vendor due diligence, AI transparency, employee obligations, incident response, and audit procedures.',
+        version: 'v1.0 — Feb 2026',
+        pages: '20+ pages',
+        icon: <FileCheck size={16} className="text-navy" />,
+      },
+      {
+        id: 'implementation-guide',
+        name: 'Safe Harbor Implementation Guide',
+        filename: 'Safe_Harbor_Implementation_Guide.pdf',
+        type: 'pdf',
+        description: '6-phase step-by-step implementation workflow with checklists. Covers policy customization, AI disclosure deployment, vendor hardening, staff training, and registry verification.',
+        version: 'v1.0 — Feb 2026',
+        pages: '15+ pages',
+        icon: <FileText size={16} className="text-blue-600" />,
+      },
+      {
+        id: 'ai-disclosure-kit',
+        name: 'AI Disclosure Kit',
+        filename: 'AI_Disclosure_Kit.pdf',
+        type: 'pdf',
+        description: '8 copy-ready assets: website footer notice, patient consent form, privacy policy section, phone scripts, staff guidelines, social media template, waiting room signage, vendor verification email.',
+        version: 'v1.0 — Feb 2026',
+        pages: '12+ pages',
+        icon: <FileText size={16} className="text-amber-600" />,
+      },
+      {
+        id: 'staff-training-guide',
+        name: 'Staff Training Guide',
+        filename: 'Staff_Training_Guide.pdf',
+        type: 'pdf',
+        description: '7 training modules: data sovereignty rules, prohibited tools, AI transparency, vendor checks, leak reporting, real-world scenarios, quick reference card. Includes staff attestation form.',
+        version: 'v1.0 — Feb 2026',
+        pages: '15+ pages',
+        icon: <FileText size={16} className="text-green-600" />,
+      },
+      {
+        id: 'compliance-roadmap',
+        name: '30-Day Compliance Roadmap',
+        filename: 'Compliance_Roadmap.pdf',
+        type: 'pdf',
+        description: '4-phase roadmap from Pre-Audited to Verified Sovereign. Full checklists with owner, deliverable, and checkbox columns. Includes ongoing quarterly maintenance schedule.',
+        version: 'v1.0 — Feb 2026',
+        pages: '10+ pages',
+        icon: <FileText size={16} className="text-purple-600" />,
+      },
+      {
+        id: 'evidence-ledger',
+        name: 'Forensic Evidence Ledger',
+        filename: 'Evidence_Ledger.xlsx',
+        type: 'xlsx',
+        description: '5-tab workbook: Digital Supply Chain Inventory, Technical Residency Signals, Regulatory & Cure Notice Log, Quarterly Audit Trail, Instructions & Reference. Pre-formatted with data validations and formulas.',
+        version: 'v1.0 — Feb 2026',
+        icon: <FileSpreadsheet size={16} className="text-emerald-600" />,
+      },
+    ],
+  },
+];
+
+// ════════════════════════════════════════════════
+// Component
+// ════════════════════════════════════════════════
 
 interface AssetsTabProps {
-  showNotification: (msg: string) => void;
+  showNotification: (msg: string, type?: string) => void;
 }
 
 export const AssetsTab: React.FC<AssetsTabProps> = ({ showNotification }) => {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [stats, setStats] = useState({ total: 0, images: 0, code: 0, documents: 0, totalSize: 0 });
-  
-  const [selectedType, setSelectedType] = useState<'all' | 'image' | 'code' | 'document'>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['safe-harbor']));
+  const [assetStatuses, setAssetStatuses] = useState<Record<string, AssetStatus>>({});
+  const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [regenerateAll, setRegenerateAll] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'code' as 'image' | 'code' | 'document',
-    category: 'General',
-    description: '',
-    content: '',
-    url: ''
-  });
-
-  useEffect(() => {
-    loadAssets();
-    loadCategories();
-    loadStats();
+  // Load asset statuses on mount
+  const loadStatuses = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/generate-asset', {
+        headers: { 'Authorization': 'Bearer admin' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const statusMap: Record<string, AssetStatus> = {};
+        for (const asset of data.assets) {
+          statusMap[asset.id] = {
+            exists: asset.exists,
+            sizeKB: asset.stats?.sizeKB,
+            modified: asset.stats?.modified,
+            url: asset.url,
+          };
+        }
+        setAssetStatuses(statusMap);
+      }
+    } catch (e) {
+      console.error('Failed to load asset statuses:', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-  }, [assets, selectedType, selectedCategory, searchTerm]);
+  useEffect(() => { loadStatuses(); }, [loadStatuses]);
 
-  const loadAssets = async () => {
-    setIsLoading(true);
+  // Regenerate a single asset
+  const handleRegenerate = async (assetId: string) => {
+    setRegenerating(assetId);
     try {
-      const data = await getAllAssets();
-      setAssets(data);
-    } catch (e) {
-      showNotification('Failed to load assets');
+      const res = await fetch('/api/admin/generate-asset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer admin' },
+        body: JSON.stringify({ assetId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Generation failed');
+      
+      showNotification(`✅ ${data.file} regenerated (${data.sizeKB} KB)`, 'success');
+      // Update status
+      setAssetStatuses(prev => ({
+        ...prev,
+        [assetId]: {
+          exists: true,
+          sizeKB: data.sizeKB,
+          modified: data.generatedAt,
+          url: data.url,
+        },
+      }));
+    } catch (e: any) {
+      showNotification(`❌ Failed to regenerate: ${e.message}`, 'error');
     } finally {
-      setIsLoading(false);
+      setRegenerating(null);
     }
   };
 
-  const loadCategories = async () => {
-    const cats = await getCategories();
-    setCategories(cats);
-  };
+  // Regenerate all assets in a folder
+  const handleRegenerateAll = async (folder: AssetFolder) => {
+    setRegenerateAll(true);
+    let success = 0;
+    let failed = 0;
 
-  const loadStats = async () => {
-    const data = await getAssetStats();
-    setStats(data);
-  };
-
-  const applyFilters = async () => {
-    let filtered = assets;
-
-    // Type filter
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(a => a.type === selectedType);
+    for (const asset of folder.assets) {
+      setRegenerating(asset.id);
+      try {
+        const res = await fetch('/api/admin/generate-asset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer admin' },
+          body: JSON.stringify({ assetId: asset.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        setAssetStatuses(prev => ({
+          ...prev,
+          [asset.id]: {
+            exists: true,
+            sizeKB: data.sizeKB,
+            modified: data.generatedAt,
+            url: data.url,
+          },
+        }));
+        success++;
+      } catch {
+        failed++;
+      }
+      setRegenerating(null);
     }
 
-    // Category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(a => a.category === selectedCategory);
-    }
-
-    // Search filter
-    if (searchTerm && searchTerm.length >= 2) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(a => 
-        a.name.toLowerCase().includes(term) ||
-        a.description?.toLowerCase().includes(term) ||
-        a.category.toLowerCase().includes(term)
-      );
-    }
-
-    setFilteredAssets(filtered);
-  };
-
-  const handleCreate = async () => {
-    if (!formData.name || !formData.type) {
-      showNotification('Name and type are required');
-      return;
-    }
-
-    if (formData.type === 'code' && !formData.content) {
-      showNotification('Content is required for code snippets');
-      return;
-    }
-
-    const result = await createAsset({
-      ...formData,
-      uploaded_by: 'admin'
-    });
-
-    if (result.success) {
-      showNotification('Asset created successfully');
-      setIsModalOpen(false);
-      resetForm();
-      loadAssets();
-      loadCategories();
-      loadStats();
-    } else {
-      showNotification(`Creation failed: ${result.error}`);
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (!editingAsset) return;
-
-    const result = await updateAsset(editingAsset.id, formData);
-
-    if (result.success) {
-      showNotification('Asset updated successfully');
-      setIsModalOpen(false);
-      setIsEditing(false);
-      setEditingAsset(null);
-      resetForm();
-      loadAssets();
-      loadCategories();
-    } else {
-      showNotification(`Update failed: ${result.error}`);
-    }
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-
-    const result = await deleteAsset(id);
-    
-    if (result.success) {
-      showNotification('Asset deleted');
-      loadAssets();
-      loadStats();
-    } else {
-      showNotification(`Delete failed: ${result.error}`);
-    }
-  };
-
-  const handleEdit = (asset: Asset) => {
-    setEditingAsset(asset);
-    setFormData({
-      name: asset.name,
-      type: asset.type,
-      category: asset.category,
-      description: asset.description || '',
-      content: asset.content || '',
-      url: asset.url || ''
-    });
-    setIsEditing(true);
-    setIsModalOpen(true);
-  };
-
-  const handleCopy = async (content: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedId(id);
-      showNotification('Copied to clipboard!');
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch (e) {
-      showNotification('Failed to copy');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      type: 'code',
-      category: 'General',
-      description: '',
-      content: '',
-      url: ''
-    });
-  };
-
-  const handleCancel = () => {
-    setIsModalOpen(false);
-    setIsEditing(false);
-    setEditingAsset(null);
-    resetForm();
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'image': return <Image size={20} />;
-      case 'code': return <Code size={20} />;
-      case 'document': return <FileText size={20} />;
-      default: return <FileText size={20} />;
-    }
-  };
-
-  const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case 'image': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'code': return 'bg-green-100 text-green-700 border-green-200';
-      case 'document': return 'bg-purple-100 text-purple-700 border-purple-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  // Modal for create/edit
-  const renderModal = () => {
-    if (!isModalOpen) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[3rem] shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="bg-navy p-8 text-white flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gold/20 rounded-2xl flex items-center justify-center">
-                {isEditing ? <Edit2 size={24} className="text-gold" /> : <Plus size={24} className="text-gold" />}
-              </div>
-              <div>
-                <h3 className="text-xl font-black uppercase tracking-tight">
-                  {isEditing ? 'Edit Asset' : 'Create New Asset'}
-                </h3>
-                <p className="text-xs text-gold font-bold uppercase tracking-widest mt-1">
-                  {formData.type.toUpperCase()}
-                </p>
-              </div>
-            </div>
-            <button onClick={handleCancel} className="p-3 hover:bg-white/10 rounded-xl transition-colors">
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* Form */}
-          <div className="p-8 space-y-6 overflow-y-auto flex-grow">
-            {/* Asset Name */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Asset Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="HB 149 AI Disclosure Snippet"
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-              />
-            </div>
-
-            {/* Type Selection */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Asset Type *
-              </label>
-              <div className="grid grid-cols-3 gap-4">
-                {(['code', 'image', 'document'] as const).map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type })}
-                    disabled={isEditing}
-                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                      formData.type === type
-                        ? 'bg-navy text-white border-navy'
-                        : 'bg-white text-navy border-gray-200 hover:border-gold'
-                    } ${isEditing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {getTypeIcon(type)}
-                    <span className="text-xs font-black uppercase">{type}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Category */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Category
-              </label>
-              <input
-                type="text"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="Compliance, Widget, Legal, etc."
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-medium text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-                placeholder="What is this asset for?"
-                className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm text-navy focus:outline-none focus:ring-2 focus:ring-gold resize-none"
-              />
-            </div>
-
-            {/* Code Content (for code type) */}
-            {formData.type === 'code' && (
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                  Code Snippet *
-                </label>
-                <textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  rows={12}
-                  placeholder="<div>Your code here...</div>"
-                  className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs text-navy focus:outline-none focus:ring-2 focus:ring-gold font-mono resize-none"
-                />
-                <div className="mt-2 text-xs text-gray-400 font-mono">
-                  {formData.content.length} characters
-                </div>
-              </div>
-            )}
-
-            {/* URL (for images/documents) */}
-            {(formData.type === 'image' || formData.type === 'document') && (
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-navy/60 mb-2 block">
-                  File URL {formData.type === 'image' ? '*' : ''}
-                </label>
-                <input
-                  type="text"
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  placeholder="https://cdn.kairologic.com/hero-image.jpg"
-                  className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-                />
-                <p className="mt-2 text-xs text-gray-400 italic">
-                  Upload to Supabase Storage first, then paste the URL here
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="p-8 border-t border-gray-100 flex justify-between items-center shrink-0">
-            <button
-              onClick={handleCancel}
-              className="px-8 py-4 text-navy font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 rounded-xl transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={isEditing ? handleUpdate : handleCreate}
-              className="bg-navy text-gold px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-gold hover:text-navy transition-all flex items-center gap-2"
-            >
-              <Save size={16} />
-              {isEditing ? 'Save Changes' : 'Create Asset'}
-            </button>
-          </div>
-        </div>
-      </div>
+    setRegenerateAll(false);
+    showNotification(
+      `Bundle regeneration complete: ${success} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
+      failed > 0 ? 'warning' : 'success'
     );
   };
 
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      next.has(folderId) ? next.delete(folderId) : next.add(folderId);
+      return next;
+    });
+  };
+
+  // Counts
+  const totalAssets = ASSET_FOLDERS.reduce((sum, f) => sum + f.assets.length, 0);
+  const existingAssets = Object.values(assetStatuses).filter(s => s.exists).length;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-black uppercase tracking-tight text-navy mb-2">
-            Assets Library
+          <h2 className="text-lg font-bold text-navy flex items-center gap-2">
+            <Package size={20} /> Asset Manager
           </h2>
-          <p className="text-sm text-gray-500 font-medium italic">
-            Manage code snippets, images, and documents for your compliance platform.
+          <p className="text-xs text-slate-500 mt-1">
+            Manage, preview, and regenerate Safe Harbor™ compliance documents
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setIsModalOpen(true);
-          }}
-          className="bg-navy text-gold px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-gold hover:text-navy transition-all flex items-center gap-2 justify-center shrink-0"
-        >
-          <Plus size={16} />
-          New Asset
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="text-2xl font-black text-navy mb-1">{stats.total}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Assets</div>
-        </div>
-        <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 shadow-sm">
-          <div className="text-2xl font-black text-blue-700 mb-1">{stats.images}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-blue-600">Images</div>
-        </div>
-        <div className="bg-green-50 p-6 rounded-2xl border border-green-100 shadow-sm">
-          <div className="text-2xl font-black text-green-700 mb-1">{stats.code}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-green-600">Code Snippets</div>
-        </div>
-        <div className="bg-purple-50 p-6 rounded-2xl border border-purple-100 shadow-sm">
-          <div className="text-2xl font-black text-purple-700 mb-1">{stats.documents}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-purple-600">Documents</div>
-        </div>
-        <div className="bg-gold/10 p-6 rounded-2xl border border-gold/20 shadow-sm">
-          <div className="text-lg font-black text-navy mb-1">{formatFileSize(stats.totalSize)}</div>
-          <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total Size</div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Type Filter */}
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-navy/40" size={20} />
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as any)}
-            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold appearance-none"
-          >
-            <option value="all">All Types</option>
-            <option value="code">Code Snippets</option>
-            <option value="image">Images</option>
-            <option value="document">Documents</option>
-          </select>
-        </div>
-
-        {/* Category Filter */}
-        <div className="relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-navy/40" size={20} />
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-navy focus:outline-none focus:ring-2 focus:ring-gold appearance-none"
-          >
-            <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-navy/40" size={20} />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search assets..."
-            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-navy focus:outline-none focus:ring-2 focus:ring-gold"
-          />
-        </div>
-      </div>
-
-      {/* Assets Grid */}
-      {isLoading ? (
-        <div className="bg-white p-20 rounded-[3rem] border border-gray-100 text-center">
-          <div className="animate-spin text-navy/20 mx-auto mb-4">
-            <Upload size={48} />
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Assets</div>
+            <div className="text-sm font-bold text-navy">{existingAssets} / {totalAssets} generated</div>
           </div>
-          <p className="text-sm font-bold text-navy/60 uppercase tracking-widest">Loading assets...</p>
+          <button
+            onClick={() => loadStatuses()}
+            disabled={loading}
+            className="p-2 text-slate-400 hover:text-navy rounded-lg transition-colors"
+            title="Refresh status"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
-      ) : filteredAssets.length === 0 ? (
-        <div className="bg-slate-50 border-2 border-dashed border-gray-200 rounded-[3rem] p-20 text-center">
-          <FileText className="text-gray-300 mx-auto mb-4" size={48} />
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-            {searchTerm || selectedType !== 'all' || selectedCategory !== 'all' 
-              ? 'No matching assets found' 
-              : 'No assets yet'}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredAssets.map((asset) => (
-            <div
-              key={asset.id}
-              className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all p-6 group"
+      </div>
+
+      {/* Folders */}
+      {ASSET_FOLDERS.map(folder => {
+        const isExpanded = expandedFolders.has(folder.id);
+        const folderAssetCount = folder.assets.length;
+        const folderExisting = folder.assets.filter(a => assetStatuses[a.id]?.exists).length;
+
+        return (
+          <div key={folder.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            {/* Folder Header */}
+            <button
+              onClick={() => toggleFolder(folder.id)}
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
             >
-              {/* Asset Header */}
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="flex items-start gap-3 flex-grow min-w-0">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    asset.type === 'image' ? 'bg-blue-100 text-blue-700' :
-                    asset.type === 'code' ? 'bg-green-100 text-green-700' :
-                    'bg-purple-100 text-purple-700'
-                  }`}>
-                    {getTypeIcon(asset.type)}
-                  </div>
-                  <div className="flex-grow min-w-0">
-                    <h3 className="font-black text-navy text-sm mb-1 truncate">{asset.name}</h3>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${getTypeBadgeColor(asset.type)}`}>
-                        {asset.type}
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-100 text-navy rounded text-[8px] font-black uppercase tracking-widest">
-                        {asset.category}
-                      </span>
-                    </div>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 bg-gradient-to-br ${folder.color} rounded-xl flex items-center justify-center text-white`}>
+                  {folder.icon}
                 </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  {asset.type === 'code' && asset.content && (
-                    <button
-                      onClick={() => handleCopy(asset.content!, asset.id)}
-                      className="p-2 bg-slate-100 text-navy rounded-xl hover:bg-gold hover:text-navy transition-all relative"
-                      title="Copy to clipboard"
-                    >
-                      {copiedId === asset.id ? <CheckCircle size={16} /> : <Copy size={16} />}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleEdit(asset)}
-                    className="p-2 bg-slate-100 text-navy rounded-xl hover:bg-gold hover:text-navy transition-all"
-                    title="Edit"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(asset.id, asset.name)}
-                    className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                    title="Delete"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                <div className="text-left">
+                  <div className="font-bold text-navy text-sm flex items-center gap-2">
+                    {folder.name}
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gold/10 text-gold-dark">
+                      {folderAssetCount} files
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500">{folder.description}</div>
                 </div>
               </div>
-
-              {/* Asset Content Preview */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-gray-100 mb-3 max-h-40 overflow-y-auto">
-                {asset.type === 'code' && asset.content && (
-                  <pre className="text-xs font-mono text-navy whitespace-pre-wrap break-all">
-                    {asset.content.substring(0, 200)}
-                    {asset.content.length > 200 && '...'}
-                  </pre>
+              <div className="flex items-center gap-3">
+                {/* Status badge */}
+                {folderExisting === folderAssetCount ? (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                    <CheckCircle size={12} /> All Generated
+                  </span>
+                ) : folderExisting > 0 ? (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                    <Clock size={12} /> {folderExisting}/{folderAssetCount}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full">
+                    <AlertTriangle size={12} /> Not Generated
+                  </span>
                 )}
-                {asset.type === 'image' && asset.url && (
-                  <div className="text-xs font-mono text-navy break-all">
-                    {asset.url}
-                  </div>
-                )}
-                {asset.type === 'document' && asset.url && (
-                  <div className="text-xs font-mono text-navy break-all">
-                    {asset.url}
-                  </div>
-                )}
-                {asset.description && (
-                  <p className="text-xs text-gray-500 italic mt-2">{asset.description}</p>
-                )}
+                {isExpanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
               </div>
+            </button>
 
-              {/* Asset Metadata */}
-              <div className="flex items-center justify-between text-[9px] text-gray-400 font-mono">
-                <span>ID: {asset.id}</span>
-                <span>{new Date(asset.uploaded_at).toLocaleDateString()}</span>
+            {/* Expanded Content */}
+            {isExpanded && (
+              <div className="border-t border-slate-100">
+                {/* Folder Actions */}
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-50/50 border-b border-slate-100">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                    {folder.id === 'safe-harbor' ? 'Safe Harbor™ Bundle Documents' : 'Documents'}
+                  </div>
+                  <button
+                    onClick={() => handleRegenerateAll(folder)}
+                    disabled={regenerateAll || regenerating !== null}
+                    className="flex items-center gap-1.5 bg-navy hover:bg-navy-light text-white px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40"
+                  >
+                    {regenerateAll ? (
+                      <><Loader2 size={13} className="animate-spin" /> Regenerating All...</>
+                    ) : (
+                      <><RefreshCw size={13} /> Update &amp; Regenerate All</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Asset List */}
+                <div className="divide-y divide-slate-100">
+                  {folder.assets.map(asset => {
+                    const status = assetStatuses[asset.id];
+                    const isRegen = regenerating === asset.id;
+
+                    return (
+                      <div
+                        key={asset.id}
+                        className={`flex items-start gap-4 p-4 transition-all ${
+                          isRegen ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'
+                        }`}
+                      >
+                        {/* Icon */}
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                            asset.type === 'xlsx' ? 'bg-emerald-50' : 'bg-slate-50'
+                          }`}>
+                            {asset.icon}
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <h4 className="font-bold text-navy text-sm">{asset.name}</h4>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                              asset.type === 'xlsx' 
+                                ? 'bg-emerald-100 text-emerald-700' 
+                                : 'bg-red-50 text-red-600'
+                            }`}>
+                              {asset.type}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 leading-relaxed">{asset.description}</p>
+                          <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                            <span>{asset.version}</span>
+                            {asset.pages && <span>• {asset.pages}</span>}
+                            {status?.exists && (
+                              <>
+                                <span>• {status.sizeKB} KB</span>
+                                {status.modified && (
+                                  <span>• Last generated: {new Date(status.modified).toLocaleString()}</span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 mt-1">
+                          {/* Download */}
+                          {status?.exists && status.url && (
+                            <a
+                              href={status.url}
+                              download={asset.filename}
+                              className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 text-slate-600 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
+                            >
+                              <Download size={13} /> Download
+                            </a>
+                          )}
+
+                          {/* Regenerate */}
+                          <button
+                            onClick={() => handleRegenerate(asset.id)}
+                            disabled={isRegen || regenerateAll}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 ${
+                              status?.exists
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-600'
+                                : 'bg-navy hover:bg-navy-light text-white'
+                            }`}
+                          >
+                            {isRegen ? (
+                              <><Loader2 size={13} className="animate-spin" /> Generating...</>
+                            ) : status?.exists ? (
+                              <><RefreshCw size={13} /> Regenerate</>
+                            ) : (
+                              <><RefreshCw size={13} /> Generate</>
+                            )}
+                          </button>
+
+                          {/* Status indicator */}
+                          {status?.exists ? (
+                            <CheckCircle size={16} className="text-green-500" />
+                          ) : (
+                            <div className="w-4 h-4 rounded-full border-2 border-slate-200" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer */}
+                <div className="px-4 py-3 bg-gradient-to-r from-navy/5 to-transparent border-t border-slate-100">
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                    <HardDrive size={11} />
+                    <span>Files stored in <code className="bg-slate-100 px-1 py-0.5 rounded text-[9px] font-mono">/public/assets/safe-harbor/</code></span>
+                    <span>•</span>
+                    <span>Generated server-side via Python (ReportLab + openpyxl)</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            )}
+          </div>
+        );
+      })}
+
+      {/* Info Box */}
+      <div className="bg-gradient-to-r from-navy/5 to-gold/5 border border-navy/10 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <Shield size={18} className="text-navy flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold text-navy text-sm">About Safe Harbor™ Bundle Generation</h4>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Each document is generated server-side using branded Python templates with the KairoLogic navy/gold design system. 
+              Click <strong>Regenerate</strong> to rebuild individual files, or <strong>Update &amp; Regenerate All</strong> to rebuild the entire bundle. 
+              Generated files are served from <code className="bg-white px-1 py-0.5 rounded text-[9px] font-mono">/assets/safe-harbor/</code> and can be 
+              linked in Stripe post-purchase delivery emails. Generator scripts are in <code className="bg-white px-1 py-0.5 rounded text-[9px] font-mono">/scripts/safe-harbor/</code>.
+            </p>
+          </div>
         </div>
-      )}
-
-      {/* Modal */}
-      {renderModal()}
+      </div>
     </div>
   );
 };
-
-export default AssetsTab;
