@@ -110,6 +110,7 @@ export default function RegistryPage() {
   const [stats, setStats] = useState({ sovereign: 0, moderate: 0, atRisk: 0, pending: 0 });
   const [cityCounts, setCityCounts] = useState<Record<CityTab, number>>({ all: 0, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 });
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -195,11 +196,11 @@ export default function RegistryPage() {
       setProviders(sorted);
       setTotalCount(count || 0);
     } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [page, activeCity, debouncedSearch, activeTier]);
+  }, [page, activeCity, debouncedSearch, activeTier, refreshKey]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadProviders(); }, [loadProviders]);
-  useEffect(() => { setPage(0); }, [activeCity, activeTier]);
+  useEffect(() => { setPage(0); setRefreshKey(k => k + 1); }, [activeCity, activeTier]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const showFrom = totalCount > 0 ? page * PAGE_SIZE + 1 : 0;
@@ -218,6 +219,8 @@ export default function RegistryPage() {
     }
     return "";
   };
+
+  const closeModal = () => { closeModal(); setRefreshKey(k => k + 1); };
 
   const handleClaim = async () => {
     if (!claimForm.email || !claimForm.name) return;
@@ -376,12 +379,12 @@ export default function RegistryPage() {
 
       {/* CLAIM MODAL */}
       {claimModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={()=>setClaimModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={()=>closeModal()}>
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
           <div className="relative bg-[#0c1425] border border-white/[0.1] rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
             {claimStep === "verify" ? (<>
               <div className="px-6 pt-6 pb-4 border-b border-white/[0.08]">
-                <div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center"><Shield className="w-4 h-4 text-amber-400" /></div><span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Verification Required</span></div><button onClick={()=>setClaimModal(null)} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div>
+                <div className="flex items-center justify-between mb-4"><div className="flex items-center gap-2"><div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center"><Shield className="w-4 h-4 text-amber-400" /></div><span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Verification Required</span></div><button onClick={()=>closeModal()} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div>
                 <h3 className="text-white font-bold text-lg">{claimModal.name}</h3>
                 <p className="text-slate-400 text-xs mt-1">{claimModal.city}{claimModal.zip?`, ${claimModal.zip}`:""}</p>
               </div>
@@ -435,7 +438,7 @@ export default function RegistryPage() {
               </div>
             </>) : (<>
               {/* RESULT STEP - Full scan results breakdown */}
-              <div className="sticky top-0 z-10 px-6 pt-6 pb-4 border-b border-white/[0.08] bg-[#0c1425] rounded-t-2xl"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-emerald-400" /><span className="text-emerald-400 text-sm font-bold">Identity Verified</span></div><button onClick={()=>setClaimModal(null)} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div></div>
+              <div className="sticky top-0 z-10 px-6 pt-6 pb-4 border-b border-white/[0.08] bg-[#0c1425] rounded-t-2xl"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-emerald-400" /><span className="text-emerald-400 text-sm font-bold">Identity Verified</span></div><button onClick={()=>closeModal()} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div></div>
               <div className="px-6 py-6">
                 <h3 className="text-white font-bold text-lg mb-1">{claimModal.name}</h3>
                 <p className="text-slate-400 text-xs mb-5">{claimModal.city}{claimModal.zip?`, ${claimModal.zip}`:""}</p>
