@@ -266,8 +266,148 @@ function SuccessPageInner() {
           styles: { fontSize: 7, cellPadding: 2 },
           headStyles: { fillColor: [0, 35, 78], textColor: 255 },
           margin: { left: 15, right: 15 },
+          didParseCell: (data: any) => {
+            if (data.section === 'body' && data.column.index === 3) {
+              data.cell.styles.textColor = String(data.cell.raw).includes('\u2713') ? [22, 163, 74] : [220, 38, 38];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          },
         });
+        y = (doc as any).lastAutoTable.finalY + 10;
       }
+
+      // ═══ REMEDIATION ROADMAP ═══
+      const failedFindings = (report.findings || []).filter((f: any) => (f.status || '').toLowerCase() === 'fail');
+      const warnFindings = (report.findings || []).filter((f: any) => (f.status || '').toLowerCase() === 'warn' && (f.recommendedFix || f.technicalFix || f.recommended_fix));
+      const remediationItems = [...failedFindings, ...warnFindings];
+      
+      if (remediationItems.length > 0) {
+        if (y > 220) { doc.addPage(); y = 20; }
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 35, 78);
+        doc.text(`Remediation Roadmap (${remediationItems.length} Items)`, 15, y);
+        doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.8);
+        doc.line(15, y + 2, 90, y + 2);
+        y += 10;
+
+        // Priority sort
+        const priOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        remediationItems.sort((a: any, b: any) => (priOrder[(a.severity || 'medium').toLowerCase()] || 4) - (priOrder[(b.severity || 'medium').toLowerCase()] || 4));
+
+        remediationItems.forEach((f: any, idx: number) => {
+          const fix = f.recommendedFix || f.technicalFix || f.recommended_fix || '';
+          if (!fix) return;
+          if (y > 250) { doc.addPage(); y = 20; }
+
+          const isFail = (f.status || '').toLowerCase() === 'fail';
+          const stepColor: [number, number, number] = isFail ? [220, 38, 38] : [217, 119, 6];
+          
+          // Step number
+          doc.setFillColor(...stepColor);
+          doc.circle(19, y + 3, 3.5, 'F');
+          doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+          doc.text(`${idx + 1}`, 19, y + 4.5, { align: 'center' });
+
+          // Finding ID + name
+          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 35, 78);
+          doc.text(`${f.id || ''}: ${f.name || 'Finding'}`, 26, y + 2);
+
+          // Priority badge
+          const sevLabel = (f.severity || 'medium').toUpperCase();
+          doc.setFontSize(5.5); doc.setTextColor(...stepColor);
+          doc.text(`${isFail ? 'FAILED' : 'WARNING'} \u2022 ${sevLabel}`, 26, y + 7);
+
+          // Fix text
+          doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(6, 78, 59);
+          const fixLines = doc.splitTextToSize(fix, pageWidth - 50);
+          doc.setFillColor(236, 253, 245);
+          doc.rect(25, y + 9, pageWidth - 42, fixLines.length * 3.2 + 3, 'F');
+          doc.setFillColor(16, 185, 129);
+          doc.rect(25, y + 9, 0.8, fixLines.length * 3.2 + 3, 'F');
+          doc.text(fixLines, 28, y + 13);
+
+          y += 16 + fixLines.length * 3.2;
+        });
+        y += 6;
+      }
+
+      // ═══ COMPLIANCE ATTESTATION / SIGN SHEET ═══
+      if (y > 200) { doc.addPage(); y = 20; }
+      
+      // Navy attestation block
+      doc.setFillColor(0, 35, 78);
+      doc.roundedRect(15, y, pageWidth - 30, 52, 3, 3, 'F');
+      
+      // Gold header
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(197, 160, 89);
+      doc.text('COMPLIANCE ATTESTATION', pageWidth / 2, y + 10, { align: 'center' });
+      
+      // Attestation text
+      doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 220, 220);
+      const practiceLbl = report.practice_name || 'the above-named practice';
+      const reportDateFmt = new Date(report.report_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const attText = `This document certifies that ${practiceLbl} (NPI: ${report.npi}) has been assessed for compliance with Texas SB 1188 (Data Sovereignty) and HB 149 (AI Transparency) as of ${reportDateFmt}. The findings herein reflect the observable digital infrastructure at the time of scan and do not constitute legal advice or guarantee of regulatory compliance.`;
+      const attLines = doc.splitTextToSize(attText, pageWidth - 46);
+      doc.text(attLines, 23, y + 17);
+      
+      // Signature lines
+      doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.3);
+      // Left signature: KairoLogic Compliance Engine
+      doc.line(23, y + 40, 75, y + 40);
+      doc.setFontSize(6); doc.setTextColor(197, 160, 89);
+      doc.text('KairoLogic Compliance Engine', 25, y + 44);
+      doc.setFontSize(5.5); doc.setTextColor(160, 170, 190);
+      doc.text(`Engine: ${report.engine_version || 'SENTRY-3.1.0'}`, 25, y + 48);
+      
+      // Right signature: Date
+      doc.line(pageWidth - 75, y + 40, pageWidth - 23, y + 40);
+      doc.setFontSize(6); doc.setTextColor(197, 160, 89);
+      doc.text('Date', pageWidth - 73, y + 44);
+      doc.setFontSize(5.5); doc.setTextColor(160, 170, 190);
+      doc.text(reportDateFmt, pageWidth - 73, y + 48);
+      
+      y += 60;
+
+      // ═══ NEXT STEPS CTA ═══
+      if (y > 240) { doc.addPage(); y = 20; }
+      
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 35, 78);
+      doc.text('Next Steps', 15, y);
+      doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.8);
+      doc.line(15, y + 2, 50, y + 2);
+      y += 8;
+
+      const nextSteps = [
+        { num: '1', title: 'Schedule Consultation', desc: 'Contact KairoLogic to discuss remediation strategies — support@kairologic.com' },
+        { num: '2', title: 'Implement Technical Fixes', desc: 'Follow the recommended fixes outlined in this report for each finding' },
+        { num: '3', title: 'Activate Monitoring', desc: 'Purchase Sentry Shield for ongoing compliance monitoring — $299/month' },
+        { num: '4', title: 'Verify & Certify', desc: 'Complete final attestation to achieve Verified Sovereign status' },
+      ];
+      
+      nextSteps.forEach((step) => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.setFillColor(0, 35, 78);
+        doc.circle(19, y + 2, 3, 'F');
+        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+        doc.text(step.num, 19, y + 3.5, { align: 'center' });
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 35, 78);
+        doc.text(step.title, 26, y + 3);
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
+        doc.text(step.desc, 26, y + 8);
+        y += 14;
+      });
+
+      y += 6;
+
+      // ═══ LEGAL DISCLAIMER ═══
+      if (y > 255) { doc.addPage(); y = 20; }
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(15, y, pageWidth - 30, 22, 2, 2, 'F');
+      doc.setFontSize(5.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(100, 116, 139);
+      const disclaimerText = 'This report is generated by the KairoLogic SENTRY engine based on publicly observable digital infrastructure signals including DNS records, IP geolocation, HTTP headers, TLS certificates, and website content. It does not constitute legal advice, certification, or guarantee of regulatory compliance. Healthcare entities should consult qualified legal counsel for definitive compliance guidance. \u00A9 ' + new Date().getFullYear() + ' KairoLogic. All rights reserved.';
+      const discLines = doc.splitTextToSize(disclaimerText, pageWidth - 40);
+      doc.text(discLines, 20, y + 5);
 
       // Footer
       const pageCount = doc.getNumberOfPages();
