@@ -271,8 +271,22 @@ export async function POST(request: NextRequest) {
       const reportId = await storeReport(p.npi, p.name, scanData, origin);
 
       // ── 4. Update registry with scan results ──
-      const statusLabel = riskScore >= 75 ? 'Verified Sovereign' : riskScore >= 50 ? 'Drift Detected' : 'Violation';
-      const widgetStatus = riskScore >= 75 ? 'active' : riskScore >= 50 ? 'warning' : 'hidden';
+      // DR-aware risk categorization: Data Residency score elevates risk due to SB 1188
+      const drCategory = (scanData.categoryScores as Record<string, any>)?.data_sovereignty;
+      const drScore = drCategory?.percentage ?? 100;
+
+      let statusLabel: string;
+      let widgetStatus: string;
+      if (riskScore < 60 || drScore < 65) {
+        statusLabel = 'Violation';
+        widgetStatus = 'hidden';
+      } else if (riskScore < 80 || drScore < 75) {
+        statusLabel = 'Drift Detected';
+        widgetStatus = 'warning';
+      } else {
+        statusLabel = 'Verified Sovereign';
+        widgetStatus = 'active';
+      }
 
       const registryUpdate: Record<string, unknown> = {
         url: targetUrl,
@@ -297,9 +311,10 @@ export async function POST(request: NextRequest) {
         await supabaseInsert('prospects', {
           source: 'bulk-scan',
           contact_name: p.name,
+          practice_name: p.name,
           email: p.email || null,
-          status: riskScore >= 75 ? 'passive' : riskScore >= 50 ? 'nurture' : 'hot',
-          priority: riskScore < 50 ? 'high' : riskScore < 75 ? 'medium' : 'low',
+          status: statusLabel === 'Verified Sovereign' ? 'passive' : statusLabel === 'Drift Detected' ? 'nurture' : 'hot',
+          priority: statusLabel === 'Violation' ? 'high' : statusLabel === 'Drift Detected' ? 'medium' : 'low',
           admin_notes: `Bulk scan: Score ${riskScore} (${statusLabel}). ${failCount} issues found.`,
           form_data: {
             npi: p.npi,
