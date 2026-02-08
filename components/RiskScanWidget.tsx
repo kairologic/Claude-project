@@ -241,6 +241,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const [scanLog, setScanLog] = useState<Array<{message: string, type: string, timestamp: number}>>([]);
   const [urlError, setUrlError] = useState('');
   const [emailHint, setEmailHint] = useState('');
+  const [npiError, setNpiError] = useState('');
 
   const addLog = (message: string, type: string = 'info') => {
     setScanLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
@@ -591,9 +592,18 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       return;
     }
 
+    // Validate NPI - must be exactly 10 digits
+    if (npi.length !== 10 || !/^\d{10}$/.test(npi)) {
+      setNpiError('NPI must be exactly 10 digits');
+      addLog('[ERROR] Invalid NPI — must be exactly 10 digits', 'error');
+      return;
+    }
+    setNpiError('');
+
     // Validate URL format
     const urlTrimmed = url.trim();
     const urlWithProtocol = urlTrimmed.startsWith('http') ? urlTrimmed : `https://${urlTrimmed}`;
+    let validatedUrl = urlWithProtocol;
     try {
       const parsed = new URL(urlWithProtocol);
       if (!parsed.hostname.includes('.')) {
@@ -601,7 +611,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         addLog('[ERROR] Invalid URL — must be a website address, not a practice name', 'error');
         return;
       }
-      // Auto-fix: update the URL state with the validated version
+      validatedUrl = urlWithProtocol;
       if (url !== urlWithProtocol) setUrl(urlWithProtocol);
       setUrlError('');
     } catch {
@@ -610,13 +620,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       return;
     }
 
-    // Email-to-domain hint (non-blocking)
+    // Email-to-domain hint (non-blocking, just a tip)
     if (email && email.includes('@')) {
       const emailDomain = email.split('@')[1]?.toLowerCase();
       const freeProviders = ['gmail.com','yahoo.com','hotmail.com','outlook.com','aol.com','icloud.com','protonmail.com'];
       if (freeProviders.includes(emailDomain)) {
         try {
-          const urlDomain = new URL(urlWithProtocol).hostname.replace(/^www\./, '');
+          const urlDomain = new URL(validatedUrl).hostname.replace(/^www\./, '');
           setEmailHint(`Tip: Use your practice email (${urlDomain}) to receive results directly`);
         } catch { /* ignore */ }
       } else {
@@ -911,11 +921,13 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
             <input
               type="text"
               value={npi}
-              onChange={(e) => setNpi(e.target.value)}
+              onChange={(e) => { setNpi(e.target.value.replace(/\D/g, '').slice(0, 10)); setNpiError(''); }}
               placeholder="1234567890"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${npiError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
               disabled={scanning}
+              maxLength={10}
             />
+            {npiError && <p className="text-xs text-red-500 mt-1">{npiError}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
