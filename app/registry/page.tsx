@@ -384,52 +384,70 @@ export default function RegistryPage() {
                 <button onClick={handleClaim} disabled={!claimForm.name||!claimForm.email||claimSubmitting} className="bg-gold hover:bg-gold-light disabled:opacity-40 text-navy font-bold px-5 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2">{claimSubmitting?<Loader2 className="w-4 h-4 animate-spin" />:<ShieldCheck size={16} />} Verify &amp; Unlock Scan</button>
               </div>
             </>) : (<>
-              {/* RESULT STEP - Personalized findings */}
+              {/* RESULT STEP - Full scan results breakdown */}
               <div className="px-6 pt-6 pb-4 border-b border-white/[0.08]"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-emerald-400" /><span className="text-emerald-400 text-sm font-bold">Identity Verified</span></div><button onClick={()=>setClaimModal(null)} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div></div>
               <div className="px-6 py-6">
                 <h3 className="text-white font-bold text-lg mb-1">{claimModal.name}</h3>
                 <p className="text-slate-400 text-xs mb-5">{claimModal.city}{claimModal.zip?`, ${claimModal.zip}`:""}</p>
 
                 {(claimModal.risk_score ?? 0) > 0 ? (<>
-                  {/* Score circle + categories */}
+                  {/* Composite Score Header */}
                   <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-5 mb-4">
-                    <div className="flex items-center gap-5">
-                      <div className={`w-16 h-16 rounded-full border-4 flex items-center justify-center ${(claimModal.risk_score??0)>=80?"border-emerald-400 text-emerald-400":(claimModal.risk_score??0)>=60?"border-amber-400 text-amber-400":"border-red-400 text-red-400"}`}><span className="text-xl font-black">{claimModal.risk_score}</span></div>
-                      <div className="flex-1"><div className="text-white font-bold text-sm mb-2">Preliminary Risk Score</div>
-                        <div className="grid grid-cols-3 gap-2 text-[11px]">
-                          <div><div className={`font-bold ${getResidencySignal(claimModal).color}`}>{claimModal.last_scan_result?.categoryScores?.data_sovereignty?.percentage??"\u2014"}%</div><div className="text-slate-400">Residency</div></div>
-                          <div><div className={`font-bold ${getTransparencySignal(claimModal).color}`}>{claimModal.last_scan_result?.categoryScores?.ai_transparency?.percentage??"\u2014"}%</div><div className="text-slate-400">Transparency</div></div>
-                          <div><div className="font-bold text-slate-300">{claimModal.last_scan_result?.categoryScores?.clinical_integrity?.percentage??"\u2014"}%</div><div className="text-slate-400">Integrity</div></div>
-                        </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <div><div className="text-white font-bold text-base">Composite Compliance Score</div>
+                        <div className="text-slate-500 text-[10px] font-mono mt-0.5">NPI: {claimModal.npi} &middot; Engine: SENTRY-3.1</div></div>
+                      <div className="text-right">
+                        <div className={`text-3xl font-black ${(claimModal.risk_score??0)>=80?"text-emerald-400":(claimModal.risk_score??0)>=60?"text-amber-400":"text-red-400"}`}>{claimModal.risk_score}%</div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${(claimModal.risk_score??0)>=80?"bg-emerald-500/20 text-emerald-400":(claimModal.risk_score??0)>=60?"bg-amber-500/20 text-amber-400":"bg-red-500/20 text-red-400"}`}>{(claimModal.risk_score??0)>=80?"Sovereign":(claimModal.risk_score??0)>=60?"Drift":"Violation"}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Personalized findings summary */}
+                  {/* Category Breakdown - Path to 100% */}
+                  <div className="mb-4">
+                    <div className="text-white font-bold text-sm mb-3">Category Breakdown &mdash; Path to 100%</div>
+                    {(() => {
+                      const cs = claimModal.last_scan_result?.categoryScores || {};
+                      const findings = claimModal.last_scan_result?.findings || [];
+                      const cats = [
+                        { key: "data_sovereignty", label: "Data Residency", icon: "\uD83C\uDF10", weight: 45 },
+                        { key: "ai_transparency", label: "AI Transparency", icon: "\uD83D\uDCE1", weight: 30 },
+                        { key: "clinical_integrity", label: "Clinical Integrity", icon: "\uD83D\uDD12", weight: 25 },
+                      ];
+                      return cats.map(cat => {
+                        const catData = cs[cat.key] || { percentage: 0, passed: 0, findings: 0 };
+                        const pct = catData.percentage ?? 0;
+                        const catFindings = findings.filter((f: any) => f.category === cat.key);
+                        const passed = catFindings.filter((f: any) => f.status === "pass").length;
+                        const failed = catFindings.filter((f: any) => f.status === "fail").length;
+                        const warned = catFindings.filter((f: any) => f.status === "warn").length;
+                        const tierLabel = pct >= 80 ? "Sovereign" : pct >= 60 ? "Drift" : "Violation";
+                        const tierColor = pct >= 80 ? "text-emerald-400 bg-emerald-500/20" : pct >= 60 ? "text-amber-400 bg-amber-500/20" : "text-red-400 bg-red-500/20";
+                        const barColor = pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500";
+                        return (
+                          <div key={cat.key} className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-4 mb-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2"><span>{cat.icon}</span><span className="text-white font-semibold text-sm">{cat.label}</span><span className="text-slate-500 text-[10px]">(weight: {cat.weight}%)</span></div>
+                              <div className="flex items-center gap-2"><span className={`font-bold text-sm ${pct >= 80 ? "text-emerald-400" : pct >= 60 ? "text-amber-400" : "text-red-400"}`}>{pct}%</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${tierColor}`}>{tierLabel}</span></div>
+                            </div>
+                            <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden mb-1.5"><div className={`h-full rounded-full transition-all ${barColor}`} style={{width:`${pct}%`}} /></div>
+                            <div className="text-[10px] text-slate-500">{passed}/{catFindings.length} passed{failed > 0 ? <span className="text-red-400"> &middot; {failed} failed</span> : ""}{warned > 0 ? <span className="text-amber-400"> &middot; {warned} warnings</span> : ""}</div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Personalized findings list */}
                   {(() => {
                     const { critical, warnings, passes } = generateFindingsSummary(claimModal);
                     const hasFindings = critical.length > 0 || warnings.length > 0;
                     return hasFindings ? (
                       <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-5 space-y-3">
                         <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Preliminary Findings</div>
-                        {critical.length > 0 && (
-                          <div>
-                            <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1.5">Critical Exposures ({critical.length})</div>
-                            {critical.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-red-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />{f}</div>))}
-                          </div>
-                        )}
-                        {warnings.length > 0 && (
-                          <div>
-                            <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5">Warnings ({warnings.length})</div>
-                            {warnings.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-amber-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />{f}</div>))}
-                          </div>
-                        )}
-                        {passes.length > 0 && (
-                          <div>
-                            <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">Passing ({passes.length})</div>
-                            {passes.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-emerald-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />{f}</div>))}
-                          </div>
-                        )}
+                        {critical.length > 0 && (<div><div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1.5">Critical Exposures ({critical.length})</div>{critical.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-red-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />{f}</div>))}</div>)}
+                        {warnings.length > 0 && (<div><div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5">Warnings ({warnings.length})</div>{warnings.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-amber-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />{f}</div>))}</div>)}
+                        {passes.length > 0 && (<div><div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">Passing ({passes.length})</div>{passes.map((f, i) => (<div key={i} className="flex items-center gap-2 text-[11px] text-emerald-300 py-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />{f}</div>))}</div>)}
                       </div>
                     ) : null;
                   })()}
@@ -439,10 +457,15 @@ export default function RegistryPage() {
 
                 <p className="text-slate-400 text-xs mb-5">A summary has been sent to <strong className="text-white">{claimForm.email}</strong>. To unlock the full remediation roadmap and evidence documentation:</p>
 
-                <div className="space-y-2.5">
-                  <a href="/#scan" className="flex items-center justify-between w-full bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.1] rounded-xl p-4 transition-all group/btn"><div className="flex items-center gap-3"><FileText className="w-5 h-5 text-gold" /><div><div className="text-white font-bold text-sm">Full Audit Report</div><div className="text-slate-400 text-xs">Detailed forensic analysis with legal evidence mapping</div></div></div><div className="text-right"><div className="text-gold font-black text-lg">$149</div></div></a>
-                  <a href="/#scan" className="flex items-center justify-between w-full bg-gold/5 hover:bg-gold/10 border-2 border-gold/20 hover:border-gold/40 rounded-xl p-4 transition-all relative group/btn"><div className="absolute -top-2 left-4 bg-gold text-navy text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">Recommended</div><div className="flex items-center gap-3 mt-1"><Shield className="w-5 h-5 text-gold" /><div><div className="text-white font-bold text-sm">Safe Harbor&trade; Bundle</div><div className="text-slate-400 text-xs">Audit + policies + AI disclosures + remediation</div></div></div><div className="text-right mt-1"><div className="text-gold font-black text-lg">$249</div></div></a>
-                </div>
+                {(() => {
+                  const clientRef = `?client_reference_id=${encodeURIComponent(claimModal.npi)}&prefilled_email=${encodeURIComponent(claimForm.email)}`;
+                  return (
+                    <div className="space-y-2.5">
+                      <a href={`https://buy.stripe.com/test_dRm4gz9aX7ty9oz6VK4ko02${clientRef}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.1] rounded-xl p-4 transition-all group/btn"><div className="flex items-center gap-3"><FileText className="w-5 h-5 text-gold" /><div><div className="text-white font-bold text-sm">Full Audit Report</div><div className="text-slate-400 text-xs">Detailed forensic analysis with legal evidence mapping</div></div></div><div className="text-right"><div className="text-gold font-black text-lg">$149</div><ChevronRight className="w-4 h-4 text-slate-500 group-hover/btn:text-gold ml-auto transition-colors" /></div></a>
+                      <a href={`https://buy.stripe.com/test_8x2bJ14UHbJO30b93S4ko03${clientRef}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full bg-gold/5 hover:bg-gold/10 border-2 border-gold/20 hover:border-gold/40 rounded-xl p-4 transition-all relative group/btn"><div className="absolute -top-2 left-4 bg-gold text-navy text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">Recommended</div><div className="flex items-center gap-3 mt-1"><Shield className="w-5 h-5 text-gold" /><div><div className="text-white font-bold text-sm">Safe Harbor&trade; Bundle</div><div className="text-slate-400 text-xs">Audit + policies + AI disclosures + remediation</div></div></div><div className="text-right mt-1"><div className="text-gold font-black text-lg">$249</div><ChevronRight className="w-4 h-4 text-slate-500 group-hover/btn:text-gold ml-auto transition-colors" /></div></a>
+                    </div>
+                  );
+                })()}
               </div>
             </>)}
           </div>
