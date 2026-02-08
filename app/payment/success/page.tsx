@@ -83,12 +83,6 @@ function SuccessPageInner() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
-  const detectProduct = useCallback((): PurchaseInfo['product'] => {
-    const product = searchParams.get('product');
-    if (product && PRODUCT_CONFIG[product]) return product as PurchaseInfo['product'];
-    return 'report';
-  }, [searchParams]);
-
   const fetchReport = useCallback(async (npi: string): Promise<{ report: ScanReport | null; ageDays: number }> => {
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/scan_reports?npi=eq.${npi}&order=report_date.desc&limit=1`, {
@@ -107,9 +101,33 @@ function SuccessPageInner() {
 
   useEffect(() => {
     const init = async () => {
-      const npi = searchParams.get('client_reference_id') || searchParams.get('npi') || '';
-      const email = searchParams.get('prefilled_email') || searchParams.get('email') || '';
-      const product = detectProduct();
+      const sessionId = searchParams.get('session_id');
+
+      let product: PurchaseInfo['product'] = 'report';
+      let npi = searchParams.get('client_reference_id') || searchParams.get('npi') || '';
+      let email = searchParams.get('prefilled_email') || searchParams.get('email') || '';
+
+      // If we have a Stripe session ID, fetch the real product/NPI/email from Stripe
+      if (sessionId) {
+        try {
+          const res = await fetch(`/api/stripe-session?session_id=${sessionId}`);
+          if (res.ok) {
+            const session = await res.json();
+            if (session.product && PRODUCT_CONFIG[session.product]) {
+              product = session.product as PurchaseInfo['product'];
+            }
+            if (session.npi) npi = session.npi;
+            if (session.email) email = session.email;
+          }
+        } catch (e) {
+          console.error('Failed to fetch Stripe session:', e);
+        }
+      } else {
+        // Fallback: try to detect from URL params
+        const urlProduct = searchParams.get('product');
+        if (urlProduct && PRODUCT_CONFIG[urlProduct]) product = urlProduct as PurchaseInfo['product'];
+      }
+
       if (npi) {
         const { report, ageDays } = await fetchReport(npi);
         setPurchaseInfo({ product, npi, email, reportData: report, reportAge: ageDays });
@@ -119,7 +137,7 @@ function SuccessPageInner() {
       setLoading(false);
     };
     init();
-  }, [searchParams, detectProduct, fetchReport]);
+  }, [searchParams, fetchReport]);
 
   // ── PDF Generation (client-side jsPDF) ──
   const handleDownloadReport = async () => {
