@@ -104,18 +104,17 @@ function ClaimContent() {
     }
     setSubmitting(true);
     try {
-      const supabase = getSupabase();
-      await supabase.from("prospects").insert({
-        source: "registry-claim", contact_name: form.name, practice_name: provider.name,
-        email: form.email, status: "hot", priority: "high",
-        admin_notes: `Claimed: ${provider.name}. NPI: ${form.npi || "N/A"}. Score: ${provider.risk_score || "N/A"}. Domain match: ${!emailError ? "yes" : "override"}`,
-        form_data: { npi: form.npi, registry_id: provider.id, registry_npi: provider.npi, practice_name: provider.name, city: provider.city, risk_score: provider.risk_score, claim_source: "registry-page", email_domain_verified: !emailError },
+      const res = await fetch("/api/registry-claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registryId: provider.id,
+          name: form.name,
+          email: form.email,
+          npi: form.npi || undefined,
+        }),
       });
-      if (form.npi) {
-        await supabase.from("registry").update({ email: form.email, npi: form.npi, updated_at: new Date().toISOString() }).eq("id", provider.id);
-      } else {
-        await supabase.from("registry").update({ email: form.email, updated_at: new Date().toISOString() }).eq("id", provider.id);
-      }
+      if (!res.ok) throw new Error("Claim failed");
       setStep("result");
     } catch (e) { console.error(e); } finally { setSubmitting(false); }
   };
