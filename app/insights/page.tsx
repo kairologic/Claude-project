@@ -53,6 +53,34 @@ const blogs = [
     icon: AlertTriangle,
     accentColor: 'orange',
   },
+  {
+    id: 'sb-1118-med-spas',
+    category: 'Med Spa Compliance',
+    statute: 'SB 1118',
+    title: 'SB 1118 for Med Spas: Why Aesthetics Practices Are at Higher Risk This Year',
+    excerpt: 'Texas med spas have been growing fast — faster than most traditional healthcare sectors. But SB 1118 quietly raises the stakes for every aesthetics practice in the state. Here\'s why med spas are uniquely exposed.',
+    author: 'KairoLogic Compliance Team',
+    date: 'February 4, 2026',
+    time: '9:30 AM CST',
+    timestamp: '2026-02-04T09:30:00-06:00',
+    readTime: '4 min read',
+    icon: ClipboardList,
+    accentColor: 'orange',
+  },
+  {
+    id: 'sb-1118-sb-49-intersection',
+    category: 'Regulatory Analysis',
+    statute: 'SB 1118 + SB 49',
+    title: 'Complaint Handling + Digital Records: How SB 1118 and SB 49 Intersect in Real Life',
+    excerpt: 'Most Texas practices have heard of SB 1118 and SB 49 separately. But very few realize how these two laws interlock — and how a simple complaint can instantly become a digital-records audit.',
+    author: 'KairoLogic Compliance Team',
+    date: 'February 6, 2026',
+    time: '2:15 PM CST',
+    timestamp: '2026-02-06T14:15:00-06:00',
+    readTime: '4 min read',
+    icon: FileCheck,
+    accentColor: 'gold',
+  },
 ];
 
 // ─── Article Content Components ──────────────────────────────────────────────
@@ -343,10 +371,239 @@ function Article3() {
   );
 }
 
+function Article4() {
+  return (
+    <div className="article-body">
+      <p className="text-lg text-gray-700 leading-relaxed mb-8 font-medium">
+        Texas med spas have been growing fast — faster than most traditional healthcare sectors. But with that growth comes something far less glamorous: a surge in patient complaints and a brand-new law, <span className="text-orange font-bold">SB 1118</span>, that quietly raises the stakes for every aesthetics practice in the state.
+      </p>
+      <p className="text-gray-600 leading-relaxed mb-10">
+        If you run or manage a med spa, this is the year to tighten up your complaint handling, documentation, and staff communication. SB 1118 isn&apos;t complicated, but it is unforgiving.
+      </p>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">Why SB 1118 Hits Med Spas Harder Than Traditional Clinics</h2>
+      <p className="text-gray-700 leading-relaxed mb-6">Med spas operate in a perfect storm of risk:</p>
+
+      <div className="space-y-4 mb-10">
+        {[
+          { num: '01', title: 'High-Expectation Patients', desc: 'Aesthetics patients often expect immediate, visible results. When outcomes vary — even slightly — complaints spike.' },
+          { num: '02', title: 'Fast-Moving Staff + High Volume', desc: 'Front desk teams juggle phones, walk-ins, memberships, and upsells. One missed step in documenting a complaint can now trigger an SB 1118 violation.' },
+          { num: '03', title: 'More "Gray Area" Services', desc: 'Injectables, lasers, and wellness add-ons create more opportunities for misunderstandings, dissatisfaction, or miscommunication.' },
+          { num: '04', title: 'Social Media Amplifies Everything', desc: 'A single unhappy patient can escalate from a DM to a formal complaint in hours.' },
+        ].map(item => (
+          <div key={item.num} className="flex gap-5 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <div className="text-3xl font-display font-black text-orange/20">{item.num}</div>
+            <div>
+              <div className="font-display font-bold text-navy mb-1">{item.title}</div>
+              <p className="text-sm text-gray-600 leading-relaxed">{item.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-orange/5 border-l-4 border-orange rounded-r-xl p-6 mb-10">
+        <p className="text-gray-700 leading-relaxed font-medium">
+          SB 1118 doesn&apos;t care whether the issue was minor. It cares whether you <strong>logged it</strong>, <strong>responded correctly</strong>, and <strong>documented the entire process</strong>.
+        </p>
+      </div>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">A Realistic Scenario</h2>
+      <div className="bg-gradient-to-br from-navy to-navy-dark rounded-2xl p-8 mb-10 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 opacity-5">
+          <AlertTriangle size={192} className="text-gold" />
+        </div>
+        <div className="relative z-10">
+          <div className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-4">The Friday Botox Touch-Up That Became a Monday Morning Investigation</div>
+          <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
+            <p>A patient calls on Friday afternoon saying her Botox &ldquo;didn&apos;t take.&rdquo; The front desk promises a touch-up next week but <strong className="text-white">forgets to log the complaint</strong>.</p>
+            <p>Over the weekend, the patient posts on social media, gets advice from friends, and files a formal complaint with the state.</p>
+            <p>By Monday, the practice is asked to provide:</p>
+            <div className="grid grid-cols-2 gap-2 my-4">
+              {['Complaint log entry', 'Documentation of the call', 'Notes on how it was handled', 'Proof of follow-up'].map(item => (
+                <div key={item} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                  <X size={14} className="text-red-400" />
+                  <span className="text-xs">{item}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-gold font-semibold">None of it exists. Under SB 1118, that&apos;s a compliance failure — even if the clinical care was perfect.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">What SB 1118 Actually Requires</h2>
+      <div className="overflow-hidden rounded-2xl border border-gray-100 mb-10">
+        <table className="w-full text-sm">
+          <thead className="bg-navy text-white">
+            <tr>
+              <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider">Requirement</th>
+              <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider">What It Means for Med Spas</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {[
+              ['Every complaint must be logged', 'No more "we\'ll just handle it verbally."'],
+              ['Document your response', 'Who called back, when, and what was said.'],
+              ['Track resolution steps', 'Touch-ups, refunds, follow-ups — everything.'],
+              ['Maintain a complaint log', 'Must be organized, accessible, and complete.'],
+              ['Be ready for audits', 'The state can request logs at any time.'],
+            ].map(([req, meaning], i) => (
+              <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-5 py-3 font-semibold text-navy">{req}</td>
+                <td className="px-5 py-3 text-gray-600">{meaning}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-navy rounded-2xl p-8 text-white">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-3">Bottom Line</div>
+        <p className="text-lg font-display font-bold leading-relaxed mb-3">
+          SB 1118 isn&apos;t about punishing practices. It&apos;s about ensuring consistent, documented responses.
+        </p>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          Aesthetics practices are at higher risk because they handle more complaints, more expectations, and more gray-area services than traditional clinics. The good news? With the right systems in place, compliance becomes simple — and you protect your practice from unnecessary investigations.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Article5() {
+  return (
+    <div className="article-body">
+      <p className="text-lg text-gray-700 leading-relaxed mb-8 font-medium">
+        Most Texas practices have heard of <span className="text-orange font-bold">SB 1118</span> (patient-complaint handling) and <span className="text-gold-dark font-bold">SB 49</span> (digital-records and documentation requirements). But very few realize how these two laws <em>interlock</em> — and how a simple complaint can instantly become a digital-records audit.
+      </p>
+      <p className="text-gray-600 leading-relaxed mb-10">
+        If you&apos;re a med spa, clinic, or aesthetics practice, this intersection is where real risk lives. Not because you&apos;re doing anything wrong, but because the <strong>workflow between &ldquo;patient complaint&rdquo; and &ldquo;digital documentation&rdquo; is often messy, rushed, or inconsistent</strong>.
+      </p>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">Two Laws, One Weak Link</h2>
+      <div className="bg-gradient-to-br from-orange/5 to-gold/5 border-2 border-orange/10 rounded-2xl p-8 mb-10">
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-orange/10">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-orange mb-3">SB 1118</div>
+            <p className="text-gray-700 text-sm leading-relaxed">Cares <strong>that</strong> you logged the complaint and responded properly.</p>
+          </div>
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gold/20">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-gold-dark mb-3">SB 49</div>
+            <p className="text-gray-700 text-sm leading-relaxed">Cares <strong>how</strong> you documented it, stored it, and proved it happened.</p>
+          </div>
+        </div>
+        <div className="text-center mt-6 text-sm text-gray-600">
+          <strong className="text-navy">One law triggers the other.</strong> A complaint (SB 1118) becomes a documentation event (SB 49).
+          <br />If either side is weak, the whole chain breaks.
+        </div>
+      </div>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">The Complaint That Became a Records Problem</h2>
+      <div className="bg-gradient-to-br from-navy to-navy-dark rounded-2xl p-8 mb-10 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 opacity-5">
+          <FileCheck size={192} className="text-gold" />
+        </div>
+        <div className="relative z-10">
+          <div className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-4">The Laser Burn Complaint That Exposed a Digital Records Gap</div>
+          <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
+            <p>A patient emails the practice saying she has redness after a laser treatment. The front desk replies quickly, offers a follow-up visit, and thinks the issue is resolved.</p>
+            <p>But two things go wrong:</p>
+            <div className="space-y-2 my-4">
+              <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <span className="text-red-400 font-bold text-sm mt-0.5">1.</span>
+                <span className="text-sm">The complaint isn&apos;t logged in the official SB 1118 complaint log.</span>
+              </div>
+              <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <span className="text-red-400 font-bold text-sm mt-0.5">2.</span>
+                <span className="text-sm">The email thread isn&apos;t saved in the EMR or digital record system.</span>
+              </div>
+            </div>
+            <p>A week later, the patient files a formal complaint with the state. Now the practice must produce the complaint log entry, the email communication, documentation of the follow-up, notes from the visit, and proof of resolution.</p>
+            <p className="text-gold font-semibold">The clinical care wasn&apos;t the problem. The documentation was. Two violations — one under each law.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">Where the Two Laws Overlap</h2>
+      <div className="overflow-hidden rounded-2xl border border-gray-100 mb-10">
+        <table className="w-full text-sm">
+          <thead className="bg-navy text-white">
+            <tr>
+              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider">Requirement</th>
+              <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider">SB 1118</th>
+              <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider">SB 49</th>
+              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider">Why It Matters</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {[
+              ['Log every complaint', true, false, 'Missing logs trigger investigations'],
+              ['Document your response', true, true, 'Both laws expect proof of action'],
+              ['Store records correctly', false, true, 'Emails, texts, photos must be retained'],
+              ['Track resolution steps', true, true, 'Both require a clear timeline'],
+              ['Produce records on request', true, true, 'Audits can happen anytime'],
+            ].map(([req, sb1118, sb49, why], i) => (
+              <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-4 py-3 font-semibold text-navy">{req as string}</td>
+                <td className="px-4 py-3 text-center">{sb1118 ? <span className="text-green-500 text-lg">✓</span> : <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-3 text-center">{sb49 ? <span className="text-green-500 text-lg">✓</span> : <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-3 text-gray-600">{why as string}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-gray-700 leading-relaxed mb-6">
+        The overlap is where most practices stumble — not because they don&apos;t care, but because complaints often happen <strong>outside the EMR</strong>: email, text, Instagram DMs, phone calls, walk-ins, or staff notes on sticky pads.
+      </p>
+      <div className="bg-orange/5 border-l-4 border-orange rounded-r-xl p-6 mb-10">
+        <p className="text-gray-700 text-sm leading-relaxed">
+          <strong>SB 1118 says:</strong> &ldquo;Log it.&rdquo;<br />
+          <strong>SB 49 says:</strong> &ldquo;Store it properly.&rdquo;<br />
+          <span className="text-navy font-bold">Your workflow needs to do both.</span>
+        </p>
+      </div>
+
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">Why This Matters More in 2025</h2>
+      <div className="grid md:grid-cols-2 gap-4 mb-10">
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <h4 className="font-display font-bold text-navy mb-3 text-sm">Texas Regulators Are Watching For:</h4>
+          <div className="space-y-2">
+            {['Inconsistent complaint logs', 'Missing digital records', 'Informal communication channels', 'Staff who "handled it verbally"', 'Slow document production'].map(item => (
+              <div key={item} className="flex items-center gap-2 text-sm text-gray-600"><Eye size={12} className="text-orange flex-shrink-0" /> {item}</div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <h4 className="font-display font-bold text-navy mb-3 text-sm">Med Spas See More Of:</h4>
+          <div className="space-y-2">
+            {['High-expectation patients', 'Cosmetic dissatisfaction complaints', 'Social-media-driven escalations', 'Staff turnover breaking habits', 'Volume overwhelming documentation'].map(item => (
+              <div key={item} className="flex items-center gap-2 text-sm text-gray-600"><AlertTriangle size={12} className="text-gold-dark flex-shrink-0" /> {item}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-navy rounded-2xl p-8 text-white">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-3">Bottom Line</div>
+        <p className="text-lg font-display font-bold leading-relaxed mb-3">
+          You don&apos;t need a legal team. You need one clean workflow.
+        </p>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          Connect complaint intake → complaint logging → digital documentation → follow-up tracking → record storage. When these steps are unified, compliance becomes simple — and you protect your practice from unnecessary investigations.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const articleComponents: Record<string, React.FC> = {
   'sb-1188-patient-data': Article1,
   'hb-149-ai-transparency': Article2,
   'combined-threat-solution': Article3,
+  'sb-1118-med-spas': Article4,
+  'sb-1118-sb-49-intersection': Article5,
 };
 
 // ─── Main Page Component ─────────────────────────────────────────────────────
@@ -383,7 +640,7 @@ export default function InsightsPage() {
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <button
-              onClick={() => setActiveBlog(blogs[2].id)}
+              onClick={() => setActiveBlog(blogs[blogs.length - 1].id)}
               className="w-full text-left group"
             >
               <div className="bg-gradient-to-br from-navy to-navy-dark rounded-3xl p-8 md:p-12 relative overflow-hidden hover:shadow-2xl transition-shadow">
@@ -393,23 +650,23 @@ export default function InsightsPage() {
                 <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="bg-orange/20 text-orange text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">Featured</span>
-                    <span className="bg-white/10 text-gold text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">{blogs[2].statute}</span>
+                    <span className="bg-white/10 text-gold text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">{blogs[blogs.length - 1].statute}</span>
                   </div>
                   <h2 className="text-2xl md:text-4xl font-display font-bold text-white mb-4 group-hover:text-gold transition-colors leading-tight">
-                    {blogs[2].title}
+                    {blogs[blogs.length - 1].title}
                   </h2>
                   <p className="text-gray-400 max-w-2xl mb-6 leading-relaxed">
-                    {blogs[2].excerpt}
+                    {blogs[blogs.length - 1].excerpt}
                   </p>
                   <div className="flex items-center gap-6 text-sm">
                     <span className="flex items-center gap-2 text-gray-500">
-                      <Calendar size={14} /> {blogs[2].date}
+                      <Calendar size={14} /> {blogs[blogs.length - 1].date}
                     </span>
                     <span className="flex items-center gap-2 text-gray-500">
-                      <Clock size={14} /> {blogs[2].time}
+                      <Clock size={14} /> {blogs[blogs.length - 1].time}
                     </span>
                     <span className="flex items-center gap-2 text-gray-500">
-                      <BookOpen size={14} /> {blogs[2].readTime}
+                      <BookOpen size={14} /> {blogs[blogs.length - 1].readTime}
                     </span>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-gold font-bold text-sm uppercase tracking-wider group-hover:gap-3 transition-all">
@@ -425,7 +682,7 @@ export default function InsightsPage() {
         <section className="pb-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
-              {blogs.slice(0, 2).map((post) => {
+              {blogs.slice(0, blogs.length - 1).map((post) => {
                 const Icon = post.icon;
                 return (
                   <button
