@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
@@ -50,6 +50,14 @@ function generateFindingsSummary(p: ProviderRow) {
 }
 
 export default function ClaimPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070d1b] flex items-center justify-center"><Loader2 className="w-8 h-8 text-gold animate-spin" /></div>}>
+      <ClaimContent />
+    </Suspense>
+  );
+}
+
+function ClaimContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const providerId = searchParams.get("id");
