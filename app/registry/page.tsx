@@ -106,6 +106,7 @@ export default function RegistryPage() {
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
+  const [activeTier, setActiveTier] = useState<string | null>(null);
   const [stats, setStats] = useState({ sovereign: 0, moderate: 0, atRisk: 0, pending: 0 });
   const [cityCounts, setCityCounts] = useState<Record<CityTab, number>>({ all: 0, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 });
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -149,16 +150,48 @@ export default function RegistryPage() {
         const s = debouncedSearch.trim();
         q = q.or(`name.ilike.%${s}%,city.ilike.%${s}%,zip.ilike.%${s}%`);
       }
+      // Tier filter
+      if (activeTier === "sovereign") q = q.gte("risk_score", 80);
+      else if (activeTier === "moderate") q = q.gte("risk_score", 60).lt("risk_score", 80);
+      else if (activeTier === "atRisk") q = q.gt("risk_score", 0).lt("risk_score", 60);
+      else if (activeTier === "pending") q = q.or("risk_score.is.null,risk_score.eq.0");
+
       const { data, error, count } = await q.order("risk_score", { ascending: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
       if (error) throw error;
-      setProviders(data || []);
-      if (debouncedSearch.trim() || activeCity !== "all") setTotalCount(count || 0);
+
+      // Interleaved sort: S-S-I-S-R pattern (only when no tier filter active)
+      let sorted: ProviderRow[] = (data || []) as ProviderRow[];
+      if (!activeTier && !debouncedSearch.trim()) {
+        const sovereign = sorted.filter(p => (p.risk_score ?? 0) >= 80);
+        const moderate = sorted.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80);
+        const atRisk = sorted.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60);
+        const pending = sorted.filter(p => !p.risk_score || p.risk_score === 0);
+        const interleaved: ProviderRow[] = [];
+        let si = 0, mi = 0, ri = 0, pi = 0;
+        // Pattern: S, S, I, S, R — repeat
+        while (si < sovereign.length || mi < moderate.length || ri < atRisk.length || pi < pending.length) {
+          if (si < sovereign.length) interleaved.push(sovereign[si++]);
+          if (si < sovereign.length) interleaved.push(sovereign[si++]);
+          if (mi < moderate.length) interleaved.push(moderate[mi++]);
+          if (si < sovereign.length) interleaved.push(sovereign[si++]);
+          if (ri < atRisk.length) interleaved.push(atRisk[ri++]);
+        }
+        // Append any remaining
+        while (si < sovereign.length) interleaved.push(sovereign[si++]);
+        while (mi < moderate.length) interleaved.push(moderate[mi++]);
+        while (ri < atRisk.length) interleaved.push(atRisk[ri++]);
+        while (pi < pending.length) interleaved.push(pending[pi++]);
+        sorted = interleaved;
+      }
+
+      setProviders(sorted);
+      setTotalCount(count || 0);
     } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [page, activeCity, debouncedSearch]);
+  }, [page, activeCity, debouncedSearch, activeTier]);
 
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadProviders(); }, [loadProviders]);
-  useEffect(() => { setPage(0); }, [activeCity]);
+  useEffect(() => { setPage(0); }, [activeCity, activeTier]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const showFrom = totalCount > 0 ? page * PAGE_SIZE + 1 : 0;
@@ -235,8 +268,8 @@ export default function RegistryPage() {
       <section className="border-y border-white/[0.08] bg-white/[0.03]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="grid grid-cols-4 gap-4">
-            {[{ l:"Sovereign",v:stats.sovereign,c:"text-emerald-400",d:"bg-emerald-400" },{ l:"Inconclusive",v:stats.moderate,c:"text-amber-400",d:"bg-amber-400" },{ l:"At Risk",v:stats.atRisk,c:"text-red-400",d:"bg-red-400" },{ l:"Pre-Audited",v:stats.pending,c:"text-slate-400",d:"bg-slate-500" }].map(s=>(
-              <div key={s.l} className="flex items-center gap-3"><span className={`w-2.5 h-2.5 rounded-full ${s.d}`} /><div><div className={`text-xl font-bold font-mono ${s.c}`}>{s.v}</div><div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{s.l}</div></div></div>
+            {[{ l:"Sovereign",k:"sovereign",v:stats.sovereign,c:"text-emerald-400",d:"bg-emerald-400" },{ l:"Inconclusive",k:"moderate",v:stats.moderate,c:"text-amber-400",d:"bg-amber-400" },{ l:"At Risk",k:"atRisk",v:stats.atRisk,c:"text-red-400",d:"bg-red-400" },{ l:"Pre-Audited",k:"pending",v:stats.pending,c:"text-slate-400",d:"bg-slate-500" }].map(s=>(
+              <button key={s.l} onClick={()=>setActiveTier(activeTier===s.k?null:s.k)} className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-left ${activeTier===s.k?"bg-white/[0.08] ring-1 ring-white/[0.15]":"hover:bg-white/[0.04]"}`}><span className={`w-2.5 h-2.5 rounded-full ${s.d}`} /><div><div className={`text-xl font-bold font-mono ${s.c}`}>{s.v}</div><div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{s.l}</div></div></button>
             ))}
           </div>
         </div>
@@ -258,6 +291,15 @@ export default function RegistryPage() {
       {/* TABLE */}
       <section className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {activeTier && (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-[11px] text-slate-400">Filtered by:</span>
+              <span className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.1] text-white text-[11px] font-bold px-3 py-1 rounded-lg">
+                {activeTier === "sovereign" ? "Sovereign" : activeTier === "moderate" ? "Inconclusive" : activeTier === "atRisk" ? "At Risk" : "Pre-Audited"}
+                <button onClick={() => setActiveTier(null)} className="text-slate-400 hover:text-white ml-1"><X size={12} /></button>
+              </span>
+            </div>
+          )}
           {loading ? (
             <div className="text-center py-20"><Loader2 className="w-8 h-8 text-gold animate-spin mx-auto mb-4" /><p className="text-slate-400 text-sm">Loading forensic signals...</p></div>
           ) : providers.length === 0 ? (
@@ -300,7 +342,7 @@ export default function RegistryPage() {
               </div>
               {/* Pagination */}
               <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-white/[0.02]">
-                <div className="text-[11px] text-slate-400 font-mono">Showing <span className="text-slate-200 font-bold">{showFrom}\u2013{showTo}</span> of <span className="text-slate-200 font-bold">{totalCount.toLocaleString()}</span></div>
+                <div className="text-[11px] text-slate-400 font-mono">Showing <span className="text-slate-200 font-bold">{showFrom}&ndash;{showTo}</span> of <span className="text-slate-200 font-bold">{totalCount.toLocaleString()}</span></div>
                 <div className="flex items-center gap-1">
                   <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={14} /> Prev</button>
                   {Array.from({length:Math.min(totalPages,7)},(_,i)=>{
@@ -385,7 +427,7 @@ export default function RegistryPage() {
               </div>
             </>) : (<>
               {/* RESULT STEP - Full scan results breakdown */}
-              <div className="px-6 pt-6 pb-4 border-b border-white/[0.08]"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-emerald-400" /><span className="text-emerald-400 text-sm font-bold">Identity Verified</span></div><button onClick={()=>setClaimModal(null)} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div></div>
+              <div className="sticky top-0 z-10 px-6 pt-6 pb-4 border-b border-white/[0.08] bg-[#0c1425] rounded-t-2xl"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-emerald-400" /><span className="text-emerald-400 text-sm font-bold">Identity Verified</span></div><button onClick={()=>setClaimModal(null)} className="text-slate-400 hover:text-white p-1"><X size={18} /></button></div></div>
               <div className="px-6 py-6">
                 <h3 className="text-white font-bold text-lg mb-1">{claimModal.name}</h3>
                 <p className="text-slate-400 text-xs mb-5">{claimModal.city}{claimModal.zip?`, ${claimModal.zip}`:""}</p>
