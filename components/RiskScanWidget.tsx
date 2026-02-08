@@ -234,6 +234,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
   const [url, setUrl] = useState(initialURL);
   const [email, setEmail] = useState(initialEmail);
   const [contactName, setContactName] = useState('');
+  const [practiceName, setPracticeName] = useState('');
   const [scanning, setScanning] = useState(false);
   const [currentPhase, setCurrentPhase] = useState('');
   const [progress, setProgress] = useState<number>(0);
@@ -677,18 +678,20 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       setProgress(90);
       addLog('📊 Finalizing risk profile...', 'info');
 
-      // Try to get provider name from session storage or NPI verification
-      let providerName = '';
+      // Try to get provider name from input field, session storage, or NPI verification
+      let providerName = practiceName.trim() || '';
       let providerEmail = email || '';
-      try {
-        const storedData = sessionStorage.getItem('scanData');
-        if (storedData) {
-          const parsed = JSON.parse(storedData);
-          providerName = parsed.name || '';
-          if (!providerEmail) providerEmail = parsed.email || '';
+      if (!providerName) {
+        try {
+          const storedData = sessionStorage.getItem('scanData');
+          if (storedData) {
+            const parsed = JSON.parse(storedData);
+            providerName = parsed.name || '';
+            if (!providerEmail) providerEmail = parsed.email || '';
+          }
+        } catch {
+          // Ignore
         }
-      } catch {
-        // Ignore
       }
       if (!providerName && scanData.npiVerification?.name) {
         providerName = scanData.npiVerification.name;
@@ -949,6 +952,19 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
+              Practice Name <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={practiceName}
+              onChange={(e) => setPracticeName(e.target.value)}
+              placeholder="August Dental"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={scanning}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Contact Name
             </label>
             <input
@@ -978,7 +994,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
 
         <button
           onClick={runScan}
-          disabled={scanning || !npi || !url}
+          disabled={scanning || !npi || !url || !practiceName.trim()}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
         >
           {scanning ? (
