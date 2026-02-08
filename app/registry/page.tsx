@@ -58,6 +58,46 @@ function maskName(name: string) {
   return w[0] + ' ' + w.slice(1).map(x => x.charAt(0) + '●'.repeat(Math.min(x.length - 1, 6))).join(' ');
 }
 
+function getExposureStatement(p: ProviderRow): { count: number; lines: string[] } {
+  const cs = p.last_scan_result?.categoryScores;
+  const findings = p.last_scan_result?.findings || [];
+  const lines: string[] = [];
+
+  const drScore = cs?.data_sovereignty?.percentage ?? null;
+  const aiScore = cs?.ai_transparency?.percentage ?? null;
+  const ciScore = cs?.clinical_integrity?.percentage ?? null;
+  const failCount = findings.filter((f: any) => f.status === 'fail').length;
+
+  // Data Residency exposures
+  if (drScore !== null && drScore < 75) {
+    if (drScore < 50) lines.push('Primary hosting infrastructure resolved to non-sovereign jurisdiction — potential SB 1188 §2(a) exposure');
+    else if (drScore < 65) lines.push('Data residency signals indicate partial offshore routing — SB 1188 remediation recommended');
+    else lines.push('Minor data residency gaps detected in CDN or sub-processor chain');
+  }
+
+  // AI Transparency exposures  
+  if (aiScore !== null && aiScore < 75) {
+    if (aiScore < 50) lines.push('No AI disclosure or algorithmic transparency notice detected — HB 149 §3 compliance gap');
+    else if (aiScore < 65) lines.push('Incomplete AI transparency documentation — HB 149 disclosure requirements partially unmet');
+    else lines.push('AI transparency signals present but may require additional disclosure language');
+  }
+
+  // Clinical Integrity exposures
+  if (ciScore !== null && ciScore < 75) {
+    if (ciScore < 60) lines.push('Clinical content integrity checks flagged — potential patient safety information gaps');
+    else lines.push('Minor clinical integrity signals flagged for review');
+  }
+
+  // Foreign infrastructure
+  const foreignFindings = findings.filter((f: any) => f.status === 'fail' && f.category === 'data_sovereignty');
+  if (foreignFindings.length > 0) {
+    const countries = [...new Set(foreignFindings.map((f: any) => f.evidence?.country || f.evidence?.countryCode).filter(Boolean))];
+    if (countries.length > 0) lines.push(`Infrastructure endpoints detected in ${countries.join(', ')} — outside Texas sovereign boundary`);
+  }
+
+  return { count: Math.max(failCount, lines.length), lines: lines.slice(0, 3) };
+}
+
 const CITY_TABS: { key: CityTab; label: string; filter: string[] }[] = [
   { key: 'all', label: 'All Regions', filter: [] },
   { key: 'austin', label: 'Austin', filter: ['austin','round rock','cedar park','leander','georgetown','pflugerville','kyle','buda','lakeway','bee cave','dripping springs'] },
@@ -105,6 +145,36 @@ export default function RegistryPage() {
     if (searchTerm.trim()) {
       const s = searchTerm.toLowerCase();
       r = r.filter(p => (p.name||'').toLowerCase().includes(s) || (p.city||'').toLowerCase().includes(s) || (p.zip||'').includes(s));
+    }
+    // Strategic interleave: credibility first, then curiosity gaps
+    // Pattern: Sovereign, Sovereign, Inconclusive, Sovereign, At Risk, repeat
+    if (!searchTerm.trim()) {
+      const sovereign = r.filter(p => (p.risk_score ?? 0) >= 80).sort((a,b) => (b.risk_score??0)-(a.risk_score??0));
+      const inconclusive = r.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80).sort((a,b) => (a.risk_score??0)-(b.risk_score??0));
+      const atRisk = r.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60).sort((a,b) => (a.risk_score??0)-(b.risk_score??0));
+      const unscanned = r.filter(p => !p.risk_score || p.risk_score === 0);
+
+      const interleaved: ProviderRow[] = [];
+      let si = 0, ii = 0, ai = 0;
+      // Pattern cycle: S, S, I, S, R
+      const pattern = ['s','s','i','s','r'];
+      let pi = 0;
+
+      while (si < sovereign.length || ii < inconclusive.length || ai < atRisk.length) {
+        const slot = pattern[pi % pattern.length];
+        if (slot === 's' && si < sovereign.length) { interleaved.push(sovereign[si++]); }
+        else if (slot === 'i' && ii < inconclusive.length) { interleaved.push(inconclusive[ii++]); }
+        else if (slot === 'r' && ai < atRisk.length) { interleaved.push(atRisk[ai++]); }
+        else {
+          // Fallback: pick from whichever bucket still has items
+          if (si < sovereign.length) interleaved.push(sovereign[si++]);
+          else if (ii < inconclusive.length) interleaved.push(inconclusive[ii++]);
+          else if (ai < atRisk.length) interleaved.push(atRisk[ai++]);
+        }
+        pi++;
+      }
+      // Append unscanned at the end
+      r = [...interleaved, ...unscanned];
     }
     return r;
   }, [providers, activeCity, searchTerm]);
@@ -294,15 +364,36 @@ export default function RegistryPage() {
                 <p className="text-slate-400 text-xs mt-1">{claimModal.city}{claimModal.zip ? `, ${claimModal.zip}` : ''}</p>
               </div>
               <div className="px-6 py-4">
-                <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-4 mb-5">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-amber-200 text-sm font-semibold">We have identified potential statutory exposures for this entity.</p>
-                      <p className="text-slate-400 text-xs mt-1">To protect the privacy of forensic data, please verify your identity to unlock the Preliminary Forensic Scan.</p>
+                {(() => {
+                  const exposure = getExposureStatement(claimModal);
+                  return (
+                    <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-4 mb-5">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-amber-200 text-sm font-semibold">
+                            {exposure.count > 0
+                              ? `We have identified ${exposure.count} potential statutory exposure${exposure.count !== 1 ? 's' : ''} for this entity.`
+                              : 'We have identified potential statutory exposures for this entity.'}
+                          </p>
+                          {exposure.lines.length > 0 && (
+                            <ul className="mt-2 space-y-1.5">
+                              {exposure.lines.map((line, i) => (
+                                <li key={i} className="text-xs text-slate-400 flex items-start gap-2">
+                                  <span className="text-red-400 mt-0.5 flex-shrink-0">▸</span>
+                                  <span>{line}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <p className="text-slate-500 text-[11px] mt-3">
+                            To protect the privacy of your full forensic data, please verify your identity below.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
                 <div className="space-y-3">
                   <div><label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Your Name</label>
                     <input type="text" value={claimForm.name} onChange={e => setClaimForm({...claimForm, name: e.target.value})} placeholder="Dr. Jane Smith" className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-gold/40" /></div>
