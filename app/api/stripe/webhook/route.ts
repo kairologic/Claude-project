@@ -96,9 +96,9 @@ const PRODUCTS: Record<ProductType, Omit<ProductInfo, 'type'>> = {
     includesMonitoring: 'watch',
   },
   'sentry-shield': {
-    displayName: 'Sentry Shield',
+    displayName: 'Sentry Shield + Free Audit Report',
     templateSlug: 'sentryshield-activation',
-    includesReport: false,
+    includesReport: true,
     includesSafeHarbor: false,
     includesMonitoring: 'shield',
   },
