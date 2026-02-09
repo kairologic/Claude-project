@@ -285,15 +285,15 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Monitoring */}
+            {/* Sentry Shield */}
             <div className="border-2 border-orange rounded-2xl p-8 relative shadow-xl shadow-orange/10">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
                 Most Popular
               </div>
-              <div className="text-xs font-bold uppercase tracking-widest text-orange mb-4">Ongoing</div>
-              <h3 className="text-2xl font-display font-bold text-navy mb-2">Compliance Monitoring</h3>
+              <div className="text-xs font-bold uppercase tracking-widest text-orange mb-4">Ongoing Protection</div>
+              <h3 className="text-2xl font-display font-bold text-navy mb-2">Sentry Shield</h3>
               <div className="flex items-baseline gap-1 mb-4">
-                <span className="text-5xl font-display font-black text-navy">$149</span>
+                <span className="text-5xl font-display font-black text-navy">$79</span>
                 <span className="text-gray-400 text-sm">/month</span>
               </div>
               <p className="text-gray-500 text-sm mb-6">
@@ -302,11 +302,11 @@ export default function HomePage() {
               <ul className="space-y-3 mb-8">
                 {[
                   'Everything in Compliance Report',
-                  'Continuous automated re-scans',
+                  'Real-time compliance drift detection',
                   'Instant drift alerts via email',
-                  'Monthly compliance status reports',
-                  'Regulatory update tracking',
-                  'Priority support',
+                  'Provider compliance dashboard',
+                  'KairoLogic Trust Seal for your website',
+                  'Priority support & remediation guidance',
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
@@ -316,7 +316,7 @@ export default function HomePage() {
               </ul>
               <Link href="/scan">
                 <button className="w-full btn-primary py-3 text-base">
-                  Start Monitoring
+                  Get Sentry Shield
                 </button>
               </Link>
               <p className="text-center text-xs text-gray-400 mt-3">Cancel anytime. No long-term contracts.</p>
@@ -326,8 +326,8 @@ export default function HomePage() {
           {/* Cost comparison callout */}
           <div className="mt-12 max-w-3xl mx-auto bg-navy/5 border border-navy/10 rounded-xl p-6 text-center">
             <p className="text-sm text-gray-600">
-              <strong className="text-navy">$149/month</strong> vs. <strong className="text-red-600">$50,000+</strong> per compliance violation.{' '}
-              <span className="text-gray-500">That&apos;s 0.3% of the cost of a single fine — to make sure it never happens.</span>
+              <strong className="text-navy">$79/month</strong> vs. <strong className="text-red-600">$50,000+</strong> per compliance violation.{' '}
+              <span className="text-gray-500">That&apos;s less than 0.2% of the cost of a single fine — to make sure it never happens.</span>
             </p>
           </div>
         </div>
@@ -388,4 +388,3 @@ export default function HomePage() {
     </div>
   );
 }
-
