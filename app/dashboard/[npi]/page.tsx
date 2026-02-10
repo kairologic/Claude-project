@@ -184,7 +184,9 @@ export default function ShieldDashboard() {
             </ul>
           </div>
           <a
-            href={`${API_BASE}/scan?npi=${npi}`}
+            href={`https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=${npi}`}
+            target="_blank"
+            rel="noopener"
             className="inline-flex items-center gap-2 bg-[#0A192F] text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#1a365d] transition-colors"
           >
             <Shield size={16} /> Get Sentry Shield — $79/mo
