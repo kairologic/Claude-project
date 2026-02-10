@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KairoLogic Sentry Widget Test Harness</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: #f1f5f9; color: #1e293b; }
+    
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    
+    .header { background: linear-gradient(135deg, #0A192F, #1a365d); color: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
+    .header h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .header p { font-size: 12px; opacity: 0.7; }
+    
+    .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card h2 { font-size: 14px; font-weight: 700; color: #0A192F; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card h3 { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px; }
+    
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.3px; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: #0A192F; color: white; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-info { background: #3b82f6; color: white; }
+    .btn-outline { background: white; color: #475569; border: 1px solid #e2e8f0; }
+    
+    .log { background: #0f172a; color: #94a3b8; border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .log .info { color: #60a5fa; }
+    .log .success { color: #4ade80; }
+    .log .warn { color: #fbbf24; }
+    .log .error { color: #f87171; }
+    .log .drift { color: #c084fc; font-weight: 700; }
+    
+    .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .status-item { background: #f8fafc; border-radius: 8px; padding: 12px; border: 1px solid #e2e8f0; }
+    .status-item .label { font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-item .value { font-size: 16px; font-weight: 800; color: #1e293b; margin-top: 2px; }
+    .status-item .sub { font-size: 9px; color: #94a3b8; margin-top: 2px; }
+    
+    .compliance-zone { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 12px; position: relative; }
+    .compliance-zone .zone-label { position: absolute; top: -10px; left: 12px; background: white; padding: 0 8px; font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .editable { background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 4px 8px; font-size: 11px; min-height: 20px; }
+    .editable:focus { outline: 2px solid #f59e0b; }
+    
+    input[type="text"] { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px; width: 100%; }
+    
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+    
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+    .tag-green { background: #dcfce7; color: #16a34a; }
+    .tag-red { background: #fee2e2; color: #dc2626; }
+    .tag-blue { background: #dbeafe; color: #2563eb; }
+    .tag-amber { background: #fef3c7; color: #d97706; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Header -->
+    <div class="header">
+      <h1>🛡️ KairoLogic Sentry Widget — Test Harness</h1>
+      <p>Simulate a provider website to test drift detection, heartbeats, and baseline comparison</p>
+    </div>
+
+    <!-- Config -->
+    <div class="card">
+      <h2>⚙️ Widget Configuration</h2>
+      <div class="two-col">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#64748b;">Test NPI</label>
+          <input type="text" id="cfg-npi" value="1234567890" style="margin-top:4px;" />
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#64748b;">Widget Mode</label>
+          <div class="controls" style="margin-top:4px;">
+            <button class="btn btn-info" onclick="setMode('watch')">Watch</button>
+            <button class="btn btn-success" onclick="setMode('shield')">Shield</button>
+            <span id="current-mode" class="tag tag-blue" style="line-height:2.5;">WATCH</span>
+          </div>
+        </div>
+      </div>
+      <div class="controls" style="margin-top:12px;">
+        <button class="btn btn-primary" onclick="loadWidget()">🔄 Load/Reload Widget</button>
+        <button class="btn btn-info" onclick="triggerDriftCheck()">🔍 Manual Drift Check</button>
+        <button class="btn btn-outline" onclick="checkHeartbeats()">💓 Check Heartbeats</button>
+        <button class="btn btn-outline" onclick="checkDriftEvents()">📊 Check Drift Events</button>
+        <button class="btn btn-outline" onclick="checkBaselines()">📋 Check Baselines</button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="card">
+      <h2>📊 Current Status</h2>
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="label">Widget Status</div>
+          <div class="value" id="stat-widget">Not Loaded</div>
+          <div class="sub" id="stat-widget-ver"></div>
+        </div>
+        <div class="status-item">
+          <div class="label">Last Heartbeat</div>
+          <div class="value" id="stat-heartbeat">—</div>
+          <div class="sub" id="stat-heartbeat-time"></div>
+        </div>
+        <div class="status-item">
+          <div class="label">Baseline Status</div>
+          <div class="value" id="stat-baseline">Unknown</div>
+          <div class="sub" id="stat-baseline-count"></div>
+        </div>
+        <div class="status-item">
+          <div class="label">Drift Events</div>
+          <div class="value" id="stat-drift">0</div>
+          <div class="sub" id="stat-drift-new"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulated Provider Website Content -->
+    <div class="card">
+      <h2>🏥 Simulated Provider Website Content</h2>
+      <p style="font-size:10px;color:#94a3b8;margin-bottom:12px;">
+        Edit these sections to simulate compliance changes. The widget will detect modifications on next drift check.
+      </p>
+
+      <!-- AI Disclosure -->
+      <div class="compliance-zone">
+        <div class="zone-label">AI Disclosure (HB 149)</div>
+        <div id="ai-disclosure-content" class="editable" contenteditable="true" data-ai-disclosure>
+          This practice uses AI-powered tools for appointment scheduling and preliminary symptom assessment. 
+          All AI-assisted decisions are reviewed by licensed healthcare professionals before any clinical action is taken.
+        </div>
+        <div class="controls" style="margin-top:8px;">
+          <button class="btn btn-danger" onclick="removeContent('ai-disclosure-content')" style="font-size:9px;">🗑️ Remove</button>
+          <button class="btn btn-warning" onclick="modifyContent('ai-disclosure-content')" style="font-size:9px;">✏️ Modify</button>
+          <button class="btn btn-success" onclick="restoreContent('ai-disclosure-content', 'ai')" style="font-size:9px;">↩️ Restore</button>
+        </div>
+      </div>
+
+      <!-- Privacy Policy -->
+      <div class="compliance-zone">
+        <div class="zone-label">Privacy Policy Link</div>
+        <div id="privacy-content">
+          <a href="https://testpractice.com/privacy-policy" id="privacy-link">Privacy Policy</a>
+          <span style="font-size:10px;color:#94a3b8;margin-left:8px;">← Widget detects this link's presence and href</span>
+        </div>
+        <div class="controls" style="margin-top:8px;">
+          <button class="btn btn-danger" onclick="removePrivacyLink()" style="font-size:9px;">🗑️ Remove Link</button>
+          <button class="btn btn-warning" onclick="changePrivacyLink()" style="font-size:9px;">✏️ Change URL</button>
+          <button class="btn btn-success" onclick="restorePrivacyLink()" style="font-size:9px;">↩️ Restore</button>
+        </div>
+      </div>
+
+      <!-- Third Party Scripts -->
+      <div class="compliance-zone">
+        <div class="zone-label">Third-Party Scripts</div>
+        <div id="scripts-content" style="font-size:10px;color:#64748b;">
+          Current external scripts will be listed here after widget loads.
+        </div>
+        <div class="controls" style="margin-top:8px;">
+          <button class="btn btn-warning" onclick="addExternalScript()" style="font-size:9px;">➕ Add External Script</button>
+          <button class="btn btn-danger" onclick="removeExternalScripts()" style="font-size:9px;">🗑️ Remove Added Scripts</button>
+        </div>
+      </div>
+
+      <!-- Data Collection Form -->
+      <div class="compliance-zone">
+        <div class="zone-label">Data Collection Form</div>
+        <form id="test-form" action="https://testpractice.com/api/intake" method="POST">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="text" name="patient_name" placeholder="Patient Name" style="flex:1;min-width:120px;" />
+            <input type="email" name="patient_email" placeholder="Email" style="flex:1;min-width:120px;" />
+            <input type="tel" name="patient_phone" placeholder="Phone" style="flex:1;min-width:120px;" />
+          </div>
+        </form>
+        <div class="controls" style="margin-top:8px;">
+          <button class="btn btn-warning" onclick="addFormField()" style="font-size:9px;">➕ Add SSN Field</button>
+          <button class="btn btn-danger" onclick="changeFormAction()" style="font-size:9px;">🔀 Change Form Action</button>
+          <button class="btn btn-success" onclick="restoreForm()" style="font-size:9px;">↩️ Restore</button>
+        </div>
+      </div>
+
+      <!-- HIPAA References -->
+      <div class="compliance-zone">
+        <div class="zone-label">HIPAA References</div>
+        <div id="hipaa-content" class="editable" contenteditable="true">
+          This practice maintains a Business Associate Agreement (BAA) with all technology vendors handling Protected Health Information (PHI) in compliance with HIPAA regulations.
+        </div>
+        <div class="controls" style="margin-top:8px;">
+          <button class="btn btn-danger" onclick="removeContent('hipaa-content')" style="font-size:9px;">🗑️ Remove</button>
+          <button class="btn btn-success" onclick="restoreContent('hipaa-content', 'hipaa')" style="font-size:9px;">↩️ Restore</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Baseline Management -->
+    <div class="card">
+      <h2>📋 Baseline Management</h2>
+      <p style="font-size:10px;color:#94a3b8;margin-bottom:12px;">
+        Baselines represent the "known good" state. Drift is detected by comparing current content against baselines.
+      </p>
+      <div class="controls">
+        <button class="btn btn-primary" onclick="seedBaseline()">🌱 Seed Baseline from Current Content</button>
+        <button class="btn btn-danger" onclick="clearBaselines()">🗑️ Clear All Baselines</button>
+        <button class="btn btn-outline" onclick="viewBaselines()">👁️ View Current Baselines</button>
+      </div>
+      <div id="baseline-display" style="margin-top:8px;display:none;">
+        <div class="log" id="baseline-log"></div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <h2>📝 Event Log</h2>
+      <div class="controls">
+        <button class="btn btn-outline" onclick="clearLog()" style="font-size:9px;">Clear Log</button>
+      </div>
+      <div class="log" id="event-log" style="margin-top:8px;">Waiting for widget to load...\n</div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TEST HARNESS SCRIPTS -->
+  <!-- ══════════════════════════════════════════════ -->
+  <script>
+    var API_BASE = window.location.origin;
+    var currentMode = 'watch';
+    var addedScripts = [];
+
+    // Original content for restore
+    var originals = {
+      ai: 'This practice uses AI-powered tools for appointment scheduling and preliminary symptom assessment. All AI-assisted decisions are reviewed by licensed healthcare professionals before any clinical action is taken.',
+      hipaa: 'This practice maintains a Business Associate Agreement (BAA) with all technology vendors handling Protected Health Information (PHI) in compliance with HIPAA regulations.'
+    };
+
+    // ── Logging ──
+    function log(msg, type) {
+      var el = document.getElementById('event-log');
+      var ts = new Date().toLocaleTimeString();
+      var cls = type || 'info';
+      el.innerHTML += '<span class="' + cls + '">[' + ts + '] ' + msg + '</span>\n';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById('event-log').innerHTML = '';
+    }
+
+    // ── Widget Management ──
+    function getNpi() { return document.getElementById('cfg-npi').value; }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('current-mode').textContent = mode.toUpperCase();
+      document.getElementById('current-mode').className = 'tag ' + (mode === 'shield' ? 'tag-green' : 'tag-blue');
+      log('Mode set to: ' + mode, 'info');
+    }
+
+    function loadWidget() {
+      // Remove existing widget
+      var existing = document.getElementById('kl-sentry');
+      if (existing) existing.remove();
+      var existingScript = document.getElementById('sentry-script');
+      if (existingScript) existingScript.remove();
+
+      var npi = getNpi();
+      log('Loading widget for NPI ' + npi + ' in ' + currentMode + ' mode...', 'info');
+
+      // Intercept XHR to log API calls
+      patchXHR();
+
+      // Load the widget
+      var script = document.createElement('script');
+      script.id = 'sentry-script';
+      script.src = API_BASE + '/sentry.js';
+      script.setAttribute('data-npi', npi);
+      script.setAttribute('data-mode', currentMode);
+      script.setAttribute('data-position', 'bottom-right');
+      script.onload = function() {
+        log('✅ Widget script loaded successfully', 'success');
+        document.getElementById('stat-widget').textContent = 'Loaded';
+        if (window.KairoLogicSentry) {
+          document.getElementById('stat-widget-ver').textContent = 'v' + window.KairoLogicSentry.version;
+          log('Widget version: ' + window.KairoLogicSentry.version, 'info');
+        }
+      };
+      script.onerror = function() {
+        log('❌ Failed to load widget script', 'error');
+        document.getElementById('stat-widget').textContent = 'Error';
+      };
+      document.body.appendChild(script);
+    }
+
+    // Patch XMLHttpRequest to log widget API calls
+    function patchXHR() {
+      if (window._xhrPatched) return;
+      window._xhrPatched = true;
+
+      var origOpen = XMLHttpRequest.prototype.open;
+      var origSend = XMLHttpRequest.prototype.send;
+
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this._method = method;
+        this._url = url;
+        return origOpen.apply(this, arguments);
+      };
+
+      XMLHttpRequest.prototype.send = function(body) {
+        var self = this;
+        if (self._url && self._url.indexOf('/api/widget/') !== -1) {
+          var endpoint = self._url.split('/api/widget/')[1].split('?')[0];
+          log('📡 ' + self._method + ' /api/widget/' + endpoint, 'info');
+
+          if (body) {
+            try {
+              var parsed = JSON.parse(body);
+              if (parsed.drifts && parsed.drifts.length > 0) {
+                parsed.drifts.forEach(function(d) {
+                  log('🚨 DRIFT DETECTED: ' + d.category + ' — ' + d.drift_type, 'drift');
+                });
+              }
+            } catch(e) {}
+          }
+
+          this.addEventListener('load', function() {
+            try {
+              var resp = JSON.parse(self.responseText);
+              if (resp.ok) {
+                log('✅ ' + endpoint + ' response OK' + (resp.inserted ? ' (inserted: ' + resp.inserted + ')' : ''), 'success');
+              } else if (resp.baselines === null) {
+                log('⚠️ No baseline exists yet — seed one first', 'warn');
+              }
+            } catch(e) {}
+          });
+        }
+        return origSend.apply(this, arguments);
+      };
+
+      // Also patch fetch
+      var origFetch = window.fetch;
+      window.fetch = function(url, opts) {
+        if (typeof url === 'string' && url.indexOf('/api/widget/') !== -1) {
+          var endpoint = url.split('/api/widget/')[1].split('?')[0];
+          log('📡 FETCH /api/widget/' + endpoint, 'info');
+        }
+        return origFetch.apply(this, arguments).then(function(resp) {
+          if (typeof url === 'string' && url.indexOf('/api/widget/') !== -1) {
+            var endpoint = url.split('/api/widget/')[1].split('?')[0];
+            resp.clone().json().then(function(data) {
+              if (data.baselines === null) {
+                log('⚠️ No baseline found — drift detection inactive until baseline is seeded', 'warn');
+                document.getElementById('stat-baseline').textContent = 'None';
+              } else if (data.baselines) {
+                var count = Object.keys(data.baselines).length;
+                log('📋 Baseline loaded: ' + count + ' categories', 'success');
+                document.getElementById('stat-baseline').textContent = 'Active';
+                document.getElementById('stat-baseline-count').textContent = count + ' categories';
+              }
+            }).catch(function() {});
+          }
+          return resp;
+        });
+      };
+    }
+
+    function triggerDriftCheck() {
+      if (window.KairoLogicSentry && window.KairoLogicSentry.triggerDriftCheck) {
+        log('🔍 Triggering manual drift check...', 'info');
+        window.KairoLogicSentry.triggerDriftCheck();
+      } else {
+        log('❌ Widget not loaded — load it first', 'error');
+      }
+    }
+
+    // ── Content Manipulation ──
+    function removeContent(id) {
+      var el = document.getElementById(id);
+      el.textContent = '';
+      el.style.background = '#fee2e2';
+      log('🗑️ Removed content: ' + id, 'warn');
+    }
+
+    function modifyContent(id) {
+      var el = document.getElementById(id);
+      el.textContent = 'This content has been modified by the test harness at ' + new Date().toLocaleTimeString();
+      el.style.background = '#fef3c7';
+      log('✏️ Modified content: ' + id, 'warn');
+    }
+
+    function restoreContent(id, key) {
+      var el = document.getElementById(id);
+      el.textContent = originals[key];
+      el.style.background = '#fffbeb';
+      log('↩️ Restored content: ' + id, 'success');
+    }
+
+    function removePrivacyLink() {
+      var link = document.getElementById('privacy-link');
+      if (link) { link.remove(); log('🗑️ Removed privacy policy link', 'warn'); }
+    }
+
+    function changePrivacyLink() {
+      var link = document.getElementById('privacy-link');
+      if (link) { link.href = 'https://suspicious-site.com/data'; log('🔀 Changed privacy link to suspicious URL', 'warn'); }
+    }
+
+    function restorePrivacyLink() {
+      var container = document.getElementById('privacy-content');
+      container.innerHTML = '<a href="https://testpractice.com/privacy-policy" id="privacy-link">Privacy Policy</a><span style="font-size:10px;color:#94a3b8;margin-left:8px;">← Widget detects this link\'s presence and href</span>';
+      log('↩️ Restored privacy link', 'success');
+    }
+
+    function addExternalScript() {
+      var domains = ['https://cdn.tracking-service.com/track.js', 'https://analytics.unknown-vendor.com/v2.js', 'https://widgets.chat-provider.io/bot.js'];
+      var src = domains[addedScripts.length % domains.length];
+      var s = document.createElement('script');
+      s.src = src;
+      s.className = 'test-added-script';
+      document.head.appendChild(s);
+      addedScripts.push(s);
+      log('➕ Added external script: ' + src, 'warn');
+      updateScriptsList();
+    }
+
+    function removeExternalScripts() {
+      addedScripts.forEach(function(s) { s.remove(); });
+      addedScripts = [];
+      log('🗑️ Removed all added external scripts', 'success');
+      updateScriptsList();
+    }
+
+    function updateScriptsList() {
+      var el = document.getElementById('scripts-content');
+      var scripts = document.querySelectorAll('script[src]');
+      var domains = [];
+      scripts.forEach(function(s) {
+        try {
+          var url = new URL(s.src);
+          if (url.hostname !== window.location.hostname) domains.push(url.hostname);
+        } catch(e) {}
+      });
+      el.innerHTML = domains.length > 0 
+        ? domains.map(function(d) { return '<span class="tag tag-amber" style="margin:2px;">' + d + '</span>'; }).join(' ')
+        : '<span style="font-size:10px;color:#94a3b8;">No external scripts detected</span>';
+    }
+
+    function addFormField() {
+      var form = document.getElementById('test-form');
+      var existing = document.getElementById('ssn-field');
+      if (existing) { log('SSN field already added', 'warn'); return; }
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.name = 'patient_ssn';
+      input.id = 'ssn-field';
+      input.placeholder = 'SSN (⚠️ sensitive!)';
+      input.style.cssText = 'flex:1;min-width:120px;border-color:#ef4444;margin-top:8px;';
+      form.querySelector('div').appendChild(input);
+      log('➕ Added SSN field to form — HIGH severity drift!', 'warn');
+    }
+
+    function changeFormAction() {
+      var form = document.getElementById('test-form');
+      form.action = 'https://unknown-server.com/collect';
+      log('🔀 Changed form action to unknown-server.com', 'warn');
+    }
+
+    function restoreForm() {
+      var form = document.getElementById('test-form');
+      form.action = 'https://testpractice.com/api/intake';
+      var ssn = document.getElementById('ssn-field');
+      if (ssn) ssn.remove();
+      log('↩️ Restored form to original state', 'success');
+    }
+
+    // ── Baseline Management ──
+    function seedBaseline() {
+      var npi = getNpi();
+      log('🌱 Seeding baseline for NPI ' + npi + '...', 'info');
+
+      // We need to run the extractors and post their results as the baseline
+      // Use the widget's internal methods if available, otherwise use fetch
+      if (!window.crypto || !window.crypto.subtle) {
+        log('❌ Web Crypto API not available — cannot hash content', 'error');
+        return;
+      }
+
+      // Simple extractors matching the widget's logic
+      var categories = {
+        ai_disclosure: extractTextByKeywords(['artificial intelligence', 'ai-powered', 'ai assisted', 'machine learning', 'ai tool', 'ai disclosure']),
+        privacy_policy: extractPrivacyLinks(),
+        third_party_scripts: extractExternalScripts(),
+        data_collection_forms: extractForms(),
+        hipaa_references: extractHipaaRefs(),
+        cookie_consent: '',
+        meta_compliance: ''
+      };
+
+      var pending = Object.keys(categories).length;
+      var baselineData = {};
+
+      Object.keys(categories).forEach(function(cat) {
+        var content = categories[cat];
+        sha256(content || '').then(function(hash) {
+          baselineData[cat] = { hash: hash, content: (content || '').substring(0, 500) };
+          pending--;
+          if (pending === 0) {
+            // POST to baseline API
+            fetch(API_BASE + '/api/widget/baseline', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                npi: npi,
+                page_url: window.location.pathname,
+                categories: baselineData,
+                framework: 'tx_sb1188_hb149'
+              })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.ok) {
+                log('✅ Baseline seeded: ' + data.upserted + ' categories', 'success');
+                document.getElementById('stat-baseline').textContent = 'Active';
+                document.getElementById('stat-baseline-count').textContent = data.upserted + ' categories';
+              } else {
+                log('❌ Baseline seed failed: ' + JSON.stringify(data), 'error');
+              }
+            })
+            .catch(function(e) { log('❌ Baseline seed error: ' + e.message, 'error'); });
+          }
+        });
+      });
+    }
+
+    function clearBaselines() {
+      log('⚠️ Clear baselines requires Supabase SQL Editor — run: DELETE FROM compliance_baselines WHERE npi = \'' + getNpi() + '\';', 'warn');
+    }
+
+    function viewBaselines() {
+      var npi = getNpi();
+      fetch(API_BASE + '/api/widget/baseline?npi=' + npi + '&page_url=' + encodeURIComponent(window.location.pathname))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var display = document.getElementById('baseline-display');
+          var logEl = document.getElementById('baseline-log');
+          display.style.display = 'block';
+          
+          if (!data.baselines) {
+            logEl.innerHTML = '<span class="warn">No baselines found for NPI ' + npi + '</span>';
+            return;
+          }
+
+          var html = '<span class="success">Baselines for NPI ' + npi + ':</span>\n';
+          Object.keys(data.baselines).forEach(function(cat) {
+            var b = data.baselines[cat];
+            html += '<span class="info">' + cat + '</span>: hash=' + b.hash.substring(0, 16) + '... empty=' + b.empty + '\n';
+            if (b.content) html += '  content: ' + b.content.substring(0, 80) + '...\n';
+          });
+          html += '\n<span class="info">Last updated: ' + (data.last_updated || 'unknown') + '</span>';
+          logEl.innerHTML = html;
+        })
+        .catch(function(e) { log('❌ Failed to fetch baselines: ' + e.message, 'error'); });
+    }
+
+    // ── API Checks ──
+    function checkHeartbeats() {
+      fetch(API_BASE + '/api/widget/drift?limit=0') // just to test the API
+        .then(function() {
+          log('Heartbeats are visible in the Admin Dashboard → Drift tab', 'info');
+        });
+      // Fetch from Supabase REST directly won't work from browser due to CORS
+      // Direct the user to admin dashboard
+      log('💓 Open Admin Dashboard → Drift tab to view heartbeats', 'info');
+      document.getElementById('stat-heartbeat').textContent = 'Check Admin';
+    }
+
+    function checkDriftEvents() {
+      var npi = getNpi();
+      fetch(API_BASE + '/api/widget/drift?npi=' + npi)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var count = data.events ? data.events.length : 0;
+          document.getElementById('stat-drift').textContent = count;
+          document.getElementById('stat-drift-new').textContent = data.events ? data.events.filter(function(e) { return e.status === 'new'; }).length + ' new' : '';
+          log('📊 Found ' + count + ' drift events for NPI ' + npi, count > 0 ? 'warn' : 'success');
+          if (data.events) {
+            data.events.slice(0, 5).forEach(function(e) {
+              log('  → ' + e.category + ' [' + e.severity + '] ' + e.drift_type + ' (' + e.status + ')', e.severity === 'critical' ? 'error' : 'warn');
+            });
+          }
+        })
+        .catch(function(e) { log('❌ Failed to check drift events: ' + e.message, 'error'); });
+    }
+
+    function checkBaselines() {
+      viewBaselines();
+    }
+
+    // ── Helper: SHA-256 ──
+    function sha256(str) {
+      var buffer = new TextEncoder().encode(str);
+      return window.crypto.subtle.digest('SHA-256', buffer).then(function(hash) {
+        return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+      });
+    }
+
+    // ── Helper: Extract compliance content (mirrors widget extractors) ──
+    function extractTextByKeywords(keywords) {
+      var signals = [];
+      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      var node;
+      while (node = walker.nextNode()) {
+        var text = (node.textContent || '').toLowerCase().trim();
+        if (text.length < 5) continue;
+        for (var i = 0; i < keywords.length; i++) {
+          if (text.indexOf(keywords[i]) !== -1) {
+            var parent = node.parentElement;
+            var tag = parent ? parent.tagName.toLowerCase() : '';
+            if (tag !== 'script' && tag !== 'style') { signals.push(text.substring(0, 200)); break; }
+          }
+        }
+      }
+      return signals.sort().join('|');
+    }
+
+    function extractPrivacyLinks() {
+      var links = document.querySelectorAll('a');
+      var found = [];
+      links.forEach(function(a) {
+        var href = (a.href || '').toLowerCase();
+        var text = (a.textContent || '').toLowerCase();
+        if (href.indexOf('privacy') !== -1 || text.indexOf('privacy policy') !== -1) {
+          found.push(href + '::' + text.trim().substring(0, 50));
+        }
+      });
+      return found.sort().join('|');
+    }
+
+    function extractExternalScripts() {
+      var scripts = document.querySelectorAll('script[src]');
+      var unique = [];
+      scripts.forEach(function(s) {
+        try {
+          var url = new URL(s.src);
+          if (url.hostname !== window.location.hostname && url.hostname !== 'kairologic.net') {
+            if (unique.indexOf(url.hostname) === -1) unique.push(url.hostname);
+          }
+        } catch(e) {}
+      });
+      return unique.sort().join('|');
+    }
+
+    function extractForms() {
+      var forms = document.querySelectorAll('form');
+      var signals = [];
+      forms.forEach(function(f) {
+        var action = f.action || 'none';
+        var inputs = f.querySelectorAll('input, select, textarea');
+        var fields = [];
+        inputs.forEach(function(inp) {
+          var name = inp.name || inp.id || inp.type;
+          if (name) fields.push(name);
+        });
+        signals.push(action + '::' + fields.sort().join(','));
+      });
+      return signals.sort().join('|');
+    }
+
+    function extractHipaaRefs() {
+      var text = (document.body.innerText || '').toLowerCase();
+      var terms = ['hipaa', 'business associate agreement', 'baa', 'protected health information', 'phi'];
+      var found = [];
+      terms.forEach(function(t) { if (text.indexOf(t) !== -1) found.push(t); });
+      return found.sort().join('|');
+    }
+
+    // ── Init ──
+    window.addEventListener('load', function() {
+      log('Test harness ready. Click "Load/Reload Widget" to start.', 'info');
+      updateScriptsList();
+    });
+  </script>
+
+</body>
+</html>
