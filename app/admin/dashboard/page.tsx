@@ -16,7 +16,7 @@ import { AssetsTab } from '@/components/admin/AssetsTab';
 import { PageContentTab } from '@/components/admin/PageContentTab';
 import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
 import { ProspectsTab } from '@/components/admin/ProspectsTab';
-// import { DriftTab } from '@/components/admin/DriftTab';
+import { DriftTab } from '@/components/admin/DriftTab';
 import { EmailTemplatesTab } from '@/components/admin/EmailTemplatesTab';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -2010,6 +2010,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
 
 
