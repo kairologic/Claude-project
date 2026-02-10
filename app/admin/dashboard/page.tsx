@@ -1734,11 +1734,7 @@ export default function AdminDashboard() {
               <EmailTemplatesTab showNotification={notify} />
             )}
 
-            {activeTab === 'drift' && (
-            <DriftTab showNotification={notify} />
-            }}
-
-            {activeTab === 'calendar' && (
+                       {activeTab === 'calendar' && (
               <div className="space-y-3">
                 <h3 className="text-sm font-bold">Appointment Calendar</h3>
                 <div className="bg-white rounded-lg p-2.5 shadow-sm border">
@@ -2018,6 +2014,7 @@ So it becomes:
     </div>
   );
 }
+
 
 
 
