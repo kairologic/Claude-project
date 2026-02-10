@@ -1764,10 +1764,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {activeTab === 'content' && <PageContentTab showNotification={notify} />}
-            {activeTab === 'assets' && <AssetsTab showNotification={notify} />}
-            {activeTab === 'prospects' && <ProspectsTab showNotification={notify} />}
-         {activeTab === 'drift' && <DriftTab showNotification={notify} />}
+                     {activeTab === 'drift' && <DriftTab showNotification={notify} />}
   {activeTab === 'content' && <PageContentTab showNotification={notify} />}
   {activeTab === 'assets' && <AssetsTab showNotification={notify} />}
  {activeTab === 'prospects' && <ProspectsTab showNotification={notify} />}
@@ -2010,6 +2007,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
 
 
