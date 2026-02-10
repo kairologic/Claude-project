@@ -1,21 +1,34 @@
 /**
- * KairoLogic Sentry Compliance Widget v2.0
- * Glassmorphism design — embeddable on any healthcare practice site
+ * KairoLogic Sentry Compliance Widget v2.1
+ * =========================================
+ * Glassmorphism trust badge + compliance drift detection engine.
  * 
  * Usage:
- * <script src="https://kairologic.com/sentry.js" data-npi="1234567890" data-mode="shield"></script>
+ * <script src="https://kairologic.net/sentry.js" data-npi="1234567890" data-mode="shield"></script>
  * 
  * Attributes:
  *   data-npi       Required. 10-digit NPI.
  *   data-mode      "watch" (default) or "shield"
  *   data-position  "bottom-right" (default), "bottom-left", "inline"
  *   data-theme     "auto" (default), "light", "dark"
+ * 
+ * What it does:
+ *   1. Renders glassmorphism trust badge (existing v1 UI)
+ *   2. Extracts compliance-relevant content from the DOM
+ *   3. Generates SHA-256 hashes per compliance category
+ *   4. Compares against known baseline from last scan
+ *   5. Reports drift events to KairoLogic API
+ *   6. Sends periodic heartbeats (1x per hour max)
+ * 
+ * Deploy to: public/sentry.js (replaces existing)
  */
 (function() {
   'use strict';
 
-  var VERSION = '2.0.0';
-  var API_BASE = window.KAIROLOGIC_API_URL || 'https://kairlogic-website.vercel.app';
+  var VERSION = '2.1.0';
+  var API_BASE = window.KAIROLOGIC_API_URL || 'https://kairologic.net';
+  var DRIFT_API = API_BASE + '/api/widget';
+  var HEARTBEAT_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
   // ── Find script tag ──
   var scriptTag = document.currentScript || (function() {
@@ -30,9 +43,9 @@
 
   var cfg = {
     npi:      scriptTag.getAttribute('data-npi') || '',
-    mode:     scriptTag.getAttribute('data-mode') || 'watch',         // watch | shield
-    position: scriptTag.getAttribute('data-position') || 'bottom-right', // bottom-right | bottom-left | inline
-    theme:    scriptTag.getAttribute('data-theme') || 'auto'          // auto | light | dark
+    mode:     scriptTag.getAttribute('data-mode') || 'watch',
+    position: scriptTag.getAttribute('data-position') || 'bottom-right',
+    theme:    scriptTag.getAttribute('data-theme') || 'auto'
   };
 
   if (!cfg.npi || cfg.npi.length !== 10) {
@@ -41,6 +54,10 @@
   }
 
   var isShield = cfg.mode === 'shield';
+
+  // ══════════════════════════════════════════════════════════
+  // PART 1: BADGE UI (from v1)
+  // ══════════════════════════════════════════════════════════
 
   // ── Detect dark background (for auto theme) ──
   function detectTheme() {
@@ -57,351 +74,150 @@
   }
 
   // ── Styles ──
-  var css = `
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap');
+  var css = ''
+    + '@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap");'
 
-    #kl-sentry { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.4; box-sizing: border-box; z-index: 99999; }
-    #kl-sentry * { box-sizing: border-box; margin: 0; padding: 0; }
+    + '#kl-sentry { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.4; box-sizing: border-box; z-index: 99999; }'
+    + '#kl-sentry * { box-sizing: border-box; margin: 0; padding: 0; }'
 
-    /* Position */
-    #kl-sentry.kl-pos-bottom-right { position: fixed; bottom: 16px; right: 16px; }
-    #kl-sentry.kl-pos-bottom-left  { position: fixed; bottom: 16px; left: 16px; }
-    #kl-sentry.kl-pos-inline        { position: relative; display: inline-block; }
+    + '#kl-sentry.kl-pos-bottom-right { position: fixed; bottom: 16px; right: 16px; }'
+    + '#kl-sentry.kl-pos-bottom-left  { position: fixed; bottom: 16px; left: 16px; }'
+    + '#kl-sentry.kl-pos-inline        { position: relative; display: inline-block; }'
+    + '#kl-sentry.kl-hidden { display: none !important; }'
 
-    /* ── Badge (collapsed) ── */
-    .kl-badge {
-      display: flex; align-items: center; gap: 8px;
-      padding: 7px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      user-select: none;
-      -webkit-user-select: none;
-      transition: all 0.25s ease;
-      max-width: 240px;
-    }
-    .kl-badge:hover { transform: translateY(-1px); }
+    // Badge
+    + '.kl-badge { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; cursor: pointer; user-select: none; -webkit-user-select: none; transition: all 0.25s ease; max-width: 240px; }'
+    + '.kl-badge:hover { transform: translateY(-1px); }'
 
-    /* Light glass */
-    .kl-light .kl-badge {
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(10,25,47,0.08);
-      border-left: 4px solid #FF6700;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
-    }
-    .kl-light .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+    // Light glass
+    + '.kl-light .kl-badge { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(10,25,47,0.08); border-left: 4px solid #FF6700; box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04); }'
+    + '.kl-light .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.12); }'
 
-    /* Dark glass */
-    .kl-dark .kl-badge {
-      background: rgba(15,23,42,0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-left: 4px solid #FF6700;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-    }
-    .kl-dark .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    // Dark glass
+    + '.kl-dark .kl-badge { background: rgba(15,23,42,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid #FF6700; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }'
+    + '.kl-dark .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }'
 
-    /* Shield icon box */
-    .kl-icon-box {
-      width: 30px; height: 30px;
-      background: #0A192F;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      position: relative;
-    }
-    .kl-icon-box svg { width: 16px; height: 16px; color: #fff; }
+    // Icon box
+    + '.kl-icon-box { width: 30px; height: 30px; background: #0A192F; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }'
+    + '.kl-icon-box svg { width: 16px; height: 16px; color: #fff; }'
 
-    /* Live pulse (Shield only) */
-    .kl-pulse-dot {
-      position: absolute; top: -2px; right: -2px;
-      width: 8px; height: 8px;
-    }
-    .kl-pulse-ring {
-      position: absolute; inset: 0;
-      border-radius: 50%;
-      background: #22c55e;
-      opacity: 0.6;
-      animation: klPulse 2s ease-out infinite;
-    }
-    .kl-pulse-core {
-      position: relative;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #22c55e;
-      border: 1.5px solid #fff;
-    }
-    .kl-dark .kl-pulse-core { border-color: #0f172a; }
+    // Shield pulse (Shield mode)
+    + '.kl-pulse-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; }'
+    + '.kl-pulse-ring { position: absolute; inset: 0; border-radius: 50%; background: #22c55e; opacity: 0.6; animation: klPulse 2s ease-out infinite; }'
+    + '.kl-pulse-core { position: relative; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; border: 1.5px solid #fff; }'
+    + '.kl-dark .kl-pulse-core { border-color: #0f172a; }'
+    + '@keyframes klPulse { 0% { transform: scale(1); opacity: 0.6; } 70% { transform: scale(2.2); opacity: 0; } 100% { transform: scale(2.2); opacity: 0; } }'
 
-    @keyframes klPulse {
-      0%   { transform: scale(1); opacity: 0.6; }
-      70%  { transform: scale(2.2); opacity: 0; }
-      100% { transform: scale(2.2); opacity: 0; }
-    }
+    // Watch dot (static)
+    + '.kl-watch-dot { position: absolute; top: -1px; right: -1px; width: 7px; height: 7px; border-radius: 50%; background: #3b82f6; border: 1.5px solid #fff; }'
+    + '.kl-dark .kl-watch-dot { border-color: #0f172a; }'
 
-    /* Watch dot (static, no pulse) */
-    .kl-watch-dot {
-      position: absolute; top: -1px; right: -1px;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #3b82f6;
-      border: 1.5px solid #fff;
-    }
-    .kl-dark .kl-watch-dot { border-color: #0f172a; }
+    // Badge text
+    + '.kl-badge-brand { font-size: 10px; font-weight: 800; letter-spacing: 0.3px; white-space: nowrap; }'
+    + '.kl-light .kl-badge-brand { color: #0A192F; }'
+    + '.kl-dark .kl-badge-brand { color: #e2e8f0; }'
+    + '.kl-badge-status { font-size: 9px; font-weight: 600; }'
+    + '.kl-badge-id { font-size: 8px; font-family: "JetBrains Mono", monospace; letter-spacing: 0.5px; }'
+    + '.kl-light .kl-badge-status { color: #16a34a; }'
+    + '.kl-dark .kl-badge-status { color: #4ade80; }'
+    + '.kl-light .kl-badge-id { color: #94a3b8; }'
+    + '.kl-dark .kl-badge-id { color: #64748b; }'
 
-    /* Text area */
-    .kl-badge-text { flex: 1; min-width: 0; }
-    .kl-badge-brand {
-      font-size: 8px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 1.2px;
-      color: #FF6700;
-    }
-    .kl-badge-status {
-      font-size: 11px; font-weight: 700;
-      line-height: 1.2;
-    }
-    .kl-light .kl-badge-status { color: #0A192F; }
-    .kl-dark  .kl-badge-status { color: #f1f5f9; }
+    // Chevron
+    + '.kl-info-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.25s ease; flex-shrink: 0; margin-left: auto; }'
+    + '.kl-light .kl-info-btn { background: rgba(10,25,47,0.04); }'
+    + '.kl-dark .kl-info-btn { background: rgba(255,255,255,0.06); }'
+    + '.kl-info-btn svg { width: 10px; height: 10px; transition: transform 0.25s ease; }'
+    + '.kl-light .kl-info-btn svg { color: #64748b; }'
+    + '.kl-dark .kl-info-btn svg { color: #94a3b8; }'
+    + '.kl-info-btn.kl-open svg { transform: rotate(180deg); }'
 
-    .kl-badge-id {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 8px;
-      margin-top: 1px;
-    }
-    .kl-light .kl-badge-id { color: #94a3b8; }
-    .kl-dark  .kl-badge-id { color: #64748b; }
+    // Pane (expandable)
+    + '.kl-pane { max-height: 0; overflow: hidden; transition: max-height 0.35s ease, opacity 0.25s ease; opacity: 0; margin-top: 0; }'
+    + '.kl-pane.kl-open { max-height: 500px; opacity: 1; margin-top: 8px; }'
+    + '.kl-pane-inner { border-radius: 12px; padding: 14px; }'
+    + '.kl-light .kl-pane-inner { background: rgba(255,255,255,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(10,25,47,0.06); box-shadow: 0 8px 32px rgba(0,0,0,0.08); }'
+    + '.kl-dark .kl-pane-inner { background: rgba(15,23,42,0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }'
 
-    /* Info button */
-    .kl-info-btn {
-      padding-left: 8px;
-      border-left: 1px solid rgba(128,128,128,0.12);
-      display: flex; align-items: center;
-      flex-shrink: 0;
-    }
-    .kl-info-btn svg {
-      width: 12px; height: 12px;
-      transition: color 0.2s, transform 0.3s;
-    }
-    .kl-light .kl-info-btn svg { color: #94a3b8; }
-    .kl-dark  .kl-info-btn svg { color: #475569; }
-    .kl-badge:hover .kl-info-btn svg { color: #0A192F; }
-    .kl-dark .kl-badge:hover .kl-info-btn svg { color: #e2e8f0; }
-    .kl-info-btn.kl-open svg { transform: rotate(180deg); }
+    // Trust items
+    + '.kl-trust-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; }'
+    + '.kl-trust-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }'
+    + '.kl-trust-icon svg { width: 12px; height: 12px; }'
+    + '.kl-trust-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }'
+    + '.kl-light .kl-trust-label { color: #64748b; }'
+    + '.kl-dark .kl-trust-label { color: #94a3b8; }'
+    + '.kl-trust-value { font-size: 10px; font-weight: 500; margin-top: 1px; }'
+    + '.kl-light .kl-trust-value { color: #475569; }'
+    + '.kl-dark .kl-trust-value { color: #cbd5e1; }'
 
-    /* ── Trust Pane (expanded) ── */
-    .kl-pane {
-      max-height: 0; overflow: hidden; opacity: 0;
-      transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, margin 0.3s ease;
-      margin-top: 0;
-    }
-    .kl-pane.kl-open {
-      max-height: 500px; opacity: 1; margin-top: 8px;
-    }
-    .kl-pane-inner {
-      border-radius: 12px;
-      padding: 16px;
-    }
-    .kl-light .kl-pane-inner {
-      background: rgba(255,255,255,0.97);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(10,25,47,0.06);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-    }
-    .kl-dark .kl-pane-inner {
-      background: rgba(15,23,42,0.95);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.06);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-    }
+    // Category bars
+    + '.kl-cat-bar-track { flex: 1; height: 4px; border-radius: 2px; overflow: hidden; }'
+    + '.kl-light .kl-cat-bar-track { background: rgba(10,25,47,0.06); }'
+    + '.kl-dark .kl-cat-bar-track { background: rgba(255,255,255,0.08); }'
+    + '.kl-cat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }'
+    + '.kl-cat-score { font-size: 10px; font-weight: 700; font-family: "JetBrains Mono", monospace; min-width: 28px; text-align: right; }'
 
-    /* Trust items */
-    .kl-trust-item {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 8px 0;
-    }
-    .kl-trust-item + .kl-trust-item {
-      border-top: 1px solid rgba(128,128,128,0.1);
-    }
-    .kl-trust-icon {
-      width: 28px; height: 28px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      font-size: 14px;
-    }
-    .kl-trust-label {
-      font-size: 11px; font-weight: 600;
-    }
-    .kl-light .kl-trust-label { color: #1e293b; }
-    .kl-dark  .kl-trust-label { color: #e2e8f0; }
+    // Summary row
+    + '.kl-summary-row { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(128,128,128,0.1); }'
+    + '.kl-stat { text-align: center; flex: 1; }'
+    + '.kl-stat-val { font-size: 16px; font-weight: 800; font-family: "JetBrains Mono", monospace; }'
+    + '.kl-stat-lbl { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }'
+    + '.kl-light .kl-stat-lbl { color: #94a3b8; }'
+    + '.kl-dark .kl-stat-lbl { color: #64748b; }'
 
-    .kl-trust-value {
-      font-size: 10px;
-      margin-top: 1px;
-    }
-    .kl-light .kl-trust-value { color: #64748b; }
-    .kl-dark  .kl-trust-value { color: #94a3b8; }
+    // CTA
+    + '.kl-pane-cta { display: block; text-align: center; font-size: 10px; font-weight: 700; text-decoration: none; padding: 8px; border-radius: 8px; margin-top: 10px; transition: all 0.2s; background: #FF6700; color: white; }'
+    + '.kl-pane-cta:hover { background: #e55b00; transform: translateY(-1px); }'
+    + '.kl-pane-footer { text-align: center; margin-top: 8px; }'
+    + '.kl-pane-footer a { font-size: 8px; text-decoration: none; font-weight: 600; }'
+    + '.kl-light .kl-pane-footer a { color: #94a3b8; }'
+    + '.kl-dark .kl-pane-footer a { color: #64748b; }';
 
-    /* Category bars */
-    .kl-cat-bar-track {
-      flex: 1; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 4px;
-    }
-    .kl-light .kl-cat-bar-track { background: #e2e8f0; }
-    .kl-dark  .kl-cat-bar-track { background: #334155; }
-
-    .kl-cat-bar-fill {
-      height: 100%; border-radius: 2px;
-      transition: width 0.8s ease;
-    }
-
-    .kl-cat-score {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; font-weight: 700;
-      min-width: 28px; text-align: right;
-    }
-
-    /* Summary row */
-    .kl-summary-row {
-      display: flex; justify-content: center; gap: 20px;
-      padding-top: 10px; margin-top: 8px;
-    }
-    .kl-light .kl-summary-row { border-top: 1px solid rgba(10,25,47,0.06); }
-    .kl-dark  .kl-summary-row { border-top: 1px solid rgba(255,255,255,0.06); }
-
-    .kl-stat { text-align: center; }
-    .kl-stat-val { font-size: 16px; font-weight: 800; line-height: 1; }
-    .kl-stat-lbl { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-    .kl-light .kl-stat-lbl { color: #94a3b8; }
-    .kl-dark  .kl-stat-lbl { color: #64748b; }
-
-    /* CTA link */
-    .kl-pane-cta {
-      display: block; text-align: center;
-      margin-top: 12px; padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.8px;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-    .kl-light .kl-pane-cta { background: #0A192F; color: #fff; }
-    .kl-light .kl-pane-cta:hover { background: #0f2744; }
-    .kl-dark  .kl-pane-cta { background: #FF6700; color: #fff; }
-    .kl-dark  .kl-pane-cta:hover { background: #e55a00; }
-
-    /* Footer */
-    .kl-pane-footer {
-      text-align: center; margin-top: 8px;
-      font-size: 8px; letter-spacing: 0.3px;
-    }
-    .kl-pane-footer a { text-decoration: none; transition: color 0.2s; }
-    .kl-light .kl-pane-footer a { color: #94a3b8; }
-    .kl-light .kl-pane-footer a:hover { color: #FF6700; }
-    .kl-dark  .kl-pane-footer a { color: #475569; }
-    .kl-dark  .kl-pane-footer a:hover { color: #FF6700; }
-
-    /* Hidden */
-    #kl-sentry.kl-hidden { display: none !important; }
-
-    /* Mobile */
-    @media (max-width: 480px) {
-      #kl-sentry.kl-pos-bottom-right, #kl-sentry.kl-pos-bottom-left {
-        right: 8px; left: 8px; bottom: 8px;
-      }
-      .kl-badge { max-width: none; }
-    }
-  `;
-
-  // ── Icons ──
+  // ── SVG Icons ──
   var ico = {
-    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
-    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
-    server: '\uD83D\uDDA5\uFE0F',   // 🖥️
-    ai: '\uD83E\uDD16',              // 🤖
-    clock: '\u23F0',                  // ⏰
-    check: '\u2705',                  // ✅
+    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>',
+    server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>',
+    ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
   };
 
-  // ── Helpers ──
-  function fmtDate(d) {
-    if (!d) return 'Recently';
-    try {
-      var dt = new Date(d), now = new Date();
-      var diff = Math.floor((now - dt) / 3600000); // hours
-      if (diff < 1) return 'Just now';
-      if (diff < 24) return diff + 'h ago';
-      var days = Math.floor(diff / 24);
-      if (days === 1) return 'Yesterday';
-      if (days < 7) return days + 'd ago';
-      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch(e) { return 'Recently'; }
-  }
-
-  // ── Build widget ──
+  // ── Init UI ──
   function init() {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', init);
-      return;
-    }
+    fetchWidgetData(cfg.npi, function(data) {
+      var theme = detectTheme();
+      var status = data ? data.status : 'unregistered';
+      var lastScan = data && data.last_scan ? new Date(data.last_scan).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not yet scanned';
 
-    // Inject styles
-    var styleEl = document.createElement('style');
-    styleEl.id = 'kl-sentry-css';
-    styleEl.textContent = css;
-    document.head.appendChild(styleEl);
+      var statusText = status === 'verified' ? (isShield ? 'Shield Active' : 'Verified Compliant') : 'Compliance Unknown';
+      var opts = { mode: cfg.mode, status: status, statusText: statusText };
 
-    // Create root
-    var theme = detectTheme();
-    var root = document.createElement('div');
-    root.id = 'kl-sentry';
-    root.className = 'kl-pos-' + cfg.position + ' kl-' + theme;
-
-    // Show loading badge
-    root.innerHTML = buildBadge(theme, {
-      status: 'loading',
-      statusText: 'Verifying\u2026',
-      id: 'TX-SB1188-' + cfg.npi,
-      mode: cfg.mode
-    });
-
-    document.body.appendChild(root);
-
-    // Fetch data
-    fetchData(cfg.npi).then(function(data) {
-      if (!data) {
-        root.classList.add('kl-hidden');
-        return;
-      }
-      if (data.widget_status === 'hidden') {
-        root.classList.add('kl-hidden');
-        return;
-      }
-      if (data.widget_status === 'not_registered') {
-        root.innerHTML = buildBadge(theme, {
-          status: 'unregistered',
-          statusText: 'Not Verified',
-          id: 'TX-SB1188-' + cfg.npi,
-          mode: cfg.mode
-        }) + buildUnregisteredPane(theme);
-        wireToggle(root);
-        return;
+      // Build HTML
+      var html = buildBadge(theme, opts);
+      if (status === 'verified') {
+        html += buildTrustPane(theme, data, lastScan);
+      } else {
+        html += buildUnregisteredPane(theme);
       }
 
-      // Verified
-      var lastScan = fmtDate(data.last_scan_timestamp || data.updated_at);
-      root.innerHTML = buildBadge(theme, {
-        status: 'verified',
-        statusText: isShield ? 'Verified Sovereign' : 'Monitored',
-        id: 'TX-SB1188-' + cfg.npi,
-        mode: cfg.mode
-      }) + buildTrustPane(theme, data, lastScan);
+      // Create shadow-like container
+      var root = document.createElement('div');
+      root.id = 'kl-sentry';
+      root.className = 'kl-' + theme + ' kl-pos-' + cfg.position;
+
+      var style = document.createElement('style');
+      style.textContent = css;
+      root.appendChild(style);
+
+      var content = document.createElement('div');
+      content.innerHTML = html;
+      root.appendChild(content);
+
+      document.body.appendChild(root);
       wireToggle(root);
     });
   }
 
-  // ── Badge HTML ──
   function buildBadge(theme, opts) {
     var dotHtml = '';
     if (opts.mode === 'shield' && opts.status === 'verified') {
@@ -425,21 +241,16 @@
       + '</div>';
   }
 
-  // ── Trust Pane (verified) ──
   function buildTrustPane(theme, data, lastScan) {
     var score = data.compliance_score || 0;
 
     return ''
       + '<div class="kl-pane" id="kl-pane">'
       +   '<div class="kl-pane-inner">'
-
-      // Scan timestamp header
       +     '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid rgba(128,128,128,0.1);">'
       +       '<span class="kl-trust-label" style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;">Compliance Status</span>'
       +       '<span class="kl-badge-id" style="font-size:9px;font-weight:600;">Scanned: ' + lastScan + '</span>'
       +     '</div>'
-
-      // Trust items
       +     '<div class="kl-trust-item">'
       +       '<div class="kl-trust-icon" style="background:rgba(59,130,246,0.1)">' + ico.server + '</div>'
       +       '<div style="flex:1">'
@@ -451,7 +262,6 @@
       +         '</div>'
       +       '</div>'
       +     '</div>'
-
       +     '<div class="kl-trust-item">'
       +       '<div class="kl-trust-icon" style="background:rgba(245,158,11,0.1)">' + ico.ai + '</div>'
       +       '<div style="flex:1">'
@@ -463,7 +273,6 @@
       +         '</div>'
       +       '</div>'
       +     '</div>'
-
       +     '<div class="kl-trust-item">'
       +       '<div class="kl-trust-icon" style="background:rgba(34,197,94,0.1)">' + ico.clock + '</div>'
       +       '<div>'
@@ -474,23 +283,18 @@
       +         '</div>'
       +       '</div>'
       +     '</div>'
-
-      // Pass/Warn/Fail summary
       +     '<div class="kl-summary-row">'
       +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#16a34a" id="kl-s-pass">\u2014</div><div class="kl-stat-lbl">Passed</div></div>'
       +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#d97706" id="kl-s-warn">\u2014</div><div class="kl-stat-lbl">Advisory</div></div>'
       +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#dc2626" id="kl-s-fail">\u2014</div><div class="kl-stat-lbl">Issues</div></div>'
       +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#0A192F" id="kl-s-score">' + score + '</div><div class="kl-stat-lbl">Score</div></div>'
       +     '</div>'
-
-      // CTA
       +     '<a class="kl-pane-cta" href="' + API_BASE + '/scan/results?npi=' + cfg.npi + '&mode=verified" target="_blank" rel="noopener">View Full Compliance Report</a>'
       +     '<div class="kl-pane-footer"><a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic Sentry ' + (isShield ? 'Shield' : 'Watch') + '</a></div>'
       +   '</div>'
       + '</div>';
   }
 
-  // ── Unregistered Pane ──
   function buildUnregisteredPane(theme) {
     return ''
       + '<div class="kl-pane" id="kl-pane">'
@@ -503,7 +307,6 @@
       + '</div>';
   }
 
-  // ── Wire toggle ──
   function wireToggle(root) {
     var badge = root.querySelector('#kl-badge');
     var pane = root.querySelector('#kl-pane');
@@ -533,22 +336,20 @@
     });
   }
 
-  // ── Lazy-load detailed report data ──
   function loadDetails(npi) {
     fetch(API_BASE + '/api/report?npi=' + npi, { headers: { 'Accept': 'application/json' } })
       .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(reports) {
-        if (!reports || !Array.isArray(reports) || !reports.length) return;
+      .then(function(resp) {
+        var reports = resp && resp.reports ? resp.reports : (Array.isArray(resp) ? resp : null);
+        if (!reports || !reports.length) return;
         var rpt = reports[0];
 
-        // Category bars
         if (rpt.category_scores) {
           var cs = rpt.category_scores;
-          setBar('kl-bar-dr', 'kl-val-dr', cs.dataResidency && cs.dataResidency.percentage || 0);
-          setBar('kl-bar-ai', 'kl-val-ai', cs.aiTransparency && cs.aiTransparency.percentage || 0);
+          setBar('kl-bar-dr', 'kl-val-dr', cs.data_sovereignty ? cs.data_sovereignty.percentage : (cs.dataResidency ? cs.dataResidency.percentage : 0));
+          setBar('kl-bar-ai', 'kl-val-ai', cs.ai_transparency ? cs.ai_transparency.percentage : (cs.aiTransparency ? cs.aiTransparency.percentage : 0));
         }
 
-        // Pass / warn / fail counts
         if (rpt.findings && Array.isArray(rpt.findings)) {
           var p = 0, w = 0, f = 0;
           rpt.findings.forEach(function(fi) {
@@ -575,12 +376,294 @@
     if (el) el.textContent = v;
   }
 
-  // ── Fetch widget data ──
-  function fetchData(npi) {
-    return fetch(API_BASE + '/api/widget/' + npi, { headers: { 'Accept': 'application/json' } })
+  function fetchWidgetData(npi, callback) {
+    fetch(API_BASE + '/api/widget/' + npi, { headers: { 'Accept': 'application/json' } })
       .then(function(r) { return r.ok ? r.json() : null; })
-      .catch(function() { return null; });
+      .then(function(data) { callback(data); })
+      .catch(function() { callback(null); });
   }
+
+  // ══════════════════════════════════════════════════════════
+  // PART 2: DRIFT DETECTION ENGINE (new in v2)
+  // ══════════════════════════════════════════════════════════
+
+  var lastHeartbeat = 0;
+
+  // ── SHA-256 hash ──
+  function sha256(str) {
+    if (window.crypto && window.crypto.subtle) {
+      var buffer = new TextEncoder().encode(str);
+      return window.crypto.subtle.digest('SHA-256', buffer).then(function(hash) {
+        return Array.from(new Uint8Array(hash))
+          .map(function(b) { return b.toString(16).padStart(2, '0'); })
+          .join('');
+      });
+    }
+    return Promise.resolve(simpleHash(str));
+  }
+
+  function simpleHash(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+      var chr = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0;
+    }
+    return 'sh_' + Math.abs(hash).toString(36);
+  }
+
+  // ── Compliance Content Extractors ──
+  var driftExtractors = {
+
+    ai_disclosure: function() {
+      var signals = [];
+      var keywords = ['artificial intelligence', 'ai-powered', 'ai assisted', 'machine learning',
+        'automated', 'chatbot', 'virtual assistant', 'ai tool', 'ai system', 'algorithmic',
+        'ai disclosure', 'ai notice', 'uses ai', 'powered by ai'];
+      var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+      var node;
+      while (node = walker.nextNode()) {
+        var text = (node.textContent || '').toLowerCase().trim();
+        if (text.length < 5) continue;
+        for (var i = 0; i < keywords.length; i++) {
+          if (text.indexOf(keywords[i]) !== -1) {
+            var parent = node.parentElement;
+            var tag = parent ? parent.tagName.toLowerCase() : 'unknown';
+            if (tag !== 'script' && tag !== 'style' && tag !== 'noscript') {
+              signals.push(text.substring(0, 200));
+              break;
+            }
+          }
+        }
+      }
+      var selectors = ['[data-ai-disclosure]', '.ai-disclosure', '#ai-disclosure'];
+      for (var s = 0; s < selectors.length; s++) {
+        try {
+          var els = document.querySelectorAll(selectors[s]);
+          for (var e = 0; e < els.length; e++) {
+            signals.push((els[e].textContent || '').trim().substring(0, 200));
+          }
+        } catch(ex) {}
+      }
+      return signals.sort().join('|');
+    },
+
+    privacy_policy: function() {
+      var links = document.querySelectorAll('a');
+      var found = [];
+      for (var i = 0; i < links.length; i++) {
+        var href = (links[i].href || '').toLowerCase();
+        var text = (links[i].textContent || '').toLowerCase();
+        if (href.indexOf('privacy') !== -1 || text.indexOf('privacy policy') !== -1 || text.indexOf('privacy notice') !== -1) {
+          found.push(href + '::' + text.trim().substring(0, 50));
+        }
+      }
+      return found.sort().join('|');
+    },
+
+    third_party_scripts: function() {
+      var scripts = document.querySelectorAll('script[src]');
+      var currentHost = window.location.hostname;
+      var unique = [];
+      for (var i = 0; i < scripts.length; i++) {
+        try {
+          var url = new URL(scripts[i].src);
+          if (url.hostname !== currentHost && url.hostname !== 'kairologic.net') {
+            if (unique.indexOf(url.hostname) === -1) unique.push(url.hostname);
+          }
+        } catch(e) {}
+      }
+      return unique.sort().join('|');
+    },
+
+    data_collection_forms: function() {
+      var forms = document.querySelectorAll('form');
+      var signals = [];
+      for (var i = 0; i < forms.length; i++) {
+        var action = forms[i].action || 'none';
+        var inputs = forms[i].querySelectorAll('input, select, textarea');
+        var fields = [];
+        for (var j = 0; j < inputs.length; j++) {
+          var name = inputs[j].name || inputs[j].id || inputs[j].type;
+          if (name) fields.push(name);
+        }
+        signals.push(action + '::' + fields.sort().join(','));
+      }
+      return signals.sort().join('|');
+    },
+
+    cookie_consent: function() {
+      var selectors = ['[class*="cookie"]', '[id*="cookie"]', '[class*="consent"]', '[id*="consent"]', '[class*="gdpr"]', '[id*="gdpr"]'];
+      var found = [];
+      for (var s = 0; s < selectors.length; s++) {
+        try {
+          var els = document.querySelectorAll(selectors[s]);
+          for (var e = 0; e < els.length; e++) {
+            var tag = els[e].tagName.toLowerCase();
+            if (tag !== 'script' && tag !== 'style') {
+              found.push(tag + '::' + (els[e].className || '').substring(0, 50));
+            }
+          }
+        } catch(ex) {}
+      }
+      return found.sort().join('|');
+    },
+
+    hipaa_references: function() {
+      var text = (document.body.innerText || '').toLowerCase();
+      var terms = ['hipaa', 'business associate agreement', 'baa', 'protected health information', 'phi', 'notice of privacy practices', 'npp'];
+      var found = [];
+      for (var i = 0; i < terms.length; i++) {
+        if (text.indexOf(terms[i]) !== -1) found.push(terms[i]);
+      }
+      return found.sort().join('|');
+    },
+
+    meta_compliance: function() {
+      var metas = document.querySelectorAll('meta');
+      var found = [];
+      var keywords = ['compliance', 'hipaa', 'privacy', 'data-processing', 'ai-usage', 'sovereignty', 'data-residency'];
+      for (var i = 0; i < metas.length; i++) {
+        var name = ((metas[i].name || '') + (metas[i].httpEquiv || '')).toLowerCase();
+        for (var k = 0; k < keywords.length; k++) {
+          if (name.indexOf(keywords[k]) !== -1) {
+            found.push(name + '::' + (metas[i].content || '').substring(0, 100));
+          }
+        }
+      }
+      return found.sort().join('|');
+    }
+  };
+
+  // ── Run all extractors and hash ──
+  function extractAndHash(callback) {
+    var categories = Object.keys(driftExtractors);
+    var results = {};
+    var pending = categories.length;
+
+    categories.forEach(function(catId) {
+      try {
+        var content = driftExtractors[catId]();
+        sha256(content || '').then(function(hash) {
+          results[catId] = { hash: hash, content: (content || '').substring(0, 500), empty: !content };
+          pending--;
+          if (pending === 0) callback(results);
+        });
+      } catch(e) {
+        results[catId] = { hash: 'error', content: '', empty: true };
+        pending--;
+        if (pending === 0) callback(results);
+      }
+    });
+  }
+
+  // ── Compare current hashes against baseline ──
+  function detectDrift(current, baseline) {
+    var drifts = [];
+    if (!baseline) return drifts;
+
+    var categories = Object.keys(current);
+    for (var i = 0; i < categories.length; i++) {
+      var cat = categories[i];
+      var curr = current[cat];
+      var base = baseline[cat];
+
+      if (!base) {
+        if (!curr.empty) {
+          drifts.push({ category: cat, drift_type: 'content_added', previous_hash: null, current_hash: curr.hash, content_after: curr.content });
+        }
+      } else if (curr.empty && !base.empty) {
+        drifts.push({ category: cat, drift_type: 'content_removed', previous_hash: base.hash, current_hash: curr.hash, content_before: base.content, content_after: '' });
+      } else if (curr.hash !== base.hash) {
+        drifts.push({ category: cat, drift_type: 'content_changed', previous_hash: base.hash, current_hash: curr.hash, content_before: base.content, content_after: curr.content });
+      }
+    }
+
+    // Check for categories removed from page
+    if (baseline) {
+      var baseCategories = Object.keys(baseline);
+      for (var b = 0; b < baseCategories.length; b++) {
+        if (!current[baseCategories[b]]) {
+          drifts.push({ category: baseCategories[b], drift_type: 'content_removed', previous_hash: baseline[baseCategories[b]].hash, current_hash: null, content_before: baseline[baseCategories[b]].content, content_after: '' });
+        }
+      }
+    }
+
+    return drifts;
+  }
+
+  // ── Report drift ──
+  function reportDrift(drifts) {
+    if (drifts.length === 0) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', DRIFT_API + '/drift');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({
+      npi: cfg.npi,
+      page_url: window.location.pathname,
+      widget_mode: cfg.mode,
+      drifts: drifts,
+      timestamp: new Date().toISOString(),
+      user_agent: navigator.userAgent.substring(0, 200)
+    }));
+  }
+
+  // ── Send heartbeat ──
+  function sendHeartbeat(hashes) {
+    var now = Date.now();
+    if (now - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+    lastHeartbeat = now;
+
+    var categoryHashes = {};
+    if (hashes) {
+      var cats = Object.keys(hashes);
+      for (var i = 0; i < cats.length; i++) {
+        categoryHashes[cats[i]] = hashes[cats[i]].hash;
+      }
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', DRIFT_API + '/heartbeat');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({
+      npi: cfg.npi,
+      page_url: window.location.pathname,
+      widget_mode: cfg.mode,
+      category_hashes: categoryHashes,
+      timestamp: new Date().toISOString()
+    }));
+  }
+
+  // ── Drift engine main ──
+  function runDriftEngine() {
+    // Fetch baseline
+    fetch(DRIFT_API + '/baseline?npi=' + encodeURIComponent(cfg.npi) + '&page_url=' + encodeURIComponent(window.location.pathname))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        var baselineData = data ? data.baselines : null;
+
+        // Extract and hash current content
+        extractAndHash(function(currentHashes) {
+          var drifts = detectDrift(currentHashes, baselineData);
+
+          if (drifts.length > 0) {
+            reportDrift(drifts);
+          }
+
+          sendHeartbeat(currentHashes);
+        });
+      })
+      .catch(function() {
+        // Baseline fetch failed — still send heartbeat
+        extractAndHash(function(currentHashes) {
+          sendHeartbeat(currentHashes);
+        });
+      });
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // MAIN ENTRY
+  // ══════════════════════════════════════════════════════════
 
   // ── Public API ──
   window.KairoLogicSentry = {
@@ -597,10 +680,20 @@
     show: function() {
       var el = document.getElementById('kl-sentry');
       if (el) el.classList.remove('kl-hidden');
+    },
+    triggerDriftCheck: function() {
+      runDriftEngine();
     }
   };
 
-  // Start
+  // Start badge UI
   init();
+
+  // Start drift engine (delayed to not block page load)
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(runDriftEngine, { timeout: 5000 });
+  } else {
+    setTimeout(runDriftEngine, 3000);
+  }
 
 })();
