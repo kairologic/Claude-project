@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { 
   Shield, Users, Database, Calendar, Mail, 
   Search, Plus, Trash2, Edit, Eye, EyeOff, Download, Upload, Play, 
-  Star,
+  Star,Activity,
   CheckCircle, AlertTriangle, XCircle, Clock, Copy, Globe, FileCode, 
   BarChart3, TrendingUp, AlertCircle, Loader2, X, Save, LogOut, FileText, Package, Zap, Pause, FileWarning, UserPlus
 } from 'lucide-react';
@@ -16,11 +16,12 @@ import { AssetsTab } from '@/components/admin/AssetsTab';
 import { PageContentTab } from '@/components/admin/PageContentTab';
 import { ProviderDetailModal } from '@/components/admin/ProviderDetailModal';
 import { ProspectsTab } from '@/components/admin/ProspectsTab';
+import { DriftTab } from '@/components/admin/DriftTab';
 import { EmailTemplatesTab } from '@/components/admin/EmailTemplatesTab';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-type TabType = 'overview' | 'registry' | 'prospects' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
+type TabType = 'overview' | 'registry' | 'prospects' | 'drift' | 'widgets' | 'templates' | 'calendar' | 'content' | 'assets';
 
 // Technical fixes for violations (from RiskScanWidget)
 const TECHNICAL_FIXES: Record<string, any> = {
@@ -1495,6 +1496,7 @@ export default function AdminDashboard() {
     { id: 'calendar' as TabType, icon: <Calendar size={15} />, label: 'Calendar' },
     { id: 'content' as TabType, icon: <FileText size={15} />, label: 'Content' },
     { id: 'assets' as TabType, icon: <Package size={15} />, label: 'Assets' },
+    { id: 'drift' as TabType, icon: <Activity size={15} />, label: 'Drift' },
   ];
 
   if (!authenticated) return null;
@@ -1731,6 +1733,10 @@ export default function AdminDashboard() {
             {activeTab === 'templates' && (
               <EmailTemplatesTab showNotification={notify} />
             )}
+
+            {activeTab === 'drift' && (
+            <DriftTab showNotification={notify} />
+            }}
 
             {activeTab === 'calendar' && (
               <div className="space-y-3">
@@ -2003,4 +2009,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
