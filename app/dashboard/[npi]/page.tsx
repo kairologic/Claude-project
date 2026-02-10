@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Shield, Activity, AlertTriangle, CheckCircle, XCircle, Clock,
@@ -81,7 +81,9 @@ const DRIFT_TYPE_LABELS: Record<string, string> = {
 
 export default function ShieldDashboard() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const npi = params.npi as string;
+  const token = searchParams.get('token') || '';
 
   const [provider, setProvider] = useState<ProviderInfo | null>(null);
   const [events, setEvents] = useState<DriftEvent[]>([]);
@@ -98,10 +100,10 @@ export default function ShieldDashboard() {
     setLoading(true);
     try {
       // Fetch provider info + access check
-      const provRes = await fetch(`${API_BASE}/api/shield/dashboard?npi=${npi}`);
+      const provRes = await fetch(`${API_BASE}/api/shield/dashboard?npi=${npi}&token=${encodeURIComponent(token)}`);
       const provData = await provRes.json();
 
-      if (provData.error === 'access_denied') {
+      if (provData.error === 'access_denied' || provData.error === 'provider_not_found') {
         setAccessDenied(true);
         setLoading(false);
         return;
