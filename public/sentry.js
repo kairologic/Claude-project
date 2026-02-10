@@ -1,7 +1,15 @@
 /**
- * KairoLogic Sentry Compliance Widget v2.1
+ * KairoLogic Sentry Compliance Widget v3.0
  * =========================================
- * Glassmorphism trust badge + compliance drift detection engine.
+ * Redesigned trust badge + compliance drift detection engine.
+ * 
+ * v3.0 Changes:
+ *   - Redesigned badge: "Verified Sovereign" (Watch) / "Sentry Shield™" (Shield)
+ *   - Patient-friendly trust pane: US-Sovereign Data, AI Transparent, Access Controlled
+ *   - Drift count nudge: shows event count + severity in widget
+ *   - Watch: upgrade CTA to Stripe. Shield: dashboard link.
+ *   - Close button on expanded pane
+ *   - DM Sans typography
  * 
  * Usage:
  * <script src="https://kairologic.net/sentry.js" data-npi="1234567890" data-mode="shield"></script>
@@ -25,7 +33,7 @@
 (function() {
   'use strict';
 
-  var VERSION = '2.1.0';
+  var VERSION = '3.0.0';
   var API_BASE = window.KAIROLOGIC_API_URL || 'https://kairologic.net';
   var DRIFT_API = API_BASE + '/api/widget';
   var HEARTBEAT_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -56,7 +64,7 @@
   var isShield = cfg.mode === 'shield';
 
   // ══════════════════════════════════════════════════════════
-  // PART 1: BADGE UI (from v1)
+  // PART 1: BADGE UI — v3 Redesign
   // ══════════════════════════════════════════════════════════
 
   // ── Detect dark background (for auto theme) ──
@@ -75,134 +83,140 @@
 
   // ── Styles ──
   var css = ''
-    + '@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap");'
+    + '@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap");'
 
-    + '#kl-sentry { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.4; box-sizing: border-box; z-index: 99999; }'
-    + '#kl-sentry * { box-sizing: border-box; margin: 0; padding: 0; }'
-
-    + '#kl-sentry.kl-pos-bottom-right { position: fixed; bottom: 16px; right: 16px; }'
-    + '#kl-sentry.kl-pos-bottom-left  { position: fixed; bottom: 16px; left: 16px; }'
-    + '#kl-sentry.kl-pos-inline        { position: relative; display: inline-block; }'
+    // Root container
+    + '#kl-sentry { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.4; box-sizing: border-box; z-index: 99999; }'
+    + '#kl-sentry * { box-sizing: border-box; }'
     + '#kl-sentry.kl-hidden { display: none !important; }'
+    + '.kl-pos-bottom-right { position: fixed; bottom: 20px; right: 20px; }'
+    + '.kl-pos-bottom-left { position: fixed; bottom: 20px; left: 20px; }'
+    + '.kl-pos-inline { position: relative; display: inline-block; }'
 
-    // Badge
-    + '.kl-badge { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; cursor: pointer; user-select: none; -webkit-user-select: none; transition: all 0.25s ease; max-width: 240px; }'
-    + '.kl-badge:hover { transform: translateY(-1px); }'
+    // Badge (collapsed)
+    + '.kl-badge-v3 {'
+    +   'display:flex;align-items:center;gap:10px;'
+    +   'padding:10px 16px 10px 12px;border-radius:14px;cursor:pointer;'
+    +   'transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);'
+    +   'box-shadow:0 4px 20px rgba(0,0,0,0.12),0 0 0 1px rgba(255,255,255,0.1) inset;'
+    +   'user-select:none;position:relative;overflow:hidden;'
+    + '}'
+    + '.kl-badge-v3:hover { transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.16),0 0 0 1px rgba(255,255,255,0.1) inset; }'
+    + '.kl-badge-v3:active { transform:translateY(0); }'
+    + '.kl-badge-v3.kl-verified { background:linear-gradient(135deg,#0A192F 0%,#132d54 100%);color:white; }'
+    + '.kl-badge-v3.kl-unknown { background:linear-gradient(135deg,#475569 0%,#64748b 100%);color:white; }'
 
-    // Light glass
-    + '.kl-light .kl-badge { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(10,25,47,0.08); border-left: 4px solid #FF6700; box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04); }'
-    + '.kl-light .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.12); }'
-
-    // Dark glass
-    + '.kl-dark .kl-badge { background: rgba(15,23,42,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid #FF6700; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }'
-    + '.kl-dark .kl-badge:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }'
-
-    // Icon box
-    + '.kl-icon-box { width: 30px; height: 30px; background: #0A192F; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }'
-    + '.kl-icon-box svg { width: 16px; height: 16px; color: #fff; }'
-
-    // Shield pulse (Shield mode)
-    + '.kl-pulse-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; }'
-    + '.kl-pulse-ring { position: absolute; inset: 0; border-radius: 50%; background: #22c55e; opacity: 0.6; animation: klPulse 2s ease-out infinite; }'
-    + '.kl-pulse-core { position: relative; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; border: 1.5px solid #fff; }'
-    + '.kl-dark .kl-pulse-core { border-color: #0f172a; }'
-    + '@keyframes klPulse { 0% { transform: scale(1); opacity: 0.6; } 70% { transform: scale(2.2); opacity: 0; } 100% { transform: scale(2.2); opacity: 0; } }'
-
-    // Watch dot (static)
-    + '.kl-watch-dot { position: absolute; top: -1px; right: -1px; width: 7px; height: 7px; border-radius: 50%; background: #3b82f6; border: 1.5px solid #fff; }'
-    + '.kl-dark .kl-watch-dot { border-color: #0f172a; }'
+    // Badge icon
+    + '.kl-badge-icon { width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,0.1);position:relative; }'
+    + '.kl-badge-icon svg { width:18px;height:18px;stroke:white;fill:none; }'
+    + '.kl-badge-check { position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #0A192F; }'
+    + '.kl-badge-check svg { width:7px;height:7px;stroke:white;stroke-width:3;fill:none; }'
 
     // Badge text
-    + '.kl-badge-brand { font-size: 10px; font-weight: 800; letter-spacing: 0.3px; white-space: nowrap; }'
-    + '.kl-light .kl-badge-brand { color: #0A192F; }'
-    + '.kl-dark .kl-badge-brand { color: #e2e8f0; }'
-    + '.kl-badge-status { font-size: 9px; font-weight: 600; }'
-    + '.kl-badge-id { font-size: 8px; font-family: "JetBrains Mono", monospace; letter-spacing: 0.5px; }'
-    + '.kl-light .kl-badge-status { color: #16a34a; }'
-    + '.kl-dark .kl-badge-status { color: #4ade80; }'
-    + '.kl-light .kl-badge-id { color: #94a3b8; }'
-    + '.kl-dark .kl-badge-id { color: #64748b; }'
+    + '.kl-badge-text { flex:1;min-width:0; }'
+    + '.kl-badge-title { font-size:11px;font-weight:800;letter-spacing:0.2px;line-height:1.2; }'
+    + '.kl-badge-sub { font-size:8px;font-weight:600;opacity:0.6;text-transform:uppercase;letter-spacing:0.8px;margin-top:1px; }'
 
-    // Chevron
-    + '.kl-info-btn { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.25s ease; flex-shrink: 0; margin-left: auto; }'
-    + '.kl-light .kl-info-btn { background: rgba(10,25,47,0.04); }'
-    + '.kl-dark .kl-info-btn { background: rgba(255,255,255,0.06); }'
-    + '.kl-info-btn svg { width: 10px; height: 10px; transition: transform 0.25s ease; }'
-    + '.kl-light .kl-info-btn svg { color: #64748b; }'
-    + '.kl-dark .kl-info-btn svg { color: #94a3b8; }'
-    + '.kl-info-btn.kl-open svg { transform: rotate(180deg); }'
+    // Badge chevron
+    + '.kl-badge-chevron { width:16px;height:16px;opacity:0.5;transition:transform 0.3s;flex-shrink:0; }'
+    + '.kl-badge-chevron svg { width:16px;height:16px;stroke:white;fill:none; }'
+    + '.kl-badge-v3.kl-expanded .kl-badge-chevron { transform:rotate(180deg); }'
 
-    // Pane (expandable)
-    + '.kl-pane { max-height: 0; overflow: hidden; transition: max-height 0.35s ease, opacity 0.25s ease; opacity: 0; margin-top: 0; }'
-    + '.kl-pane.kl-open { max-height: 500px; opacity: 1; margin-top: 8px; }'
-    + '.kl-pane-inner { border-radius: 12px; padding: 14px; }'
-    + '.kl-light .kl-pane-inner { background: rgba(255,255,255,0.97); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(10,25,47,0.06); box-shadow: 0 8px 32px rgba(0,0,0,0.08); }'
-    + '.kl-dark .kl-pane-inner { background: rgba(15,23,42,0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }'
+    // Shield pulse dot
+    + '.kl-shield-pulse { position:absolute;top:6px;right:6px;width:8px;height:8px; }'
+    + '.kl-shield-pulse::before { content:"";position:absolute;inset:0;border-radius:50%;background:#22c55e;animation:kl-pulse 2s ease-in-out infinite; }'
+    + '.kl-shield-pulse::after { content:"";position:absolute;inset:2px;border-radius:50%;background:#22c55e; }'
+    + '@keyframes kl-pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.4;transform:scale(1.8);} }'
 
-    // Trust items
-    + '.kl-trust-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; }'
-    + '.kl-trust-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }'
-    + '.kl-trust-icon svg { width: 12px; height: 12px; }'
-    + '.kl-trust-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }'
-    + '.kl-light .kl-trust-label { color: #64748b; }'
-    + '.kl-dark .kl-trust-label { color: #94a3b8; }'
-    + '.kl-trust-value { font-size: 10px; font-weight: 500; margin-top: 1px; }'
-    + '.kl-light .kl-trust-value { color: #475569; }'
-    + '.kl-dark .kl-trust-value { color: #cbd5e1; }'
+    // ── Expanded Pane ──
+    + '.kl-pane-v3 {'
+    +   'position:absolute;bottom:calc(100% + 8px);width:320px;border-radius:16px;overflow:hidden;'
+    +   'opacity:0;transform:translateY(8px) scale(0.96);pointer-events:none;'
+    +   'transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);'
+    +   'box-shadow:0 20px 60px rgba(0,0,0,0.15),0 0 0 1px rgba(0,0,0,0.04);'
+    + '}'
+    + '.kl-pos-bottom-right .kl-pane-v3 { right:0; }'
+    + '.kl-pos-bottom-left .kl-pane-v3 { left:0; }'
+    + '.kl-pane-v3.kl-open { opacity:1;transform:translateY(0) scale(1);pointer-events:auto; }'
+    + '.kl-pane-v3-inner { background:white; }'
 
-    // Category bars
-    + '.kl-cat-bar-track { flex: 1; height: 4px; border-radius: 2px; overflow: hidden; }'
-    + '.kl-light .kl-cat-bar-track { background: rgba(10,25,47,0.06); }'
-    + '.kl-dark .kl-cat-bar-track { background: rgba(255,255,255,0.08); }'
-    + '.kl-cat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }'
-    + '.kl-cat-score { font-size: 10px; font-weight: 700; font-family: "JetBrains Mono", monospace; min-width: 28px; text-align: right; }'
+    // Pane header
+    + '.kl-pane-header { background:linear-gradient(135deg,#0A192F 0%,#1a365d 100%);padding:16px 18px;display:flex;align-items:center;gap:10px; }'
+    + '.kl-pane-header-icon { width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0; }'
+    + '.kl-pane-header-icon svg { width:20px;height:20px;stroke:#C5A059;fill:none; }'
+    + '.kl-pane-header-text { flex:1; }'
+    + '.kl-pane-header-title { color:white;font-size:13px;font-weight:800;letter-spacing:-0.2px; }'
+    + '.kl-pane-header-sub { color:rgba(255,255,255,0.5);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-top:2px; }'
+    + '.kl-pane-close { width:24px;height:24px;border-radius:6px;border:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s; }'
+    + '.kl-pane-close:hover { background:rgba(255,255,255,0.2);color:white; }'
+    + '.kl-pane-close svg { width:12px;height:12px;stroke:currentColor;fill:none; }'
 
-    // Summary row
-    + '.kl-summary-row { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(128,128,128,0.1); }'
-    + '.kl-stat { text-align: center; flex: 1; }'
-    + '.kl-stat-val { font-size: 16px; font-weight: 800; font-family: "JetBrains Mono", monospace; }'
-    + '.kl-stat-lbl { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }'
-    + '.kl-light .kl-stat-lbl { color: #94a3b8; }'
-    + '.kl-dark .kl-stat-lbl { color: #64748b; }'
+    // Status banner
+    + '.kl-status-banner { display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:10px;font-weight:700; }'
+    + '.kl-status-pass { background:#f0fdf4;color:#166534;border-bottom:1px solid #dcfce7; }'
+    + '.kl-status-warn { background:#fffbeb;color:#92400e;border-bottom:1px solid #fef3c7; }'
+    + '.kl-status-unknown { background:#f8fafc;color:#64748b;border-bottom:1px solid #f1f5f9; }'
+    + '.kl-status-dot { width:6px;height:6px;border-radius:50%; }'
+    + '.kl-status-pass .kl-status-dot { background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,0.4); }'
+    + '.kl-status-warn .kl-status-dot { background:#f59e0b; }'
+    + '.kl-status-unknown .kl-status-dot { background:#94a3b8; }'
 
-    // CTA
-    + '.kl-pane-cta { display: block; text-align: center; font-size: 10px; font-weight: 700; text-decoration: none; padding: 8px; border-radius: 8px; margin-top: 10px; transition: all 0.2s; background: #FF6700; color: white; }'
-    + '.kl-pane-cta:hover { background: #e55b00; transform: translateY(-1px); }'
-    + '.kl-pane-footer { text-align: center; margin-top: 8px; }'
-    + '.kl-pane-footer a { font-size: 8px; text-decoration: none; font-weight: 600; }'
-    + '.kl-light .kl-pane-footer a { color: #94a3b8; }'
-    + '.kl-dark .kl-pane-footer a { color: #64748b; }'
+    // Trust rows
+    + '.kl-trust-section { padding:14px 18px; }'
+    + '.kl-trust-row { display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9; }'
+    + '.kl-trust-row:last-child { border-bottom:none; }'
+    + '.kl-trust-row-icon { width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px; }'
+    + '.kl-trust-row-content { flex:1; }'
+    + '.kl-trust-row-label { font-size:10px;font-weight:700;color:#1e293b; }'
+    + '.kl-trust-row-value { font-size:10px;font-weight:500;color:#64748b;margin-top:2px;line-height:1.4; }'
+    + '.kl-trust-row-ref { font-size:8px;font-weight:600;color:#94a3b8;margin-top:3px;font-family:"JetBrains Mono",monospace; }'
 
-    // Drift alert nudge
-    + '.kl-drift-nudge { margin-top: 10px; padding: 10px; border-radius: 8px; display: none; }'
-    + '.kl-drift-nudge.kl-visible { display: block; }'
-    + '.kl-light .kl-drift-nudge { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }'
-    + '.kl-dark .kl-drift-nudge { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); }'
-    + '.kl-drift-nudge-icon { font-size: 14px; margin-bottom: 4px; }'
-    + '.kl-drift-nudge-count { font-size: 11px; font-weight: 700; }'
-    + '.kl-light .kl-drift-nudge-count { color: #92400e; }'
-    + '.kl-dark .kl-drift-nudge-count { color: #fbbf24; }'
-    + '.kl-drift-nudge-detail { font-size: 9px; font-weight: 500; margin-top: 2px; }'
-    + '.kl-light .kl-drift-nudge-detail { color: #a16207; }'
-    + '.kl-dark .kl-drift-nudge-detail { color: #d97706; }'
-    + '.kl-drift-nudge-cta { display: block; text-align: center; font-size: 9px; font-weight: 700; text-decoration: none; padding: 6px; border-radius: 6px; margin-top: 8px; transition: all 0.2s; }'
-    + '.kl-light .kl-drift-nudge-cta { background: #0A192F; color: white; }'
-    + '.kl-dark .kl-drift-nudge-cta { background: #1e40af; color: white; }'
-    + '.kl-drift-nudge-cta:hover { opacity: 0.9; transform: translateY(-1px); }'
+    // Score bars
+    + '.kl-score-bar { display:flex;align-items:center;gap:6px;margin-top:6px; }'
+    + '.kl-score-track { flex:1;height:3px;background:#f1f5f9;border-radius:2px;overflow:hidden; }'
+    + '.kl-score-fill { height:100%;border-radius:2px;transition:width 0.8s ease; }'
+    + '.kl-score-pct { font-size:9px;font-weight:700;font-family:"JetBrains Mono",monospace;min-width:28px;text-align:right; }'
 
-    // Shield dashboard link
-    + '.kl-shield-dash-link { display: block; text-align: center; font-size: 10px; font-weight: 700; text-decoration: none; padding: 8px; border-radius: 8px; margin-top: 6px; transition: all 0.2s; border: 1px solid; }'
-    + '.kl-light .kl-shield-dash-link { background: rgba(10,25,47,0.03); color: #0A192F; border-color: rgba(10,25,47,0.12); }'
-    + '.kl-dark .kl-shield-dash-link { background: rgba(255,255,255,0.05); color: #e2e8f0; border-color: rgba(255,255,255,0.1); }'
-    + '.kl-shield-dash-link:hover { transform: translateY(-1px); opacity: 0.9; }';
+    // Scan date row
+    + '.kl-scan-date { display:flex;align-items:center;justify-content:space-between;padding:8px 18px;background:#f8fafc;border-top:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9; }'
+    + '.kl-scan-date-label { font-size:8px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px; }'
+    + '.kl-scan-date-value { font-size:9px;font-weight:700;color:#475569;font-family:"JetBrains Mono",monospace; }'
+
+    // Drift nudge
+    + '.kl-drift-alert { margin:0 18px 14px;padding:10px 12px;border-radius:10px;display:none; }'
+    + '.kl-drift-alert.kl-visible { display:block; }'
+    + '.kl-drift-alert-default { background:#fffbeb;border:1px solid #fde68a; }'
+    + '.kl-drift-alert-critical { background:#fef2f2;border:1px solid #fecaca; }'
+    + '.kl-drift-alert-header { display:flex;align-items:center;gap:6px; }'
+    + '.kl-drift-alert-icon { font-size:12px; }'
+    + '.kl-drift-alert-count { font-size:10px;font-weight:700; }'
+    + '.kl-drift-alert-default .kl-drift-alert-count { color:#92400e; }'
+    + '.kl-drift-alert-critical .kl-drift-alert-count { color:#991b1b; }'
+    + '.kl-drift-alert-detail { font-size:9px;margin-top:3px;line-height:1.4; }'
+    + '.kl-drift-alert-default .kl-drift-alert-detail { color:#a16207; }'
+    + '.kl-drift-alert-critical .kl-drift-alert-detail { color:#b91c1c; }'
+    + '.kl-drift-alert-cta { display:block;text-align:center;margin-top:8px;padding:6px;border-radius:6px;font-size:9px;font-weight:700;text-decoration:none;transition:all 0.2s;color:white; }'
+    + '.kl-drift-alert-cta:hover { opacity:0.9;transform:translateY(-1px); }'
+
+    // Action buttons
+    + '.kl-pane-actions { padding:0 18px 14px; }'
+    + '.kl-pane-btn { display:block;width:100%;text-align:center;padding:10px;border-radius:10px;font-size:11px;font-weight:700;text-decoration:none;transition:all 0.2s;border:none;cursor:pointer;margin-bottom:6px;font-family:"DM Sans",sans-serif; }'
+    + '.kl-pane-btn-primary { background:#FF6700;color:white; }'
+    + '.kl-pane-btn-primary:hover { background:#e55b00;transform:translateY(-1px); }'
+    + '.kl-pane-btn-secondary { background:rgba(10,25,47,0.04);color:#0A192F;border:1px solid rgba(10,25,47,0.08); }'
+    + '.kl-pane-btn-secondary:hover { background:rgba(10,25,47,0.08); }'
+
+    // Footer
+    + '.kl-pane-footer-v3 { padding:10px 18px;text-align:center;border-top:1px solid #f1f5f9; }'
+    + '.kl-pane-footer-v3 a { font-size:8px;color:#94a3b8;text-decoration:none;font-weight:600;letter-spacing:0.3px; }'
+    + '.kl-pane-footer-v3 a:hover { color:#64748b; }';
 
   // ── SVG Icons ──
   var ico = {
-    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>',
-    server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>',
-    ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/></svg>',
-    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
   };
 
   // ── Init UI ──
@@ -212,21 +226,16 @@
       var status = data ? data.status : 'unregistered';
       var lastScan = data && data.last_scan ? new Date(data.last_scan).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not yet scanned';
 
-      var statusText = status === 'verified' ? (isShield ? 'Shield Active' : 'Verified Compliant') : 'Compliance Unknown';
-      var opts = { mode: cfg.mode, status: status, statusText: statusText };
-
-      // Build HTML
-      var html = buildBadge(theme, opts);
+      var html = buildBadge(status);
       if (status === 'verified') {
-        html += buildTrustPane(theme, data, lastScan);
+        html += buildTrustPane(data, lastScan);
       } else {
-        html += buildUnregisteredPane(theme);
+        html += buildUnregisteredPane();
       }
 
-      // Create shadow-like container
       var root = document.createElement('div');
       root.id = 'kl-sentry';
-      root.className = 'kl-' + theme + ' kl-pos-' + cfg.position;
+      root.className = 'kl-pos-' + cfg.position;
 
       var style = document.createElement('style');
       style.textContent = css;
@@ -241,100 +250,147 @@
     });
   }
 
-  function buildBadge(theme, opts) {
-    var dotHtml = '';
-    if (opts.mode === 'shield' && opts.status === 'verified') {
-      dotHtml = '<div class="kl-pulse-dot"><span class="kl-pulse-ring"></span><span class="kl-pulse-core"></span></div>';
-    } else if (opts.status === 'verified') {
-      dotHtml = '<div class="kl-watch-dot"></div>';
-    }
+  function buildBadge(status) {
+    var verified = status === 'verified';
+    var badgeClass = verified ? 'kl-verified' : 'kl-unknown';
 
     return ''
-      + '<div class="kl-badge" id="kl-badge" role="button" tabindex="0" aria-expanded="false">'
-      +   '<div class="kl-icon-box">'
+      + '<div class="kl-badge-v3 ' + badgeClass + '" id="kl-badge" role="button" tabindex="0" aria-expanded="false">'
+      +   '<div class="kl-badge-icon">'
       +     ico.shield
-      +     dotHtml
+      +     (verified ? '<div class="kl-badge-check">' + ico.check + '</div>' : '')
       +   '</div>'
       +   '<div class="kl-badge-text">'
-      +     '<div class="kl-badge-brand">KairoLogic\u2122 ' + (opts.status === 'verified' ? 'Certified' : 'Sentry') + '</div>'
-      +     '<div class="kl-badge-status">' + opts.statusText + '</div>'
-      +     '<div class="kl-badge-id">TX-SB1188-' + cfg.npi.slice(-6) + '</div>'
+      +     '<div class="kl-badge-title">' + (verified ? (isShield ? 'Data & AI Trust' : 'Data & AI Trust') : 'Compliance Unknown') + '</div>'
+      +     '<div class="kl-badge-sub">' + (verified ? (isShield ? 'Live Monitoring Active' : 'US Data \u00b7 AI Disclosed') : 'Not yet verified') + '</div>'
       +   '</div>'
-      +   '<div class="kl-info-btn" id="kl-info-btn">' + ico.chevron + '</div>'
+      +   (isShield && verified ? '<div class="kl-shield-pulse"></div>' : '')
+      +   '<div class="kl-badge-chevron">' + ico.chevron + '</div>'
       + '</div>';
   }
 
-  function buildTrustPane(theme, data, lastScan) {
+  function buildTrustPane(data, lastScan) {
     var score = data.compliance_score || 0;
 
     return ''
-      + '<div class="kl-pane" id="kl-pane">'
-      +   '<div class="kl-pane-inner">'
-      +     '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid rgba(128,128,128,0.1);">'
-      +       '<span class="kl-trust-label" style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;">Compliance Status</span>'
-      +       '<span class="kl-badge-id" style="font-size:9px;font-weight:600;">Scanned: ' + lastScan + '</span>'
+      + '<div class="kl-pane-v3" id="kl-pane">'
+      +   '<div class="kl-pane-v3-inner">'
+
+      // Header
+      +     '<div class="kl-pane-header">'
+      +       '<div class="kl-pane-header-icon">' + ico.shield + '</div>'
+      +       '<div class="kl-pane-header-text">'
+      +         '<div class="kl-pane-header-title">KairoLogic\u2122 Sentry</div>'
+      +         '<div class="kl-pane-header-sub">' + (isShield ? 'Shield \u00b7 Live Monitoring' : 'Watch \u00b7 Compliance Verified') + '</div>'
+      +       '</div>'
+      +       '<button class="kl-pane-close" id="kl-pane-close">' + ico.close + '</button>'
       +     '</div>'
-      +     '<div class="kl-trust-item">'
-      +       '<div class="kl-trust-icon" style="background:rgba(59,130,246,0.1)">' + ico.server + '</div>'
-      +       '<div style="flex:1">'
-      +         '<div class="kl-trust-label">Data Residency</div>'
-      +         '<div class="kl-trust-value">Data hosted on US-based sovereign infrastructure</div>'
-      +         '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
-      +           '<div class="kl-cat-bar-track"><div class="kl-cat-bar-fill" id="kl-bar-dr" style="width:0%;background:#3b82f6;"></div></div>'
-      +           '<span class="kl-cat-score" id="kl-val-dr" style="color:#3b82f6;">\u2014</span>'
+
+      // Status banner
+      +     '<div class="kl-status-banner kl-status-pass">'
+      +       '<div class="kl-status-dot"></div>'
+      +       '<span>Verified Compliant \u2014 TX SB 1188 & HB 149</span>'
+      +     '</div>'
+
+      // Trust rows
+      +     '<div class="kl-trust-section">'
+
+      // Data Residency
+      +       '<div class="kl-trust-row">'
+      +         '<div class="kl-trust-row-icon" style="background:rgba(37,99,235,0.08);">\ud83c\uddfa\ud83c\uddf8</div>'
+      +         '<div class="kl-trust-row-content">'
+      +           '<div class="kl-trust-row-label">US-Sovereign Data</div>'
+      +           '<div class="kl-trust-row-value">Your data is stored physically within the United States on certified infrastructure.</div>'
+      +           '<div class="kl-score-bar">'
+      +             '<div class="kl-score-track"><div class="kl-score-fill" id="kl-bar-dr" style="width:0%;background:#2563eb;"></div></div>'
+      +             '<span class="kl-score-pct" id="kl-val-dr" style="color:#2563eb;">\u2014</span>'
+      +           '</div>'
+      +           '<div class="kl-trust-row-ref">SB 1188 Sec. 602.054</div>'
       +         '</div>'
       +       '</div>'
-      +     '</div>'
-      +     '<div class="kl-trust-item">'
-      +       '<div class="kl-trust-icon" style="background:rgba(245,158,11,0.1)">' + ico.ai + '</div>'
-      +       '<div style="flex:1">'
-      +         '<div class="kl-trust-label">AI Transparency</div>'
-      +         '<div class="kl-trust-value">AI interactions verified and properly disclosed</div>'
-      +         '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
-      +           '<div class="kl-cat-bar-track"><div class="kl-cat-bar-fill" id="kl-bar-ai" style="width:0%;background:#f59e0b;"></div></div>'
-      +           '<span class="kl-cat-score" id="kl-val-ai" style="color:#f59e0b;">\u2014</span>'
+
+      // AI Transparency
+      +       '<div class="kl-trust-row">'
+      +         '<div class="kl-trust-row-icon" style="background:rgba(217,119,6,0.08);">\ud83e\udd16</div>'
+      +         '<div class="kl-trust-row-content">'
+      +           '<div class="kl-trust-row-label">AI Transparent & Disclosed</div>'
+      +           '<div class="kl-trust-row-value">AI-assisted tools are properly disclosed. No automated-only clinical decisions.</div>'
+      +           '<div class="kl-score-bar">'
+      +             '<div class="kl-score-track"><div class="kl-score-fill" id="kl-bar-ai" style="width:0%;background:#d97706;"></div></div>'
+      +             '<span class="kl-score-pct" id="kl-val-ai" style="color:#d97706;">\u2014</span>'
+      +           '</div>'
+      +           '<div class="kl-trust-row-ref">HB 149 \u00b7 AI Transparency</div>'
       +         '</div>'
       +       '</div>'
-      +     '</div>'
-      +     '<div class="kl-trust-item">'
-      +       '<div class="kl-trust-icon" style="background:rgba(34,197,94,0.1)">' + ico.clock + '</div>'
-      +       '<div>'
-      +         '<div class="kl-trust-label">Last Verification</div>'
-      +         '<div class="kl-trust-value">'
-      +           '<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;">' + lastScan + '</span>'
-      +           (isShield ? ' \u2022 Live monitoring active' : ' \u2022 Monthly scans')
+
+      // Access Control
+      +       '<div class="kl-trust-row">'
+      +         '<div class="kl-trust-row-icon" style="background:rgba(22,163,74,0.08);">\ud83d\udd12</div>'
+      +         '<div class="kl-trust-row-content">'
+      +           '<div class="kl-trust-row-label">Access Controlled</div>'
+      +           '<div class="kl-trust-row-value">Only your authorized care team can access your health records.</div>'
       +         '</div>'
       +       '</div>'
+
       +     '</div>'
-      +     '<div class="kl-summary-row">'
-      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#16a34a" id="kl-s-pass">\u2014</div><div class="kl-stat-lbl">Passed</div></div>'
-      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#d97706" id="kl-s-warn">\u2014</div><div class="kl-stat-lbl">Advisory</div></div>'
-      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#dc2626" id="kl-s-fail">\u2014</div><div class="kl-stat-lbl">Issues</div></div>'
-      +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#0A192F" id="kl-s-score">' + score + '</div><div class="kl-stat-lbl">Score</div></div>'
+
+      // Scan date
+      +     '<div class="kl-scan-date">'
+      +       '<span class="kl-scan-date-label">' + (isShield ? 'Monitoring Since' : 'Last Verified') + '</span>'
+      +       '<span class="kl-scan-date-value">' + lastScan + (isShield ? ' \u00b7 Live' : '') + '</span>'
       +     '</div>'
-      +     '<div class="kl-drift-nudge" id="kl-drift-nudge">'
-      +       '<div class="kl-drift-nudge-icon">\u26a0\ufe0f</div>'
-      +       '<div class="kl-drift-nudge-count" id="kl-drift-count"></div>'
-      +       '<div class="kl-drift-nudge-detail" id="kl-drift-detail"></div>'
+
+      // Drift nudge placeholder (populated by loadDriftCount)
+      +     '<div class="kl-drift-alert kl-drift-alert-default" id="kl-drift-nudge">'
+      +       '<div class="kl-drift-alert-header">'
+      +         '<span class="kl-drift-alert-icon">\u26a0\ufe0f</span>'
+      +         '<span class="kl-drift-alert-count" id="kl-drift-count"></span>'
+      +       '</div>'
+      +       '<div class="kl-drift-alert-detail" id="kl-drift-detail"></div>'
       +       (isShield
-        ?      '<a class="kl-drift-nudge-cta" id="kl-drift-dash-link" href="#" target="_blank" rel="noopener">\ud83d\udee1\ufe0f View Dashboard</a>'
-        :      '<a class="kl-drift-nudge-cta" href="https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=' + cfg.npi + '" target="_blank" rel="noopener">Upgrade to Shield for Real-Time Alerts</a>')
+        ?       '<a class="kl-drift-alert-cta" id="kl-drift-dash-link" href="#" style="background:#166534;" target="_blank" rel="noopener">\ud83d\udee1\ufe0f Open Dashboard</a>'
+        :       '<a class="kl-drift-alert-cta" href="https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=' + cfg.npi + '" style="background:#0A192F;" target="_blank" rel="noopener">Upgrade to Shield for Real-Time Alerts \u2192</a>')
       +     '</div>'
-      +     '<a class="kl-pane-cta" href="' + API_BASE + '/scan/results?npi=' + cfg.npi + '&mode=verified" target="_blank" rel="noopener">View Full Compliance Report</a>'
-      +     (isShield ? '<a class="kl-shield-dash-link" id="kl-shield-dash-link" href="#" target="_blank" rel="noopener">\ud83d\udee1\ufe0f Open Compliance Dashboard</a>' : '')
-      +     '<div class="kl-pane-footer"><a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic Sentry ' + (isShield ? 'Shield' : 'Watch') + '</a></div>'
+
+      // Actions
+      +     '<div class="kl-pane-actions" style="padding-top:14px;">'
+      +       '<a class="kl-pane-btn kl-pane-btn-primary" href="' + API_BASE + '/scan/results?npi=' + cfg.npi + '&mode=verified" target="_blank" rel="noopener">View Full Compliance Report</a>'
+      +       (isShield ? '<a class="kl-pane-btn kl-pane-btn-secondary" id="kl-shield-dash-link" href="' + API_BASE + '/dashboard/' + cfg.npi + '" target="_blank" rel="noopener">\ud83d\udee1\ufe0f Open Compliance Dashboard</a>' : '')
+      +     '</div>'
+
+      // Footer
+      +     '<div class="kl-pane-footer-v3">'
+      +       '<a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic Sentry ' + (isShield ? 'Shield\u2122' : 'Watch\u2122') + ' \u00b7 kairologic.net</a>'
+      +     '</div>'
+
       +   '</div>'
       + '</div>';
   }
 
-  function buildUnregisteredPane(theme) {
+  function buildUnregisteredPane() {
     return ''
-      + '<div class="kl-pane" id="kl-pane">'
-      +   '<div class="kl-pane-inner" style="text-align:center;padding:20px;">'
-      +     '<div style="font-size:11px;font-weight:600;margin-bottom:6px;" class="kl-trust-label">This practice has not yet been verified</div>'
-      +     '<div style="font-size:10px;margin-bottom:12px;" class="kl-trust-value">Run a free compliance scan to verify SB 1188 & HB 149 compliance.</div>'
-      +     '<a class="kl-pane-cta" href="' + API_BASE + '/scan?npi=' + cfg.npi + '" target="_blank" rel="noopener">Run Free Scan</a>'
-      +     '<div class="kl-pane-footer"><a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic</a></div>'
+      + '<div class="kl-pane-v3" id="kl-pane">'
+      +   '<div class="kl-pane-v3-inner">'
+      +     '<div class="kl-pane-header">'
+      +       '<div class="kl-pane-header-icon">' + ico.shield + '</div>'
+      +       '<div class="kl-pane-header-text">'
+      +         '<div class="kl-pane-header-title">KairoLogic\u2122 Sentry</div>'
+      +         '<div class="kl-pane-header-sub">Compliance Verification</div>'
+      +       '</div>'
+      +       '<button class="kl-pane-close" id="kl-pane-close">' + ico.close + '</button>'
+      +     '</div>'
+      +     '<div class="kl-status-banner kl-status-unknown">'
+      +       '<div class="kl-status-dot"></div>'
+      +       '<span>This practice has not yet been verified</span>'
+      +     '</div>'
+      +     '<div style="padding:20px 18px;text-align:center;">'
+      +       '<div style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;">Verify compliance with TX SB 1188 & HB 149</div>'
+      +       '<div style="font-size:10px;color:#94a3b8;margin-bottom:16px;">Run a free compliance scan to verify data sovereignty and AI transparency requirements.</div>'
+      +       '<a class="kl-pane-btn kl-pane-btn-primary" href="' + API_BASE + '/scan?npi=' + cfg.npi + '" target="_blank" rel="noopener">Run Free Scan</a>'
+      +     '</div>'
+      +     '<div class="kl-pane-footer-v3">'
+      +       '<a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic \u00b7 kairologic.net</a>'
+      +     '</div>'
       +   '</div>'
       + '</div>';
   }
@@ -342,30 +398,36 @@
   function wireToggle(root) {
     var badge = root.querySelector('#kl-badge');
     var pane = root.querySelector('#kl-pane');
-    var btn = root.querySelector('#kl-info-btn');
+    var closeBtn = root.querySelector('#kl-pane-close');
     if (!badge || !pane) return;
 
     var loaded = false;
-    function toggle() {
-      var isOpen = pane.classList.contains('kl-open');
-      if (isOpen) {
-        pane.classList.remove('kl-open');
-        if (btn) btn.classList.remove('kl-open');
-        badge.setAttribute('aria-expanded', 'false');
-      } else {
-        pane.classList.add('kl-open');
-        if (btn) btn.classList.add('kl-open');
-        badge.setAttribute('aria-expanded', 'true');
-        if (!loaded) {
-          loaded = true;
-          loadDetails(cfg.npi);
-        }
+    function openPane() {
+      pane.classList.add('kl-open');
+      badge.classList.add('kl-expanded');
+      badge.setAttribute('aria-expanded', 'true');
+      if (!loaded) {
+        loaded = true;
+        loadDetails(cfg.npi);
       }
     }
+    function closePane() {
+      pane.classList.remove('kl-open');
+      badge.classList.remove('kl-expanded');
+      badge.setAttribute('aria-expanded', 'false');
+    }
+    function toggle() {
+      var isOpen = pane.classList.contains('kl-open');
+      if (isOpen) closePane(); else openPane();
+    }
+
     badge.addEventListener('click', toggle);
     badge.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     });
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closePane(); });
+    }
   }
 
   function loadDetails(npi) {
@@ -399,7 +461,7 @@
     // Fetch drift event count
     loadDriftCount(npi);
 
-    // For Shield: fetch dashboard token link
+    // For Shield: populate dashboard link
     if (isShield) {
       loadDashboardLink(npi);
     }
@@ -420,7 +482,6 @@
           else if (e.severity === 'medium') medium++;
         });
 
-        // Build count text
         var countText = total + ' compliance change' + (total !== 1 ? 's' : '') + ' detected';
         var detailParts = [];
         if (critical > 0) detailParts.push(critical + ' critical');
@@ -437,6 +498,11 @@
         if (nudge && countEl && detailEl) {
           countEl.textContent = countText;
           detailEl.textContent = detailText;
+          // Switch to critical styling if critical events exist
+          if (critical > 0) {
+            nudge.classList.remove('kl-drift-alert-default');
+            nudge.classList.add('kl-drift-alert-critical');
+          }
           nudge.classList.add('kl-visible');
         }
       })
@@ -444,19 +510,11 @@
   }
 
   function loadDashboardLink(npi) {
-    fetch(API_BASE + '/api/shield/dashboard?npi=' + npi + '&token=check', { headers: { 'Accept': 'application/json' } })
-      .then(function(r) { return r.json(); })
-      .catch(function() { return null; })
-      .then(function(data) {
-        // If we get access_denied, the provider needs the correct token URL
-        // We can't expose the token in the widget, so link to a page that asks for auth
-        var dashLink = document.getElementById('kl-shield-dash-link');
-        var driftDashLink = document.getElementById('kl-drift-dash-link');
-        var url = API_BASE + '/dashboard/' + npi;
-
-        if (dashLink) dashLink.href = url;
-        if (driftDashLink) driftDashLink.href = url;
-      });
+    var dashLink = document.getElementById('kl-shield-dash-link');
+    var driftDashLink = document.getElementById('kl-drift-dash-link');
+    var url = API_BASE + '/dashboard/' + npi;
+    if (dashLink) dashLink.href = url;
+    if (driftDashLink) driftDashLink.href = url;
   }
 
   function setBar(barId, valId, pct) {
@@ -476,8 +534,6 @@
       .then(function(data) { callback(data); })
       .catch(function() { callback(null); });
   }
-
-  // ══════════════════════════════════════════════════════════
   // PART 2: DRIFT DETECTION ENGINE (new in v2)
   // ══════════════════════════════════════════════════════════
 
