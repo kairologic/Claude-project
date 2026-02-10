@@ -374,6 +374,49 @@ export default function ShieldTestPage() {
     addLog(`DELETE FROM registry WHERE npi = '${TEST_NPI}';`, 'sql');
   }
 
+  // ── Widget Preview ──
+  function loadWidgetPreview(mode: string) {
+    return () => {
+      // Remove existing
+      removeWidgetPreview();
+
+      addLog(`Loading ${mode.toUpperCase()} widget for NPI ${TEST_NPI}...`, 'info');
+
+      const script = document.createElement('script');
+      script.id = 'kl-sentry-test-script';
+      script.src = `${API_BASE}/sentry.js`;
+      script.setAttribute('data-npi', TEST_NPI);
+      script.setAttribute('data-mode', mode);
+      script.setAttribute('data-position', 'bottom-right');
+      script.onload = () => {
+        addLog(`✅ ${mode.toUpperCase()} widget loaded — click the badge in the bottom-right corner`, 'success');
+        addLog(`   Click the badge to expand and see the drift nudge (if drift events exist)`, 'info');
+        const zone = document.getElementById('widget-preview-zone');
+        if (zone) {
+          zone.innerHTML = `<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:20px;">${mode === 'shield' ? '🛡️' : '👁️'}</span><div><div style="font-size:11px;font-weight:700;color:#1e293b;">${mode.toUpperCase()} widget active</div><div style="font-size:9px;color:#94a3b8;">Look in the bottom-right corner → click the badge to expand</div></div></div>`;
+        }
+      };
+      script.onerror = () => {
+        addLog('❌ Failed to load widget script', 'error');
+      };
+      document.body.appendChild(script);
+    };
+  }
+
+  function removeWidgetPreview() {
+    // Remove sentry root
+    const root = document.getElementById('kl-sentry');
+    if (root) root.remove();
+    // Remove script
+    const script = document.getElementById('kl-sentry-test-script');
+    if (script) script.remove();
+    // Reset zone
+    const zone = document.getElementById('widget-preview-zone');
+    if (zone) {
+      zone.innerHTML = '<p class="text-[10px] text-slate-400">Widget will appear in the bottom-right corner of this page after loading.</p>';
+    }
+  }
+
   // ── Render ──
   return (
     <div className="min-h-screen bg-slate-100 py-8 px-4">
@@ -504,6 +547,36 @@ export default function ShieldTestPage() {
                 className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-[10px] font-bold rounded-lg hover:bg-green-700">
                 <Shield size={10} /> Provider Shield Dashboard <ExternalLink size={8} />
               </a>
+            </div>
+          </div>
+
+          {/* Step 6 - Widget Preview */}
+          <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg p-4 mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">6</span>
+              <h3 className="text-xs font-bold text-slate-700">Live Widget Preview</h3>
+            </div>
+            <p className="text-[10px] text-slate-500 ml-8 mb-3">
+              Load the actual sentry.js widget on this page to see the trust badge, drift nudge, and upgrade CTA.
+              Toggle between Watch and Shield to see the different experiences.
+              After triggering drift events (Step 4), click the badge to see the drift count appear.
+            </p>
+            <div className="ml-8 flex flex-wrap gap-2 mb-3">
+              <button onClick={loadWidgetPreview('watch')} disabled={running}
+                className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                <Eye size={10} /> Load Watch Widget
+              </button>
+              <button onClick={loadWidgetPreview('shield')} disabled={running}
+                className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-[10px] font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">
+                <Shield size={10} /> Load Shield Widget
+              </button>
+              <button onClick={removeWidgetPreview}
+                className="flex items-center gap-1 px-3 py-2 bg-red-100 text-red-700 text-[10px] font-bold rounded-lg hover:bg-red-200">
+                <Trash2 size={10} /> Remove Widget
+              </button>
+            </div>
+            <div className="ml-8 bg-white rounded-lg border border-slate-200 p-4 text-center min-h-[80px] flex items-center justify-center" id="widget-preview-zone">
+              <p className="text-[10px] text-slate-400">Widget will appear in the bottom-right corner of this page after loading.</p>
             </div>
           </div>
 
