@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Austin Family Medical — Patient Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: #f5f7fa; color: #1e293b; }
+
+  /* Nav */
+  .nav { background: white; border-bottom: 1px solid #e5e7eb; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; }
+  .nav-logo { width: 36px; height: 36px; background: linear-gradient(135deg, #0ea5e9, #0284c7); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 16px; }
+  .nav-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+  .nav-sub { font-size: 10px; color: #94a3b8; font-weight: 500; }
+  .nav-links { display: flex; gap: 24px; }
+  .nav-links a { font-size: 13px; font-weight: 600; color: #64748b; text-decoration: none; }
+  .nav-links a:hover { color: #0ea5e9; }
+  .nav-links a.active { color: #0ea5e9; }
+
+  /* Hero */
+  .hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); padding: 48px 32px; color: white; }
+  .hero h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+  .hero p { font-size: 14px; color: rgba(255,255,255,0.7); max-width: 500px; line-height: 1.6; }
+
+  /* Content */
+  .content { max-width: 900px; margin: 32px auto; padding: 0 24px; }
+
+  .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
+  .card h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #0f172a; }
+  .card p { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 8px; }
+
+  .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px; }
+  .service-item { background: #f8fafc; border-radius: 10px; padding: 16px; text-align: center; border: 1px solid #f1f5f9; }
+  .service-icon { font-size: 24px; margin-bottom: 8px; }
+  .service-name { font-size: 12px; font-weight: 700; color: #334155; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .info-item label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; display: block; margin-bottom: 4px; }
+  .info-item span { font-size: 13px; color: #334155; font-weight: 500; }
+
+  .footer { text-align: center; padding: 32px; font-size: 11px; color: #94a3b8; }
+
+  /* Mode switcher (dev only) */
+  .dev-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100000; background: #fef3c7; border-bottom: 2px solid #f59e0b; padding: 8px 20px; display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 600; color: #92400e; }
+  .dev-bar button { padding: 4px 12px; border-radius: 6px; border: 1px solid #d97706; background: white; font-size: 10px; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .dev-bar button.active { background: #0A192F; color: white; border-color: #0A192F; }
+  body.has-dev-bar { padding-top: 40px; }
+</style>
+</head>
+<body class="has-dev-bar">
+
+<!-- Dev mode switcher -->
+<div class="dev-bar">
+  ⚙️ Widget Preview Mode:
+  <button id="btn-watch" class="active" onclick="switchMode('watch')">Watch</button>
+  <button id="btn-shield" onclick="switchMode('shield')">Shield</button>
+  <span style="margin-left:auto;opacity:0.6;">This bar is for testing only — not visible to patients</span>
+</div>
+
+<!-- Simulated provider site -->
+<div class="nav">
+  <div class="nav-brand">
+    <div class="nav-logo">AF</div>
+    <div>
+      <div class="nav-name">Austin Family Medical</div>
+      <div class="nav-sub">NPI: 9999999901 · Austin, TX</div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="#" class="active">Home</a>
+    <a href="#">Services</a>
+    <a href="#">Patient Portal</a>
+    <a href="#">Contact</a>
+  </div>
+</div>
+
+<div class="hero">
+  <h1>Welcome to Austin Family Medical</h1>
+  <p>Providing compassionate, patient-centered care for the whole family. Our practice combines modern technology with a personal touch to deliver the best outcomes for our patients.</p>
+</div>
+
+<div class="content">
+  <div class="card">
+    <h2>Our Services</h2>
+    <p>We offer a comprehensive range of primary care services for patients of all ages.</p>
+    <div class="services-grid">
+      <div class="service-item"><div class="service-icon">🩺</div><div class="service-name">Primary Care</div></div>
+      <div class="service-item"><div class="service-icon">💉</div><div class="service-name">Vaccinations</div></div>
+      <div class="service-item"><div class="service-icon">🔬</div><div class="service-name">Lab Services</div></div>
+      <div class="service-item"><div class="service-icon">❤️</div><div class="service-name">Chronic Care</div></div>
+      <div class="service-item"><div class="service-icon">🧠</div><div class="service-name">Mental Health</div></div>
+      <div class="service-item"><div class="service-icon">👶</div><div class="service-name">Pediatrics</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Practice Information</h2>
+    <div class="info-grid">
+      <div class="info-item"><label>Address</label><span>1200 S Lamar Blvd, Suite 300, Austin, TX 78704</span></div>
+      <div class="info-item"><label>Phone</label><span>(512) 555-0142</span></div>
+      <div class="info-item"><label>Hours</label><span>Mon–Fri: 8:00 AM – 5:00 PM</span></div>
+      <div class="info-item"><label>Accepting</label><span>New patients welcome</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>AI-Assisted Tools Disclosure</h2>
+    <p>This practice uses AI-powered tools for appointment scheduling and preliminary symptom assessment. All AI-assisted decisions are reviewed by licensed healthcare professionals before any clinical action is taken.</p>
+    <p>In compliance with Texas HB 149, we disclose that AI technology assists in the following areas: patient intake triage, appointment optimization, and medical record summarization. A human physician always makes the final clinical decision.</p>
+  </div>
+
+  <div class="card">
+    <h2>Data Privacy & Sovereignty</h2>
+    <p>Your health data is stored exclusively on US-based, HIPAA-compliant infrastructure. We do not share, sell, or transfer your data to any third-party entities outside the United States. In compliance with Texas SB 1188, all electronic health records are maintained within sovereign US data centers.</p>
+  </div>
+</div>
+
+<div class="footer">
+  © 2026 Austin Family Medical. All rights reserved. This is a simulated provider website for widget testing purposes.
+</div>
+
+<!-- THE WIDGET — this is what providers would embed -->
+<script id="kl-sentry-script" src="/sentry.js" data-npi="9999999901" data-mode="watch" data-position="bottom-right"></script>
+
+<script>
+function switchMode(mode) {
+  // Remove existing widget
+  var existing = document.getElementById('kl-sentry');
+  if (existing) existing.remove();
+  var oldScript = document.getElementById('kl-sentry-script');
+  if (oldScript) oldScript.remove();
+
+  // Update buttons
+  document.getElementById('btn-watch').classList.toggle('active', mode === 'watch');
+  document.getElementById('btn-shield').classList.toggle('active', mode === 'shield');
+
+  // Reload widget with new mode
+  var script = document.createElement('script');
+  script.id = 'kl-sentry-script';
+  script.src = '/sentry.js';
+  script.setAttribute('data-npi', '9999999901');
+  script.setAttribute('data-mode', mode);
+  script.setAttribute('data-position', 'bottom-right');
+  document.body.appendChild(script);
+}
+</script>
+
+</body>
+</html>
