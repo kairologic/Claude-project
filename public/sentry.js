@@ -171,7 +171,30 @@
     + '.kl-pane-footer { text-align: center; margin-top: 8px; }'
     + '.kl-pane-footer a { font-size: 8px; text-decoration: none; font-weight: 600; }'
     + '.kl-light .kl-pane-footer a { color: #94a3b8; }'
-    + '.kl-dark .kl-pane-footer a { color: #64748b; }';
+    + '.kl-dark .kl-pane-footer a { color: #64748b; }'
+
+    // Drift alert nudge
+    + '.kl-drift-nudge { margin-top: 10px; padding: 10px; border-radius: 8px; display: none; }'
+    + '.kl-drift-nudge.kl-visible { display: block; }'
+    + '.kl-light .kl-drift-nudge { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }'
+    + '.kl-dark .kl-drift-nudge { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); }'
+    + '.kl-drift-nudge-icon { font-size: 14px; margin-bottom: 4px; }'
+    + '.kl-drift-nudge-count { font-size: 11px; font-weight: 700; }'
+    + '.kl-light .kl-drift-nudge-count { color: #92400e; }'
+    + '.kl-dark .kl-drift-nudge-count { color: #fbbf24; }'
+    + '.kl-drift-nudge-detail { font-size: 9px; font-weight: 500; margin-top: 2px; }'
+    + '.kl-light .kl-drift-nudge-detail { color: #a16207; }'
+    + '.kl-dark .kl-drift-nudge-detail { color: #d97706; }'
+    + '.kl-drift-nudge-cta { display: block; text-align: center; font-size: 9px; font-weight: 700; text-decoration: none; padding: 6px; border-radius: 6px; margin-top: 8px; transition: all 0.2s; }'
+    + '.kl-light .kl-drift-nudge-cta { background: #0A192F; color: white; }'
+    + '.kl-dark .kl-drift-nudge-cta { background: #1e40af; color: white; }'
+    + '.kl-drift-nudge-cta:hover { opacity: 0.9; transform: translateY(-1px); }'
+
+    // Shield dashboard link
+    + '.kl-shield-dash-link { display: block; text-align: center; font-size: 10px; font-weight: 700; text-decoration: none; padding: 8px; border-radius: 8px; margin-top: 6px; transition: all 0.2s; border: 1px solid; }'
+    + '.kl-light .kl-shield-dash-link { background: rgba(10,25,47,0.03); color: #0A192F; border-color: rgba(10,25,47,0.12); }'
+    + '.kl-dark .kl-shield-dash-link { background: rgba(255,255,255,0.05); color: #e2e8f0; border-color: rgba(255,255,255,0.1); }'
+    + '.kl-shield-dash-link:hover { transform: translateY(-1px); opacity: 0.9; }';
 
   // ── SVG Icons ──
   var ico = {
@@ -289,7 +312,16 @@
       +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#dc2626" id="kl-s-fail">\u2014</div><div class="kl-stat-lbl">Issues</div></div>'
       +       '<div class="kl-stat"><div class="kl-stat-val" style="color:#0A192F" id="kl-s-score">' + score + '</div><div class="kl-stat-lbl">Score</div></div>'
       +     '</div>'
+      +     '<div class="kl-drift-nudge" id="kl-drift-nudge">'
+      +       '<div class="kl-drift-nudge-icon">\u26a0\ufe0f</div>'
+      +       '<div class="kl-drift-nudge-count" id="kl-drift-count"></div>'
+      +       '<div class="kl-drift-nudge-detail" id="kl-drift-detail"></div>'
+      +       (isShield
+        ?      '<a class="kl-drift-nudge-cta" id="kl-drift-dash-link" href="#" target="_blank" rel="noopener">\ud83d\udee1\ufe0f View Dashboard</a>'
+        :      '<a class="kl-drift-nudge-cta" href="https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=' + cfg.npi + '" target="_blank" rel="noopener">Upgrade to Shield for Real-Time Alerts</a>')
+      +     '</div>'
       +     '<a class="kl-pane-cta" href="' + API_BASE + '/scan/results?npi=' + cfg.npi + '&mode=verified" target="_blank" rel="noopener">View Full Compliance Report</a>'
+      +     (isShield ? '<a class="kl-shield-dash-link" id="kl-shield-dash-link" href="#" target="_blank" rel="noopener">\ud83d\udee1\ufe0f Open Compliance Dashboard</a>' : '')
       +     '<div class="kl-pane-footer"><a href="' + API_BASE + '" target="_blank" rel="noopener">Powered by KairoLogic Sentry ' + (isShield ? 'Shield' : 'Watch') + '</a></div>'
       +   '</div>'
       + '</div>';
@@ -363,6 +395,68 @@
         }
       })
       .catch(function() {});
+
+    // Fetch drift event count
+    loadDriftCount(npi);
+
+    // For Shield: fetch dashboard token link
+    if (isShield) {
+      loadDashboardLink(npi);
+    }
+  }
+
+  function loadDriftCount(npi) {
+    fetch(API_BASE + '/api/widget/drift?npi=' + npi + '&status=new&limit=100', { headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data || !data.events || data.events.length === 0) return;
+
+        var events = data.events;
+        var total = events.length;
+        var critical = 0, high = 0, medium = 0;
+        events.forEach(function(e) {
+          if (e.severity === 'critical') critical++;
+          else if (e.severity === 'high') high++;
+          else if (e.severity === 'medium') medium++;
+        });
+
+        // Build count text
+        var countText = total + ' compliance change' + (total !== 1 ? 's' : '') + ' detected';
+        var detailParts = [];
+        if (critical > 0) detailParts.push(critical + ' critical');
+        if (high > 0) detailParts.push(high + ' high severity');
+        if (medium > 0) detailParts.push(medium + ' medium');
+        var detailText = detailParts.length > 0
+          ? detailParts.join(', ') + (isShield ? '' : ' \u2014 upgrade to see details')
+          : (isShield ? 'View your dashboard for details' : 'Upgrade to Shield to see details and get alerts');
+
+        var nudge = document.getElementById('kl-drift-nudge');
+        var countEl = document.getElementById('kl-drift-count');
+        var detailEl = document.getElementById('kl-drift-detail');
+
+        if (nudge && countEl && detailEl) {
+          countEl.textContent = countText;
+          detailEl.textContent = detailText;
+          nudge.classList.add('kl-visible');
+        }
+      })
+      .catch(function() {});
+  }
+
+  function loadDashboardLink(npi) {
+    fetch(API_BASE + '/api/shield/dashboard?npi=' + npi + '&token=check', { headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.json(); })
+      .catch(function() { return null; })
+      .then(function(data) {
+        // If we get access_denied, the provider needs the correct token URL
+        // We can't expose the token in the widget, so link to a page that asks for auth
+        var dashLink = document.getElementById('kl-shield-dash-link');
+        var driftDashLink = document.getElementById('kl-drift-dash-link');
+        var url = API_BASE + '/dashboard/' + npi;
+
+        if (dashLink) dashLink.href = url;
+        if (driftDashLink) driftDashLink.href = url;
+      });
   }
 
   function setBar(barId, valId, pct) {
