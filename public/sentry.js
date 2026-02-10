@@ -223,8 +223,9 @@
   function init() {
     fetchWidgetData(cfg.npi, function(data) {
       var theme = detectTheme();
-      var status = data ? data.status : 'unregistered';
-      var lastScan = data && data.last_scan ? new Date(data.last_scan).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not yet scanned';
+      var status = data ? (data.widget_status || data.status || (data.verified ? 'verified' : 'unregistered')) : 'unregistered';
+      var lastScanRaw = data && (data.last_scan_timestamp || data.last_scan || data.updated_at);
+      var lastScan = lastScanRaw ? new Date(lastScanRaw).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not yet scanned';
 
       var html = buildBadge(status);
       if (status === 'verified') {
