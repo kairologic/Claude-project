@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * GET /api/shield/dashboard?npi=XXX
+ * GET /api/shield/dashboard?npi=XXX&token=YYY
  * 
  * Returns provider info, heartbeats, and access status for the Shield dashboard.
- * Access is granted if:
- *   - subscription_tier === 'shield'
- *   - OR shield_trial_end > now() (future: trial period)
  * 
- * Returns { error: 'access_denied' } if provider doesn't have Shield access.
+ * Access is granted if:
+ *   - token matches dashboard_token in registry, AND
+ *   - subscription_tier === 'shield' OR shield_trial_end > now()
+ * 
+ * Returns { error: 'access_denied' } if auth fails.
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
@@ -17,6 +18,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_P
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const npi = searchParams.get('npi');
+  const token = searchParams.get('token');
 
   if (!npi) {
     return NextResponse.json({ error: 'npi required' }, { status: 400 });
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
   try {
     // Fetch provider info
     const provRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/registry?npi=eq.${encodeURIComponent(npi)}&limit=1&select=name,npi,url,email,risk_score,status_label,subscription_tier,subscription_status,last_scan_timestamp,widget_status,shield_trial_start,shield_trial_end`,
+      `${SUPABASE_URL}/rest/v1/registry?npi=eq.${encodeURIComponent(npi)}&limit=1&select=name,npi,url,email,risk_score,status_label,subscription_tier,subscription_status,last_scan_timestamp,widget_status,shield_trial_start,shield_trial_end,dashboard_token`,
       {
         headers: {
           'apikey': SUPABASE_KEY,
@@ -42,10 +44,16 @@ export async function GET(request: NextRequest) {
 
     const provider = providers[0];
 
-    // ── Access Control ──
-    // Shield access if:
-    // 1. subscription_tier is 'shield', OR
-    // 2. shield_trial_end exists and is in the future
+    // ── Token Auth ──
+    // Must provide valid dashboard_token
+    if (!token || !provider.dashboard_token || token !== provider.dashboard_token) {
+      return NextResponse.json({
+        error: 'access_denied',
+        message: 'Valid dashboard token required',
+      });
+    }
+
+    // ── Subscription Check ──
     const hasShieldSubscription = provider.subscription_tier === 'shield';
     const hasActiveTrial = provider.shield_trial_end && new Date(provider.shield_trial_end) > new Date();
 
@@ -57,7 +65,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch heartbeats for this provider
+    // Fetch heartbeats
     const hbRes = await fetch(
       `${SUPABASE_URL}/rest/v1/widget_heartbeats?npi=eq.${encodeURIComponent(npi)}&select=*&order=last_seen.desc`,
       {
@@ -70,7 +78,6 @@ export async function GET(request: NextRequest) {
 
     const heartbeats = await hbRes.json();
 
-    // Build response
     return NextResponse.json({
       provider: {
         name: provider.name,
