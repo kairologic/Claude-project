@@ -491,7 +491,7 @@ export default function ServicesPage() {
                     { feature: 'Evidence Ledger Templates', vals: ['—', '—', '✓', '—'] },
                     { feature: 'Staff Training Guide', vals: ['—', '—', '✓', '—'] },
                     { feature: 'Implementation Blueprint', vals: ['—', '—', '✓', '—'] },
-                    { feature: '3 Months Shield Monitoring', vals: ['—', '✓ FREE', '✓ FREE', 'Included'] },
+                    { feature: '3 Months Shield Monitoring', vals: ['—', '✓ FREE', '✓ FREE', '✓'] },
                     { feature: 'Compliance Drift Alerts', vals: ['—', '✓ Trial', '✓ Trial', '✓'] },
                     { feature: 'Live Dashboard', vals: ['—', '✓ Trial', '✓ Trial', '✓'] },
                     { feature: 'Website Compliance Widget', vals: ['—', '✓ Trial', '✓ Trial', '✓'] },
