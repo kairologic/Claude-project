@@ -377,6 +377,7 @@ function ClaimContent() {
                           <div className="text-white font-bold text-sm">Full Audit Report</div>
                           <div className="text-slate-400 text-xs">Forensic analysis + remediation roadmap</div>
                           <div className="text-green-400 text-xs font-bold mt-0.5">+ 3 months Sentry Shield FREE</div>
+                          <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-gold underline mt-1 inline-block">Preview sample report</a>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
