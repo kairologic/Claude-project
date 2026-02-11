@@ -26,13 +26,13 @@ export default function HomePage() {
 
           {/* Primary message — immediately clear */}
           <h1 className="text-center text-4xl sm:text-5xl md:text-6xl font-display font-extrabold leading-tight mb-6">
-            Your Practice Website May Be{' '}
+            Your Healthcare Website May Be{' '}
             <span className="text-gold">Breaking Texas Law</span>
           </h1>
 
           {/* Sub message — plain English, specific */}
           <p className="text-center text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-3 leading-relaxed">
-            Texas SB 1188 requires healthcare providers to keep patient data inside the US. Most practice websites unknowingly send data to servers in Ireland, Singapore, and beyond — through Google Fonts, analytics, chatbots, and scheduling tools.
+            Texas SB 1188 requires healthcare providers to keep patient data inside the US. Most healthcare websites unknowingly send data to servers in Ireland, Singapore, and beyond — through Google Fonts, analytics, chatbots, and scheduling tools.
           </p>
           <p className="text-center text-base text-red-300 font-semibold mb-10">
             Fines up to $50,000 per violation. Free scan takes 30 seconds.
@@ -43,7 +43,7 @@ export default function HomePage() {
             <Link href="/scan">
               <button className="btn-primary text-lg px-10 py-4 flex items-center gap-2 shadow-xl shadow-orange/20">
                 <Search size={20} />
-                SCAN MY PRACTICE — FREE
+                SCAN MY WEBSITE — FREE
               </button>
             </Link>
             <button
@@ -421,10 +421,10 @@ export default function HomePage() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: <Activity size={20} />, title: 'Medical Practices', desc: 'Solo and group practices with patient-facing websites' },
-              { icon: <Users size={20} />, title: 'Dental Offices', desc: 'Online scheduling, patient portals, and practice sites' },
-              { icon: <Shield size={20} />, title: 'Mental Health', desc: 'Therapy practices handling sensitive behavioral health data' },
-              { icon: <Eye size={20} />, title: 'Specialty Clinics', desc: 'Dermatology, orthopedics, optometry, and more' },
+              { icon: <Activity size={20} />, title: 'Medical Practices', desc: 'Solo and group practices, urgent care, and primary care clinics' },
+              { icon: <Users size={20} />, title: 'Dental & Orthodontics', desc: 'Dental offices, orthodontic clinics, and oral surgery centers' },
+              { icon: <Shield size={20} />, title: 'Mental Health & Wellness', desc: 'Therapy practices, counseling centers, and wellness clinics' },
+              { icon: <Eye size={20} />, title: 'Med Spas & Specialty', desc: 'Med spas, dermatology, chiropractic, optometry, and more' },
             ].map((item, i) => (
               <div key={i} className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gold transition-colors">
                 <div className="w-10 h-10 bg-navy/5 rounded-lg flex items-center justify-center mb-3 text-navy">
@@ -445,12 +445,12 @@ export default function HomePage() {
             Don&apos;t Wait for a Regulator to Find Out First
           </h2>
           <p className="text-lg text-gray-300 mb-8 max-w-xl mx-auto">
-            Run a free compliance scan right now. 30 seconds, no signup, no credit card — and you&apos;ll know exactly where your practice stands.
+            Run a free compliance scan right now. 30 seconds, no signup, no credit card — and you&apos;ll know exactly where you stand.
           </p>
           <Link href="/scan">
             <button className="btn-primary text-lg px-10 py-4 flex items-center gap-2 mx-auto shadow-xl shadow-orange/20">
               <Shield size={22} />
-              SCAN MY PRACTICE — FREE
+              SCAN MY WEBSITE — FREE
             </button>
           </Link>
           <p className="text-xs text-gray-500 mt-4">
