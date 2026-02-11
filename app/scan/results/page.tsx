@@ -125,7 +125,7 @@ function DynamicCTA({ score, npi }: { score: number; npi: string }) {
               </div>
               <h3 className="text-lg font-display font-bold text-navy mb-2">Sovereignty Audit &amp; Forensic Report</h3>
               <p className="text-gray-500 text-sm mb-5 leading-relaxed">Complete forensic evidence, technical fixes, and prioritized remediation roadmap for your IT team.</p>
-              <a href="https://buy.stripe.com/REPORT_LINK_PLACEHOLDER" target="_blank" rel="noopener noreferrer"
+              <a href="https://buy.stripe.com/4gM5kDdpw0HP18x3057Re08" target="_blank" rel="noopener noreferrer"
                 className="block w-full bg-navy hover:bg-navy-light text-white font-bold py-3 px-6 rounded-lg text-center transition-colors">
                 Get Full Report — $149
                 <span className="block text-xs text-green-400 font-bold mt-0.5">+ 3 months Shield FREE</span>
@@ -160,7 +160,7 @@ function DynamicCTA({ score, npi }: { score: number; npi: string }) {
               </div>
               <h3 className="text-lg font-display font-bold text-navy mb-2">Quick-Fix Blueprint&trade;</h3>
               <p className="text-gray-500 text-sm mb-5 leading-relaxed">Targeted remediation scripts, Safe Harbor checklist, and disclosure templates to close your remaining gaps.</p>
-              <a href="https://buy.stripe.com/SAFE_HARBOR_LINK_PLACEHOLDER" target="_blank" rel="noopener noreferrer"
+              <a href="https://buy.stripe.com/00w28retAeyF6sRgQV7Re07" target="_blank" rel="noopener noreferrer"
                 className="block w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg text-center transition-colors">
                 Get Safe Harbor™ — $249
                 <span className="block text-xs text-orange-200 font-bold mt-0.5">+ 3 months Shield FREE</span>
@@ -201,7 +201,7 @@ function DynamicCTA({ score, npi }: { score: number; npi: string }) {
             <h3 className="text-xl font-display font-bold text-navy mb-2">Sentry Performance Widget</h3>
             <p className="text-gray-600 text-sm mb-2 leading-relaxed">Deploy the Widget to activate real-time compliance indicator messaging on your site.</p>
             <p className="text-gray-400 text-xs mb-6 italic">Less than the cost of a single remediation cycle per year.</p>
-            <a href="https://buy.stripe.com/SHIELD_LINK_PLACEHOLDER" target="_blank" rel="noopener noreferrer"
+            <a href="https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06" target="_blank" rel="noopener noreferrer"
                 className="block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-center transition-colors">
                 Start Sentry Shield — $79/mo
                 <span className="block text-xs text-green-200 font-bold mt-0.5">Includes free Audit Report</span>
