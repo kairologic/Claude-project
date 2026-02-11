@@ -27,31 +27,55 @@ export async function GET(req: NextRequest) {
 
     const session = await res.json();
 
-    // Extract product info
+    // Extract basic info
     const npi = session.client_reference_id || "";
     const email = session.customer_details?.email || session.customer_email || "";
     const amountTotal = (session.amount_total || 0) / 100;
 
-    // Determine product from price/amount
-    // Map Stripe prices to our product keys
     const lineItems = session.line_items?.data || [];
     const priceId = lineItems[0]?.price?.id || "";
     const productName = lineItems[0]?.description || lineItems[0]?.price?.product?.name || "";
 
-    // Detect product by amount (most reliable for Payment Links)
+    // ── Product Detection (v3 — 3 products + hidden watch) ──
+    // Priority: metadata > product name > amount
     let product = "report";
-    if (amountTotal >= 249 || productName.toLowerCase().includes("safe harbor") || productName.toLowerCase().includes("bundle")) {
-      product = "safe-harbor";
-    } else if (amountTotal >= 149 || productName.toLowerCase().includes("audit") || productName.toLowerCase().includes("report")) {
-      product = "report";
-    } else if (amountTotal >= 79 || productName.toLowerCase().includes("shield")) {
-      product = "shield";
-    } else if (amountTotal >= 39 || productName.toLowerCase().includes("watch")) {
-      product = "watch";
+
+    // 1. Check metadata (most reliable — set on Payment Link)
+    const metadata = session.metadata as Record<string, string> | undefined;
+    if (metadata?.product) {
+      const metaProduct = metadata.product.toLowerCase();
+      if (metaProduct === 'audit-report') product = 'report';
+      else if (metaProduct === 'safe-harbor') product = 'safe-harbor';
+      else if (metaProduct === 'sentry-shield') product = 'shield';
+      else if (metaProduct === 'sentry-watch') product = 'watch';
+      else product = metaProduct;
+    } else {
+      // 2. Fallback: detect from product name or amount
+      const nameLower = productName.toLowerCase();
+      if (nameLower.includes('safe harbor') || nameLower.includes('safe-harbor') || nameLower.includes('bundle')) {
+        product = "safe-harbor";
+      } else if (nameLower.includes('shield')) {
+        product = "shield";
+      } else if (nameLower.includes('watch')) {
+        product = "watch";
+      } else if (nameLower.includes('audit') || nameLower.includes('report') || nameLower.includes('sovereignty')) {
+        product = "report";
+      } else if (amountTotal >= 200) {
+        product = "safe-harbor";
+      } else if (amountTotal >= 100) {
+        product = "report";
+      } else if (amountTotal >= 70) {
+        product = "shield";
+      } else if (amountTotal >= 30) {
+        product = "watch";
+      }
     }
 
-    // Check for recurring (subscription products)
+    // Check if recurring
     const isRecurring = lineItems.some((li: any) => li.price?.type === "recurring");
+
+    // Determine trial status
+    const includesShieldTrial = product === 'report' || product === 'safe-harbor';
 
     return NextResponse.json({
       product,
@@ -61,6 +85,7 @@ export async function GET(req: NextRequest) {
       productName,
       priceId,
       isRecurring,
+      includesShieldTrial,
       paymentStatus: session.payment_status,
     });
   } catch (e: any) {
@@ -68,4 +93,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
-
