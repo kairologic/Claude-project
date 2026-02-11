@@ -1307,6 +1307,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                           Full Audit Report — $149
                           <span className="block text-[10px] text-green-400 font-bold mt-0.5">+ 3 months Shield FREE</span>
                         </a>
+                        <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-green-600 underline text-center mt-1 block">Preview sample report</a>
                         <a href={LINKS.safeHarbor} target="_blank" rel="noopener noreferrer"
                           className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors">
                           Safe Harbor™ — $249
@@ -1349,6 +1350,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                             </div>
                             <p className="text-xs text-slate-500">Forensic analysis with findings, border map, and remediation roadmap</p>
                             <p className="text-xs font-bold text-green-600 mt-1">✦ Includes 3 months Sentry Shield FREE</p>
+                            <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-gold underline mt-1 inline-block">Preview sample</a>
                           </div>
                           <div className="text-right ml-4 flex-shrink-0">
                             <div className="text-xl font-black text-slate-800">$149</div>
@@ -1414,6 +1416,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                           </div>
                           <p className="text-xs text-slate-500">Forensic analysis with findings and remediation roadmap — bring it to your own developer</p>
                           <p className="text-xs font-bold text-green-600 mt-1">✦ Includes 3 months Sentry Shield FREE</p>
+                          <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-gold underline mt-1 inline-block">Preview sample</a>
                         </div>
                         <div className="text-right ml-4 flex-shrink-0">
                           <div className="text-xl font-black text-slate-800">$149</div>
