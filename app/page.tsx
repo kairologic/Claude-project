@@ -315,6 +315,9 @@ export default function HomePage() {
                   Get My Report
                 </button>
               </Link>
+              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-gold hover:text-gold-light mt-2 underline underline-offset-2">
+                Preview sample report
+              </a>
             </div>
 
             {/* Safe Harbor — $249 */}
@@ -353,6 +356,9 @@ export default function HomePage() {
                   Get Safe Harbor
                 </button>
               </Link>
+              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-orange hover:text-orange-dark mt-2 underline underline-offset-2">
+                Preview sample report
+              </a>
             </div>
 
             {/* Sentry Shield — $79/mo */}
