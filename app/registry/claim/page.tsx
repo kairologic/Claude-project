@@ -369,7 +369,7 @@ function ClaimContent() {
                 return (
                   <div className="space-y-3">
                     {/* Audit Report — $149 + Shield Trial */}
-                    <a href={`https://buy.stripe.com/REPORT_LINK_PLACEHOLDER${clientRef}`} target="_blank" rel="noopener noreferrer"
+                    <a href={`https://buy.stripe.com/4gM5kDdpw0HP18x3057Re08${clientRef}`} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between w-full bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.1] rounded-xl p-5 transition-all group">
                       <div className="flex items-center gap-3">
                         <FileText className="w-5 h-5 text-gold" />
@@ -387,7 +387,7 @@ function ClaimContent() {
                     </a>
 
                     {/* Safe Harbor — $249 + Shield Trial [Recommended] */}
-                    <a href={`https://buy.stripe.com/SAFE_HARBOR_LINK_PLACEHOLDER${clientRef}`} target="_blank" rel="noopener noreferrer"
+                    <a href={`https://buy.stripe.com/00w28retAeyF6sRgQV7Re07${clientRef}`} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between w-full bg-gold/5 hover:bg-gold/10 border-2 border-gold/20 hover:border-gold/40 rounded-xl p-5 transition-all relative group">
                       <div className="absolute -top-2.5 left-4 bg-gold text-navy text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">Recommended</div>
                       <div className="flex items-center gap-3 mt-1">
@@ -405,7 +405,7 @@ function ClaimContent() {
                     </a>
 
                     {/* Sentry Shield — $79/mo standalone */}
-                    <a href={`https://buy.stripe.com/SHIELD_LINK_PLACEHOLDER${clientRef}`} target="_blank" rel="noopener noreferrer"
+                    <a href={`https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06${clientRef}`} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between w-full bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl p-5 transition-all group">
                       <div className="flex items-center gap-3">
                         <Shield className="w-5 h-5 text-emerald-400" />
