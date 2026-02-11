@@ -267,6 +267,10 @@ export default function ServicesPage() {
                   <ArrowRight size={16} />
                 </button>
               </Link>
+              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-gold hover:text-gold-light mt-3 underline underline-offset-2">
+                <FileText size={14} />
+                Preview a sample report (PDF)
+              </a>
             </div>
           </div>
         </div>
