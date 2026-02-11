@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle, Download, Code, Shield, FileText, Clock, ArrowRight, AlertTriangle, Copy, ExternalLink } from 'lucide-react';
+import { CheckCircle, Download, Code, Shield, FileText, Clock, ArrowRight, AlertTriangle, Copy, ExternalLink, Zap } from 'lucide-react';
 
 // ── Types ──
 interface ScanReport {
@@ -24,11 +24,12 @@ interface ScanReport {
 }
 
 interface PurchaseInfo {
-  product: 'report' | 'safe-harbor' | 'watch' | 'shield' | 'safe-harbor-watch' | 'safe-harbor-shield' | 'unknown';
+  product: 'report' | 'safe-harbor' | 'shield' | 'watch' | 'unknown';
   npi: string;
   email: string;
   reportData: ScanReport | null;
   reportAge: number;
+  includesShieldTrial: boolean;
 }
 
 const SUPABASE_URL = 'https://mxrtltezhkxhqizvxvsz.supabase.co';
@@ -36,42 +37,67 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const REPORT_MAX_AGE_DAYS = 30;
 
-const PRODUCT_CONFIG: Record<string, { title: string; icon: any; color: string; includes: string[] }> = {
+// ── Product configs (v3 — 3 products + hidden watch) ──
+const PRODUCT_CONFIG: Record<string, { title: string; subtitle: string; icon: any; color: string; includes: string[] }> = {
   'report': {
     title: 'Sovereignty Audit Report',
+    subtitle: '+ 3 Months Sentry Shield FREE',
     icon: FileText,
     color: 'text-amber-600',
-    includes: ['Forensic audit report (PDF)', 'Data border map', 'Remediation roadmap', 'Statutory clause mapping'],
+    includes: [
+      'Forensic audit report (PDF)',
+      'Data border map',
+      'Remediation roadmap',
+      'Statutory clause mapping',
+      '3 months Sentry Shield monitoring',
+      'Live compliance dashboard',
+      'Website compliance widget',
+    ],
   },
   'safe-harbor': {
-    title: 'Safe Harbor\u2122 Bundle',
+    title: 'Safe Harbor\u2122 Compliance Bundle',
+    subtitle: '+ 3 Months Sentry Shield FREE',
     icon: Shield,
     color: 'text-orange-600',
-    includes: ['Everything in Audit Report', 'SB 1188 Policy Pack', 'AI Disclosure Kit', 'Evidence Ledger Templates', 'Staff Training Guide', 'Implementation Blueprint'],
-  },
-  'watch': {
-    title: 'Sentry Watch',
-    icon: Shield,
-    color: 'text-blue-600',
-    includes: ['Automated monthly re-scans', 'Compliance drift alerts', 'Monthly compliance reports', 'Infrastructure heartbeat'],
+    includes: [
+      'Everything in Audit Report',
+      'SB 1188 Policy Pack',
+      'AI Disclosure Kit',
+      'Evidence Ledger Templates',
+      'Staff Training Guide',
+      'Implementation Blueprint',
+      '3 months Sentry Shield monitoring',
+      'Live compliance dashboard',
+      'Website compliance widget',
+    ],
   },
   'shield': {
-    title: 'Sentry Shield + Free Audit Report',
+    title: 'Sentry Shield — Continuous Compliance',
+    subtitle: 'Active Subscription',
     icon: Shield,
     color: 'text-green-600',
-    includes: ['Free Sovereignty Audit Report (PDF)', 'Everything in Sentry Watch', 'Live compliance dashboard', 'Quarterly forensic reports', 'Annual certification seal', 'Priority support'],
+    includes: [
+      'Free Sovereignty Audit Report (PDF)',
+      '24/7 compliance monitoring',
+      'Live compliance dashboard',
+      'Website compliance widget',
+      'Quarterly forensic reports',
+      'Annual certification seal',
+      'Compliance drift alerts',
+      'Priority support',
+    ],
   },
-  'safe-harbor-watch': {
-    title: 'Safe Harbor\u2122 + Sentry Watch',
+  'watch': {
+    title: 'Sentry Watch — Basic Monitoring',
+    subtitle: 'Active Subscription',
     icon: Shield,
-    color: 'text-orange-600',
-    includes: ['Everything in Safe Harbor\u2122', 'Automated monthly re-scans', 'Compliance drift alerts', 'Monthly compliance reports'],
-  },
-  'safe-harbor-shield': {
-    title: 'Safe Harbor\u2122 + Sentry Shield',
-    icon: Shield,
-    color: 'text-green-600',
-    includes: ['Everything in Safe Harbor\u2122', 'Live compliance dashboard', 'Quarterly forensic reports', 'Annual certification seal', 'Priority support'],
+    color: 'text-blue-600',
+    includes: [
+      'Automated monthly re-scans',
+      'Compliance drift alerts',
+      'Monthly compliance reports',
+      'Website compliance widget',
+    ],
   },
 };
 
@@ -106,6 +132,7 @@ function SuccessPageInner() {
       let product: PurchaseInfo['product'] = 'report';
       let npi = searchParams.get('client_reference_id') || searchParams.get('npi') || '';
       let email = searchParams.get('prefilled_email') || searchParams.get('email') || '';
+      let includesShieldTrial = false;
 
       // If we have a Stripe session ID, fetch the real product/NPI/email from Stripe
       if (sessionId) {
@@ -118,6 +145,7 @@ function SuccessPageInner() {
             }
             if (session.npi) npi = session.npi;
             if (session.email) email = session.email;
+            includesShieldTrial = session.includesShieldTrial || false;
           }
         } catch (e) {
           console.error('Failed to fetch Stripe session:', e);
@@ -126,13 +154,15 @@ function SuccessPageInner() {
         // Fallback: try to detect from URL params
         const urlProduct = searchParams.get('product');
         if (urlProduct && PRODUCT_CONFIG[urlProduct]) product = urlProduct as PurchaseInfo['product'];
+        // Report and Safe Harbor always include Shield trial
+        includesShieldTrial = product === 'report' || product === 'safe-harbor';
       }
 
       if (npi) {
         const { report, ageDays } = await fetchReport(npi);
-        setPurchaseInfo({ product, npi, email, reportData: report, reportAge: ageDays });
+        setPurchaseInfo({ product, npi, email, reportData: report, reportAge: ageDays, includesShieldTrial });
       } else {
-        setPurchaseInfo({ product, npi, email, reportData: null, reportAge: 999 });
+        setPurchaseInfo({ product, npi, email, reportData: null, reportAge: 999, includesShieldTrial });
       }
       setLoading(false);
     };
@@ -266,148 +296,8 @@ function SuccessPageInner() {
           styles: { fontSize: 7, cellPadding: 2 },
           headStyles: { fillColor: [0, 35, 78], textColor: 255 },
           margin: { left: 15, right: 15 },
-          didParseCell: (data: any) => {
-            if (data.section === 'body' && data.column.index === 3) {
-              data.cell.styles.textColor = String(data.cell.raw).includes('\u2713') ? [22, 163, 74] : [220, 38, 38];
-              data.cell.styles.fontStyle = 'bold';
-            }
-          },
         });
-        y = (doc as any).lastAutoTable.finalY + 10;
       }
-
-      // ═══ REMEDIATION ROADMAP ═══
-      const failedFindings = (report.findings || []).filter((f: any) => (f.status || '').toLowerCase() === 'fail');
-      const warnFindings = (report.findings || []).filter((f: any) => (f.status || '').toLowerCase() === 'warn' && (f.recommendedFix || f.technicalFix || f.recommended_fix));
-      const remediationItems = [...failedFindings, ...warnFindings];
-      
-      if (remediationItems.length > 0) {
-        if (y > 220) { doc.addPage(); y = 20; }
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(0, 35, 78);
-        doc.text(`Remediation Roadmap (${remediationItems.length} Items)`, 15, y);
-        doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.8);
-        doc.line(15, y + 2, 90, y + 2);
-        y += 10;
-
-        // Priority sort
-        const priOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-        remediationItems.sort((a: any, b: any) => (priOrder[(a.severity || 'medium').toLowerCase()] || 4) - (priOrder[(b.severity || 'medium').toLowerCase()] || 4));
-
-        remediationItems.forEach((f: any, idx: number) => {
-          const fix = f.recommendedFix || f.technicalFix || f.recommended_fix || '';
-          if (!fix) return;
-          if (y > 250) { doc.addPage(); y = 20; }
-
-          const isFail = (f.status || '').toLowerCase() === 'fail';
-          const stepColor: [number, number, number] = isFail ? [220, 38, 38] : [217, 119, 6];
-          
-          // Step number
-          doc.setFillColor(...stepColor);
-          doc.circle(19, y + 3, 3.5, 'F');
-          doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-          doc.text(`${idx + 1}`, 19, y + 4.5, { align: 'center' });
-
-          // Finding ID + name
-          doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 35, 78);
-          doc.text(`${f.id || ''}: ${f.name || 'Finding'}`, 26, y + 2);
-
-          // Priority badge
-          const sevLabel = (f.severity || 'medium').toUpperCase();
-          doc.setFontSize(5.5); doc.setTextColor(...stepColor);
-          doc.text(`${isFail ? 'FAILED' : 'WARNING'} \u2022 ${sevLabel}`, 26, y + 7);
-
-          // Fix text
-          doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(6, 78, 59);
-          const fixLines = doc.splitTextToSize(fix, pageWidth - 50);
-          doc.setFillColor(236, 253, 245);
-          doc.rect(25, y + 9, pageWidth - 42, fixLines.length * 3.2 + 3, 'F');
-          doc.setFillColor(16, 185, 129);
-          doc.rect(25, y + 9, 0.8, fixLines.length * 3.2 + 3, 'F');
-          doc.text(fixLines, 28, y + 13);
-
-          y += 16 + fixLines.length * 3.2;
-        });
-        y += 6;
-      }
-
-      // ═══ COMPLIANCE ATTESTATION / SIGN SHEET ═══
-      if (y > 200) { doc.addPage(); y = 20; }
-      
-      // Navy attestation block
-      doc.setFillColor(0, 35, 78);
-      doc.roundedRect(15, y, pageWidth - 30, 52, 3, 3, 'F');
-      
-      // Gold header
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(197, 160, 89);
-      doc.text('COMPLIANCE ATTESTATION', pageWidth / 2, y + 10, { align: 'center' });
-      
-      // Attestation text
-      doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 220, 220);
-      const practiceLbl = report.practice_name || 'the above-named practice';
-      const reportDateFmt = new Date(report.report_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const attText = `This document certifies that ${practiceLbl} (NPI: ${report.npi}) has been assessed for compliance with Texas SB 1188 (Data Sovereignty) and HB 149 (AI Transparency) as of ${reportDateFmt}. The findings herein reflect the observable digital infrastructure at the time of scan and do not constitute legal advice or guarantee of regulatory compliance.`;
-      const attLines = doc.splitTextToSize(attText, pageWidth - 46);
-      doc.text(attLines, 23, y + 17);
-      
-      // Signature lines
-      doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.3);
-      // Left signature: KairoLogic Compliance Engine
-      doc.line(23, y + 40, 75, y + 40);
-      doc.setFontSize(6); doc.setTextColor(197, 160, 89);
-      doc.text('KairoLogic Compliance Engine', 25, y + 44);
-      doc.setFontSize(5.5); doc.setTextColor(160, 170, 190);
-      doc.text(`Engine: ${report.engine_version || 'SENTRY-3.1.0'}`, 25, y + 48);
-      
-      // Right signature: Date
-      doc.line(pageWidth - 75, y + 40, pageWidth - 23, y + 40);
-      doc.setFontSize(6); doc.setTextColor(197, 160, 89);
-      doc.text('Date', pageWidth - 73, y + 44);
-      doc.setFontSize(5.5); doc.setTextColor(160, 170, 190);
-      doc.text(reportDateFmt, pageWidth - 73, y + 48);
-      
-      y += 60;
-
-      // ═══ NEXT STEPS CTA ═══
-      if (y > 240) { doc.addPage(); y = 20; }
-      
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 35, 78);
-      doc.text('Next Steps', 15, y);
-      doc.setDrawColor(197, 160, 89); doc.setLineWidth(0.8);
-      doc.line(15, y + 2, 50, y + 2);
-      y += 8;
-
-      const nextSteps = [
-        { num: '1', title: 'Schedule Consultation', desc: 'Contact KairoLogic to discuss remediation strategies — support@kairologic.net' },
-        { num: '2', title: 'Implement Technical Fixes', desc: 'Follow the recommended fixes outlined in this report for each finding' },
-        { num: '3', title: 'Activate Monitoring', desc: 'Purchase Sentry Shield for ongoing compliance monitoring — $299/month' },
-        { num: '4', title: 'Verify & Certify', desc: 'Complete final attestation to achieve Verified Sovereign status' },
-      ];
-      
-      nextSteps.forEach((step) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.setFillColor(0, 35, 78);
-        doc.circle(19, y + 2, 3, 'F');
-        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-        doc.text(step.num, 19, y + 3.5, { align: 'center' });
-        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 35, 78);
-        doc.text(step.title, 26, y + 3);
-        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
-        doc.text(step.desc, 26, y + 8);
-        y += 14;
-      });
-
-      y += 6;
-
-      // ═══ LEGAL DISCLAIMER ═══
-      if (y > 255) { doc.addPage(); y = 20; }
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(15, y, pageWidth - 30, 22, 2, 2, 'F');
-      doc.setFontSize(5.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(100, 116, 139);
-      const disclaimerText = 'This report is generated by the KairoLogic SENTRY engine based on publicly observable digital infrastructure signals including DNS records, IP geolocation, HTTP headers, TLS certificates, and website content. It does not constitute legal advice, certification, or guarantee of regulatory compliance. Healthcare entities should consult qualified legal counsel for definitive compliance guidance. \u00A9 ' + new Date().getFullYear() + ' KairoLogic. All rights reserved.';
-      const discLines = doc.splitTextToSize(disclaimerText, pageWidth - 40);
-      doc.text(discLines, 20, y + 5);
 
       // Footer
       const pageCount = doc.getNumberOfPages();
@@ -431,7 +321,7 @@ function SuccessPageInner() {
   // ── Widget embed code ──
   const getWidgetCode = (mode: 'watch' | 'shield') => {
     const npiVal = purchaseInfo?.npi || 'YOUR_NPI';
-    return `<!-- KairoLogic Sentry ${mode === 'shield' ? 'Shield' : 'Watch'} Widget -->\n<script\n  src="https://kairologic.net/widget/sentry.js"\n  data-npi="${npiVal}"\n  data-mode="${mode}"\n  data-theme="light"\n  async>\n</script>\n<noscript>\n  <a href="https://kairologic.net/scan?npi=${npiVal}">\n    Compliance verified by KairoLogic\n  </a>\n</noscript>`;
+    return `<!-- KairoLogic Sentry ${mode === 'shield' ? 'Shield' : 'Watch'} Widget -->\n<script\n  src="https://kairologic.com/widget/sentry.js"\n  data-npi="${npiVal}"\n  data-mode="${mode}"\n  data-theme="light"\n  async>\n</script>\n<noscript>\n  <a href="https://kairologic.com/scan?npi=${npiVal}">\n    Compliance verified by KairoLogic\n  </a>\n</noscript>`;
   };
 
   const handleCopyCode = (code: string) => {
@@ -454,11 +344,13 @@ function SuccessPageInner() {
 
   const product = purchaseInfo?.product || 'unknown';
   const config = PRODUCT_CONFIG[product] || PRODUCT_CONFIG['report'];
-  const hasReport = ['report', 'safe-harbor', 'safe-harbor-watch', 'safe-harbor-shield', 'shield'].includes(product);
-  const hasSafeHarbor = ['safe-harbor', 'safe-harbor-watch', 'safe-harbor-shield'].includes(product);
-  const hasMonitoring = ['watch', 'shield', 'safe-harbor-watch', 'safe-harbor-shield'].includes(product);
-  const monitoringMode: 'watch' | 'shield' = ['shield', 'safe-harbor-shield'].includes(product) ? 'shield' : 'watch';
+  const hasReport = ['report', 'safe-harbor', 'shield'].includes(product);
+  const hasSafeHarbor = ['safe-harbor'].includes(product);
+  // Every product now gets Shield monitoring (report/safe-harbor via trial, shield directly)
+  const hasMonitoring = ['report', 'safe-harbor', 'shield', 'watch'].includes(product);
+  const monitoringMode: 'watch' | 'shield' = product === 'watch' ? 'watch' : 'shield';
   const reportFresh = purchaseInfo?.reportData && purchaseInfo.reportAge <= REPORT_MAX_AGE_DAYS;
+  const isTrialShield = purchaseInfo?.includesShieldTrial || false;
   const IconComponent = config.icon;
 
   return (
@@ -483,8 +375,30 @@ function SuccessPageInner() {
               <IconComponent className={`w-4 h-4 ${config.color}`} />
               <span className="text-sm font-semibold text-navy">{config.title}</span>
             </div>
+            {config.subtitle && (
+              <p className="text-xs text-green-600 font-bold mt-2">{config.subtitle}</p>
+            )}
           </div>
         </div>
+
+        {/* ═══ SHIELD TRIAL BANNER ═══ */}
+        {isTrialShield && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="bg-green-100 rounded-full p-2 flex-shrink-0">
+                <Zap className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-green-800 text-sm mb-1">Sentry Shield Activated — 90 Days FREE</h3>
+                <p className="text-xs text-green-700 leading-relaxed">
+                  Your purchase includes 3 months of Sentry Shield continuous compliance monitoring at no extra cost. 
+                  This includes a live dashboard, website compliance widget, drift alerts, and quarterly reports.
+                  After your trial, you can continue Shield at $79/mo, switch to Watch at $39/mo, or cancel anytime.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ═══ DELIVERABLES ═══ */}
         <div className="space-y-4">
@@ -539,7 +453,7 @@ function SuccessPageInner() {
                         <p className="text-xs text-amber-600 mb-3">Your most recent scan is {purchaseInfo.reportAge} days old. We recommend a fresh scan for the most accurate report.</p>
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Link href={`/scan?npi=${purchaseInfo.npi}`} className="flex-1">
-                            <button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors">Run Fresh Scan → Generate Report</button>
+                            <button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors">Run Fresh Scan &rarr; Generate Report</button>
                           </Link>
                           <button onClick={handleDownloadReport} disabled={generating}
                             className="flex-1 border border-slate-200 text-slate-600 font-medium py-2.5 px-4 rounded-lg text-sm hover:bg-slate-50 transition-colors">
@@ -576,7 +490,7 @@ function SuccessPageInner() {
                 <span className="ml-auto bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">READY</span>
               </div>
               <div className="p-6">
-                <p className="text-sm text-gray-600 mb-4">Your complete remediation kit. Each document is ready to use — no customization required.</p>
+                <p className="text-sm text-gray-600 mb-4">Your complete remediation kit. Each document is ready to use &mdash; no customization required.</p>
                 <div className="space-y-2">
                   {[
                     { name: 'SB 1188 Data Sovereignty Policy', file: 'sb1188-policy-pack.pdf', icon: '\uD83D\uDCCB' },
@@ -599,45 +513,71 @@ function SuccessPageInner() {
             </div>
           )}
 
-          {/* ── SENTRY WIDGET CODE ── */}
+          {/* ── SENTRY SHIELD / WATCH — DASHBOARD + WIDGET CODE ── */}
           {hasMonitoring && (
             <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
               <div className={`px-6 py-4 border-b flex items-center gap-3 ${monitoringMode === 'shield' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'}`}>
-                <Code className={`w-5 h-5 ${monitoringMode === 'shield' ? 'text-green-600' : 'text-blue-600'}`} />
-                <h2 className="font-bold text-navy text-sm">Sentry {monitoringMode === 'shield' ? 'Shield' : 'Watch'} — Widget Code</h2>
-                <span className="ml-auto bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">ACTIVE</span>
+                <Shield className={`w-5 h-5 ${monitoringMode === 'shield' ? 'text-green-600' : 'text-blue-600'}`} />
+                <h2 className="font-bold text-navy text-sm">
+                  Sentry {monitoringMode === 'shield' ? 'Shield' : 'Watch'} — {isTrialShield ? '90-Day Trial' : 'Active'}
+                </h2>
+                <span className="ml-auto bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {isTrialShield ? 'TRIAL ACTIVE' : 'ACTIVE'}
+                </span>
               </div>
-              <div className="p-6">
-                <p className="text-sm text-gray-600 mb-4">Add this code to your website to display your live compliance status badge.</p>
-                <div className="relative">
-                  <pre className="bg-slate-900 text-green-400 text-xs p-4 rounded-lg overflow-x-auto font-mono leading-relaxed">
-                    {getWidgetCode(monitoringMode)}
-                  </pre>
-                  <button onClick={() => handleCopyCode(getWidgetCode(monitoringMode))}
-                    className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-md transition-colors" title="Copy to clipboard">
-                    {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-                {copied && <p className="text-xs text-green-600 font-semibold mt-2">&check; Copied to clipboard</p>}
+              <div className="p-6 space-y-6">
 
-                <div className="mt-4 bg-slate-50 border border-slate-100 rounded-lg p-4">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Installation Guide</h4>
-                  <div className="space-y-2 text-xs text-slate-600">
-                    {['Copy the code snippet above', 'Paste it into your website\u2019s HTML \u2014 just before the closing </body> tag', 'The widget will automatically display your compliance badge and status'].map((step, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="bg-navy text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                        <span>{step}</span>
-                      </div>
-                    ))}
+                {/* Dashboard Access */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 mb-2">Your Compliance Dashboard</h3>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Access your live compliance dashboard to monitor your practice&apos;s data sovereignty status in real time.
+                  </p>
+                  <a href={`/dashboard/${purchaseInfo?.npi || ''}?email=${encodeURIComponent(purchaseInfo?.email || '')}`}
+                    className={`inline-flex items-center gap-2 font-semibold py-3 px-5 rounded-lg text-sm transition-colors ${
+                      monitoringMode === 'shield'
+                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}>
+                    <ExternalLink className="w-4 h-4" />
+                    Open Compliance Dashboard
+                  </a>
+                </div>
+
+                {/* Widget Code */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 mb-2">Website Widget Code</h3>
+                  <p className="text-xs text-gray-600 mb-3">Add this code to your website to display your live compliance status badge.</p>
+                  <div className="relative">
+                    <pre className="bg-slate-900 text-green-400 text-xs p-4 rounded-lg overflow-x-auto font-mono leading-relaxed">
+                      {getWidgetCode(monitoringMode)}
+                    </pre>
+                    <button onClick={() => handleCopyCode(getWidgetCode(monitoringMode))}
+                      className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-md transition-colors" title="Copy to clipboard">
+                      {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-3">Works with WordPress, Squarespace, Wix, custom HTML, and any website platform.</p>
-                </div>
+                  {copied && <p className="text-xs text-green-600 font-semibold mt-2">&check; Copied to clipboard</p>}
 
-                <div className="mt-3">
-                  <Link href={`/widget/test?npi=${purchaseInfo?.npi || ''}&mode=${monitoringMode}`}
-                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
-                    <ExternalLink className="w-3 h-3" /> Preview how the widget looks on your site &rarr;
-                  </Link>
+                  <div className="mt-4 bg-slate-50 border border-slate-100 rounded-lg p-4">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Installation Guide</h4>
+                    <div className="space-y-2 text-xs text-slate-600">
+                      {['Copy the code snippet above', 'Paste it into your website\u2019s HTML \u2014 just before the closing </body> tag', 'The widget will automatically display your compliance badge and status'].map((step, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="bg-navy text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                          <span>{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-3">Works with WordPress, Squarespace, Wix, custom HTML, and any website platform.</p>
+                  </div>
+
+                  <div className="mt-3">
+                    <Link href={`/widget/test?npi=${purchaseInfo?.npi || ''}&mode=${monitoringMode}`}
+                      className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                      <ExternalLink className="w-3 h-3" /> Preview how the widget looks on your site &rarr;
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -655,64 +595,48 @@ function SuccessPageInner() {
             </div>
           </div>
 
-          {/* ── UPSELL — ALWAYS PUSH RECURRING REVENUE ── */}
+          {/* ── POST-PURCHASE MESSAGING ── */}
           {(() => {
-            const npiRef = purchaseInfo?.npi || '';
-            const emailRef = encodeURIComponent(purchaseInfo?.email || '');
-            const watchLink = `https://buy.stripe.com/test_9B614n2Mz0168kv0xm4ko01?client_reference_id=${npiRef}&prefilled_email=${emailRef}`;
-            const shieldLink = `https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00?client_reference_id=${npiRef}&prefilled_email=${emailRef}`;
-
-            // Audit Report buyer → upsell Watch
-            if (purchaseInfo?.product === 'report') return (
-              <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-xl p-6 text-center">
-                <h3 className="text-white font-bold text-sm mb-1">Your report is a snapshot. Compliance is ongoing.</h3>
-                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Plugin updates, hosting changes, and new scripts can silently break your compliance. Sentry Watch monitors your site 24/7 and alerts you the moment something drifts.</p>
-                <a href={watchLink} target="_blank" rel="noopener noreferrer"
-                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
-                  Add Sentry Watch — $39/mo
-                </a>
-                <p className="text-[10px] text-slate-500 mt-2">Drift alerts • Monthly re-scans • Compliance reports</p>
-              </div>
-            );
-
-            // Safe Harbor buyer → upsell Watch
-            if (purchaseInfo?.product === 'safe-harbor') return (
-              <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-xl p-6 text-center">
-                <h3 className="text-white font-bold text-sm mb-1">You&apos;ve fixed the issues. Now stay protected.</h3>
-                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Your Safe Harbor remediation gets you compliant today. Sentry Watch ensures you stay compliant tomorrow — automatically.</p>
-                <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-md mx-auto">
-                  <a href={watchLink} target="_blank" rel="noopener noreferrer"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-5 rounded-lg text-sm transition-colors">
-                    Add Sentry Watch — $39/mo
-                  </a>
-                  <a href={shieldLink} target="_blank" rel="noopener noreferrer"
-                    className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-5 rounded-lg text-sm transition-colors border border-white/20">
-                    Upgrade to Shield — $79/mo
-                  </a>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-2">Shield adds live dashboard, quarterly forensic reports, and annual certification seal</p>
-              </div>
-            );
-
-            // Watch buyer → upsell Shield
-            if (purchaseInfo?.product === 'watch' || purchaseInfo?.product === 'safe-harbor-watch') return (
-              <div className="bg-gradient-to-r from-green-900 to-slate-900 rounded-xl p-6 text-center">
-                <h3 className="text-white font-bold text-sm mb-1">Want full visibility? Upgrade to Shield.</h3>
-                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">Get a live compliance dashboard, quarterly forensic reports, annual certification seal, and priority support.</p>
-                <a href={shieldLink} target="_blank" rel="noopener noreferrer"
+            // Report or Safe Harbor buyer (already has Shield trial) → reinforce value, no upsell needed
+            if (product === 'report' || product === 'safe-harbor') return (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 text-center">
+                <div className="text-3xl mb-2">🛡️</div>
+                <h3 className="text-green-800 font-bold text-sm mb-1">Your Sentry Shield is active for 90 days</h3>
+                <p className="text-green-600 text-xs max-w-lg mx-auto mb-3">
+                  Your website is now being monitored 24/7. You&apos;ll receive drift alerts if anything changes.
+                  After 90 days, continue Shield at $79/mo, switch to Watch at $39/mo, or cancel anytime.
+                </p>
+                <a href={`/dashboard/${purchaseInfo?.npi || ''}?email=${encodeURIComponent(purchaseInfo?.email || '')}`}
                   className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
-                  Upgrade to Sentry Shield — $79/mo
+                  View Your Dashboard &rarr;
                 </a>
-                <p className="text-[10px] text-slate-500 mt-2">Only $40/mo more for full enterprise-grade compliance management</p>
               </div>
             );
 
-            // Shield / Safe Harbor + Shield buyer → no upsell, reinforcement
-            if (purchaseInfo?.product === 'shield' || purchaseInfo?.product === 'safe-harbor-shield') return (
+            // Shield subscriber → reinforcement
+            if (product === 'shield') return (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 text-center">
                 <div className="text-3xl mb-2">🏆</div>
                 <h3 className="text-green-800 font-bold text-sm mb-1">You have the highest level of protection</h3>
-                <p className="text-green-600 text-xs max-w-lg mx-auto">Sentry Shield provides continuous monitoring, quarterly forensic reports, live dashboard access, and annual certification. Your compliance is in expert hands.</p>
+                <p className="text-green-600 text-xs max-w-lg mx-auto">
+                  Sentry Shield provides continuous monitoring, quarterly forensic reports, live dashboard access, and annual certification. Your compliance is in expert hands.
+                </p>
+              </div>
+            );
+
+            // Watch subscriber → upsell to Shield
+            if (product === 'watch') return (
+              <div className="bg-gradient-to-r from-green-900 to-slate-900 rounded-xl p-6 text-center">
+                <h3 className="text-white font-bold text-sm mb-1">Want full visibility? Upgrade to Shield.</h3>
+                <p className="text-slate-400 text-xs mb-4 max-w-lg mx-auto">
+                  Get a live compliance dashboard, quarterly forensic reports, annual certification seal, and priority support.
+                </p>
+                {/* TODO: Replace with live Shield payment link */}
+                <a href="https://buy.stripe.com/SHIELD_LINK_PLACEHOLDER"
+                  className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
+                  Upgrade to Sentry Shield &mdash; $79/mo
+                </a>
+                <p className="text-[10px] text-slate-500 mt-2">Only $40/mo more for enterprise-grade compliance management</p>
               </div>
             );
 
@@ -722,7 +646,7 @@ function SuccessPageInner() {
           {/* ── SUPPORT ── */}
           <div className="text-center py-4">
             <p className="text-slate-400 text-xs">
-              Questions? Email <a href="mailto:compliance@kairologic.net" className="text-blue-600 hover:underline">compliance@kairologic.net</a> or call (512) 402-2237
+              Questions? Email <a href="mailto:compliance@kairologic.com" className="text-blue-600 hover:underline">compliance@kairologic.com</a> or call (512) 402-2237
             </p>
             <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-navy mt-2 transition-colors">
               <ArrowRight className="w-3 h-3" /> Return to KairoLogic
@@ -746,4 +670,3 @@ export default function PaymentSuccessPage() {
     </Suspense>
   );
 }
-
