@@ -1284,9 +1284,9 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
               const clientRef = `?client_reference_id=${npiParam}&prefilled_email=${encodeURIComponent(emailParam)}`;
 
               const LINKS = {
-                report: `https://buy.stripe.com/REPORT_LINK_PLACEHOLDER${clientRef}`,
-                safeHarbor: `https://buy.stripe.com/SAFE_HARBOR_LINK_PLACEHOLDER${clientRef}`,
-                shield: `https://buy.stripe.com/SHIELD_LINK_PLACEHOLDER${clientRef}`,
+                report: `https://buy.stripe.com/4gM5kDdpw0HP18x3057Re08${clientRef}`,
+                safeHarbor: `https://buy.stripe.com/00w28retAeyF6sRgQV7Re07${clientRef}`,
+                shield: `https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06${clientRef}`,
               };
 
               // ── TIER 1: Sovereign (80-100) ──
