@@ -1,31 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * KairoLogic Stripe Webhook v2
+ * KairoLogic Stripe Webhook v3
  * ============================
  * POST /api/stripe/webhook
  * 
- * Handles checkout.session.completed events.
+ * PRODUCT LINEUP (v3):
+ *   1. Audit Report ($149)      → report + 3-month Shield trial
+ *   2. Safe Harbor ($249)       → report + safe harbor + 3-month Shield trial
+ *   3. Sentry Shield ($79/mo)   → Shield subscription (immediate billing)
+ *   4. Sentry Watch ($39/mo)    → Watch subscription (downgrade only, never sold directly)
  * 
- * PRODUCT HIERARCHY:
- *   1. Audit Report ($149)        → report generated, email sent
- *   2. Safe Harbor ($249)         → report + safe harbor materials
- *   3. Safe Harbor + Watch ($249) → report + safe harbor + Watch subscription ($39/mo)
- *   4. Safe Harbor + Shield ($249)→ report + safe harbor + Shield subscription ($79/mo)
- *   5. Sentry Watch ($39/mo)      → Watch subscription (standalone)
- *   6. Sentry Shield ($79/mo)     → Shield subscription (standalone)
- * 
- * BUNDLE LOGIC:
- *   When a bundle product (Safe Harbor + Watch/Shield) is purchased as a
- *   one-time payment, this webhook auto-creates the recurring subscription
- *   via the Stripe API using the customer's payment method.
+ * TRIAL LOGIC:
+ *   Report & Safe Harbor purchases auto-create a Shield subscription
+ *   with a 90-day free trial (trial_period_days=90). After trial:
+ *   - Customer converts to Shield ($79/mo), or
+ *   - Downgrades to Watch ($39/mo), or
+ *   - Cancels entirely
  * 
  * FLOW:
- *   1. Identify product from session line items / metadata
- *   2. Find provider in registry (by email or client_reference_id NPI)
+ *   1. Identify product from session metadata / line items
+ *   2. Find provider in registry (by NPI or email)
  *   3. Update registry (is_paid, report_status, subscription_status, widget_status)
  *   4. Log purchase to purchases table
- *   5. If bundle → auto-create Stripe subscription for Watch/Shield
+ *   5. If report/safe-harbor → auto-create Shield subscription with 90-day trial
  *   6. Send product-specific email
  *   7. Log to prospects
  */
@@ -35,18 +33,18 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_P
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 
 // ── Stripe recurring price IDs ──
-// Set these in your .env or Vercel environment variables after creating prices in Stripe Dashboard
-const STRIPE_WATCH_PRICE_ID = process.env.STRIPE_WATCH_PRICE_ID || '';   // $39/mo recurring price
 const STRIPE_SHIELD_PRICE_ID = process.env.STRIPE_SHIELD_PRICE_ID || ''; // $79/mo recurring price
+const STRIPE_WATCH_PRICE_ID = process.env.STRIPE_WATCH_PRICE_ID || '';   // $39/mo recurring price (downgrade)
+
+// ── Shield trial duration ──
+const SHIELD_TRIAL_DAYS = 90; // 3 months free with Report or Safe Harbor
 
 // ── Product Types ──
 type ProductType =
   | 'audit-report'
   | 'safe-harbor'
-  | 'safe-harbor-watch'
-  | 'safe-harbor-shield'
-  | 'sentry-watch'
   | 'sentry-shield'
+  | 'sentry-watch'
   | 'unknown';
 
 interface ProductInfo {
@@ -55,7 +53,8 @@ interface ProductInfo {
   templateSlug: string;
   includesReport: boolean;
   includesSafeHarbor: boolean;
-  includesMonitoring: false | 'watch' | 'shield';
+  includesShieldTrial: boolean;    // 90-day free Shield for report/safe-harbor
+  includesMonitoring: false | 'shield' | 'watch';
 }
 
 // ── Product Config ──
@@ -65,48 +64,39 @@ const PRODUCTS: Record<ProductType, Omit<ProductInfo, 'type'>> = {
     templateSlug: 'purchase-success',
     includesReport: true,
     includesSafeHarbor: false,
-    includesMonitoring: false,
+    includesShieldTrial: true,     // 3 months Shield FREE
+    includesMonitoring: 'shield',
   },
   'safe-harbor': {
-    displayName: 'Safe Harbor\u2122 Bundle',
+    displayName: 'Safe Harbor\u2122 Compliance Bundle',
     templateSlug: 'purchase-success',
     includesReport: true,
     includesSafeHarbor: true,
-    includesMonitoring: false,
+    includesShieldTrial: true,     // 3 months Shield FREE
+    includesMonitoring: 'shield',
   },
-  'safe-harbor-watch': {
-    displayName: 'Safe Harbor\u2122 + Sentry Watch',
+  'sentry-shield': {
+    displayName: 'Sentry Shield — Continuous Compliance',
     templateSlug: 'sentryshield-activation',
-    includesReport: true,
-    includesSafeHarbor: true,
-    includesMonitoring: 'watch',
-  },
-  'safe-harbor-shield': {
-    displayName: 'Safe Harbor\u2122 + Sentry Shield',
-    templateSlug: 'sentryshield-activation',
-    includesReport: true,
-    includesSafeHarbor: true,
+    includesReport: true,          // Shield includes free audit report
+    includesSafeHarbor: false,
+    includesShieldTrial: false,    // No trial — immediate billing
     includesMonitoring: 'shield',
   },
   'sentry-watch': {
-    displayName: 'Sentry Watch',
+    displayName: 'Sentry Watch — Basic Monitoring',
     templateSlug: 'sentryshield-activation',
     includesReport: false,
     includesSafeHarbor: false,
+    includesShieldTrial: false,
     includesMonitoring: 'watch',
-  },
-  'sentry-shield': {
-    displayName: 'Sentry Shield + Free Audit Report',
-    templateSlug: 'sentryshield-activation',
-    includesReport: true,
-    includesSafeHarbor: false,
-    includesMonitoring: 'shield',
   },
   'unknown': {
     displayName: 'KairoLogic Product',
     templateSlug: 'purchase-success',
     includesReport: false,
     includesSafeHarbor: false,
+    includesShieldTrial: false,
     includesMonitoring: false,
   },
 };
@@ -153,38 +143,33 @@ function identifyProduct(session: Record<string, unknown>): ProductInfo {
     }
   }
 
+  // 4. Fallback: check amount
+  const amountTotal = session.amount_total as number | undefined;
+  if (amountTotal) {
+    const dollars = amountTotal / 100;
+    if (dollars >= 200) candidates.push('safe-harbor');
+    else if (dollars >= 100) candidates.push('audit-report');
+  }
+
   const combined = candidates.join(' ');
 
-  // Match bundles first (more specific)
-  if ((combined.includes('safe harbor') || combined.includes('safe-harbor')) && combined.includes('shield')) {
-    return { type: 'safe-harbor-shield', ...PRODUCTS['safe-harbor-shield'] };
-  }
-  if ((combined.includes('safe harbor') || combined.includes('safe-harbor')) && combined.includes('watch')) {
-    return { type: 'safe-harbor-watch', ...PRODUCTS['safe-harbor-watch'] };
-  }
+  // Match products
   if (combined.includes('safe harbor') || combined.includes('safe-harbor')) {
     return { type: 'safe-harbor', ...PRODUCTS['safe-harbor'] };
   }
-
-  // Standalone monitoring
-  if (combined.includes('shield') || combined.includes('sentry shield')) {
+  if (combined.includes('shield') || combined.includes('sentry shield') || combined.includes('sentry-shield')) {
     return { type: 'sentry-shield', ...PRODUCTS['sentry-shield'] };
   }
-  if (combined.includes('watch') || combined.includes('sentry watch')) {
+  if (combined.includes('watch') || combined.includes('sentry watch') || combined.includes('sentry-watch')) {
     return { type: 'sentry-watch', ...PRODUCTS['sentry-watch'] };
   }
-
-  // Report
   if (combined.includes('audit') || combined.includes('report') || combined.includes('forensic') || combined.includes('sovereignty')) {
     return { type: 'audit-report', ...PRODUCTS['audit-report'] };
   }
 
   // Legacy fallbacks
-  if (combined.includes('quick-fix') || combined.includes('quick fix') || combined.includes('blueprint')) {
+  if (combined.includes('quick-fix') || combined.includes('blueprint') || combined.includes('bundle')) {
     return { type: 'safe-harbor', ...PRODUCTS['safe-harbor'] };
-  }
-  if (combined.includes('sentry') || combined.includes('widget') || combined.includes('sentryguard')) {
-    return { type: 'sentry-watch', ...PRODUCTS['sentry-watch'] };
   }
 
   return { type: 'unknown', ...PRODUCTS['unknown'] };
@@ -193,7 +178,7 @@ function identifyProduct(session: Record<string, unknown>): ProductInfo {
 // ── Stripe API helper ──
 async function stripeRequest(endpoint: string, body: Record<string, string>): Promise<Record<string, unknown> | null> {
   if (!STRIPE_SECRET_KEY) {
-    console.error('[Stripe Webhook] STRIPE_SECRET_KEY not set — cannot create subscription');
+    console.error('[Stripe Webhook] STRIPE_SECRET_KEY not set');
     return null;
   }
   try {
@@ -217,30 +202,36 @@ async function stripeRequest(endpoint: string, body: Record<string, string>): Pr
   }
 }
 
-// ── Auto-create subscription for bundle purchases ──
-async function createSubscription(
+// ── Create Shield subscription (with optional 90-day trial) ──
+async function createShieldSubscription(
   customerId: string,
-  monitoringTier: 'watch' | 'shield',
-  npi: string
+  npi: string,
+  withTrial: boolean,
+  sourceProduct: string
 ): Promise<{ subscriptionId: string | null; error: string | null }> {
-  const priceId = monitoringTier === 'shield' ? STRIPE_SHIELD_PRICE_ID : STRIPE_WATCH_PRICE_ID;
-
-  if (!priceId) {
-    return {
-      subscriptionId: null,
-      error: `STRIPE_${monitoringTier.toUpperCase()}_PRICE_ID not configured`,
-    };
+  if (!STRIPE_SHIELD_PRICE_ID) {
+    return { subscriptionId: null, error: 'STRIPE_SHIELD_PRICE_ID not configured' };
   }
 
-  const sub = await stripeRequest('/subscriptions', {
+  const params: Record<string, string> = {
     'customer': customerId,
-    'items[0][price]': priceId,
-    'payment_behavior': 'default_incomplete',
+    'items[0][price]': STRIPE_SHIELD_PRICE_ID,
     'metadata[npi]': npi,
-    'metadata[product]': `sentry-${monitoringTier}`,
-    'metadata[created_by]': 'webhook-auto-bundle',
-  });
+    'metadata[product]': 'sentry-shield',
+    'metadata[source_product]': sourceProduct,
+    'metadata[created_by]': withTrial ? 'webhook-auto-trial' : 'webhook-direct',
+  };
 
+  // Add 90-day trial for Report and Safe Harbor purchases
+  if (withTrial) {
+    params['trial_period_days'] = String(SHIELD_TRIAL_DAYS);
+    params['metadata[trial_type]'] = '90-day-shield';
+    params['metadata[trial_end_action]'] = 'prompt-convert-or-downgrade';
+  } else {
+    params['payment_behavior'] = 'default_incomplete';
+  }
+
+  const sub = await stripeRequest('/subscriptions', params);
   if (!sub) {
     return { subscriptionId: null, error: 'Stripe subscription creation failed' };
   }
@@ -334,7 +325,6 @@ export async function POST(request: NextRequest) {
       console.log(`[Stripe Webhook] Payment: ${customerEmail}, $${amountTotal}, ${product.displayName} (${product.type}), customer: ${customerId}`);
 
       // ── 1. Find provider ──
-      // Try by NPI (from client_reference_id) first, then by email
       let provider: Record<string, unknown> | null = null;
       const npi = clientRefId?.split(':')[0] || clientRefId || '';
 
@@ -360,13 +350,20 @@ export async function POST(request: NextRequest) {
         }
 
         if (product.includesMonitoring) {
-          registryUpdate.subscription_status = 'active';
+          registryUpdate.subscription_status = product.includesShieldTrial ? 'trialing' : 'active';
           registryUpdate.widget_status = 'active';
-          registryUpdate.subscription_tier = product.includesMonitoring; // 'watch' or 'shield'
+          registryUpdate.subscription_tier = product.includesMonitoring; // 'shield' or 'watch'
+        }
+
+        if (product.includesShieldTrial) {
+          const trialEnd = new Date();
+          trialEnd.setDate(trialEnd.getDate() + SHIELD_TRIAL_DAYS);
+          registryUpdate.trial_end_date = trialEnd.toISOString();
+          registryUpdate.trial_source_product = product.type;
         }
 
         await supabasePatch('registry', `id=eq.${provider.id}`, registryUpdate);
-        console.log(`[Stripe Webhook] Registry updated: ${provider.name} (${provider.npi}) — ${product.type}`);
+        console.log(`[Stripe Webhook] Registry updated: ${provider.name} (${provider.npi}) — ${product.type}${product.includesShieldTrial ? ' (90-day Shield trial)' : ''}`);
       } else {
         console.warn(`[Stripe Webhook] No provider found for email=${customerEmail}, npi=${npi}`);
       }
@@ -385,40 +382,43 @@ export async function POST(request: NextRequest) {
         includes_report: product.includesReport,
         includes_safe_harbor: product.includesSafeHarbor,
         includes_monitoring: product.includesMonitoring || null,
+        includes_shield_trial: product.includesShieldTrial,
         receipt_url: receiptUrl,
         created_at: new Date().toISOString(),
       });
       console.log(`[Stripe Webhook] Purchase logged: ${product.type}`);
 
-      // ── 4. Auto-create subscription for bundles ──
+      // ── 4. Auto-create Shield subscription ──
+      // For Report/Safe Harbor: 90-day trial
+      // For standalone Shield: this is already handled by Stripe (it's a recurring product)
       let subscriptionResult: { subscriptionId: string | null; error: string | null } = {
         subscriptionId: null,
         error: null,
       };
 
-      if (product.includesMonitoring && customerId) {
-        console.log(`[Stripe Webhook] Creating ${product.includesMonitoring} subscription for customer ${customerId}...`);
-        subscriptionResult = await createSubscription(
+      if (product.includesShieldTrial && customerId) {
+        // Report or Safe Harbor → auto-create Shield sub with 90-day trial
+        console.log(`[Stripe Webhook] Creating Shield subscription with ${SHIELD_TRIAL_DAYS}-day trial for customer ${customerId}...`);
+        subscriptionResult = await createShieldSubscription(
           customerId,
-          product.includesMonitoring,
-          (provider?.npi as string) || npi
+          (provider?.npi as string) || npi,
+          true,   // withTrial = true
+          product.type
         );
 
         if (subscriptionResult.subscriptionId) {
-          console.log(`[Stripe Webhook] Subscription created: ${subscriptionResult.subscriptionId}`);
-          // Update registry with subscription ID
+          console.log(`[Stripe Webhook] Shield trial subscription created: ${subscriptionResult.subscriptionId}`);
           if (provider) {
             await supabasePatch('registry', `id=eq.${provider.id}`, {
               stripe_subscription_id: subscriptionResult.subscriptionId,
             });
           }
         } else {
-          console.error(`[Stripe Webhook] Subscription creation failed: ${subscriptionResult.error}`);
-          // Non-fatal — the purchase is still valid, just flag for manual follow-up
+          console.error(`[Stripe Webhook] Shield trial creation failed: ${subscriptionResult.error}`);
           if (provider) {
             await supabasePatch('registry', `id=eq.${provider.id}`, {
               subscription_status: 'pending_activation',
-              admin_notes: `Auto-subscription failed: ${subscriptionResult.error}. Needs manual activation.`,
+              admin_notes: `Auto-trial failed: ${subscriptionResult.error}. Needs manual activation.`,
             });
           }
         }
@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
       // ── 5. Send product-specific email ──
       if (customerEmail) {
         try {
-          const origin = request.headers.get('origin') || request.nextUrl.origin || 'https://kairologic.net';
+          const origin = request.headers.get('origin') || request.nextUrl.origin || 'https://kairologic.com';
           await fetch(`${origin}/api/email/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -447,8 +447,9 @@ export async function POST(request: NextRequest) {
                 includes_report: product.includesReport,
                 includes_safe_harbor: product.includesSafeHarbor,
                 monitoring_tier: product.includesMonitoring || '',
+                includes_shield_trial: product.includesShieldTrial,
+                trial_days: product.includesShieldTrial ? SHIELD_TRIAL_DAYS : 0,
                 subscription_id: subscriptionResult.subscriptionId || '',
-                // Success page URL with product context
                 deliverables_url: `${origin}/payment/success?npi=${(provider?.npi as string) || npi}&product=${product.type}&email=${encodeURIComponent(customerEmail)}`,
               },
             }),
@@ -467,7 +468,7 @@ export async function POST(request: NextRequest) {
           email: customerEmail,
           status: 'qualified',
           priority: 'high',
-          admin_notes: `Stripe: $${amountTotal.toFixed(2)} — ${product.displayName}${subscriptionResult.subscriptionId ? ` (sub: ${subscriptionResult.subscriptionId})` : ''}`,
+          admin_notes: `Stripe: $${amountTotal.toFixed(2)} — ${product.displayName}${product.includesShieldTrial ? ' (+ 90-day Shield trial)' : ''}${subscriptionResult.subscriptionId ? ` (sub: ${subscriptionResult.subscriptionId})` : ''}`,
           form_data: {
             stripe_event: event.type,
             stripe_session_id: session.id,
@@ -477,6 +478,7 @@ export async function POST(request: NextRequest) {
             product_type: product.type,
             product_name: product.displayName,
             includes_monitoring: product.includesMonitoring,
+            includes_shield_trial: product.includesShieldTrial,
             subscription_id: subscriptionResult.subscriptionId,
             npi: (provider?.npi as string) || npi || '',
           },
@@ -491,6 +493,7 @@ export async function POST(request: NextRequest) {
         product: product.type,
         subscription_created: !!subscriptionResult.subscriptionId,
         subscription_id: subscriptionResult.subscriptionId,
+        shield_trial: product.includesShieldTrial,
       });
     }
 
@@ -502,22 +505,54 @@ export async function POST(request: NextRequest) {
       }
 
       const subNpi = subscription.metadata?.npi;
-      const subStatus = subscription.status; // active, canceled, past_due, etc.
+      const subStatus = subscription.status; // active, canceled, past_due, trialing, etc.
 
       if (subNpi) {
-        const widgetStatus = subStatus === 'active' ? 'active' : 'hidden';
-        const subscriptionStatus = subStatus === 'active' ? 'active' : 'inactive';
+        let widgetStatus = 'hidden';
+        let subscriptionStatus = 'inactive';
+        let subscriptionTier: string | null = null;
 
-        await supabasePatch('registry', `npi=eq.${subNpi}`, {
+        if (subStatus === 'active' || subStatus === 'trialing') {
+          widgetStatus = 'active';
+          subscriptionStatus = subStatus; // 'active' or 'trialing'
+          
+          // Determine tier from price
+          const priceId = subscription.items?.data?.[0]?.price?.id;
+          if (priceId === STRIPE_SHIELD_PRICE_ID) {
+            subscriptionTier = 'shield';
+          } else if (priceId === STRIPE_WATCH_PRICE_ID) {
+            subscriptionTier = 'watch';
+          }
+        }
+
+        const update: Record<string, unknown> = {
           subscription_status: subscriptionStatus,
           widget_status: widgetStatus,
           updated_at: new Date().toISOString(),
-        });
+        };
+        if (subscriptionTier) {
+          update.subscription_tier = subscriptionTier;
+        }
 
-        console.log(`[Stripe Webhook] Subscription ${event.type}: NPI ${subNpi} → ${subscriptionStatus}`);
+        await supabasePatch('registry', `npi=eq.${subNpi}`, update);
+        console.log(`[Stripe Webhook] Subscription ${event.type}: NPI ${subNpi} → ${subscriptionStatus}${subscriptionTier ? ` (${subscriptionTier})` : ''}`);
       }
 
       return NextResponse.json({ received: true, action: event.type, status: subStatus });
+    }
+
+    // ── Handle trial ending (subscription goes from trialing to active or past_due) ──
+    if (event.type === 'customer.subscription.trial_will_end') {
+      // Stripe sends this 3 days before trial ends
+      const subscription = event.data?.object;
+      const subNpi = subscription?.metadata?.npi;
+      const custEmail = subscription?.metadata?.email || '';
+
+      console.log(`[Stripe Webhook] Trial ending soon: NPI=${subNpi}, email=${custEmail}`);
+      
+      // Could send a "trial ending" email here
+      // For now, just log it
+      return NextResponse.json({ received: true, action: 'trial_will_end', npi: subNpi });
     }
 
     // ── Handle payment failures ──
@@ -527,8 +562,6 @@ export async function POST(request: NextRequest) {
       const custEmail = invoice?.customer_email;
 
       console.warn(`[Stripe Webhook] Payment failed: sub=${subId}, email=${custEmail}`);
-
-      // Could send a dunning email here in the future
       return NextResponse.json({ received: true, action: 'payment_failed' });
     }
 
@@ -552,4 +585,3 @@ export async function OPTIONS() {
     },
   });
 }
-
