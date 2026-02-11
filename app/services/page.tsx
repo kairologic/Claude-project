@@ -7,7 +7,6 @@ import { Shield, FileText, Eye, Search, CheckCircle, AlertTriangle, Activity, Ar
 function ScanResultsMockup() {
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden text-left">
-      {/* Header */}
       <div className="bg-gradient-to-r from-navy to-navy-light px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield size={16} className="text-gold" />
@@ -15,7 +14,6 @@ function ScanResultsMockup() {
         </div>
         <span className="text-slate-400 text-[10px] font-mono">SENTRY-3.1.0</span>
       </div>
-      {/* Score */}
       <div className="px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
         <div className="flex items-center justify-between">
           <div>
@@ -25,7 +23,6 @@ function ScanResultsMockup() {
           <span className="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">Drift</span>
         </div>
       </div>
-      {/* Categories */}
       <div className="px-5 py-3 space-y-2.5">
         {[
           { label: 'Data Residency', pct: 75, pass: 3, total: 4, color: 'bg-green-500' },
@@ -43,9 +40,8 @@ function ScanResultsMockup() {
           </div>
         ))}
       </div>
-      {/* CTA teaser */}
       <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 text-center">
-        <span className="text-[10px] text-slate-500">Full report with remediation available for $149</span>
+        <span className="text-[10px] text-slate-500">Full report with remediation starts at $149</span>
       </div>
     </div>
   );
@@ -55,13 +51,11 @@ function ScanResultsMockup() {
 function ReportMockup() {
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden text-left">
-      {/* Navy header */}
       <div className="bg-navy px-5 py-4 text-center">
         <div className="text-white text-sm font-bold tracking-wider">KAIRO<span className="text-gold">LOGIC</span></div>
         <div className="text-gold text-[8px] uppercase tracking-[0.2em] mt-0.5">Statutory Audit Report</div>
-        <div className="text-slate-400 text-[8px] mt-1">Report ID: KL-SAR-2X7F • Feb 2026</div>
+        <div className="text-slate-400 text-[8px] mt-1">Report ID: KL-SAR-2X7F &bull; Feb 2026</div>
       </div>
-      {/* Score row */}
       <div className="px-5 py-3 flex items-center gap-4 border-b border-slate-100">
         <div className="w-12 h-12 rounded-full border-[3px] border-green-500 flex items-center justify-center">
           <span className="text-green-600 font-black text-lg">92</span>
@@ -71,7 +65,6 @@ function ReportMockup() {
           <div className="text-[10px] text-slate-400 mt-0.5">Post-remediation score</div>
         </div>
       </div>
-      {/* Findings preview */}
       <div className="px-5 py-3 space-y-2">
         {[
           { id: 'DR-01', name: 'IP Geo-Location', status: 'pass' },
@@ -89,17 +82,15 @@ function ReportMockup() {
           </div>
         ))}
       </div>
-      {/* Remediation peek */}
       <div className="px-5 py-3 bg-emerald-50 border-t border-emerald-200">
         <div className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Remediation Roadmap</div>
-        <div className="text-[10px] text-emerald-600">3 items • Priority-sorted with technical fixes</div>
+        <div className="text-[10px] text-emerald-600">3 items &bull; Priority-sorted with technical fixes</div>
       </div>
-      {/* Border map peek */}
       <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200">
         <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Data Border Map</div>
         <div className="flex items-center gap-3 text-[10px] text-slate-500">
-          <span className="text-green-600 font-semibold">🇺🇸 10 US</span>
-          <span className="text-amber-600 font-semibold">🌍 3 foreign</span>
+          <span className="text-green-600 font-semibold">&#x1F1FA;&#x1F1F8; 10 US</span>
+          <span className="text-amber-600 font-semibold">&#x1F30D; 3 foreign</span>
         </div>
       </div>
     </div>
@@ -113,20 +104,18 @@ function MonitoringMockup() {
       <div className="bg-gradient-to-r from-navy to-navy-light px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Activity size={14} className="text-green-400" />
-          <span className="text-white text-xs font-bold">Sentry Watch Dashboard</span>
+          <span className="text-white text-xs font-bold">Sentry Shield Dashboard</span>
         </div>
         <span className="inline-flex items-center gap-1 text-[10px] text-green-400 font-semibold">
           <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
           LIVE
         </span>
       </div>
-      {/* Score timeline */}
       <div className="px-5 py-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Compliance Timeline</span>
           <span className="text-xs font-bold text-green-600">98%</span>
         </div>
-        {/* Simple bar chart */}
         <div className="flex items-end gap-1 h-10">
           {[85, 85, 62, 88, 92, 92, 95, 95, 98, 98, 98, 98].map((v, i) => (
             <div key={i} className="flex-1 rounded-t" style={{ height: `${v}%`, backgroundColor: v >= 80 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444' }} />
@@ -136,12 +125,11 @@ function MonitoringMockup() {
           <span>Jan</span><span>Mar</span><span>Jun</span><span>Now</span>
         </div>
       </div>
-      {/* Alert feed */}
       <div className="px-5 py-3 border-t border-slate-100 space-y-2">
         {[
           { time: '2h ago', msg: 'Re-scan complete — 98% sovereign', type: 'ok' },
           { time: '3d ago', msg: 'CDN drift detected → auto-alerted', type: 'warn' },
-          { time: '1w ago', msg: 'Monthly report generated', type: 'info' },
+          { time: '1w ago', msg: 'Quarterly report generated', type: 'info' },
         ].map((a, i) => (
           <div key={i} className="flex items-center gap-2 text-[10px]">
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.type === 'ok' ? 'bg-green-400' : a.type === 'warn' ? 'bg-amber-400' : 'bg-blue-400'}`} />
@@ -151,7 +139,7 @@ function MonitoringMockup() {
         ))}
       </div>
       <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200 text-center">
-        <span className="text-[10px] text-slate-400">Next scan in 6 days • 12 endpoints monitored</span>
+        <span className="text-[10px] text-slate-400">Next scan in 6 days &bull; 12 endpoints monitored</span>
       </div>
     </div>
   );
@@ -176,7 +164,7 @@ export default function ServicesPage() {
             From your first scan to continuous protection — everything your practice needs to stay compliant with Texas SB 1188 and HB 149, without an IT team.
           </p>
           <p className="text-sm text-gray-500">
-            Scan → Report → Remediate → Monitor. Pick what you need.
+            Scan &rarr; Report &rarr; Remediate &rarr; Monitor. Every purchase includes 3 months of Shield monitoring free.
           </p>
         </div>
       </section>
@@ -229,7 +217,7 @@ export default function ServicesPage() {
         </div>
       </section>
 
-      {/* ═══ PRODUCT 2: COMPLIANCE REPORT ═══ */}
+      {/* ═══ PRODUCT 2: AUDIT REPORT ═══ */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -246,10 +234,11 @@ export default function ServicesPage() {
               <h2 className="text-3xl md:text-4xl font-display font-bold text-navy mb-4">
                 Sovereignty Audit Report
               </h2>
-              <div className="flex items-baseline gap-2 mb-6">
+              <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-4xl font-display font-black text-navy">$149</span>
                 <span className="text-gray-400 text-sm">/report</span>
               </div>
+              <div className="text-sm text-green-600 font-bold mb-6">+ 3 months Sentry Shield monitoring FREE</div>
               <p className="text-gray-600 text-lg leading-relaxed mb-6">
                 A professional, audit-defensible PDF with every finding mapped to the specific Texas statute, a complete data border map, and an <strong>exact remediation roadmap</strong> your web developer can act on immediately.
               </p>
@@ -264,6 +253,7 @@ export default function ServicesPage() {
                   'Remediation roadmap — priority-sorted with technical fixes',
                   'SB 1188 & HB 149 statute clause mapping',
                   'Audit-defensible evidence for regulators & insurers',
+                  '3 months Sentry Shield monitoring included',
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-2 text-sm text-gray-600">
                     <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
@@ -282,7 +272,7 @@ export default function ServicesPage() {
         </div>
       </section>
 
-      {/* ═══ PRODUCT 2B: SAFE HARBOR BUNDLE ═══ */}
+      {/* ═══ PRODUCT 3: SAFE HARBOR BUNDLE ═══ */}
       <section className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -294,13 +284,14 @@ export default function ServicesPage() {
               <h2 className="text-3xl md:text-4xl font-display font-bold text-navy mb-4">
                 Safe Harbor&trade; Bundle
               </h2>
-              <div className="flex items-baseline gap-2 mb-2">
+              <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-4xl font-display font-black text-navy">$249</span>
                 <span className="text-gray-400 text-sm">/one-time</span>
               </div>
+              <div className="text-sm text-green-600 font-bold mb-2">+ 3 months Sentry Shield monitoring FREE</div>
               <div className="inline-flex items-center gap-1.5 bg-orange/10 text-orange text-xs font-bold px-3 py-1 rounded-full mb-6">
                 <Zap size={12} />
-                Recommended with Audit Report
+                Includes everything in Audit Report
               </div>
               <p className="text-gray-600 text-lg leading-relaxed mb-4">
                 The Audit Report tells you what&apos;s wrong. Safe Harbor&trade; gives you <strong>everything you need to fix it</strong> — pre-written policies, copy-paste code, staff training, and an implementation blueprint. Zero research. Zero writing. Just implement.
@@ -364,7 +355,7 @@ export default function ServicesPage() {
                       <span className="text-xl flex-shrink-0 mt-0.5">{item.icon}</span>
                       <div>
                         <div className="font-bold text-navy text-sm">{item.title}</div>
-                        <div className="text-[11px] text-orange font-medium mb-1">{item.job}</div>
+                        <div className="text-[10px] text-orange font-semibold uppercase tracking-wider mb-1">{item.job}</div>
                         <div className="text-xs text-gray-500 leading-relaxed">{item.deliverable}</div>
                       </div>
                     </div>
@@ -373,25 +364,11 @@ export default function ServicesPage() {
               </div>
             </div>
           </div>
-
-          {/* Audit + Safe Harbor combo callout */}
-          <div className="mt-12 max-w-3xl mx-auto bg-navy/5 border border-navy/10 rounded-xl p-6 flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex-1 text-center sm:text-left">
-              <div className="font-bold text-navy text-sm mb-1">Audit + Safe Harbor Combo</div>
-              <p className="text-xs text-gray-500">
-                Most practices purchase both together — the Audit identifies the problems, Safe Harbor provides the ready-made fixes. Together they give you a complete, audit-defensible compliance package.
-              </p>
-            </div>
-            <div className="flex-shrink-0 text-center">
-              <div className="text-2xl font-display font-black text-navy">$398</div>
-              <div className="text-[10px] text-gray-400">$149 + $249</div>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* ═══ PRODUCT 3: SENTRY WATCH & SHIELD ═══ */}
-      <section className="py-20 bg-white">
+      {/* ═══ PRODUCT 4: SENTRY SHIELD ═══ */}
+      <section className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -400,62 +377,43 @@ export default function ServicesPage() {
                 Step 3 — Monitor
               </div>
               <h2 className="text-3xl md:text-4xl font-display font-bold text-navy mb-4">
-                Continuous Compliance Monitoring
+                Sentry Shield — Continuous Compliance
               </h2>
-              <p className="text-gray-600 text-lg leading-relaxed mb-8">
-                Fixes don&apos;t stay fixed. Plugin updates, hosting changes, and new third-party scripts can silently break your compliance overnight. Sentry Watch and Sentry Shield keep you protected around the clock.
-              </p>
-
-              {/* Two tier cards */}
-              <div className="grid sm:grid-cols-2 gap-4 mb-8">
-                {/* Sentry Watch */}
-                <div className="border-2 border-slate-200 rounded-xl p-5 hover:border-blue-300 transition-colors">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Activity size={18} className="text-blue-500" />
-                    <h3 className="font-bold text-navy text-sm">Sentry Watch</h3>
-                  </div>
-                  <div className="flex items-baseline gap-1 mb-3">
-                    <span className="text-2xl font-display font-black text-navy">$39</span>
-                    <span className="text-gray-400 text-xs">/mo</span>
-                  </div>
-                  <ul className="space-y-2 text-xs text-gray-600">
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Automated monthly re-scans</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Compliance drift alerts</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Monthly compliance reports</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Infrastructure heartbeat</li>
-                  </ul>
-                </div>
-
-                {/* Sentry Shield */}
-                <div className="border-2 border-orange rounded-xl p-5 relative shadow-md">
-                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-orange text-white text-[9px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full">Best Value</div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield size={18} className="text-orange" />
-                    <h3 className="font-bold text-navy text-sm">Sentry Shield</h3>
-                  </div>
-                  <div className="flex items-baseline gap-1 mb-3">
-                    <span className="text-2xl font-display font-black text-navy">$79</span>
-                    <span className="text-gray-400 text-xs">/mo</span>
-                  </div>
-                  <ul className="space-y-2 text-xs text-gray-600">
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500 flex-shrink-0" /> Everything in Watch</li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Live compliance dashboard</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Quarterly forensic reports</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Annual certification seal</strong></li>
-                    <li className="flex items-center gap-1.5"><CheckCircle size={12} className="text-orange flex-shrink-0" /> <strong>Priority support</strong></li>
-                  </ul>
-                </div>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-4xl font-display font-black text-navy">$79</span>
+                <span className="text-gray-400 text-sm">/month</span>
               </div>
+              <div className="text-sm text-green-600 font-bold mb-6">Includes free Audit Report</div>
 
-              <p className="text-sm text-gray-500 mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed mb-4">
+                Fixes don&apos;t stay fixed. Plugin updates, hosting changes, and new third-party scripts can silently break your compliance overnight. Sentry Shield keeps you protected around the clock.
+              </p>
+              <p className="text-gray-500 text-sm mb-8">
                 Proof of <strong>ongoing diligence</strong> — not just a one-time fix. This is the evidence that tells regulators and insurers you take compliance seriously, every day.
               </p>
+
+              <div className="border-2 border-green-500 rounded-xl p-5 mb-8 shadow-md relative">
+                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[9px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full">Everything You Need</div>
+                <ul className="space-y-2 text-sm text-gray-600 mt-1">
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> Free Sovereignty Audit Report</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> 24/7 continuous compliance monitoring</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> Live compliance dashboard</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> Website compliance widget</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> Compliance drift alerts</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> Automated monthly re-scans</li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-orange flex-shrink-0" /> <strong>Quarterly forensic reports</strong></li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-orange flex-shrink-0" /> <strong>Annual certification seal</strong></li>
+                  <li className="flex items-center gap-1.5"><CheckCircle size={14} className="text-orange flex-shrink-0" /> <strong>Priority support</strong></li>
+                </ul>
+              </div>
+
               <Link href="/scan">
-                <button className="btn-primary text-base px-8 py-3 flex items-center gap-2">
-                  Start With a Free Scan
+                <button className="bg-green-600 hover:bg-green-700 text-white font-semibold text-base px-8 py-3 rounded-lg transition-colors flex items-center gap-2">
+                  Start Shield Monitoring
                   <ArrowRight size={16} />
                 </button>
               </Link>
+              <p className="text-xs text-gray-400 mt-3">Cancel anytime. No long-term contracts.</p>
             </div>
             <div className="flex justify-center">
               <div className="w-full max-w-sm transform rotate-1 hover:rotate-0 transition-transform">
@@ -463,11 +421,25 @@ export default function ServicesPage() {
               </div>
             </div>
           </div>
+
+          {/* Shield trial callout */}
+          <div className="mt-12 max-w-3xl mx-auto bg-green-50 border border-green-200 rounded-xl p-6 flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex-1 text-center sm:text-left">
+              <div className="font-bold text-green-800 text-sm mb-1">Already buying a Report or Safe Harbor?</div>
+              <p className="text-xs text-green-700">
+                Every Audit Report ($149) and Safe Harbor Bundle ($249) purchase includes <strong>3 months of Sentry Shield monitoring FREE</strong>. After your trial, continue at $79/mo, switch to basic monitoring at $39/mo, or cancel anytime.
+              </p>
+            </div>
+            <div className="flex-shrink-0 text-center">
+              <div className="text-lg font-display font-black text-green-700">90 days</div>
+              <div className="text-[10px] text-green-600 font-bold">FREE Shield</div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ═══ VERIFICATION MATRIX ═══ */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="section-heading">
@@ -495,10 +467,6 @@ export default function ServicesPage() {
                       <div>Safe Harbor</div>
                       <div className="text-[10px] font-normal text-amber-200 mt-0.5">$249</div>
                     </th>
-                    <th className="px-3 py-4 text-center font-semibold text-xs uppercase tracking-wider">
-                      <div>Watch</div>
-                      <div className="text-[10px] font-normal text-slate-300 mt-0.5">$39/mo</div>
-                    </th>
                     <th className="px-3 py-4 text-center font-semibold text-xs uppercase tracking-wider bg-gold/10">
                       <div>Shield</div>
                       <div className="text-[10px] font-normal text-gold mt-0.5">$79/mo</div>
@@ -507,33 +475,35 @@ export default function ServicesPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {[
-                    { feature: 'Risk Identification', vals: ['Basic', 'Forensic', '—', 'Continuous', 'Continuous'] },
-                    { feature: 'Compliance Score + Breakdown', vals: ['✓', '✓', '—', '✓', '✓'] },
-                    { feature: 'Individual Finding Details', vals: ['—', '✓', '—', '✓', '✓'] },
-                    { feature: 'Remediation Roadmap', vals: ['—', '✓', '✓ Full Kit', '✓', '✓'] },
-                    { feature: 'Data Border Map (Full)', vals: ['Summary', '✓ Full', '—', '✓ Full', '✓ Full'] },
-                    { feature: 'Professional PDF Report', vals: ['—', '✓', '—', '—', '✓ Quarterly'] },
-                    { feature: 'Statutory Clause Mapping', vals: ['—', '✓', '✓', '✓', '✓'] },
-                    { feature: 'Compliance Drift Alerts', vals: ['—', '—', '—', '✓', '✓'] },
-                    { feature: 'Live Dashboard', vals: ['—', '—', '—', '—', '✓'] },
-                    { feature: 'SB 1188 Policy Pack', vals: ['—', '—', '✓', '—', '—'] },
-                    { feature: 'AI Disclosure Kit (Code + Copy)', vals: ['—', '—', '✓', '—', '—'] },
-                    { feature: 'Evidence Ledger Templates', vals: ['—', '—', '✓', '—', '—'] },
-                    { feature: 'Staff Training Guide', vals: ['—', '—', '✓', '—', '—'] },
-                    { feature: 'Implementation Blueprint', vals: ['—', '—', '✓', '—', '—'] },
-                    { feature: 'Automated Re-Scans', vals: ['—', '—', '—', 'Monthly', 'Monthly'] },
-                    { feature: 'Quarterly Forensic Reports', vals: ['—', '—', '—', '—', '✓'] },
-                    { feature: 'Annual Certification Seal', vals: ['—', '—', '—', '—', '✓'] },
-                    { feature: 'Priority Support', vals: ['—', '—', '—', '—', '✓'] },
-                    { feature: 'Liability Defense Level', vals: ['None', 'Strong', 'Partial', 'Good', 'Maximum'] },
+                    { feature: 'Risk Identification', vals: ['Basic', 'Forensic', 'Forensic', 'Continuous'] },
+                    { feature: 'Compliance Score + Breakdown', vals: ['✓', '✓', '✓', '✓'] },
+                    { feature: 'Individual Finding Details', vals: ['—', '✓', '✓', '✓'] },
+                    { feature: 'Remediation Roadmap', vals: ['—', '✓', '✓ Full Kit', '✓'] },
+                    { feature: 'Data Border Map (Full)', vals: ['Summary', '✓ Full', '✓ Full', '✓ Full'] },
+                    { feature: 'Professional PDF Report', vals: ['—', '✓', '✓', '✓ + Quarterly'] },
+                    { feature: 'Statutory Clause Mapping', vals: ['—', '✓', '✓', '✓'] },
+                    { feature: 'SB 1188 Policy Pack', vals: ['—', '—', '✓', '—'] },
+                    { feature: 'AI Disclosure Kit (Code + Copy)', vals: ['—', '—', '✓', '—'] },
+                    { feature: 'Evidence Ledger Templates', vals: ['—', '—', '✓', '—'] },
+                    { feature: 'Staff Training Guide', vals: ['—', '—', '✓', '—'] },
+                    { feature: 'Implementation Blueprint', vals: ['—', '—', '✓', '—'] },
+                    { feature: '3 Months Shield Monitoring', vals: ['—', '✓ FREE', '✓ FREE', 'Included'] },
+                    { feature: 'Compliance Drift Alerts', vals: ['—', '✓ Trial', '✓ Trial', '✓'] },
+                    { feature: 'Live Dashboard', vals: ['—', '✓ Trial', '✓ Trial', '✓'] },
+                    { feature: 'Website Compliance Widget', vals: ['—', '✓ Trial', '✓ Trial', '✓'] },
+                    { feature: 'Automated Re-Scans', vals: ['—', '✓ Trial', '✓ Trial', 'Monthly'] },
+                    { feature: 'Quarterly Forensic Reports', vals: ['—', '—', '—', '✓'] },
+                    { feature: 'Annual Certification Seal', vals: ['—', '—', '—', '✓'] },
+                    { feature: 'Priority Support', vals: ['—', '—', '—', '✓'] },
+                    { feature: 'Liability Defense Level', vals: ['None', 'Strong', 'Maximum', 'Maximum + Ongoing'] },
                   ].map((row, i) => (
                     <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                       <td className="px-4 py-3 font-medium text-slate-700">{row.feature}</td>
                       {row.vals.map((v, j) => (
-                        <td key={j} className={`px-3 py-3 text-center ${j === 1 ? 'bg-orange/5' : j === 2 ? 'bg-amber-50/50' : j === 4 ? 'bg-gold/5' : ''}`}>
+                        <td key={j} className={`px-3 py-3 text-center ${j === 1 ? 'bg-orange/5' : j === 2 ? 'bg-amber-50/50' : j === 3 ? 'bg-gold/5' : ''}`}>
                           {v === '✓' ? <CheckCircle size={16} className="text-green-500 mx-auto" /> :
-                           v === '—' ? <span className="text-slate-300">—</span> :
-                           <span className={`text-xs font-medium ${v === 'Maximum' || v === 'Strong' ? 'text-green-600 font-bold' : v === 'None' ? 'text-slate-400' : v.startsWith('✓') ? 'text-green-600' : 'text-slate-600'}`}>{v}</span>}
+                           v === '—' ? <span className="text-slate-300">&mdash;</span> :
+                           <span className={`text-xs font-medium ${v.includes('Maximum') || v === 'Strong' ? 'text-green-600 font-bold' : v === 'None' ? 'text-slate-400' : v.startsWith('✓') ? 'text-green-600' : 'text-slate-600'}`}>{v}</span>}
                         </td>
                       ))}
                     </tr>
@@ -546,7 +516,7 @@ export default function ServicesPage() {
       </section>
 
       {/* ═══ OBJECTION HANDLING ═══ */}
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-2xl font-display font-bold text-navy">Common Questions</h2>
@@ -555,11 +525,15 @@ export default function ServicesPage() {
             {[
               {
                 q: 'Why do I need the Report if the scan is free?',
-                a: 'The free scan tells you your score and which categories need work. The Report tells you exactly what\'s wrong, maps each finding to the specific law, and gives your developer the exact technical steps to fix it. Think of the scan as the thermometer — the report is the prescription.',
+                a: 'The free scan tells you your score and which categories need work. The Report tells you exactly what\'s wrong, maps each finding to the specific law, and gives your developer the exact technical steps to fix it. Think of the scan as the thermometer — the report is the prescription. Plus, every Report purchase includes 3 months of Sentry Shield monitoring free.',
               },
               {
                 q: 'Why do I need Safe Harbor if I have the Report?',
-                a: 'The Report tells you what\'s broken. Safe Harbor gives you the ready-made materials to fix it — pre-written policies, AI disclosure code, evidence templates, and staff training. Think of it this way: the Report is the inspection, Safe Harbor is the repair kit. Most practices buy both together to get a complete, audit-defensible compliance package without any writing or research.',
+                a: 'The Report tells you what\'s broken. Safe Harbor gives you the ready-made materials to fix it — pre-written policies, AI disclosure code, evidence templates, and staff training. Think of it this way: the Report is the inspection, Safe Harbor is the repair kit. Both include 3 months of Shield monitoring free.',
+              },
+              {
+                q: 'What happens after the 3-month Shield trial?',
+                a: 'After your 90-day free trial, you can continue Sentry Shield at $79/month for full enterprise-grade monitoring (dashboard, quarterly reports, certification seal), switch to basic Sentry Watch at $39/month (monthly scans and drift alerts), or cancel entirely. You\'ll get advance notice before the trial ends so there are no surprises.',
               },
               {
                 q: 'Is Sentry Shield worth $79/month?',
@@ -567,7 +541,7 @@ export default function ServicesPage() {
               },
               {
                 q: 'Can I just fix things once and be done?',
-                a: 'You can — the $149 Report gives you everything to fix current issues. But compliance is a moving target. WordPress updates, hosting changes, new third-party scripts, and regulatory changes can all silently break your compliance. Most practices that fix once find themselves non-compliant again within 3-6 months.',
+                a: 'You can — the $149 Report (which includes 3 months of free monitoring) gives you everything to fix current issues. But compliance is a moving target. WordPress updates, hosting changes, new third-party scripts, and regulatory changes can all silently break your compliance. Most practices that fix once find themselves non-compliant again within 3-6 months.',
               },
               {
                 q: 'What if I don\'t have a web developer?',
@@ -634,4 +608,3 @@ export default function ServicesPage() {
     </div>
   );
 }
-
