@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentry Shield Dashboard — Hill Country Family Medicine</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0f1b2d;
+      --navy-light: #162033;
+      --navy-mid: #1a2744;
+      --gold: #c9a84c;
+      --gold-dim: rgba(201,168,76,0.15);
+      --green: #22c55e;
+      --green-dim: rgba(34,197,94,0.12);
+      --amber: #f59e0b;
+      --amber-dim: rgba(245,158,11,0.12);
+      --red: #ef4444;
+      --red-dim: rgba(239,68,68,0.1);
+      --blue: #3b82f6;
+      --blue-dim: rgba(59,130,246,0.12);
+      --slate: #94a3b8;
+      --slate-light: #cbd5e1;
+      --border: rgba(255,255,255,0.06);
+      --surface: rgba(255,255,255,0.03);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: var(--navy);
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ═══ SIDEBAR ═══ */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 240px;
+      background: linear-gradient(180deg, #0a1220 0%, #0f1b2d 100%);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo h1 {
+      font-size: 18px; font-weight: 800; letter-spacing: -0.3px;
+    }
+    .sidebar-logo h1 span:first-child { color: #fff; }
+    .sidebar-logo h1 span:last-child { color: var(--gold); }
+    .sidebar-logo p { font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; margin-top: 2px; }
+
+    .sidebar-nav { padding: 16px 12px; flex: 1; }
+    .nav-section { margin-bottom: 20px; }
+    .nav-section-label { font-size: 9px; color: var(--slate); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; padding: 0 8px; margin-bottom: 6px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; color: var(--slate-light);
+      cursor: pointer; transition: all 0.15s; text-decoration: none;
+    }
+    .nav-item:hover { background: var(--surface); color: #fff; }
+    .nav-item.active { background: var(--gold-dim); color: var(--gold); font-weight: 700; }
+    .nav-item .icon { width: 18px; text-align: center; font-size: 14px; }
+    .nav-badge {
+      margin-left: auto; font-size: 10px; font-weight: 700;
+      background: var(--red); color: #fff;
+      padding: 1px 6px; border-radius: 10px;
+    }
+
+    .sidebar-footer {
+      padding: 16px 20px; border-top: 1px solid var(--border);
+    }
+    .sidebar-footer .plan-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--green-dim); color: var(--green);
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+      padding: 4px 10px; border-radius: 20px;
+    }
+    .sidebar-footer .plan-badge .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .sidebar-footer p { font-size: 10px; color: var(--slate); margin-top: 6px; }
+
+    /* ═══ MAIN ═══ */
+    .main { margin-left: 240px; padding: 0; }
+
+    /* Top Bar */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,18,32,0.6);
+      backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-left h2 { font-size: 18px; font-weight: 700; color: #fff; }
+    .topbar-left p { font-size: 12px; color: var(--slate); margin-top: 2px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .topbar-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface); color: var(--slate-light);
+      transition: all 0.15s;
+    }
+    .topbar-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .topbar-btn.primary { background: var(--gold); color: var(--navy); border-color: var(--gold); }
+    .topbar-btn.primary:hover { background: #b8963f; }
+
+    /* Content area */
+    .content { padding: 28px 32px; }
+
+    /* ═══ SCORE HERO ═══ */
+    .score-hero {
+      display: grid; grid-template-columns: 260px 1fr; gap: 24px;
+      margin-bottom: 28px;
+    }
+    .score-ring-card {
+      background: linear-gradient(135deg, var(--navy-light), var(--navy-mid));
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px; text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .score-ring-card::before {
+      content: ''; position: absolute; top: -40px; right: -40px;
+      width: 120px; height: 120px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(34,197,94,0.08), transparent);
+    }
+    .score-ring { position: relative; width: 140px; height: 140px; margin: 0 auto 16px; }
+    .score-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .score-ring .bg { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 8; }
+    .score-ring .fg { fill: none; stroke: var(--green); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 377; stroke-dashoffset: 49; transition: stroke-dashoffset 1.5s ease; }
+    .score-value {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .score-value .num { font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 800; color: #fff; line-height: 1; }
+    .score-value .label { font-size: 11px; color: var(--green); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    .score-meta { font-size: 11px; color: var(--slate); }
+    .score-meta strong { color: var(--green); }
+
+    .score-details {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    }
+    .detail-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px;
+    }
+    .detail-card .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .detail-card .header .title { font-size: 11px; color: var(--slate); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .detail-card .header .badge {
+      font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-pass { background: var(--green-dim); color: var(--green); }
+    .badge-warn { background: var(--amber-dim); color: var(--amber); }
+    .badge-fail { background: var(--red-dim); color: var(--red); }
+    .badge-active { background: var(--blue-dim); color: var(--blue); }
+
+    .detail-card .big-num { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 800; color: #fff; line-height: 1; }
+    .detail-card .sub { font-size: 11px; color: var(--slate); margin-top: 4px; }
+    .detail-card .bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); margin-top: 10px; overflow: hidden; }
+    .detail-card .bar .fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+    /* ═══ DATA BORDER MAP ═══ */
+    .section-title {
+      font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title .icon { font-size: 16px; }
+
+    .border-table {
+      width: 100%; border-collapse: collapse;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; margin-bottom: 28px;
+    }
+    .border-table th {
+      text-align: left; padding: 10px 16px;
+      font-size: 10px; color: var(--slate); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+    .border-table td {
+      padding: 10px 16px; font-size: 12px; color: var(--slate-light);
+      border-bottom: 1px solid var(--border);
+    }
+    .border-table tr:last-child td { border-bottom: none; }
+    .border-table .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .border-table .loc-us { color: var(--green); font-weight: 600; }
+    .border-table .loc-foreign { color: var(--red); font-weight: 600; }
+    .status-dot { display: inline-flex; align-items: center; gap: 6px; }
+    .status-dot::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+    }
+    .status-dot.pass::before { background: var(--green); }
+    .status-dot.fail::before { background: var(--red); }
+
+    /* ═══ SCAN HISTORY ═══ */
+    .scan-history {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+      margin-bottom: 28px;
+    }
+    .history-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .history-card h3 { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .history-card h3 .icon { font-size: 16px; }
+
+    .scan-entry {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .scan-entry:last-child { border-bottom: none; }
+    .scan-entry .date { font-size: 12px; color: var(--slate-light); font-weight: 500; }
+    .scan-entry .date span { font-size: 10px; color: var(--slate); font-weight: 400; }
+    .scan-entry .score-pill {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 6px;
+    }
+    .score-green { background: var(--green-dim); color: var(--green); }
+    .score-amber { background: var(--amber-dim); color: var(--amber); }
+    .score-red { background: var(--red-dim); color: var(--red); }
+
+    /* Drift alerts */
+    .drift-entry {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .drift-entry:last-child { border-bottom: none; }
+    .drift-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .drift-icon.warn { background: var(--amber-dim); }
+    .drift-icon.resolved { background: var(--green-dim); }
+    .drift-entry .drift-text { font-size: 12px; color: var(--slate-light); line-height: 1.4; }
+    .drift-entry .drift-text strong { color: #fff; font-weight: 600; }
+    .drift-entry .drift-time { font-size: 10px; color: var(--slate); margin-top: 2px; }
+
+    /* ═══ WIDGET PREVIEW + PDF ═══ */
+    .bottom-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+      margin-bottom: 28px;
+    }
+    .widget-preview-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .widget-preview-card h3 { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .widget-preview-card h3 .icon { font-size: 16px; }
+    .widget-preview-card .sub-text { font-size: 11px; color: var(--slate); margin-bottom: 14px; }
+
+    .widget-mock {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      border-radius: 12px; padding: 14px 16px; max-width: 260px;
+    }
+    .widget-mock .wm-header { display: flex; align-items: center; gap: 10px; }
+    .widget-mock .wm-ring {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid var(--green); display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #fff;
+    }
+    .widget-mock .wm-label .line1 { display: flex; align-items: center; gap: 4px; }
+    .widget-mock .wm-label .line1 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .widget-mock .wm-label .line1 span { font-size: 11px; font-weight: 700; color: #fff; }
+    .widget-mock .wm-label .line2 { font-size: 9px; color: var(--slate); margin-top: 1px; }
+
+    .embed-snippet {
+      background: #0a1220; border-radius: 8px; padding: 12px; margin-top: 14px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--green); line-height: 1.6; overflow-x: auto;
+    }
+
+    .pdf-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .pdf-card h3 { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .pdf-card h3 .icon { font-size: 16px; }
+    .pdf-card .sub-text { font-size: 11px; color: var(--slate); margin-bottom: 14px; }
+
+    .pdf-preview {
+      background: #fff; border-radius: 8px; padding: 20px; color: #1e293b;
+      border: 1px solid #e2e8f0; position: relative;
+    }
+    .pdf-preview .watermark {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(25deg);
+      font-size: 28px; font-weight: 800; color: rgba(0,0,0,0.04); pointer-events: none;
+      white-space: nowrap;
+    }
+    .pdf-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .pdf-header .pdf-logo { font-size: 12px; font-weight: 800; }
+    .pdf-header .pdf-logo span:first-child { color: var(--navy); }
+    .pdf-header .pdf-logo span:last-child { color: var(--gold); }
+    .pdf-header .pdf-tag { font-size: 8px; color: var(--gold); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; }
+    .pdf-score-box {
+      background: var(--navy); color: #fff; border-radius: 8px;
+      padding: 12px; text-align: center; margin-bottom: 12px;
+    }
+    .pdf-score-box .score { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 800; }
+    .pdf-score-box .score span { color: var(--slate); font-size: 16px; }
+    .pdf-score-box .risk { color: #f87171; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    .pdf-finding {
+      padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .pdf-finding:last-child { border-bottom: none; }
+    .pdf-finding .name { font-size: 11px; color: #334155; }
+    .pdf-finding .severity {
+      font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+    }
+    .sev-critical { background: #fef2f2; color: #dc2626; }
+    .sev-high { background: #fffbeb; color: #d97706; }
+    .sev-medium { background: #eff6ff; color: #2563eb; }
+
+    .pdf-download-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 14px; padding: 10px 16px; border-radius: 8px;
+      background: var(--navy); color: var(--gold); font-size: 12px; font-weight: 700;
+      cursor: pointer; border: 1px solid var(--gold-dim); text-decoration: none;
+      transition: all 0.15s;
+    }
+    .pdf-download-btn:hover { background: var(--navy-mid); }
+
+    /* ═══ SUBSCRIPTION BANNER ═══ */
+    .sub-banner {
+      background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(59,130,246,0.06));
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 12px; padding: 18px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .sub-banner .left { display: flex; align-items: center; gap: 14px; }
+    .sub-banner .shield-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: var(--green-dim); display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .sub-banner .label { font-size: 13px; font-weight: 700; color: #fff; }
+    .sub-banner .meta { font-size: 11px; color: var(--slate); margin-top: 2px; }
+    .sub-banner .meta strong { color: var(--green); }
+    .sub-banner .right { display: flex; align-items: center; gap: 10px; }
+    .sub-banner .renew-date {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--slate); text-align: right;
+    }
+    .sub-banner .renew-date strong { color: #fff; display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1><span>KAIRO</span><span>LOGIC</span></h1>
+      <p>Sentry Shield</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-label">Monitoring</div>
+        <a class="nav-item active"><span class="icon">📊</span> Dashboard</a>
+        <a class="nav-item"><span class="icon">🗺️</span> Data Border Map</a>
+        <a class="nav-item"><span class="icon">🔔</span> Drift Alerts <span class="nav-badge">2</span></a>
+        <a class="nav-item"><span class="icon">📅</span> Scan History</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-label">Reports</div>
+        <a class="nav-item"><span class="icon">📋</span> Audit Report</a>
+        <a class="nav-item"><span class="icon">📜</span> Quarterly Report</a>
+        <a class="nav-item"><span class="icon">🏅</span> Annual Certification</a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-label">Tools</div>
+        <a class="nav-item"><span class="icon">🔧</span> Widget Settings</a>
+        <a class="nav-item"><span class="icon">📄</span> AI Disclosures</a>
+        <a class="nav-item"><span class="icon">⚙️</span> Settings</a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="plan-badge"><span class="dot"></span> Shield Active</div>
+      <p>Trial ends May 8, 2026</p>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="main">
+
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <h2>Hill Country Family Medicine</h2>
+        <p>NPI: 1234567890 &nbsp;•&nbsp; hillcountryfamilymed.com &nbsp;•&nbsp; Austin, TX</p>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-btn">🔄 Run Scan Now</button>
+        <button class="topbar-btn">📋 Download Report</button>
+        <button class="topbar-btn primary">🔧 Get Widget Code</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Subscription Banner -->
+      <div class="sub-banner">
+        <div class="left">
+          <div class="shield-icon">🛡️</div>
+          <div>
+            <div class="label">Sentry Shield — Active</div>
+            <div class="meta">24/7 monitoring &nbsp;•&nbsp; Last scan: <strong>12 minutes ago</strong> &nbsp;•&nbsp; Next scan in 47 minutes</div>
+          </div>
+        </div>
+        <div class="right">
+          <div class="renew-date">
+            <strong>Free Trial</strong>
+            90 days remaining (expires May 8, 2026)
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SCORE HERO ═══ -->
+      <div class="score-hero">
+        <div class="score-ring-card">
+          <div class="score-ring">
+            <svg viewBox="0 0 140 140">
+              <circle class="bg" cx="70" cy="70" r="60" />
+              <circle class="fg" cx="70" cy="70" r="60" />
+            </svg>
+            <div class="score-value">
+              <div class="num">87</div>
+              <div class="label">Compliant</div>
+            </div>
+          </div>
+          <div class="score-meta">
+            Up <strong>+29 pts</strong> since first scan<br>
+            <span style="font-size:10px;color:var(--slate);">Feb 8, 2026 → Feb 11, 2026</span>
+          </div>
+        </div>
+
+        <div class="score-details">
+          <div class="detail-card">
+            <div class="header">
+              <span class="title">🖥️ Data Residency</span>
+              <span class="badge badge-pass">Pass</span>
+            </div>
+            <div class="big-num">92<span style="font-size:14px;color:var(--slate);">%</span></div>
+            <div class="sub">9 of 10 endpoints US-hosted</div>
+            <div class="bar"><div class="fill" style="width:92%;background:var(--green);"></div></div>
+          </div>
+
+          <div class="detail-card">
+            <div class="header">
+              <span class="title">🤖 AI Transparency</span>
+              <span class="badge badge-pass">Pass</span>
+            </div>
+            <div class="big-num">88<span style="font-size:14px;color:var(--slate);">%</span></div>
+            <div class="sub">Disclosures in place, 1 advisory</div>
+            <div class="bar"><div class="fill" style="width:88%;background:var(--green);"></div></div>
+          </div>
+
+          <div class="detail-card">
+            <div class="header">
+              <span class="title">🔒 Clinical Integrity</span>
+              <span class="badge badge-pass">Pass</span>
+            </div>
+            <div class="big-num">85<span style="font-size:14px;color:var(--slate);">%</span></div>
+            <div class="sub">HTTPS enforced, headers secure</div>
+            <div class="bar"><div class="fill" style="width:85%;background:var(--green);"></div></div>
+          </div>
+
+          <div class="detail-card">
+            <div class="header">
+              <span class="title">🔔 Active Alerts</span>
+              <span class="badge badge-warn">2 Open</span>
+            </div>
+            <div class="big-num" style="color:var(--amber);">2</div>
+            <div class="sub">1 medium, 1 low priority</div>
+            <div class="bar"><div class="fill" style="width:30%;background:var(--amber);"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ DATA BORDER MAP ═══ -->
+      <div class="section-title"><span class="icon">🗺️</span> Data Border Map — Live</div>
+      <table class="border-table">
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>IP Address</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Last Check</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">hillcountryfamilymed.com</td>
+            <td class="mono">104.21.45.XXX</td>
+            <td class="loc-us">🇺🇸 Dallas, TX</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">cdn.hillcountryfamilymed.com</td>
+            <td class="mono">172.67.182.XXX</td>
+            <td class="loc-us">🇺🇸 San Jose, CA</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">fonts.bunny.net</td>
+            <td class="mono">152.53.15.XXX</td>
+            <td class="loc-us">🇺🇸 Ashburn, VA</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">plausible.io</td>
+            <td class="mono">172.66.40.XXX</td>
+            <td class="loc-us">🇺🇸 San Francisco, CA</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">widget.scheduling.com</td>
+            <td class="mono">35.186.224.XXX</td>
+            <td class="loc-us">🇺🇸 Oregon</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">api.stripe.com</td>
+            <td class="mono">104.18.10.XXX</td>
+            <td class="loc-us">🇺🇸 San Francisco, CA</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">maps.googleapis.com</td>
+            <td class="mono">142.250.80.XXX</td>
+            <td class="loc-foreign">🇮🇪 Dublin, Ireland</td>
+            <td><span class="status-dot fail">Fail</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+          <tr>
+            <td class="mono">portal.athenahealth.com</td>
+            <td class="mono">54.208.XXX.XXX</td>
+            <td class="loc-us">🇺🇸 Virginia</td>
+            <td><span class="status-dot pass">Pass</span></td>
+            <td style="font-size:11px;color:var(--slate);">12 min ago</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ═══ SCAN HISTORY + DRIFT ALERTS ═══ -->
+      <div class="scan-history">
+        <div class="history-card">
+          <h3><span class="icon">📅</span> Scan History</h3>
+          <div class="scan-entry">
+            <div class="date">Feb 11, 2026 <span>12:47 PM</span></div>
+            <div class="score-pill score-green">87 / 100</div>
+          </div>
+          <div class="scan-entry">
+            <div class="date">Feb 10, 2026 <span>12:48 PM</span></div>
+            <div class="score-pill score-green">85 / 100</div>
+          </div>
+          <div class="scan-entry">
+            <div class="date">Feb 9, 2026 <span>12:47 PM</span></div>
+            <div class="score-pill score-green">82 / 100</div>
+          </div>
+          <div class="scan-entry">
+            <div class="date">Feb 8, 2026 <span>3:21 PM — Initial Scan</span></div>
+            <div class="score-pill score-red">58 / 100</div>
+          </div>
+        </div>
+
+        <div class="history-card">
+          <h3><span class="icon">🔔</span> Drift Alerts</h3>
+          <div class="drift-entry">
+            <div class="drift-icon warn">⚠️</div>
+            <div>
+              <div class="drift-text"><strong>Google Maps embed</strong> still routing through Dublin — referrer policy recommended</div>
+              <div class="drift-time">2 hours ago • Medium priority</div>
+            </div>
+          </div>
+          <div class="drift-entry">
+            <div class="drift-icon warn">⚠️</div>
+            <div>
+              <div class="drift-text"><strong>New script detected:</strong> hotjar.com analytics — needs review for data residency</div>
+              <div class="drift-time">Yesterday • Low priority</div>
+            </div>
+          </div>
+          <div class="drift-entry">
+            <div class="drift-icon resolved">✅</div>
+            <div>
+              <div class="drift-text"><strong>Google Fonts replaced</strong> with Bunny Fonts (US-hosted) — resolved</div>
+              <div class="drift-time">Feb 9 • Auto-resolved</div>
+            </div>
+          </div>
+          <div class="drift-entry">
+            <div class="drift-icon resolved">✅</div>
+            <div>
+              <div class="drift-text"><strong>Google Analytics removed</strong> — replaced with Plausible — resolved</div>
+              <div class="drift-time">Feb 9 • Auto-resolved</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ WIDGET PREVIEW + PDF ═══ -->
+      <div class="bottom-grid">
+
+        <!-- Widget Preview -->
+        <div class="widget-preview-card">
+          <h3><span class="icon">🔧</span> Your Compliance Widget</h3>
+          <div class="sub-text">Embed this on your website footer to show patients your compliance status</div>
+
+          <div class="widget-mock">
+            <div class="wm-header">
+              <div class="wm-ring">87</div>
+              <div class="wm-label">
+                <div class="line1">
+                  <span class="dot"></span>
+                  <span>Verified Compliant</span>
+                </div>
+                <div class="line2">TX SB 1188 &amp; HB 149</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="embed-snippet">
+&lt;!-- KairoLogic Sentry Widget --&gt;<br>
+&lt;div id="kairologic-widget"&gt;&lt;/div&gt;<br>
+&lt;script src="https://kairologic.net/sentry-widget.js"<br>
+&nbsp;&nbsp;data-npi="1234567890" async&gt;<br>
+&lt;/script&gt;
+          </div>
+
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="topbar-btn" style="flex:1;justify-content:center;">📋 Copy Code</button>
+            <button class="topbar-btn" style="flex:1;justify-content:center;">👁️ Preview Live</button>
+          </div>
+        </div>
+
+        <!-- PDF Report -->
+        <div class="pdf-card">
+          <h3><span class="icon">📋</span> Latest Audit Report</h3>
+          <div class="sub-text">Generated Feb 8, 2026 — Report ID: KL-SAR-2X7F</div>
+
+          <div class="pdf-preview">
+            <div class="watermark">KAIROLOGIC</div>
+            <div class="pdf-header">
+              <div class="pdf-logo"><span>KAIRO</span><span>LOGIC</span></div>
+              <div class="pdf-tag">Sovereignty Audit Report</div>
+            </div>
+            <div class="pdf-score-box">
+              <div class="score">58 <span>/ 100</span></div>
+              <div class="risk">Violation Risk</div>
+            </div>
+            <div style="font-size:10px;color:#64748b;margin-bottom:8px;font-weight:600;">FINDINGS</div>
+            <div class="pdf-finding">
+              <span class="name">Google Fonts — Foreign CDN</span>
+              <span class="severity sev-critical">CRITICAL</span>
+            </div>
+            <div class="pdf-finding">
+              <span class="name">Google Analytics — Singapore</span>
+              <span class="severity sev-critical">CRITICAL</span>
+            </div>
+            <div class="pdf-finding">
+              <span class="name">No AI Disclosure on Chatbot</span>
+              <span class="severity sev-high">HIGH</span>
+            </div>
+            <div class="pdf-finding">
+              <span class="name">AI Content Without Attribution</span>
+              <span class="severity sev-medium">MEDIUM</span>
+            </div>
+            <div class="pdf-finding">
+              <span class="name">Google Maps Referrer Leak</span>
+              <span class="severity sev-medium">MEDIUM</span>
+            </div>
+          </div>
+
+          <a href="/sample-report.pdf" target="_blank" class="pdf-download-btn">
+            ⬇️ Download Full Report (PDF)
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
