@@ -109,12 +109,13 @@ export default function HomePage() {
               <X size={28} />
             </button>
             <div className="bg-navy rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-              <video
-                src="/Kairologic_Intro.mp4"
-                controls
-                autoPlay
-                playsInline
+              <iframe
+                src="https://www.youtube.com/embed/Lrt971tzcpo?autoplay=1&rel=0"
+                title="KairoLogic - How It Works"
                 className="w-full aspect-video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                frameBorder="0"
               />
             </div>
           </div>
