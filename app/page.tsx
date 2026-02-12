@@ -109,29 +109,13 @@ export default function HomePage() {
               <X size={28} />
             </button>
             <div className="bg-navy rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-              {/* 
-                TODO: Replace this placeholder with your actual video embed.
-                Options:
-                  - YouTube: <iframe src="https://www.youtube.com/embed/YOUR_VIDEO_ID" ...>
-                  - Vimeo:   <iframe src="https://player.vimeo.com/video/YOUR_VIDEO_ID" ...>
-                  - Loom:    <iframe src="https://www.loom.com/embed/YOUR_VIDEO_ID" ...>
-                  - Self-hosted: <video src="/videos/demo.mp4" controls autoPlay />
-              */}
-              <div className="aspect-video flex flex-col items-center justify-center bg-gradient-to-br from-navy to-navy-dark p-12">
-                <div className="w-20 h-20 bg-gold/20 rounded-full flex items-center justify-center mb-6">
-                  <Play size={36} className="text-gold ml-1" />
-                </div>
-                <h3 className="text-white text-2xl font-display font-bold mb-2">Product Demo Coming Soon</h3>
-                <p className="text-gray-400 text-sm max-w-md text-center mb-6">
-                  A 1-minute walkthrough showing how to scan your practice, read your report, and monitor your compliance with Sentry Shield.
-                </p>
-                <Link href="/scan" onClick={() => setShowVideo(false)}>
-                  <button className="btn-primary px-8 py-3 flex items-center gap-2">
-                    <Search size={16} />
-                    Try a Free Scan Now Instead
-                  </button>
-                </Link>
-              </div>
+              <video
+                src="/Kairologic_Intro.mp4"
+                controls
+                autoPlay
+                playsInline
+                className="w-full aspect-video"
+              />
             </div>
           </div>
         </div>
