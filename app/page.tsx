@@ -39,20 +39,20 @@ export default function HomePage() {
           </p>
 
           {/* CTA */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Link href="/scan">
-              <button className="btn-primary text-lg px-10 py-4 flex items-center gap-2 shadow-xl shadow-orange/20">
-                <Search size={20} />
-                SCAN MY WEBSITE — FREE
-              </button>
-            </Link>
+          <div className="flex flex-col gap-4 justify-center items-center mb-16 max-w-md mx-auto">
             <button
               onClick={() => setShowVideo(true)}
-              className="bg-white/10 border-2 border-white/20 hover:border-gold hover:bg-gold/10 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 flex items-center gap-2 justify-center">
+              className="w-full bg-white/10 border-2 border-white/20 hover:border-gold hover:bg-gold/10 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 flex items-center gap-2 justify-center">
               <Play size={18} className="text-gold" />
               Watch How It Works
               <span className="text-xs text-gray-400 ml-1">(1 min)</span>
             </button>
+            <Link href="/scan" className="w-full">
+              <button className="w-full btn-primary text-lg px-10 py-4 flex items-center gap-2 justify-center shadow-xl shadow-orange/20">
+                <Search size={20} />
+                SCAN MY WEBSITE — FREE
+              </button>
+            </Link>
           </div>
 
           {/* 3-step visual — brief preview */}
@@ -315,7 +315,8 @@ export default function HomePage() {
                   Get My Report
                 </button>
               </Link>
-              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-gold hover:text-gold-light mt-2 underline underline-offset-2">
+              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-sm font-semibold text-gold bg-gold/10 hover:bg-gold/20 border border-gold/30 mt-4 px-5 py-2 rounded-full transition-all">
+                <FileText size={15} />
                 Preview sample report
               </a>
             </div>
@@ -356,7 +357,8 @@ export default function HomePage() {
                   Get Safe Harbor
                 </button>
               </Link>
-              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="block text-center text-xs text-orange hover:text-orange-dark mt-2 underline underline-offset-2">
+              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-sm font-semibold text-orange bg-orange/10 hover:bg-orange/20 border border-orange/30 mt-4 px-5 py-2 rounded-full transition-all">
+                <FileText size={15} />
                 Preview sample report
               </a>
             </div>
