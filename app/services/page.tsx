@@ -267,8 +267,8 @@ export default function ServicesPage() {
                   <ArrowRight size={16} />
                 </button>
               </Link>
-              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-gold hover:text-gold-light mt-3 underline underline-offset-2">
-                <FileText size={14} />
+              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-gold hover:text-white bg-gold/10 hover:bg-gold/20 border border-gold/30 mt-4 px-5 py-2.5 rounded-full transition-all">
+                <FileText size={15} />
                 Preview a sample report (PDF)
               </a>
             </div>
