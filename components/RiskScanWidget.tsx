@@ -633,7 +633,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         }
         addLog('[ERROR] Practice email required — free email providers are not accepted for compliance verification', 'error');
         return;
-      } else {
+     } else {
         setEmailHint('');
       }
     }
@@ -644,12 +644,78 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
     setScanLog([]);
 
     try {
+      // ── PRE-SCAN VALIDATION: NPI + Email MX check ──
+      addLog('🔍 Verifying provider credentials...', 'info');
+      setCurrentPhase('Verifying provider...');
+      setProgress(3);
+
+      try {
+        const valRes = await fetch('/api/validate-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ npi, url: validatedUrl, email: email || '' }),
+        });
+        const valData = await valRes.json();
+
+        if (!valRes.ok || !valData.valid) {
+          // Show errors to user
+          const errors = valData.errors || ['Validation failed'];
+          errors.forEach((err: string) => addLog(`[ERROR] ${err}`, 'error'));
+
+          // Show warnings too
+          if (valData.warnings) {
+            valData.warnings.forEach((w: string) => addLog(`[WARN] ${w}`, 'warning'));
+          }
+
+          // Set field-level errors based on which check failed
+          if (errors.some((e: string) => e.toLowerCase().includes('npi'))) {
+            setNpiError(errors.find((e: string) => e.toLowerCase().includes('npi')) || 'Invalid NPI');
+          }
+          if (errors.some((e: string) => e.toLowerCase().includes('email') || e.toLowerCase().includes('mail'))) {
+            setEmailHint(errors.find((e: string) => e.toLowerCase().includes('email') || e.toLowerCase().includes('mail')) || 'Invalid email');
+          }
+
+          setScanning(false);
+          return;
+        }
+
+        // Validation passed — log success
+        addLog('✅ NPI verified against CMS National Provider Registry', 'success');
+        if (valData.npiData?.name) {
+          addLog(`   Provider: ${valData.npiData.name}`, 'info');
+          if (valData.npiData.specialty) {
+            addLog(`   Specialty: ${valData.npiData.specialty}`, 'info');
+          }
+          // Store provider name for later use in results
+          try {
+            sessionStorage.setItem('scanData', JSON.stringify({
+              name: valData.npiData.name,
+              email: email || '',
+              specialty: valData.npiData.specialty || '',
+            }));
+          } catch { /* ignore */ }
+        }
+        if (email) {
+          addLog('✅ Email domain verified (MX records valid)', 'success');
+        }
+        if (valData.warnings) {
+          valData.warnings.forEach((w: string) => addLog(`⚠️ ${w}`, 'warning'));
+        }
+        addLog(`   Validation: ${valData.duration}`, 'info');
+      } catch (valErr) {
+        // If validation endpoint is down, don't block — just warn and continue
+        addLog('⚠️ Provider verification unavailable — proceeding with scan', 'warning');
+      }
+
+      setProgress(8);
+
       addLog(`🚀 Starting Sentry compliance scan for NPI: ${npi}`, 'info');
       addLog(`Target: ${url}`, 'info');
       
       // Initialize
       const stealthResult = await stealthProbe(url);
       setProgress(10);
+
 
       // ── Call real scan API ──
       let scanData;
