@@ -633,7 +633,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         }
         addLog('[ERROR] Practice email required — free email providers are not accepted for compliance verification', 'error');
         return;
-     } else {
+      } else {
         setEmailHint('');
       }
     }
@@ -658,35 +658,27 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
         const valData = await valRes.json();
 
         if (!valRes.ok || !valData.valid) {
-          // Show errors to user
           const errors = valData.errors || ['Validation failed'];
           errors.forEach((err: string) => addLog(`[ERROR] ${err}`, 'error'));
-
-          // Show warnings too
           if (valData.warnings) {
             valData.warnings.forEach((w: string) => addLog(`[WARN] ${w}`, 'warning'));
           }
-
-          // Set field-level errors based on which check failed
           if (errors.some((e: string) => e.toLowerCase().includes('npi'))) {
             setNpiError(errors.find((e: string) => e.toLowerCase().includes('npi')) || 'Invalid NPI');
           }
           if (errors.some((e: string) => e.toLowerCase().includes('email') || e.toLowerCase().includes('mail'))) {
             setEmailHint(errors.find((e: string) => e.toLowerCase().includes('email') || e.toLowerCase().includes('mail')) || 'Invalid email');
           }
-
           setScanning(false);
           return;
         }
 
-        // Validation passed — log success
         addLog('✅ NPI verified against CMS National Provider Registry', 'success');
         if (valData.npiData?.name) {
           addLog(`   Provider: ${valData.npiData.name}`, 'info');
           if (valData.npiData.specialty) {
             addLog(`   Specialty: ${valData.npiData.specialty}`, 'info');
           }
-          // Store provider name for later use in results
           try {
             sessionStorage.setItem('scanData', JSON.stringify({
               name: valData.npiData.name,
@@ -702,8 +694,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
           valData.warnings.forEach((w: string) => addLog(`⚠️ ${w}`, 'warning'));
         }
         addLog(`   Validation: ${valData.duration}`, 'info');
-      } catch (valErr) {
-        // If validation endpoint is down, don't block — just warn and continue
+      } catch {
         addLog('⚠️ Provider verification unavailable — proceeding with scan', 'warning');
       }
 
@@ -715,7 +706,6 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       // Initialize
       const stealthResult = await stealthProbe(url);
       setProgress(10);
-
 
       // ── Call real scan API ──
       let scanData;
@@ -1350,9 +1340,12 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
               const clientRef = `?client_reference_id=${npiParam}&prefilled_email=${encodeURIComponent(emailParam)}`;
 
               const LINKS = {
-                report: `https://buy.stripe.com/4gM5kDdpw0HP18x3057Re08${clientRef}`,
-                safeHarbor: `https://buy.stripe.com/00w28retAeyF6sRgQV7Re07${clientRef}`,
-                shield: `https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06${clientRef}`,
+                report: `https://buy.stripe.com/test_dRm4gz9aX7ty9oz6VK4ko02${clientRef}`,
+                safeHarbor: `https://buy.stripe.com/test_8x2bJ14UHbJO30b93S4ko03${clientRef}`,
+                watch: `https://buy.stripe.com/test_9B614n2Mz0168kv0xm4ko01${clientRef}`,
+                shield: `https://buy.stripe.com/test_5kQfZh1IveW058j7ZO4ko00${clientRef}`,
+                safeHarborWatch: `https://buy.stripe.com/test_28EfZh4UH3di30ba7W4ko05${clientRef}`,
+                safeHarborShield: `https://buy.stripe.com/test_fZuaEX5YLcNS6cn6VK4ko04${clientRef}`,
               };
 
               // ── TIER 1: Sovereign (80-100) ──
@@ -1365,24 +1358,23 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                         <h4 className="font-bold text-green-800 text-sm">Your score is strong — keep it that way</h4>
                       </div>
                       <p className="text-xs text-green-700 mb-4">
-                        Plugin updates, hosting changes, and new scripts can silently break your compliance overnight. Every purchase includes 3 months of Sentry Shield monitoring FREE.
+                        Plugin updates, hosting changes, and new scripts can silently break your compliance overnight. Monitoring catches drift before it becomes a violation.
                       </p>
                       <div className="flex flex-col sm:flex-row gap-2">
-                        <a href={LINKS.report} target="_blank" rel="noopener noreferrer"
-                          className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors">
-                          Full Audit Report — $149
-                          <span className="block text-[10px] text-green-400 font-bold mt-0.5">+ 3 months Shield FREE</span>
+                        <a href={LINKS.watch} target="_blank" rel="noopener noreferrer"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors flex items-center justify-center gap-2">
+                          <Shield className="w-4 h-4" />
+                          Sentry Watch — $39/mo
                         </a>
-                        <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-green-600 underline text-center mt-1 block">Preview sample report</a>
-                        <a href={LINKS.safeHarbor} target="_blank" rel="noopener noreferrer"
-                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors">
-                          Safe Harbor™ — $249
-                          <span className="block text-[10px] text-orange-200 font-bold mt-0.5">+ 3 months Shield FREE</span>
+                        <a href={LINKS.report} target="_blank" rel="noopener noreferrer"
+                          className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 px-4 rounded-lg text-sm text-center transition-colors flex items-center justify-center gap-2">
+                          Full Audit Report — $149
                         </a>
                       </div>
+                      <p className="text-[10px] text-green-600 mt-2 text-center">Watch includes drift alerts, automated re-scans, and monthly reports</p>
                     </div>
 
-                    {/* Shield Standalone — Best Value */}
+                    {/* Shield + Free Audit Bundle — Recommended */}
                     <a href={LINKS.shield} target="_blank" rel="noopener noreferrer"
                       className="block w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 border-2 border-amber-500/50 text-white font-semibold py-4 px-5 rounded-xl text-center transition-all relative">
                       <div className="absolute -top-2.5 right-4 bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
@@ -1396,7 +1388,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                 );
               }
 
-              // ── TIER 2: Drift (60-79) ──
+              // ── TIER 2: Drift (50-79) ──
               if (score >= 60) {
                 return (
                   <div className="mt-6">
@@ -1405,7 +1397,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                     </div>
                     <div className="space-y-2.5">
 
-                      {/* Option 1: Report Only + Shield Trial */}
+                      {/* Option 1: Report Only */}
                       <a href={LINKS.report} target="_blank" rel="noopener noreferrer"
                         className="block border border-slate-200 hover:border-amber-300 rounded-xl p-4 transition-all hover:shadow-md cursor-pointer">
                         <div className="flex items-center justify-between">
@@ -1415,8 +1407,6 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                               <span className="font-bold text-slate-800 text-sm">Audit Report</span>
                             </div>
                             <p className="text-xs text-slate-500">Forensic analysis with findings, border map, and remediation roadmap</p>
-                            <p className="text-xs font-bold text-green-600 mt-1">✦ Includes 3 months Sentry Shield FREE</p>
-                            <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-gold underline mt-1 inline-block">Preview sample</a>
                           </div>
                           <div className="text-right ml-4 flex-shrink-0">
                             <div className="text-xl font-black text-slate-800">$149</div>
@@ -1425,7 +1415,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                         </div>
                       </a>
 
-                      {/* Option 2: Safe Harbor — Most Popular */}
+                      {/* Option 2: Safe Harbor — Recommended */}
                       <a href={LINKS.safeHarbor} target="_blank" rel="noopener noreferrer"
                         className="block border-2 border-orange-400 bg-orange-50/50 rounded-xl p-4 transition-all hover:shadow-lg relative cursor-pointer">
                         <div className="absolute -top-2.5 left-4 bg-orange-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
@@ -1438,11 +1428,33 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                               <span className="font-bold text-slate-800 text-sm">Safe Harbor&trade;</span>
                             </div>
                             <p className="text-xs text-slate-500">Everything in the Audit Report <strong>plus</strong> ready-made policies, AI disclosures, staff training, evidence templates, and implementation blueprint</p>
-                            <p className="text-xs font-bold text-green-600 mt-1">✦ Includes 3 months Sentry Shield FREE</p>
                           </div>
                           <div className="text-right ml-4 flex-shrink-0">
                             <div className="text-xl font-black text-orange-600">$249</div>
                             <div className="text-[10px] text-slate-400">one-time</div>
+                          </div>
+                        </div>
+                      </a>
+
+                      {/* Option 3: Safe Harbor + Watch — Recommended */}
+                      <a href={LINKS.safeHarborWatch} target="_blank" rel="noopener noreferrer"
+                        className="block border-2 border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 transition-all hover:shadow-lg relative cursor-pointer">
+                        <div className="absolute -top-2.5 left-4 bg-blue-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                          Recommended
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Shield className="w-4 h-4 text-blue-600" />
+                              <span className="font-bold text-slate-800 text-sm">Safe Harbor + Sentry Watch</span>
+                            </div>
+                            <p className="text-xs text-slate-500">Everything in Safe Harbor + continuous monitoring with drift alerts and automated re-scans</p>
+                            <p className="text-xs font-bold text-blue-600 mt-1">✦ First 3 months of monitoring free</p>
+                          </div>
+                          <div className="text-right ml-4 flex-shrink-0">
+                            <div className="text-xl font-black text-blue-700">$249</div>
+                            <div className="text-[10px] text-slate-400">then $39/mo</div>
+                            <div className="text-[10px] text-blue-600 font-bold">after 3 mo free</div>
                           </div>
                         </div>
                       </a>
@@ -1452,7 +1464,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                 );
               }
 
-              // ── TIER 3: Violation (0-59) ──
+              // ── TIER 3: Violation (0-49) ──
               return (
                 <div className="mt-6">
                   {/* Urgency banner */}
@@ -1481,8 +1493,6 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                             <span className="font-bold text-slate-800 text-sm">Audit Report Only</span>
                           </div>
                           <p className="text-xs text-slate-500">Forensic analysis with findings and remediation roadmap — bring it to your own developer</p>
-                          <p className="text-xs font-bold text-green-600 mt-1">✦ Includes 3 months Sentry Shield FREE</p>
-                          <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="text-[10px] text-gold underline mt-1 inline-block">Preview sample</a>
                         </div>
                         <div className="text-right ml-4 flex-shrink-0">
                           <div className="text-xl font-black text-slate-800">$149</div>
@@ -1501,7 +1511,6 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                             <span className="font-bold text-slate-800 text-sm">Safe Harbor&trade;</span>
                           </div>
                           <p className="text-xs text-slate-500">Everything in the Audit Report plus ready-made policies, AI disclosures, evidence templates, and implementation blueprint</p>
-                          <p className="text-xs font-bold text-green-600 mt-1">✦ Includes 3 months Sentry Shield FREE</p>
                         </div>
                         <div className="text-right ml-4 flex-shrink-0">
                           <div className="text-xl font-black text-slate-800">$249</div>
@@ -1510,8 +1519,8 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                       </div>
                     </a>
 
-                    {/* Option 3: Sentry Shield — Recommended for violations */}
-                    <a href={LINKS.shield} target="_blank" rel="noopener noreferrer"
+                    {/* Option 3: Safe Harbor + Shield — Recommended */}
+                    <a href={LINKS.safeHarborShield} target="_blank" rel="noopener noreferrer"
                       className="block border-2 border-red-500 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-4 transition-all hover:shadow-lg relative cursor-pointer">
                       <div className="absolute -top-2.5 left-4 bg-red-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
                         Recommended for Your Score
@@ -1520,14 +1529,15 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <Shield className="w-4 h-4 text-red-600" />
-                            <span className="font-bold text-slate-800 text-sm">Sentry Shield — Continuous Compliance</span>
+                            <span className="font-bold text-slate-800 text-sm">Safe Harbor + Sentry Shield</span>
                           </div>
-                          <p className="text-xs text-slate-500">Free audit report + 24/7 monitoring, live dashboard, quarterly forensic reports, annual certification seal</p>
-                          <p className="text-xs font-bold text-red-600 mt-1">✦ Includes free Audit Report + ongoing protection</p>
+                          <p className="text-xs text-slate-500">Everything in Safe Harbor + continuous monitoring, live dashboard, quarterly reports, and annual certification</p>
+                          <p className="text-xs font-bold text-red-600 mt-1">✦ First 3 months of monitoring free</p>
                         </div>
                         <div className="text-right ml-4 flex-shrink-0">
-                          <div className="text-xl font-black text-red-700">$79</div>
-                          <div className="text-[10px] text-slate-400">/month</div>
+                          <div className="text-xl font-black text-red-700">$249</div>
+                          <div className="text-[10px] text-slate-400">then $79/mo</div>
+                          <div className="text-[10px] text-red-600 font-bold">after 3 mo free</div>
                         </div>
                       </div>
                     </a>
