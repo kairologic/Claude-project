@@ -110,7 +110,7 @@ export default function HomePage() {
             </button>
             <div className="bg-navy rounded-2xl overflow-hidden shadow-2xl border border-white/10">
               <iframe
-                src="https://www.youtube.com/embed/Lrt971tzcpo?autoplay=1&rel=0"
+                src="https://www.youtube.com/embed/aL6NzmgvO3I?autoplay=1&rel=0"
                 title="KairoLogic - How It Works"
                 className="w-full aspect-video"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
