@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabase } from '@/lib/supabase';auth-helpers-nextjs';
 import Link from 'next/link';
 
 // ═══ CONFIG ═══
@@ -136,7 +136,7 @@ export default function RegistryPage() {
   // Load stats (one-time, lightweight)
   const loadStats = useCallback(async () => {
     try {
-      const supabase = createClientComponentClient();
+      const supabase = getSupabase():;
       const { data } = await supabase
         .from('registry')
         .select('risk_score,city')
@@ -167,7 +167,7 @@ export default function RegistryPage() {
   const loadProviders = useCallback(async () => {
     try {
       setLoading(true);
-      const supabase = createClientComponentClient();
+      const supabase = getSupabase():;
 
       let query = supabase
         .from('registry')
@@ -251,7 +251,7 @@ export default function RegistryPage() {
     setClaimError('');
 
     try {
-      const supabase = createClientComponentClient();
+      const supabase = getSupabase():;
       const score = claimModal.risk_score || 0;
 
       await supabase.from('prospects').insert({
