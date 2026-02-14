@@ -1,12 +1,8 @@
 // checks/npi/checks.ts
 // ═══ NPI Integrity Check Modules ═══
 
-import type { CheckModule } from '../types';
-import {
-  normalizeAddress, addressesMatch,
-  normalizePhone, phonesMatch,
-  specialtyMatches
-} from '../utils';
+import type { CheckModule } from './types';
+import { normalizeAddress, addressesMatch, normalizePhone, phonesMatch, specialtyMatches } from './utils';
 
 /**
  * NPI-01: Address Mismatch
