@@ -41,12 +41,12 @@ async function supabaseFetch(path: string, options: RequestInit = {}): Promise<a
       ...options.headers as any,
     },
   });
-  if (!res.ok && options.method !== 'PATCH') {
-    const text = await res.text();
+  const text = await res.text();
+  if (!res.ok && options.method !== 'PATCH' && options.method !== 'DELETE') {
     console.error(`  Supabase error (${res.status}): ${text.slice(0, 200)}`);
   }
   if (options.method === 'PATCH' || options.method === 'DELETE') return null;
-  return res.json();
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 // ═══ NPI DATA FETCHERS ═══
@@ -328,7 +328,7 @@ async function main() {
 
   // 1. Pull all providers with URLs
   const providers = await supabaseFetch(
-    `registry?url=neq.&url=not.is.null&select=npi,name,url,city,risk_score,risk_level&order=city,name&limit=1000`
+    `registry?url=neq.&url=not.is.null&select=npi,name,url,city,zip,email,risk_score,risk_level&order=city,name&limit=1000`
   );
 
   if (!providers?.length) {
@@ -390,8 +390,19 @@ async function main() {
           await supabaseFetch('org_npi_footprint', {
             method: 'POST',
             body: JSON.stringify({
-              ...npiData,
-              addresses_secondary: JSON.stringify(npiData.addresses_secondary),
+              npi: npiData.npi,
+              org_name: npiData.org_name,
+              prac_line1: npiData.prac_line1,
+              prac_line2: npiData.prac_line2,
+              prac_city: npiData.prac_city,
+              prac_state: npiData.prac_state,
+              prac_zip: npiData.prac_zip,
+              prac_phone: npiData.prac_phone,
+              tax_code: npiData.tax_code,
+              tax_classification: npiData.tax_classification,
+              enumeration_date: npiData.enumeration_date || null,
+              last_update_date: npiData.last_update_date || null,
+              addresses_secondary: npiData.addresses_secondary || [],
               fetched_at: new Date().toISOString(),
             }),
           });
@@ -403,9 +414,16 @@ async function main() {
             method: 'POST',
             body: JSON.stringify({
               npi: prov.npi, url: prov.url,
-              ...siteData,
-              specialty_labels: `{${siteData.specialty_labels.map(s => `"${s}"`).join(',')}}`,
-              provider_names: `{${siteData.provider_names.map(s => `"${s.replace(/"/g, '\\"')}"`).join(',')}}`,
+              addr_line1: siteData.addr_line1,
+              addr_line2: siteData.addr_line2,
+              addr_city: siteData.addr_city,
+              addr_state: siteData.addr_state,
+              addr_zip: siteData.addr_zip,
+              phone: siteData.phone,
+              specialty_labels: siteData.specialty_labels,
+              provider_names: siteData.provider_names,
+              provider_count: siteData.provider_count,
+              source_hash: siteData.source_hash,
             }),
           });
         }
@@ -437,7 +455,7 @@ async function main() {
               category: r.category, tier: r.tier, status: r.status,
               score: r.score, title: r.title, detail: r.detail,
               evidence: r.evidence || null,
-              remediation_steps: r.remediation_steps ? `{${r.remediation_steps.map(s => `"${s.replace(/"/g, '\\"')}"`).join(',')}}` : null,
+              remediation_steps: r.remediation_steps || null,
               severity: r.severity,
             }),
           });
