@@ -1,8 +1,8 @@
 // checks/roster/checks.ts
 // ═══ Provider Roster Check Modules ═══
 
-import type { CheckModule } from '../types';
-import { normalizeName, fuzzyNameMatch } from '../utils';
+import type { CheckModule } from './types';
+import { normalizeName, fuzzyNameMatch } from './utils';
 
 /**
  * RST-01: Roster Count Consistency
