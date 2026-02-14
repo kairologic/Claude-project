@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSupabase } from '@/lib/supabase';auth-helpers-nextjs';
+import { getSupabase } from '@/lib/supabase';
 import Link from 'next/link';
 
 // ═══ CONFIG ═══
