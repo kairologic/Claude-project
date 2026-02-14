@@ -328,7 +328,7 @@ async function main() {
 
   // 1. Pull all providers with URLs
   const providers = await supabaseFetch(
-    `registry?url=neq.&url=not.is.null&select=npi,name,url,city,state,zip,risk_score,risk_level&order=city,name&limit=1000`
+    `registry?url=neq.&url=not.is.null&select=npi,name,url,city,risk_score,risk_level&order=city,name&limit=1000`
   );
 
   if (!providers?.length) {
