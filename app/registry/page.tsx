@@ -16,7 +16,7 @@ const CITY_TABS = [
 ];
 
 type CityTab = typeof CITY_TABS[number]['key'];
-type TierFilter = 'all' | 'sovereign' | 'drift' | 'violation' | 'pending';
+type TierFilter = 'all' | 'sovereign' | 'drift' | 'violation' ;
 
 // ═══ HELPERS ═══
 function getTier(score: number | null | undefined) {
@@ -187,7 +187,7 @@ export default function RegistryPage() {
       if (activeTier === 'sovereign') query = query.gte('risk_score', 80);
       else if (activeTier === 'drift') query = query.gte('risk_score', 60).lt('risk_score', 80);
       else if (activeTier === 'violation') query = query.gt('risk_score', 0).lt('risk_score', 60);
-      else if (activeTier === 'pending') query = query.or('risk_score.is.null,risk_score.eq.0');
+      
 
       // Search
       if (debouncedSearch.trim()) {
@@ -311,7 +311,7 @@ export default function RegistryPage() {
               { key: 'sovereign' as TierFilter, label: 'Sovereign', count: stats.sovereign, color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
               { key: 'drift' as TierFilter, label: 'Drift Detected', count: stats.drift, color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
               { key: 'violation' as TierFilter, label: 'Violation', count: stats.violation, color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
-              { key: 'pending' as TierFilter, label: 'Pending Audit', count: stats.pending, color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
+              
             ].map(s => (
               <button
                 key={s.key}
