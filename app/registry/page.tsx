@@ -1,299 +1,798 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { getSupabase } from "@/lib/supabase";
-import Link from "next/link";
-import { Search, Shield, ShieldCheck, Eye, Lock, ChevronRight, X, CheckCircle, Loader2, ChevronLeft } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import Link from 'next/link';
 
-type ProviderRow = {
-  id: string; npi: string; name: string; city?: string; zip?: string;
-  risk_score?: number; risk_level?: string; status_label?: string;
-  last_scan_timestamp?: string; last_scan_result?: any; updated_at?: string;
-  is_paid?: boolean; is_visible?: boolean; subscription_status?: string;
-  url?: string; email?: string;
-};
-type CityTab = "all" | "austin" | "houston" | "dallas" | "san-antonio";
-
-function timeAgo(d: string | undefined): string {
-  if (!d) return "\u2014";
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 60) return m <= 1 ? "Just now" : `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const dy = Math.floor(h / 24);
-  if (dy < 30) return `${dy}d ago`;
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function getResidencySignal(p: ProviderRow) {
-  const dr = p.last_scan_result?.categoryScores?.data_sovereignty?.percentage ?? null;
-  if (dr === null) return { label: "Pending", color: "text-slate-400", dot: "bg-slate-400" };
-  if (dr >= 80) return { label: "Anchored", color: "text-emerald-400", dot: "bg-emerald-400" };
-  if (dr >= 65) return { label: "Partial", color: "text-amber-400", dot: "bg-amber-400" };
-  return { label: "Exposed", color: "text-red-400", dot: "bg-red-400" };
-}
-function getTransparencySignal(p: ProviderRow) {
-  const ai = p.last_scan_result?.categoryScores?.ai_transparency?.percentage ?? null;
-  if (ai === null) return { label: "Pending", color: "text-slate-400", dot: "bg-slate-400" };
-  if (ai >= 80) return { label: "Compliant", color: "text-emerald-400", dot: "bg-emerald-400" };
-  if (ai >= 60) return { label: "Partial", color: "text-amber-400", dot: "bg-amber-400" };
-  return { label: "Missing", color: "text-red-400", dot: "bg-red-400" };
-}
-function getSovStatus(p: ProviderRow) {
-  const s = p.risk_score ?? 0;
-  const paid = p.is_paid || p.subscription_status === "active";
-  if (paid && s >= 80) return { label: "Verified Sovereign", bg: "bg-emerald-900/30 border-emerald-500/30", text: "text-emerald-400", dot: "bg-emerald-400" };
-  if (s >= 80) return { label: "Sovereign", bg: "bg-emerald-900/20 border-emerald-600/20", text: "text-emerald-400", dot: "bg-emerald-400" };
-  if (s >= 60) return { label: "Signal Inconclusive", bg: "bg-amber-900/20 border-amber-600/20", text: "text-amber-400", dot: "bg-amber-400" };
-  if (s > 0) return { label: "Audit Pending", bg: "bg-red-900/20 border-red-600/20", text: "text-red-400", dot: "bg-red-400" };
-  return { label: "Pre-Audited", bg: "bg-slate-800/50 border-slate-600/20", text: "text-slate-400", dot: "bg-slate-500" };
-}
-function isHighRisk(p: ProviderRow) { return (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60; }
-function maskName(n: string) {
-  const w = n.split(" ");
-  if (w.length <= 1) return n.charAt(0) + "\u25CF\u25CF\u25CF\u25CF\u25CF\u25CF\u25CF\u25CF";
-  return w[0] + " " + w.slice(1).map(x => x.charAt(0) + "\u25CF".repeat(Math.min(x.length - 1, 6))).join(" ");
-}
-
-const CITY_TABS: { key: CityTab; label: string; filter: string[] }[] = [
-  { key: "all", label: "All Regions", filter: [] },
-  { key: "austin", label: "Austin", filter: ["austin","round rock","cedar park","leander","georgetown","pflugerville","kyle","buda","lakeway","bee cave","dripping springs"] },
-  { key: "houston", label: "Houston", filter: ["houston","katy","sugar land","pearland","the woodlands","humble","spring","cypress","tomball","pasadena","baytown","league city","friendswood","missouri city","richmond","bellaire","stafford","magnolia"] },
-  { key: "dallas", label: "Dallas\u2013Fort Worth", filter: ["dallas","fort worth","plano","frisco","mckinney","arlington","irving","richardson","garland","denton","carrollton","lewisville","flower mound","allen","addison","sachse","mesquite","rowlett","rockwall"] },
-  { key: "san-antonio", label: "San Antonio", filter: ["san antonio","new braunfels","boerne","schertz","cibolo","converse","live oak","universal city","selma","helotes","leon valley","alamo heights","bulverde"] },
-];
+// ═══ CONFIG ═══
 const PAGE_SIZE = 50;
 
+const CITY_TABS = [
+  { key: 'all' as const, label: 'All Regions', filter: [] as string[] },
+  { key: 'austin' as const, label: 'Austin', filter: ['austin', 'round rock', 'cedar park', 'pflugerville', 'leander', 'georgetown'] },
+  { key: 'houston' as const, label: 'Houston', filter: ['houston', 'sugar land', 'katy', 'pearland', 'the woodlands', 'pasadena'] },
+  { key: 'dallas' as const, label: 'Dallas–Fort Worth', filter: ['dallas', 'fort worth', 'plano', 'irving', 'arlington', 'frisco', 'mckinney', 'garland', 'denton'] },
+  { key: 'san-antonio' as const, label: 'San Antonio', filter: ['san antonio', 'new braunfels', 'schertz'] },
+];
+
+type CityTab = typeof CITY_TABS[number]['key'];
+type TierFilter = 'all' | 'sovereign' | 'drift' | 'violation' | 'pending';
+
+// ═══ HELPERS ═══
+function getTier(score: number | null | undefined) {
+  if (!score || score === 0) return { label: 'Pending', color: '#64748b', cssColor: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20' };
+  if (score >= 80) return { label: 'Sovereign', color: '#34d399', cssColor: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
+  if (score >= 60) return { label: 'Drift', color: '#fbbf24', cssColor: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };
+  return { label: 'Violation', color: '#f87171', cssColor: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' };
+}
+
+function getResidencySignal(scanResult: any) {
+  const ds = scanResult?.category_scores?.data_sovereignty?.percentage
+    ?? scanResult?.categoryScores?.data_sovereignty?.percentage;
+  if (ds === undefined || ds === null) return { icon: '◌', label: 'Pending', color: 'text-slate-500' };
+  if (ds >= 80) return { icon: '●', label: 'Anchored', color: 'text-emerald-400' };
+  if (ds >= 60) return { icon: '●', label: 'Partial', color: 'text-amber-400' };
+  return { icon: '●', label: 'Exposed', color: 'text-red-400' };
+}
+
+function getTransparencySeal(scanResult: any) {
+  const ai = scanResult?.category_scores?.ai_transparency?.percentage
+    ?? scanResult?.categoryScores?.ai_transparency?.percentage;
+  if (ai === undefined || ai === null) return { icon: '◌', label: 'Pending', color: 'text-slate-500' };
+  if (ai >= 80) return { icon: '🛡', label: 'Compliant', color: 'text-emerald-400' };
+  if (ai >= 60) return { icon: '⚠', label: 'Partial', color: 'text-amber-400' };
+  return { icon: '✗', label: 'Missing', color: 'text-red-400' };
+}
+
+function maskName(name: string): string {
+  const parts = name.split(/\s+/);
+  if (parts.length <= 1) return name[0] + '●'.repeat(Math.min(name.length - 1, 6));
+  return parts[0] + ' ' + parts.slice(1).map(p => p[0] + '●'.repeat(Math.min(p.length - 1, 4))).join(' ');
+}
+
+function timeAgo(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins <= 1 ? 'Just now' : `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function extractDomain(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+    return u.hostname.replace(/^www\./, '');
+  } catch { return null; }
+}
+
+function generateFindingsSummary(scanResult: any) {
+  const findings = scanResult?.findings || scanResult?.raw_findings || [];
+  const critical = findings.filter((f: any) => f.status === 'fail' && f.severity === 'critical');
+  const high = findings.filter((f: any) => f.status === 'fail' && f.severity === 'high');
+  const warnings = findings.filter((f: any) => f.status === 'warn');
+  const passes = findings.filter((f: any) => f.status === 'pass');
+  return { critical, high, warnings, passes, total: findings.length };
+}
+
+// ═══ ICONS (inline SVG to avoid lucide dependency issues) ═══
+const SearchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+);
+const XIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+);
+const ChevronLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+);
+const ChevronRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+);
+const AlertTriangle = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+);
+const Loader = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+);
+const ShieldIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+);
+
+// ═══ MAIN PAGE ═══
 export default function RegistryPage() {
-  const [providers, setProviders] = useState<ProviderRow[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [providers, setProviders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCity, setActiveCity] = useState<CityTab>("all");
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
-  const [activeTier, setActiveTier] = useState<string | null>(null);
-  const [stats, setStats] = useState({ sovereign: 0, moderate: 0, atRisk: 0, pending: 0 });
-  const [cityCounts, setCityCounts] = useState<Record<CityTab, number>>({ all: 0, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 });
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { setDebouncedSearch(searchTerm); setPage(0); }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [searchTerm]);
+  // Filters
+  const [activeCity, setActiveCity] = useState<CityTab>('all');
+  const [activeTier, setActiveTier] = useState<TierFilter>('all');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Load stats once on mount
+  // Stats
+  const [stats, setStats] = useState({ sovereign: 0, drift: 0, violation: 0, pending: 0 });
+  const [cityCounts, setCityCounts] = useState<Record<string, number>>({});
+
+  // Claim modal
+  const [claimModal, setClaimModal] = useState<any>(null);
+  const [claimStep, setClaimStep] = useState<'verify' | 'results'>('verify');
+  const [claimForm, setClaimForm] = useState({ name: '', email: '' });
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [claimError, setClaimError] = useState('');
+  const [claimedNpis, setClaimedNpis] = useState<Set<string>>(new Set());
+
+  // Search debounce
   useEffect(() => {
-    (async () => {
-      try {
-        const supabase = getSupabase();
-        const { data, count } = await supabase.from("registry").select("risk_score,city", { count: "exact" }).eq("is_visible", true);
-        const all = data || [];
-        setTotalCount(count || 0);
-        setStats({
-          sovereign: all.filter(p => (p.risk_score ?? 0) >= 80).length,
-          moderate: all.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80).length,
-          atRisk: all.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60).length,
-          pending: all.filter(p => !p.risk_score || p.risk_score === 0).length,
-        });
-        const c: Record<CityTab, number> = { all: all.length, austin: 0, houston: 0, dallas: 0, "san-antonio": 0 };
-        CITY_TABS.forEach(t => { if (t.key !== "all") c[t.key] = all.filter(p => t.filter.some(f => (p.city||"").toLowerCase().includes(f))).length; });
-        setCityCounts(c);
-      } catch (e) { console.error(e); }
-    })();
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Load stats (one-time, lightweight)
+  const loadStats = useCallback(async () => {
+    try {
+      const supabase = createClientComponentClient();
+      const { data } = await supabase
+        .from('registry')
+        .select('risk_score,city')
+        .eq('is_visible', true);
+
+      if (!data) return;
+      setTotalCount(data.length);
+
+      setStats({
+        sovereign: data.filter(p => (p.risk_score ?? 0) >= 80).length,
+        drift: data.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80).length,
+        violation: data.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60).length,
+        pending: data.filter(p => !p.risk_score || p.risk_score === 0).length,
+      });
+
+      const counts: Record<string, number> = { all: data.length };
+      CITY_TABS.forEach(tab => {
+        if (tab.key === 'all') return;
+        counts[tab.key] = data.filter(p =>
+          tab.filter.some(c => (p.city || '').toLowerCase().includes(c))
+        ).length;
+      });
+      setCityCounts(counts);
+    } catch (e) { console.error('Stats error:', e); }
   }, []);
 
-  // Load providers whenever filters change
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const supabase = getSupabase();
-        let q = supabase.from("registry")
-          .select("id,npi,name,city,zip,risk_score,risk_level,status_label,last_scan_timestamp,last_scan_result,updated_at,is_paid,is_visible,subscription_status,url,email", { count: "exact" })
-          .eq("is_visible", true);
+  // Load paginated providers
+  const loadProviders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const supabase = createClientComponentClient();
 
-        if (activeCity !== "all") {
-          const tab = CITY_TABS.find(t => t.key === activeCity);
-          if (tab) q = q.or(tab.filter.map(c => `city.ilike.%${c}%`).join(","));
+      let query = supabase
+        .from('registry')
+        .select('id,npi,name,url,city,zip,risk_score,risk_level,status_label,last_scan_timestamp,last_scan_result,updated_at,is_paid,is_visible,subscription_status', { count: 'exact' })
+        .eq('is_visible', true);
+
+      // City filter
+      if (activeCity !== 'all') {
+        const cityTab = CITY_TABS.find(t => t.key === activeCity);
+        if (cityTab && cityTab.filter.length > 0) {
+          const cityFilter = cityTab.filter.map(c => `city.ilike.%${c}%`).join(',');
+          query = query.or(cityFilter);
         }
-        if (debouncedSearch.trim()) {
-          const s = debouncedSearch.trim();
-          q = q.or(`name.ilike.%${s}%,city.ilike.%${s}%,zip.ilike.%${s}%`);
-        }
-        if (activeTier === "sovereign") q = q.gte("risk_score", 80);
-        else if (activeTier === "moderate") q = q.gte("risk_score", 60).lt("risk_score", 80);
-        else if (activeTier === "atRisk") q = q.gt("risk_score", 0).lt("risk_score", 60);
-        else if (activeTier === "pending") q = q.filter("risk_score", "is", null);
+      }
 
-        const { data, error, count } = await q.order("risk_score", { ascending: false, nullsFirst: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-        if (cancelled || error) return;
+      // Tier filter
+      if (activeTier === 'sovereign') query = query.gte('risk_score', 80);
+      else if (activeTier === 'drift') query = query.gte('risk_score', 60).lt('risk_score', 80);
+      else if (activeTier === 'violation') query = query.gt('risk_score', 0).lt('risk_score', 60);
+      else if (activeTier === 'pending') query = query.or('risk_score.is.null,risk_score.eq.0');
 
-        let sorted: ProviderRow[] = (data || []) as ProviderRow[];
-        if (!activeTier && !debouncedSearch.trim()) {
-          const sovereign = sorted.filter(p => (p.risk_score ?? 0) >= 80);
-          const moderate = sorted.filter(p => (p.risk_score ?? 0) >= 60 && (p.risk_score ?? 0) < 80);
-          const atRisk = sorted.filter(p => (p.risk_score ?? 0) > 0 && (p.risk_score ?? 0) < 60);
-          const pending = sorted.filter(p => !p.risk_score || p.risk_score === 0);
-          const interleaved: ProviderRow[] = [];
-          let si = 0, mi = 0, ri = 0, pi = 0;
-          while (si < sovereign.length || mi < moderate.length || ri < atRisk.length || pi < pending.length) {
-            if (si < sovereign.length) interleaved.push(sovereign[si++]);
-            if (si < sovereign.length) interleaved.push(sovereign[si++]);
-            if (mi < moderate.length) interleaved.push(moderate[mi++]);
-            if (si < sovereign.length) interleaved.push(sovereign[si++]);
-            if (ri < atRisk.length) interleaved.push(atRisk[ri++]);
-          }
-          while (si < sovereign.length) interleaved.push(sovereign[si++]);
-          while (mi < moderate.length) interleaved.push(moderate[mi++]);
-          while (ri < atRisk.length) interleaved.push(atRisk[ri++]);
-          while (pi < pending.length) interleaved.push(pending[pi++]);
-          sorted = interleaved;
-        }
+      // Search
+      if (debouncedSearch.trim()) {
+        const s = debouncedSearch.trim();
+        query = query.or(`name.ilike.%${s}%,city.ilike.%${s}%,zip.ilike.%${s}%,npi.ilike.%${s}%`);
+      }
 
-        setProviders(sorted);
-        setTotalCount(count || 0);
-      } catch (e) { console.error(e); } finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [page, activeCity, debouncedSearch, activeTier]);
+      const { data, error, count } = await query
+        .order('risk_score', { ascending: false, nullsFirst: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (error) throw error;
+      setProviders(data || []);
+      if (count !== null) setTotalCount(count);
+    } catch (e) {
+      console.error('Load error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, activeCity, activeTier, debouncedSearch]);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { loadProviders(); }, [loadProviders]);
+  useEffect(() => { setPage(0); }, [activeCity, activeTier, debouncedSearch]);
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const showFrom = totalCount > 0 ? page * PAGE_SIZE + 1 : 0;
   const showTo = Math.min((page + 1) * PAGE_SIZE, totalCount);
+
+  // ═══ CLAIM HANDLERS ═══
+  const handleClaimOpen = (provider: any) => {
+    setClaimModal(provider);
+    setClaimStep('verify');
+    setClaimForm({ name: '', email: '' });
+    setClaimError('');
+  };
+
+  const handleClaimSubmit = async () => {
+    if (!claimForm.name.trim() || !claimForm.email.trim()) {
+      setClaimError('Name and email are required.');
+      return;
+    }
+
+    // Email domain validation against provider URL
+    const providerDomain = extractDomain(claimModal?.url);
+    const emailDomain = claimForm.email.split('@')[1]?.toLowerCase();
+
+    if (providerDomain && emailDomain) {
+      // Allow if email domain matches or is a subdomain of provider domain
+      const domainMatch = emailDomain === providerDomain
+        || emailDomain.endsWith('.' + providerDomain)
+        || providerDomain.endsWith('.' + emailDomain);
+
+      if (!domainMatch) {
+        setClaimError(`Email domain must match the provider website (${providerDomain}). Use your organization email.`);
+        return;
+      }
+    }
+
+    setClaimSubmitting(true);
+    setClaimError('');
+
+    try {
+      const supabase = createClientComponentClient();
+      const score = claimModal.risk_score || 0;
+
+      await supabase.from('prospects').insert({
+        practice_name: claimModal.name,
+        contact_name: claimForm.name,
+        email: claimForm.email,
+        npi: claimModal.npi,
+        source: 'registry_claim',
+        priority: score < 60 ? 'high' : 'medium',
+        temperature: score < 60 ? 'hot' : 'warm',
+        status: 'new',
+        notes: `Claimed from public registry. Score: ${score}. City: ${claimModal.city || 'N/A'}.`,
+      });
+
+      setClaimedNpis(prev => new Set(prev).add(claimModal.npi));
+      setClaimStep('results');
+    } catch (e: any) {
+      setClaimError(e.message || 'Something went wrong. Please try again.');
+    } finally {
+      setClaimSubmitting(false);
+    }
+  };
+
+  // ═══ RENDER ═══
   return (
-    <div className="min-h-screen bg-[#070d1b]">
-      {/* HERO */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 text-[11px] font-bold tracking-wider uppercase">Live Monitoring Active</span>
+    <div className="min-h-screen" style={{ background: '#070d1b' }}>
+
+      {/* ═══ HEADER ═══ */}
+      <div className="border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(52,211,153,0.1)' }}>
+                  <span className="text-emerald-400"><ShieldIcon /></span>
+                </div>
+                <h1 className="text-xl font-bold text-white tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  Texas Healthcare Compliance Registry
+                </h1>
+              </div>
+              <p className="text-slate-500 text-xs ml-11" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                SB 1188 &middot; HB 149 &middot; Automated Compliance Monitoring
+              </p>
             </div>
-            <span className="text-slate-600 text-xs">|</span>
-            <span className="text-slate-400 text-xs font-mono">{totalCount.toLocaleString()} entities indexed</span>
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-display font-bold text-white mb-3 tracking-tight">Texas Sovereignty <span className="text-gold">Registry</span></h1>
-          <p className="text-slate-400 text-lg max-w-2xl mb-8">Forensic compliance signals for healthcare entities operating in Texas. Compiled from observable digital infrastructure per SB&nbsp;1188 and HB&nbsp;149.</p>
-          <div className="max-w-2xl">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-gold transition-colors" size={18} />
-              <input type="text" placeholder="Search by practice name, city, or ZIP code..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-10 py-3.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 focus:outline-none focus:border-gold/60 focus:bg-white/15 focus:ring-1 focus:ring-gold/30 transition-all text-sm" />
-              {searchTerm && <button onClick={() => setSearchTerm("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"><X size={16} /></button>}
-            </div>
+            <Link href="/" className="text-slate-500 hover:text-white text-xs transition-colors">
+              &larr; KairoLogic Home
+            </Link>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* STATS */}
-      <section className="border-y border-white/[0.08] bg-white/[0.03]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="grid grid-cols-4 gap-4">
-            {[{ l:"Sovereign",k:"sovereign",v:stats.sovereign,c:"text-emerald-400",d:"bg-emerald-400" },{ l:"Inconclusive",k:"moderate",v:stats.moderate,c:"text-amber-400",d:"bg-amber-400" },{ l:"At Risk",k:"atRisk",v:stats.atRisk,c:"text-red-400",d:"bg-red-400" },{ l:"Pre-Audited",k:"pending",v:stats.pending,c:"text-slate-400",d:"bg-slate-500" }].map(s=>(
-              <button key={s.l} onClick={()=>{setActiveTier(activeTier===s.k?null:s.k);setPage(0);}} className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-left ${activeTier===s.k?"bg-white/[0.08] ring-1 ring-white/[0.15]":"hover:bg-white/[0.04]"}`}><span className={`w-2.5 h-2.5 rounded-full ${s.d}`} /><div><div className={`text-xl font-bold font-mono ${s.c}`}>{s.v}</div><div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">{s.l}</div></div></button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CITY TABS */}
-      <section className="border-b border-white/[0.08]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1 overflow-x-auto py-2 -mb-px">
-            {CITY_TABS.map(tab=>(
-              <button key={tab.key} onClick={()=>{setActiveCity(tab.key);setActiveTier(null);setPage(0);}} className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all rounded-t-lg ${activeCity===tab.key?"bg-white/[0.08] text-gold border-b-2 border-gold":"text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"}`}>
-                {tab.label}<span className={`ml-2 text-[10px] font-mono ${activeCity===tab.key?"text-gold/80":"text-slate-500"}`}>{cityCounts[tab.key]}</span>
+      {/* ═══ SIGNAL SUMMARY BAR ═══ */}
+      <div className="border-b" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { key: 'sovereign' as TierFilter, label: 'Sovereign', count: stats.sovereign, color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
+              { key: 'drift' as TierFilter, label: 'Drift Detected', count: stats.drift, color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+              { key: 'violation' as TierFilter, label: 'Violation', count: stats.violation, color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
+              { key: 'pending' as TierFilter, label: 'Pending Audit', count: stats.pending, color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
+            ].map(s => (
+              <button
+                key={s.key}
+                onClick={() => setActiveTier(activeTier === s.key ? 'all' : s.key)}
+                className={`rounded-xl p-3 text-left transition-all border ${
+                  activeTier === s.key ? 'border-white/20 ring-1 ring-white/10' : 'border-transparent hover:border-white/10'
+                }`}
+                style={{ background: activeTier === s.key ? s.bg : 'transparent' }}
+              >
+                <div className="text-2xl font-black" style={{ color: s.color, fontFamily: "'DM Sans', sans-serif" }}>
+                  {s.count.toLocaleString()}
+                </div>
+                <div className="text-xs mt-0.5" style={{ color: s.color, opacity: 0.7 }}>{s.label}</div>
               </button>
             ))}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* TABLE */}
-      <section className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {activeTier && (
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-[11px] text-slate-400">Filtered by:</span>
-              <span className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.1] text-white text-[11px] font-bold px-3 py-1 rounded-lg">
-                {activeTier === "sovereign" ? "Sovereign" : activeTier === "moderate" ? "Inconclusive" : activeTier === "atRisk" ? "At Risk" : "Pre-Audited"}
-                <button onClick={() => {setActiveTier(null);setPage(0);}} className="text-slate-400 hover:text-white ml-1"><X size={12} /></button>
-              </span>
+      {/* ═══ FILTERS ═══ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          {/* Search */}
+          <div className="relative flex-1 w-full sm:max-w-sm">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><SearchIcon /></span>
+            <input
+              type="text"
+              placeholder="Search by name, city, ZIP, or NPI..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm text-white placeholder-slate-500 outline-none transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            />
+          </div>
+
+          {/* City Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {CITY_TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveCity(tab.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  activeCity === tab.key
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+                {cityCounts[tab.key] !== undefined && (
+                  <span className="ml-1.5 text-slate-600">{cityCounts[tab.key]}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ REGISTRY TABLE ═══ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-8">
+        <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+
+          {/* Table Header */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-xs font-semibold uppercase tracking-wider border-b"
+            style={{ color: 'rgba(148,163,184,0.6)', borderColor: 'rgba(255,255,255,0.06)', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px' }}>
+            <div className="col-span-3">Practice</div>
+            <div className="col-span-2">Sovereignty Status</div>
+            <div className="col-span-2">Data Residency</div>
+            <div className="col-span-2">AI Transparency</div>
+            <div className="col-span-1">Scanned</div>
+            <div className="col-span-2 text-right">Action</div>
+          </div>
+
+          {/* Loading */}
+          {loading && (
+            <div className="flex items-center justify-center py-16 gap-3 text-slate-500 text-sm">
+              <Loader /> Loading registry...
             </div>
           )}
-          {loading ? (
-            <div className="text-center py-20"><Loader2 className="w-8 h-8 text-gold animate-spin mx-auto mb-4" /><p className="text-slate-400 text-sm">Loading forensic signals...</p></div>
-          ) : providers.length === 0 ? (
-            <div className="text-center py-20"><Search className="w-12 h-12 text-slate-500 mx-auto mb-4" /><h3 className="text-white font-bold text-lg mb-2">No Results Found</h3>
-              <p className="text-slate-400 text-sm mb-6">{searchTerm ? `No entities match "${searchTerm}".` : "No entities found."}</p>
-              <Link href="/#scan" className="inline-flex items-center gap-2 bg-gold hover:bg-gold-light text-navy font-bold px-6 py-3 rounded-lg text-sm transition-colors"><Shield size={16} /> Run a Sentry Scan</Link></div>
-          ) : (
-            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_140px] gap-0 bg-white/[0.04] border-b border-white/[0.08] px-5 py-3">
-                {["Practice Name","Sovereignty Status","Residency Signal","Transparency Seal","Last Scanned"].map(h=>(<div key={h} className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{h}</div>))}
-                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Action</div>
-              </div>
-              <div className="divide-y divide-white/[0.05]">
-                {providers.map(p => {
-                  const st = getSovStatus(p); const res = getResidencySignal(p); const tr = getTransparencySignal(p);
-                  const hr = isHighRisk(p); const paid = p.is_paid || p.subscription_status === "active";
-                  const claimed = !!p.email;
-                  return (
-                    <div key={p.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_140px] gap-0 px-5 py-3.5 items-center hover:bg-white/[0.03] transition-colors">
-                      <div><div className={`font-semibold text-sm ${hr?"text-slate-400":"text-white"}`}>{hr?maskName(p.name):p.name}</div><div className="text-[11px] text-slate-500 mt-0.5">{p.city||"\u2014"}{p.zip?`, ${p.zip}`:""}</div></div>
-                      <div><span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-bold ${st.bg} ${st.text}`}><span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}</span></div>
-                      <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${res.dot}`} /><span className={`text-sm font-medium ${res.color}`}>{res.label}</span></div>
-                      <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${tr.dot}`} /><span className={`text-sm font-medium ${tr.color}`}>{tr.label}</span></div>
-                      <div className="text-sm text-slate-300 font-mono tracking-tight">{timeAgo(p.last_scan_timestamp || p.updated_at)}</div>
-                      <div className="text-right">
-                        {paid ? (
-                          <Link href={`/api/report?npi=${p.npi}&format=html`} className="inline-flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all"><ShieldCheck size={13} /> Certificate</Link>
-                        ) : hr ? (
-                          <span className="inline-flex items-center gap-1.5 text-slate-500 text-[11px] font-medium px-3 py-1.5"><Lock size={13} /> Restricted</span>
-                        ) : claimed ? (
-                          <span className="inline-flex items-center gap-1.5 bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-bold px-3 py-1.5 rounded-lg"><CheckCircle size={13} /> Claimed</span>
-                        ) : (
-                          <Link href={`/registry/claim?id=${p.id}`}
-                            className="inline-flex items-center gap-1.5 bg-gold/10 hover:bg-gold/20 border border-gold/20 hover:border-gold/40 text-gold text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all"><Eye size={13} /> Claim &amp; Verify</Link>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Pagination */}
-              <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-white/[0.02]">
-                <div className="text-[11px] text-slate-400 font-mono">Showing <span className="text-slate-200 font-bold">{showFrom}&ndash;{showTo}</span> of <span className="text-slate-200 font-bold">{totalCount.toLocaleString()}</span></div>
-                <div className="flex items-center gap-1">
-                  <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={14} /> Prev</button>
-                  {Array.from({length:Math.min(totalPages,7)},(_,i)=>{
-                    let pn = totalPages<=7?i:page<3?i:page>totalPages-4?totalPages-7+i:page-3+i;
-                    return <button key={pn} onClick={()=>setPage(pn)} className={`w-8 h-8 text-[11px] font-bold rounded-lg transition-all ${pn===page?"bg-gold/20 text-gold border border-gold/30":"text-slate-400 hover:text-white hover:bg-white/[0.06]"}`}>{pn+1}</button>;
-                  })}
-                  <button onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))} disabled={page>=totalPages-1} className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed">Next <ChevronRight size={14} /></button>
+
+          {/* Empty */}
+          {!loading && providers.length === 0 && (
+            <div className="text-center py-16">
+              <p className="text-slate-500 text-sm">No providers found matching your filters.</p>
+              <button onClick={() => { setSearch(''); setActiveCity('all'); setActiveTier('all'); }}
+                className="mt-3 text-emerald-400 text-xs hover:underline">
+                Clear all filters
+              </button>
+            </div>
+          )}
+
+          {/* Rows */}
+          {!loading && providers.map((p, i) => {
+            const score = p.risk_score || 0;
+            const tier = getTier(score);
+            const residency = getResidencySignal(p.last_scan_result);
+            const transparency = getTransparencySeal(p.last_scan_result);
+            const isHighRisk = score > 0 && score < 60;
+            const isClaimed = claimedNpis.has(p.npi);
+            const isPaid = p.is_paid || p.subscription_status === 'active';
+
+            return (
+              <div
+                key={p.id || i}
+                className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-5 py-4 border-b transition-colors hover:bg-white/[0.02] items-center"
+                style={{ borderColor: 'rgba(255,255,255,0.04)' }}
+              >
+                {/* Practice Name + City */}
+                <div className="col-span-3">
+                  <div className="text-white text-sm font-semibold leading-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                    {isHighRisk ? maskName(p.name || '') : (p.name || 'Unknown')}
+                  </div>
+                  <div className="text-slate-500 text-xs mt-0.5">
+                    {p.city || ''}{p.zip ? `, ${p.zip}` : ''}
+                    {p.npi && <span className="ml-2 text-slate-600" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px' }}>NPI: {p.npi}</span>}
+                  </div>
+                </div>
+
+                {/* Sovereignty Status */}
+                <div className="col-span-2">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${tier.bg} ${tier.border} border`}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: tier.color }} />
+                    <span className={tier.cssColor}>{tier.label}</span>
+                  </span>
+                </div>
+
+                {/* Data Residency */}
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${residency.color}`}>{residency.icon}</span>
+                    <span className={`text-xs font-medium ${residency.color}`}>{residency.label}</span>
+                  </div>
+                </div>
+
+                {/* AI Transparency */}
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${transparency.color}`}>{transparency.icon}</span>
+                    <span className={`text-xs font-medium ${transparency.color}`}>{transparency.label}</span>
+                  </div>
+                </div>
+
+                {/* Last Scanned */}
+                <div className="col-span-1">
+                  <span className="text-slate-400 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px' }}>
+                    {timeAgo(p.last_scan_timestamp || p.updated_at)}
+                  </span>
+                </div>
+
+                {/* Action */}
+                <div className="col-span-2 text-right">
+                  {isPaid ? (
+                    <Link href={`/scan/results?npi=${p.npi}&mode=verified`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all">
+                      View Audit
+                    </Link>
+                  ) : isClaimed ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-400 border border-blue-500/20 bg-blue-500/5">
+                      ✓ Claimed
+                    </span>
+                  ) : isHighRisk ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 border border-slate-500/10 bg-slate-500/5">
+                      🔒 Restricted
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleClaimOpen(p)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                      style={{
+                        color: '#d4a017',
+                        background: 'rgba(212,160,23,0.08)',
+                        border: '1px solid rgba(212,160,23,0.2)',
+                      }}
+                    >
+                      Claim &amp; Verify
+                    </button>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
-          {providers.length > 0 && (<div className="text-center mt-10"><p className="text-slate-400 text-sm mb-3">Don&apos;t see your practice listed?</p><Link href="/#scan" className="inline-flex items-center gap-2 bg-gold hover:bg-gold-light text-navy font-bold px-6 py-3 rounded-lg text-sm transition-colors"><Shield size={16} /> Run a Free Sentry Scan</Link></div>)}
+            );
+          })}
         </div>
-      </section>
 
-      {/* DISCLOSURE */}
-      <section className="border-t border-white/[0.08] py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="max-w-3xl">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Public-Interest Disclosure</h4>
-          <p className="text-[11px] text-slate-500 leading-relaxed">The Texas Sovereignty Registry compiles compliance signals from observable public digital infrastructure including DNS records, IP geolocation, HTTP headers, TLS certificates, and publicly accessible website content. Data is collected and analyzed by the SENTRY engine in accordance with SB&nbsp;1188 (Data Sovereignty) and HB&nbsp;149 (AI Transparency) statutory frameworks. This registry does not constitute a legal endorsement, certification, or guarantee of compliance. Healthcare entities may claim their listing to initiate a verified forensic audit. &copy;&nbsp;{new Date().getFullYear()} KairoLogic.</p>
-        </div></div>
-      </section>
+        {/* ═══ PAGINATION ═══ */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-slate-500 text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              Showing {showFrom}–{showTo} of {totalCount.toLocaleString()}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+                className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronLeft />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = totalPages <= 5 ? i : Math.max(0, Math.min(page - 2, totalPages - 5)) + i;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                      page === pageNum ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {pageNum + 1}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                disabled={page >= totalPages - 1}
+                className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                <ChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
 
+        {/* ═══ LEGAL FOOTER ═══ */}
+        <div className="mt-8 pt-6 border-t" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+          <p className="text-slate-600 text-[10px] leading-relaxed max-w-3xl" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            PUBLIC-INTEREST DISCLOSURE — Data is collected and analyzed by the SENTRY engine in accordance with SB&nbsp;1188 (Data Sovereignty)
+            and HB&nbsp;149 (AI Transparency) statutory frameworks. This registry does not constitute a legal endorsement, certification, or guarantee
+            of compliance. Signals marked &ldquo;Pending&rdquo; indicate automated preliminary analysis only. Healthcare entities may claim their listing
+            to initiate a verified forensic audit. &copy;&nbsp;{new Date().getFullYear()} KairoLogic. Independent auditor of the Texas medical digital supply chain.
+          </p>
+        </div>
+      </div>
+
+      {/* ═══ CLAIM & VERIFY MODAL ═══ */}
+      {claimModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setClaimModal(null)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+            style={{ background: '#0c1425', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={e => e.stopPropagation()}
+          >
+
+            {claimStep === 'verify' ? (
+              <>
+                {/* Header */}
+                <div className="px-6 pt-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.1)' }}>
+                        <span className="text-amber-400"><ShieldIcon /></span>
+                      </div>
+                      <span className="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Verification Required</span>
+                    </div>
+                    <button onClick={() => setClaimModal(null)} className="text-slate-500 hover:text-white p-1"><XIcon /></button>
+                  </div>
+                  <h3 className="text-white font-bold text-lg" style={{ fontFamily: "'DM Sans', sans-serif" }}>{claimModal.name}</h3>
+                  <p className="text-slate-400 text-xs mt-1">
+                    {claimModal.city}{claimModal.zip ? `, ${claimModal.zip}` : ''}
+                    {claimModal.npi && <span className="ml-2 text-slate-500">NPI: {claimModal.npi}</span>}
+                  </p>
+                </div>
+
+                {/* Alert */}
+                <div className="px-6 py-5">
+                  <div className="rounded-lg p-4 mb-5" style={{ background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.1)' }}>
+                    <div className="flex items-start gap-3">
+                      <span className="text-amber-400 flex-shrink-0 mt-0.5"><AlertTriangle /></span>
+                      <div>
+                        <p className="text-amber-200 text-sm font-semibold">
+                          We have identified potential statutory exposures for this entity.
+                        </p>
+                        <p className="text-slate-400 text-xs mt-1">
+                          To protect the privacy of forensic data, verify your identity using your organization email to unlock the Preliminary Forensic Scan.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-slate-400 text-xs font-semibold mb-1.5">Your Name</label>
+                      <input
+                        type="text"
+                        value={claimForm.name}
+                        onChange={e => setClaimForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="Full name"
+                        className="w-full px-3 py-2.5 rounded-lg text-sm text-white placeholder-slate-600 outline-none transition-all"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-xs font-semibold mb-1.5">Organization Email</label>
+                      <input
+                        type="email"
+                        value={claimForm.email}
+                        onChange={e => setClaimForm(f => ({ ...f, email: e.target.value }))}
+                        placeholder={claimModal.url ? `you@${extractDomain(claimModal.url) || 'yourpractice.com'}` : 'you@yourpractice.com'}
+                        className="w-full px-3 py-2.5 rounded-lg text-sm text-white placeholder-slate-600 outline-none transition-all"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                      {claimModal.url && (
+                        <p className="text-slate-600 text-[10px] mt-1">
+                          Must match provider domain: {extractDomain(claimModal.url)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {claimError && (
+                    <div className="mt-3 rounded-lg p-3 text-xs text-red-300" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)' }}>
+                      {claimError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleClaimSubmit}
+                    disabled={claimSubmitting || !claimForm.name || !claimForm.email}
+                    className="w-full mt-5 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(212,160,23,0.2), rgba(212,160,23,0.1))',
+                      border: '1px solid rgba(212,160,23,0.3)',
+                      color: '#d4a017',
+                    }}
+                  >
+                    {claimSubmitting ? <><Loader /> Verifying...</> : 'Unlock Preliminary Scan'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* ═══ STEP 2: PERSONALIZED RESULTS ═══ */
+              <>
+                <div className="px-6 pt-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-white font-bold text-lg" style={{ fontFamily: "'DM Sans', sans-serif" }}>{claimModal.name}</h3>
+                    <button onClick={() => setClaimModal(null)} className="text-slate-500 hover:text-white p-1"><XIcon /></button>
+                  </div>
+                </div>
+
+                <div className="px-6 py-5">
+                  {/* Score Ring */}
+                  {(() => {
+                    const score = claimModal.risk_score || 0;
+                    const tier = getTier(score);
+                    return (
+                      <div className="flex items-center gap-5 mb-6">
+                        <div className="relative w-20 h-20 flex-shrink-0">
+                          <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
+                            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                            <circle cx="40" cy="40" r="34" fill="none" stroke={tier.color} strokeWidth="6"
+                              strokeDasharray={`${(score / 100) * 213.6} 213.6`} strokeLinecap="round" />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-xl font-black text-white">{score}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${tier.bg} ${tier.border} border`}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: tier.color }} />
+                            <span className={tier.cssColor}>{tier.label}</span>
+                          </span>
+                          <p className="text-slate-400 text-xs mt-2">Composite compliance score based on SB 1188 and HB 149 analysis.</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Category Breakdown */}
+                  {(() => {
+                    const cs = claimModal.last_scan_result?.category_scores
+                      || claimModal.last_scan_result?.categoryScores || {};
+                    const categories = [
+                      { key: 'data_sovereignty', label: 'Data Residency (SB 1188)', weight: 45 },
+                      { key: 'ai_transparency', label: 'AI Transparency (HB 149)', weight: 30 },
+                      { key: 'clinical_integrity', label: 'Clinical Integrity', weight: 25 },
+                    ];
+                    return (
+                      <div className="space-y-2 mb-6">
+                        {categories.map(cat => {
+                          const pct = cs[cat.key]?.percentage ?? 0;
+                          const catTier = getTier(pct);
+                          return (
+                            <div key={cat.key} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-white text-xs font-semibold">{cat.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold" style={{ color: catTier.color }}>{pct}%</span>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${catTier.bg} ${catTier.cssColor}`}>{catTier.label}</span>
+                                </div>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: catTier.color }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Personalized Findings Summary */}
+                  {(() => {
+                    const { critical, high, warnings, passes, total } = generateFindingsSummary(claimModal.last_scan_result);
+                    if (total === 0) return null;
+                    return (
+                      <div className="rounded-lg p-4 mb-6" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Scan Findings</div>
+                        {critical.length > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-red-300 py-1">
+                            <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                            <span><strong className="text-red-400">{critical.length} critical</strong> exposure{critical.length !== 1 ? 's' : ''} requiring immediate attention</span>
+                          </div>
+                        )}
+                        {high.length > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-orange-300 py-1">
+                            <span className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
+                            <span><strong className="text-orange-400">{high.length} high-severity</strong> finding{high.length !== 1 ? 's' : ''} detected</span>
+                          </div>
+                        )}
+                        {warnings.length > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-amber-300 py-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                            <span><strong className="text-amber-400">{warnings.length} warning{warnings.length !== 1 ? 's' : ''}</strong> — recommended review</span>
+                          </div>
+                        )}
+                        {passes.length > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-emerald-300 py-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                            <span><strong className="text-emerald-400">{passes.length} check{passes.length !== 1 ? 's' : ''} passed</strong></span>
+                          </div>
+                        )}
+                        <p className="text-slate-600 text-[10px] mt-2 italic">
+                          Full remediation roadmap available in the Audit Report.
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Confirmation */}
+                  <p className="text-slate-400 text-xs mb-5">
+                    A summary has been sent to <strong className="text-white">{claimForm.email}</strong>. To access detailed forensic findings, remediation roadmap, and data border map:
+                  </p>
+
+                  {/* CTAs */}
+                  <div className="space-y-2.5">
+                    <a href={`/#scan`}
+                      className="flex items-center justify-between w-full rounded-xl p-4 transition-all group"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div>
+                        <div className="text-white font-bold text-sm">Full Audit Report</div>
+                        <div className="text-slate-500 text-xs">Deep forensic analysis with legal evidence mapping</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-black" style={{ color: '#d4a017' }}>$149</div>
+                      </div>
+                    </a>
+
+                    <a href={`/#scan`}
+                      className="flex items-center justify-between w-full rounded-xl p-4 transition-all relative overflow-hidden"
+                      style={{ background: 'rgba(212,160,23,0.05)', border: '1px solid rgba(212,160,23,0.2)' }}>
+                      <div className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017' }}>
+                        RECOMMENDED
+                      </div>
+                      <div>
+                        <div className="text-white font-bold text-sm">Safe Harbor™ + Audit</div>
+                        <div className="text-slate-500 text-xs">Full audit + compliance remediation package</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-black" style={{ color: '#d4a017' }}>$249</div>
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
