@@ -123,9 +123,9 @@ export default function PatientsPage() {
 
           <div className="max-w-xl mx-auto bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 mb-8">
             <label className="block text-left text-sm font-semibold text-gray-300 mb-2">Enter your healthcare provider&apos;s website</label>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="e.g., hillcountryfamilymed.com" className="flex-1 px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-red-400" onKeyDown={e => e.key === 'Enter' && quickCheck()} />
-              <button onClick={quickCheck} disabled={checking || !url} className="px-6 py-3 bg-red-500 hover:bg-red-600 disabled:bg-slate-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
+              <button onClick={quickCheck} disabled={checking || !url} className="w-full sm:w-auto px-6 py-3 bg-red-500 hover:bg-red-600 disabled:bg-slate-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap">
                 {checking ? <><div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Checking...</> : <><Search size={16} /> Quick Check</>}
               </button>
             </div>
