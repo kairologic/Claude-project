@@ -33,8 +33,9 @@ interface ScanRecord {
 
 interface CheckResult {
   id: string; check_id: string; check_name: string; category: string;
-  status: string; severity: string; detail: string;
+  status: string; severity: string; detail: string; title: string;
   npi_value?: string; site_value?: string; recommendation?: string;
+  evidence?: any; score?: number;
   created_at: string;
 }
 
@@ -203,9 +204,10 @@ function OverviewTab({ data }: { data: DashboardData }) {
 
         {/* Category Cards */}
         {[
+          { key: 'npi-integrity', label: 'NPI Integrity', sub: 'NPPES Verification' },
           { key: 'data_sovereignty', label: 'Data Residency', sub: 'SB 1188' },
           { key: 'ai_transparency', label: 'AI Transparency', sub: 'HB 149' },
-        ].map(cat => {
+        ].filter(cat => cats[cat.key]).map(cat => {
           const c = cats[cat.key];
           const pct = c?.percentage ?? 0;
           const t = getTier(pct);
@@ -326,15 +328,17 @@ function NpiIntegrityTab({ data }: { data: DashboardData }) {
           <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
             {npiChecks.map((check, i) => {
               const passed = check.status === 'pass';
+              const isWarn = check.status === 'warn';
+              const isInconclusive = check.status === 'inconclusive';
               const sev = severityColor(check.severity || 'medium');
               return (
                 <div key={i} className="px-5 py-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className={passed ? 'text-emerald-400' : 'text-red-400'}>
-                        {passed ? icons.check('#34d399') : icons.x('#f87171')}
+                      <span className={passed ? 'text-emerald-400' : isWarn ? 'text-amber-400' : isInconclusive ? 'text-slate-400' : 'text-red-400'}>
+                        {passed ? icons.check('#34d399') : isWarn ? icons.alert('#fbbf24') : isInconclusive ? icons.clock('#64748b') : icons.x('#f87171')}
                       </span>
-                      <span className="text-white text-sm font-semibold">{check.check_name || check.check_id}</span>
+                      <span className="text-white text-sm font-semibold">{check.title || check.check_name || check.check_id}</span>
                       <span className="text-slate-600 text-[10px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{check.check_id}</span>
                     </div>
                     <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${sev.bg} ${sev.text} border ${sev.border}`}>
@@ -343,18 +347,24 @@ function NpiIntegrityTab({ data }: { data: DashboardData }) {
                   </div>
 
                   {/* Side-by-side comparison */}
-                  {(check.npi_value || check.site_value) && (
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">NPI Registry</div>
-                        <div className="text-slate-300 text-xs">{check.npi_value || '—'}</div>
+                  {(() => {
+                    const ev = check.evidence || {};
+                    const npiVal = check.npi_value || ev.npi_address || ev.npi_classification || ev.npi_phone || null;
+                    const siteVal = check.site_value || ev.site_address || (ev.site_specialties || []).join(', ') || ev.site_phone || null;
+                    if (!npiVal && !siteVal) return null;
+                    return (
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">NPI Registry</div>
+                          <div className="text-slate-300 text-xs">{npiVal || '—'}</div>
+                        </div>
+                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Your Website</div>
+                          <div className="text-slate-300 text-xs">{siteVal || '—'}</div>
+                        </div>
                       </div>
-                      <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Your Website</div>
-                        <div className="text-slate-300 text-xs">{check.site_value || '—'}</div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {check.detail && (
                     <p className="text-slate-400 text-xs mt-2">{check.detail}</p>
@@ -737,9 +747,32 @@ function DashboardInner() {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      // Build category scores from last scan result
+      // Compute category scores from check_results
+      const latestChecks = (checks || []).slice(0, 10); // latest scan's checks
+      const catScores: Record<string, any> = {};
+      
+      // Group checks by category
+      const categories = ['npi-integrity', 'data-sovereignty', 'ai-transparency', 'clinical-integrity'];
+      categories.forEach(cat => {
+        const catChecks = latestChecks.filter((c: any) => c.category === cat);
+        if (catChecks.length > 0) {
+          const passed = catChecks.filter((c: any) => c.status === 'pass').length;
+          const failed = catChecks.filter((c: any) => c.status === 'fail').length;
+          const warned = catChecks.filter((c: any) => c.status === 'warn').length;
+          const totalScored = catChecks.filter((c: any) => c.score != null && c.score > 0);
+          const avgScore = totalScored.length > 0 
+            ? Math.round(totalScored.reduce((s: number, c: any) => s + c.score, 0) / totalScored.length)
+            : 0;
+          catScores[cat] = { name: cat, percentage: avgScore, passed, failed, level: getTier(avgScore).label };
+        }
+      });
+
+      // Also try last_scan_result for legacy data
       const lastScan = provider.last_scan_result || {};
-      const catScores = lastScan.category_scores || lastScan.categoryScores || {};
+      const legacyCats = lastScan.category_scores || lastScan.categoryScores || {};
+      Object.keys(legacyCats).forEach(k => {
+        if (!catScores[k]) catScores[k] = legacyCats[k];
+      });
 
       // Build border map from last scan
       const borderMap = lastScan.border_map || lastScan.borderMap || [];
@@ -759,11 +792,11 @@ function DashboardInner() {
         borderMap,
         scanHistory: (scans || []).map((s: any) => ({
           id: s.id,
-          scan_date: s.created_at,
-          risk_score: s.risk_score || 0,
-          risk_level: s.risk_level || '',
+          scan_date: s.started_at || s.created_at,
+          risk_score: s.composite_score || 0,
+          risk_level: s.risk_level || s.tier || '',
           scan_type: s.triggered_by || 'manual',
-          findings_count: (s.pass_count || 0) + (s.fail_count || 0) + (s.warn_count || 0),
+          findings_count: (s.checks_passed || 0) + (s.checks_failed || 0) + (s.checks_warned || 0),
         })),
         checkResults: checks || [],
         mismatchAlerts: mismatches || [],
