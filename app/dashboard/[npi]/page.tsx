@@ -715,11 +715,21 @@ function DashboardInner() {
       if (pErr || !provider) { setError('Provider not found.'); return; }
       if (provider.dashboard_token !== token) { setError('access_denied'); return; }
 
-      // Load check results
+      // Load latest scan session ID
+      const { data: latestScan } = await supabase
+        .from('scan_sessions')
+        .select('id')
+        .eq('npi', npi)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      // Load check results for latest scan only
       const { data: checks } = await supabase
         .from('check_results')
         .select('*')
         .eq('npi', npi)
+        .eq('scan_id', latestScan?.id || '')
         .order('created_at', { ascending: false })
         .limit(50);
 
