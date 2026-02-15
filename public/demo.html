@@ -270,14 +270,22 @@ a{color:inherit;text-decoration:none;}
       </div>
       <div style="padding:0 14px 10px;"><div style="background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.15);border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:var(--red);font-weight:600;">5 compliance changes detected</div><div style="font-size:9px;color:var(--muted);margin-top:1px;">2 critical · 2 high · 1 medium</div></div></div>
       <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:5px;">
-        <div onclick="showPage('dashboard')" style="padding:8px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);border-radius:6px;text-align:center;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;">Open Compliance Dashboard</div>
-        <div onclick="showPage('report')" style="padding:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;text-align:center;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;">View Full Compliance Report</div>
+        <div id="cta-provider" style="display:flex;flex-direction:column;gap:5px;">
+          <div onclick="showPage('dashboard')" style="padding:8px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);border-radius:6px;text-align:center;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;">Open Compliance Dashboard</div>
+          <div onclick="showPage('report')" style="padding:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;text-align:center;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;">View Full Compliance Report</div>
+        </div>
+        <div id="cta-patient" style="display:none;flex-direction:column;gap:5px;">
+          <div style="padding:8px;background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.15);border-radius:6px;text-align:center;font-size:10px;color:rgba(52,211,153,0.8);cursor:pointer;">Learn about your data rights under Texas law →</div>
+        </div>
       </div>
       <div style="padding:6px 14px;background:rgba(0,0,0,0.2);text-align:center;"><div style="font-size:7px;color:var(--muted);font-family:var(--mono);">Powered by KairoLogic Sentry Shield™</div></div>
     </div>
-    <!-- Prompt bar -->
+    <!-- Prompt bar with view toggle -->
     <div style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 18px;z-index:999;display:flex;align-items:center;gap:12px;">
-      <span style="font-size:10px;color:var(--muted);">👆 Click the shield badge to see the trust pane</span>
+      <span onclick="setWidgetView('patient')" id="vw-patient" style="font-size:10px;padding:4px 10px;border-radius:5px;cursor:pointer;font-weight:700;background:rgba(52,211,153,0.15);color:var(--green);border:1px solid rgba(52,211,153,0.3);">👤 Patient View</span>
+      <span onclick="setWidgetView('provider')" id="vw-provider" style="font-size:10px;padding:4px 10px;border-radius:5px;cursor:pointer;font-weight:700;color:var(--muted);border:1px solid transparent;">🏥 Provider View</span>
+      <span style="font-size:10px;color:rgba(255,255,255,0.15);">|</span>
+      <span style="font-size:10px;color:var(--muted);">👆 Click the badge</span>
       <span style="font-size:10px;color:rgba(255,255,255,0.15);">|</span>
       <span onclick="showPage('scan')" style="font-size:10px;color:var(--green);font-weight:700;cursor:pointer;">Continue to Sentry Scan →</span>
     </div>
@@ -604,6 +612,31 @@ function showPage(id) {
 function toggleWidgetPane() {
   var p = document.getElementById('widget-pane');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+function setWidgetView(view) {
+  var providerCta = document.getElementById('cta-provider');
+  var patientCta = document.getElementById('cta-patient');
+  var btnP = document.getElementById('vw-patient');
+  var btnPr = document.getElementById('vw-provider');
+  if (view === 'patient') {
+    providerCta.style.display = 'none';
+    patientCta.style.display = 'flex';
+    btnP.style.background = 'rgba(52,211,153,0.15)';
+    btnP.style.color = '#34d399';
+    btnP.style.borderColor = 'rgba(52,211,153,0.3)';
+    btnPr.style.background = 'transparent';
+    btnPr.style.color = '#64748b';
+    btnPr.style.borderColor = 'transparent';
+  } else {
+    providerCta.style.display = 'flex';
+    patientCta.style.display = 'none';
+    btnPr.style.background = 'rgba(96,165,250,0.15)';
+    btnPr.style.color = '#60a5fa';
+    btnPr.style.borderColor = 'rgba(96,165,250,0.3)';
+    btnP.style.background = 'transparent';
+    btnP.style.color = '#64748b';
+    btnP.style.borderColor = 'transparent';
+  }
 }
 var scanPhases = [
   {text:'Resolving DNS endpoints...',time:600},{text:'Crawling website content...',time:800},
