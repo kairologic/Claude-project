@@ -185,7 +185,9 @@ a{color:inherit;text-decoration:none;}
 .f-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
 
 /* Widget styles */
-.widget-badge{position:fixed;bottom:18px;right:18px;width:48px;height:48px;background:linear-gradient(135deg,#0f172a,#1e293b);border:2px solid rgba(52,211,153,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:1000;font-size:20px;}
+.widget-badge{position:fixed;bottom:18px;right:18px;background:linear-gradient(135deg,#0f172a,#1e293b);border:2px solid rgba(52,211,153,0.3);border-radius:10px;display:flex;align-items:center;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:1000;padding:8px 14px;gap:8px;transition:all .2s;}
+.widget-badge:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.4);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .widget-pane{position:fixed;bottom:74px;right:18px;width:320px;background:#0f172a;border:1px solid rgba(52,211,153,0.2);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:1000;display:none;overflow:hidden;color:white;}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
@@ -246,8 +248,15 @@ a{color:inherit;text-decoration:none;}
       <div class="site-card"><div class="emoji">💉</div><h3>Preventive Care</h3><p>Physicals, immunizations, screenings.</p></div>
       <div class="site-card"><div class="emoji">🧪</div><h3>Lab Services</h3><p>On-site lab, same-day results.</p></div>
     </div>
-    <!-- Widget Badge -->
-    <div class="widget-badge" onclick="toggleWidgetPane()">🛡️</div>
+    <!-- Widget Badge (matches live sentry.js) -->
+    <div class="widget-badge" onclick="toggleWidgetPane()" style="width:auto;border-radius:10px;padding:8px 14px;gap:8px;border:2px solid rgba(52,211,153,0.25);">
+      <span style="font-size:18px;">🛡️</span>
+      <div style="text-align:left;">
+        <div style="font-size:11px;font-weight:800;color:white;line-height:1.2;">Data & AI Trust</div>
+        <div style="font-size:8px;color:var(--green);font-family:var(--mono);line-height:1.2;">Live Monitoring Active</div>
+      </div>
+      <div style="width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;"></div>
+    </div>
     <!-- Widget Pane -->
     <div class="widget-pane" id="widget-pane">
       <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
