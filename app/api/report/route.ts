@@ -14,7 +14,6 @@ import { NextRequest, NextResponse } from 'next/server';
  * Format matches the locked Python reference (report_generator_v1_locked.py).
  */
 
-// @ts-expect-error - jspdf types in node context
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
