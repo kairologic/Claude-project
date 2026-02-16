@@ -576,7 +576,7 @@ function generatePDF(payload: Record<string, unknown>): string {
     y = bodyText(y, 'No compliance failures detected. Your practice meets all scanned requirements.', { bold: true, color: C.green });
   } else {
     // Assign priorities
-    const prioritized = failed.map(f => {
+    const prioritized: Array<Record<string, unknown> & { _priority: string }> = failed.map(f => {
       const id = (f.id as string) || '';
       let priority = safe(f.fix_priority as string, '').toUpperCase();
       if (!priority) {
