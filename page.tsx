@@ -18,7 +18,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-8">
             <div className="inline-block bg-green-400/20 text-green-400 px-4 py-2 rounded-full text-sm font-semibold mb-6 animate-pulse">
-              {c('hero_badge', '🟢 SOVEREIGN MODE: ATX-01 ACTIVE')}
+              {c('hero_badge', '\u{1F7E2} SOVEREIGN MODE: ATX-01 ACTIVE')}
             </div>
             <h1 
               className="text-5xl md:text-7xl font-display font-extrabold mb-6 leading-tight"
@@ -44,40 +44,40 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Trust Indicators */}
+          {/* Trust Indicators — UPDATED with V1 features */}
           <div className="grid md:grid-cols-3 gap-6 mt-16">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center border border-white/10 hover:border-gold/40 transition-colors">
-              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">The Legal Fix</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">Texas Provider Index</div>
               <div className="text-3xl font-display font-bold text-white mb-2">
-                {c('trust_stat_1_value', 'SB 1188 Certified')}
+                {c('trust_stat_1_value', '481K+ Providers')}
               </div>
               <div className="text-sm text-gray-300 leading-relaxed">
-                {c('trust_stat_1_label', '100% US-based data sovereignty. No international routing. No legal gray areas.')}
+                {c('trust_stat_1_label', 'Indexed against the federal NPPES registry with NPI Integrity verification on every scan.')}
               </div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center border border-white/10 hover:border-gold/40 transition-colors">
-              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">The Security Standard</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">Scanning Engine</div>
               <div className="text-3xl font-display font-bold text-white mb-2">
-                {c('trust_stat_2_value', 'Zero-Trust Security')}
+                {c('trust_stat_2_value', 'Check Engine v2')}
               </div>
               <div className="text-sm text-gray-300 leading-relaxed">
-                {c('trust_stat_2_label', 'Built on a modern, encrypted architecture that assumes nothing and protects everything.')}
+                {c('trust_stat_2_label', 'Plugin-based compliance scanning across Data Residency, AI Transparency, and Clinical Integrity.')}
               </div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center border border-white/10 hover:border-gold/40 transition-colors">
-              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">The Peace of Mind</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gold/70 mb-2">Shield Monitoring</div>
               <div className="text-3xl font-display font-bold text-white mb-2">
                 {c('trust_stat_3_value', '24/7 Guardrails')}
               </div>
               <div className="text-sm text-gray-300 leading-relaxed">
-                {c('trust_stat_3_label', 'Real-time monitoring that alerts you before a compliance gap becomes a liability.')}
+                {c('trust_stat_3_label', '7-tab Shield Dashboard with drift detection, data border mapping, and real-time compliance alerts.')}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Value Propositions */}
+      {/* Value Propositions — UPDATED with V1 features */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -98,10 +98,10 @@ export default function HomePage() {
                 <Shield className="w-8 h-8 text-orange" />
               </div>
               <h3 className="text-xl font-display font-bold text-navy mb-3">
-                {c('value_card_1_title', 'Sovereign Architecture')}
+                {c('value_card_1_title', 'Check Engine v2')}
               </h3>
               <p className="text-gray-600">
-                {c('value_card_1_description', 'Your PHI remains on domestic nodes. No foreign cloud dependencies. Pure Texas sovereignty.')}
+                {c('value_card_1_description', 'Plugin-based compliance scanning across Data Residency, AI Transparency, and Clinical Integrity with named check IDs and category scores.')}
               </p>
             </div>
 
@@ -110,10 +110,10 @@ export default function HomePage() {
                 <FileCheck className="w-8 h-8 text-orange" />
               </div>
               <h3 className="text-xl font-display font-bold text-navy mb-3">
-                {c('value_card_2_title', 'Legislative Guardian')}
+                {c('value_card_2_title', 'NPI Integrity')}
               </h3>
               <p className="text-gray-600">
-                {c('value_card_2_description', 'Real-time monitoring of SB 1188 and HB 149 compliance requirements and penalties.')}
+                {c('value_card_2_description', 'Cross-references your website against the federal NPPES registry to catch credentialing mismatches before regulators do.')}
               </p>
             </div>
 
@@ -122,10 +122,10 @@ export default function HomePage() {
                 <Building2 className="w-8 h-8 text-orange" />
               </div>
               <h3 className="text-xl font-display font-bold text-navy mb-3">
-                {c('value_card_3_title', 'Texas Registry')}
+                {c('value_card_3_title', 'Shield Dashboard')}
               </h3>
               <p className="text-gray-600">
-                {c('value_card_3_description', 'Searchable directory of 480K+ Texas healthcare providers with compliance scoring.')}
+                {c('value_card_3_description', '7 real-time monitoring views including drift detection, data border mapping, NPI integrity tracking, and scan history.')}
               </p>
             </div>
 
@@ -134,10 +134,10 @@ export default function HomePage() {
                 <TrendingUp className="w-8 h-8 text-orange" />
               </div>
               <h3 className="text-xl font-display font-bold text-navy mb-3">
-                {c('value_card_4_title', 'Risk Analytics')}
+                {c('value_card_4_title', 'Data & AI Trust Badge')}
               </h3>
               <p className="text-gray-600">
-                {c('value_card_4_description', 'Predictive compliance scoring and drift detection to prevent violations before they occur.')}
+                {c('value_card_4_description', 'An interactive widget your patients click to verify your compliance status in real time \u2014 building trust at the point of care.')}
               </p>
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function HomePage() {
           <div className="flex items-start gap-6">
             <div className="flex-shrink-0">
               <div className="w-16 h-16 bg-orange/20 rounded-full flex items-center justify-center">
-                <span className="text-3xl">⚠</span>
+                <span className="text-3xl">{'\u26A0'}</span>
               </div>
             </div>
             <div className="flex-1">
@@ -202,4 +202,3 @@ export default function HomePage() {
     </div>
   );
 }
-
