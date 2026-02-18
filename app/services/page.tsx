@@ -1,6 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  Shield, ShieldCheck, Search, FileText, CheckCircle, ArrowRight,
+  AlertTriangle, Globe, Lock, Cpu, Zap, Scale, Database, Eye,
+  FileCheck, Users, Calendar, Wrench, ChevronDown, ChevronUp,
+  BarChart3, Activity, MapPin, Fingerprint, BadgeCheck, Monitor,
+  ClipboardList, Bot, FolderOpen, GraduationCap, BookOpen, Settings
+} from 'lucide-react';
+
 const STRIPE_PK = 'pk_live_51SqnMvGg3oiiGF7gMSDPwdLYbU7pLsS5cqc8QGZuZQIIAqWz2xD5NwFBVFLrOiQGyHBV4UeNqwq9f5WgyuGXARsw001mJX03so';
 
 function StripeBuyButton({ buyButtonId }: { buyButtonId: string }) {
@@ -22,14 +31,6 @@ function StripeBuyButton({ buyButtonId }: { buyButtonId: string }) {
     />
   );
 }
-import Link from 'next/link';
-import {
-  Shield, ShieldCheck, Search, FileText, CheckCircle, ArrowRight,
-  AlertTriangle, Globe, Lock, Cpu, Zap, Scale, Database, Eye,
-  FileCheck, Users, Calendar, Wrench, ChevronDown, ChevronUp,
-  BarChart3, Activity, MapPin, Fingerprint, BadgeCheck, Monitor,
-  ClipboardList, Bot, FolderOpen, GraduationCap, BookOpen, Settings
-} from 'lucide-react';
 
 /* ──────────────────────────────────────────────────────────────
    FAQ Accordion
