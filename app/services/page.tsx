@@ -301,7 +301,8 @@ export default function ServicesPage() {
               <div className="mt-2">
                 <StripeBuyButton buyButtonId="buy_btn_1T1pNnGg3oiiGF7gOiPuXc0N" />
                 <p className="text-xs text-gray-500 mt-3">Cancel anytime. Secure checkout via Stripe.</p>
-</div>            
+              </div>
+            </div>
               {/* Dashboard mockup — UPDATED */}
             <div className="lg:col-span-2">
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
