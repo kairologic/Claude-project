@@ -1,6 +1,27 @@
 'use client';
 
 import { useState } from 'react';
+const STRIPE_PK = 'pk_live_51SqnMvGg3oiiGF7gMSDPwdLYbU7pLsS5cqc8QGZuZQIIAqWz2xD5NwFBVFLrOiQGyHBV4UeNqwq9f5WgyuGXARsw001mJX03so';
+
+function StripeBuyButton({ buyButtonId }: { buyButtonId: string }) {
+  useEffect(() => {
+    const existing = document.querySelector('script[src="https://js.stripe.com/v3/buy-button.js"]');
+    if (!existing) {
+      const script = document.createElement('script');
+      script.src = 'https://js.stripe.com/v3/buy-button.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  return (
+    <div
+      dangerouslySetInnerHTML={{
+        __html: `<stripe-buy-button buy-button-id="${buyButtonId}" publishable-key="${STRIPE_PK}"></stripe-buy-button>`
+      }}
+    />
+  );
+}
 import Link from 'next/link';
 import {
   Shield, ShieldCheck, Search, FileText, CheckCircle, ArrowRight,
@@ -276,15 +297,12 @@ export default function ServicesPage() {
                 ))}
               </ul>
 
-              <Link href="/scan">
-                <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors">
-                  Start Shield Monitoring
-                </button>
-              </Link>
-              <p className="text-xs text-gray-500 mt-3">Cancel anytime. No long-term contracts.</p>
-            </div>
-
-            {/* Dashboard mockup — UPDATED */}
+              <div className="mt-2">
+                <StripeBuyButton buyButtonId="buy_btn_1T1pNnGg3oiiGF7gOiPuXc0N" />
+              </div>
+              <p className="text-xs text-gray-500 mt-3">Cancel anytime. Secure checkout via Stripe.</p>
+            
+              {/* Dashboard mockup — UPDATED */}
             <div className="lg:col-span-2">
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
