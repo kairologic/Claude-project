@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   Shield, ShieldCheck, Search, FileText, CheckCircle, ArrowRight,
@@ -9,28 +9,6 @@ import {
   BarChart3, Activity, MapPin, Fingerprint, BadgeCheck, Monitor,
   ClipboardList, Bot, FolderOpen, GraduationCap, BookOpen, Settings
 } from 'lucide-react';
-
-const STRIPE_PK = 'pk_live_51SqnMvGg3oiiGF7gMSDPwdLYbU7pLsS5cqc8QGZuZQIIAqWz2xD5NwFBVFLrOiQGyHBV4UeNqwq9f5WgyuGXARsw001mJX03so';
-
-function StripeBuyButton({ buyButtonId }: { buyButtonId: string }) {
-  useEffect(() => {
-    const existing = document.querySelector('script[src="https://js.stripe.com/v3/buy-button.js"]');
-    if (!existing) {
-      const script = document.createElement('script');
-      script.src = 'https://js.stripe.com/v3/buy-button.js';
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }, []);
-
-  return (
-    <div
-      dangerouslySetInnerHTML={{
-        __html: `<stripe-buy-button buy-button-id="${buyButtonId}" publishable-key="${STRIPE_PK}"></stripe-buy-button>`
-      }}
-    />
-  );
-}
 
 /* ──────────────────────────────────────────────────────────────
    FAQ Accordion
@@ -298,13 +276,16 @@ export default function ServicesPage() {
                 ))}
               </ul>
 
-              <div className="mt-2">
-                <a href="/shield-demo.html" target="_blank" 
-   className="block text-center text-sm text-gold underline hover:text-white transition-colors mb-4">
-  View Sample Dashboard →
-</a>
-                <StripeBuyButton buyButtonId="buy_btn_1T1pNnGg3oiiGF7gOiPuXc0N" />
-                <p className="text-xs text-gray-500 mt-3">Cancel anytime. Secure checkout via Stripe.</p>
+              <div className="mt-2 space-y-3">
+                <a href="https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06" target="_blank"
+                   className="block w-full bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors text-center">
+                  Subscribe to Shield
+                </a>
+                <p className="text-xs text-gray-500 text-center">$79/month · Cancel anytime · Secure checkout via Stripe</p>
+                <a href="/shield-demo.html" target="_blank"
+                   className="block text-center text-sm text-gold underline hover:text-white transition-colors">
+                  View Sample Dashboard →
+                </a>
               </div>
             </div>
               {/* Dashboard mockup — UPDATED */}
