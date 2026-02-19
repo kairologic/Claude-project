@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentry Shield Dashboard — Sample | KairoLogic</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#070d1b;--card-dark:rgba(255,255,255,0.03);--border-dark:rgba(255,255,255,0.06);
+  --text:#e2e8f0;--muted:#64748b;--green:#34d399;--amber:#fbbf24;--red:#f87171;--orange:#fb923c;
+  --navy:#0A192F;--gold:#d4a017;--gold-light:#c9973e;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);overflow-x:hidden;}
+a{color:inherit;text-decoration:none;}
+
+/* ── SAMPLE BANNER ── */
+.sample-banner{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 20px;background:linear-gradient(90deg,#d4a017,#c9973e);color:var(--navy);font-size:12px;font-weight:700;letter-spacing:.5px;}
+.sample-banner a{color:var(--navy);text-decoration:underline;font-weight:800;}
+
+/* ── TOP NAV ── */
+.kl-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:white;border-bottom:1px solid #e2e8f0;}
+.kl-nav .logo{display:flex;align-items:center;gap:10px;color:var(--navy);font-size:18px;font-weight:800;}
+.kl-nav .logo span{color:var(--gold-light);}
+.kl-nav .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#e8760c,#c96108);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;}
+.kl-nav .cta-btn{padding:8px 18px;background:#e8760c;color:white;border-radius:6px;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer;transition:all .2s;}
+.kl-nav .cta-btn:hover{filter:brightness(1.1);}
+
+/* ── DASHBOARD ── */
+.dash-wrap{min-height:calc(100vh - 80px);}
+.alert-banner{display:flex;align-items:center;gap:10px;padding:10px 24px;background:rgba(248,113,113,0.08);border-bottom:1px solid rgba(248,113,113,0.15);}
+.alert-banner .msg{font-size:12px;font-weight:600;color:var(--red);flex:1;}
+.alert-banner .abtn{font-size:11px;font-weight:700;padding:4px 12px;border-radius:6px;background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2);cursor:pointer;}
+.dash-top{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border-dark);}
+.dash-top h2{font-size:15px;font-weight:800;color:white;}
+.dash-top .tmeta{font-size:9px;color:var(--muted);font-family:var(--mono);}
+.dash-top .shield-badge{font-size:9px;font-weight:700;padding:4px 10px;border-radius:8px;background:rgba(52,211,153,0.1);color:var(--green);border:1px solid rgba(52,211,153,0.2);}
+.dash-layout{display:flex;}
+.dash-side{width:200px;border-right:1px solid rgba(255,255,255,0.04);padding:14px 0;flex-shrink:0;}
+.dash-side .nav-item{display:flex;align-items:center;gap:9px;padding:7px 16px;font-size:11px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .15s;border-left:3px solid transparent;}
+.dash-side .nav-item:hover{color:white;background:rgba(255,255,255,0.03);}
+.dash-side .nav-item.active{color:white;background:rgba(255,255,255,0.06);border-left-color:var(--green);}
+.dash-main{flex:1;padding:16px 20px;overflow-y:auto;}
+.d-card{background:var(--card-dark);border:1px solid var(--border-dark);border-radius:10px;padding:14px;margin-bottom:12px;}
+.d-card h4{font-size:12px;font-weight:700;color:white;margin-bottom:2px;}
+.d-card .sub{font-size:9px;color:var(--muted);}
+.d-grid{display:grid;gap:10px;margin-bottom:12px;}
+.d-grid.c3{grid-template-columns:repeat(3,1fr);}
+.d-grid.c2{grid-template-columns:repeat(2,1fr);}
+.tab-section{display:none;}.tab-section.active{display:block;}
+.bar-bg{width:100%;height:4px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;}
+.npi-check{padding:12px 0;border-bottom:1px solid var(--border-dark);}.npi-check:last-child{border:none;}
+.npi-header{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.npi-header .title{font-size:12px;font-weight:700;}
+.npi-header .code{font-size:9px;color:var(--muted);font-family:var(--mono);}
+.npi-header .badge{margin-left:auto;font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;}
+.npi-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;}
+.npi-side{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:6px;padding:8px;}
+.npi-side .sl{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.npi-side .sv{font-size:11px;color:var(--text);}
+.npi-tip{font-size:10px;color:rgba(52,211,153,0.7);margin-top:3px;}
+.drift-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-dark);}.drift-item:last-child{border:none;}
+.drift-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+.drift-content{flex:1;}
+.drift-title{font-size:11px;font-weight:600;}
+.drift-desc{font-size:10px;color:var(--muted);margin-top:2px;}
+.drift-time{font-size:9px;color:var(--muted);font-family:var(--mono);flex-shrink:0;}
+.border-row{display:grid;grid-template-columns:2fr 1.2fr 1fr 2fr;gap:6px;padding:6px 0;border-bottom:1px solid var(--border-dark);font-size:10px;align-items:center;}
+.border-row.hdr{font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);}
+.border-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;}
+.f-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border-dark);font-size:10px;}.f-row:last-child{border:none;}
+.f-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+
+/* ── MOBILE RESPONSIVE ── */
+@media(max-width:768px){
+  .dash-layout{flex-direction:column;}
+  .dash-side{width:100%;display:flex;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border-dark);padding:8px 12px;gap:4px;}
+  .dash-side .nav-item{border-left:none;border-bottom:2px solid transparent;white-space:nowrap;padding:6px 10px;font-size:10px;}
+  .dash-side .nav-item.active{border-bottom-color:var(--green);border-left-color:transparent;}
+  .d-grid.c3{grid-template-columns:1fr;}
+  .d-grid.c2{grid-template-columns:1fr;}
+  .border-row{grid-template-columns:1fr 1fr;gap:4px;font-size:9px;}
+  .border-row.hdr div:nth-child(3),.border-row div:nth-child(3){display:none;}
+  .npi-compare{grid-template-columns:1fr;}
+  .kl-nav .nav-links{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ SAMPLE BANNER ═══ -->
+<div class="sample-banner">
+  🛡 SAMPLE DASHBOARD — This is a demo of the Sentry Shield monitoring experience.
+  <a href="/services">Subscribe to Shield →</a>
+</div>
+
+<!-- ═══ NAV ═══ -->
+<div class="kl-nav">
+  <a href="/" class="logo">
+    <div class="logo-icon">🛡</div>
+    Kairo<span>Logic</span>
+  </a>
+  <a href="/services" class="cta-btn">View Plans</a>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="dash-wrap">
+  <div class="alert-banner"><span>⚠️</span><span class="msg">5 open alerts — 2 critical, 2 high severity, 1 medium</span><span class="abtn" onclick="showDashTab('alerts')">View Details</span></div>
+  <div class="dash-top">
+    <div><h2 style="color:white;">🛡 Hill Country Family Medicine</h2><div class="tmeta">NPI: 1234567890 · SHIELD · Monitoring since Feb 1, 2026 · Live</div></div>
+    <div class="shield-badge">🛡 SHIELD ACTIVE</div>
+  </div>
+  <div class="dash-layout">
+    <div class="dash-side">
+      <div class="nav-item active" data-tab="overview" onclick="showDashTab('overview')">📊 Dashboard</div>
+      <div class="nav-item" data-tab="npi" onclick="showDashTab('npi')">👤 NPI Integrity</div>
+      <div class="nav-item" data-tab="border" onclick="showDashTab('border')">🗺️ Data Border Map</div>
+      <div class="nav-item" data-tab="alerts" onclick="showDashTab('alerts')">🔔 Drift Monitor</div>
+      <div class="nav-item" data-tab="history" onclick="showDashTab('history')">🕐 Scan History</div>
+      <div class="nav-item" data-tab="docs" onclick="showDashTab('docs')">📄 Documents</div>
+      <div class="nav-item" data-tab="settings" onclick="showDashTab('settings')">⚙️ Settings</div>
+    </div>
+    <div class="dash-main">
+
+      <!-- Overview -->
+      <div class="tab-section active" id="tab-overview">
+        <div class="d-grid c3">
+          <div class="d-card" style="text-align:center;"><div style="position:relative;width:70px;height:70px;margin:0 auto 6px;"><svg viewBox="0 0 70 70" style="width:100%;height:100%;transform:rotate(-90deg);"><circle cx="35" cy="35" r="29" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="5"/><circle cx="35" cy="35" r="29" fill="none" stroke="var(--red)" stroke-width="5" stroke-dasharray="106 182" stroke-linecap="round"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:var(--red);">58</div></div><span style="font-size:9px;font-weight:700;background:rgba(248,113,113,0.1);color:var(--red);padding:2px 8px;border-radius:6px;">Violation</span></div>
+          <div class="d-card"><h4>Data Residency</h4><div class="sub">SB 1188</div><div style="font-size:20px;font-weight:900;color:var(--red);float:right;margin-top:-20px;">38%</div><div class="bar-bg" style="margin-top:16px;"><div class="bar-fill" style="width:38%;background:var(--red);"></div></div></div>
+          <div class="d-card"><h4>AI Transparency</h4><div class="sub">HB 149</div><div style="font-size:20px;font-weight:900;color:var(--amber);float:right;margin-top:-20px;">62%</div><div class="bar-bg" style="margin-top:16px;"><div class="bar-fill" style="width:62%;background:var(--amber);"></div></div></div>
+        </div>
+        <div class="d-card"><h4>Open Alerts (5)</h4><div style="margin-top:8px;">
+          <div class="f-row"><span class="f-dot" style="background:var(--red)"></span><span style="flex:1;color:var(--red);">Foreign data routing — Google Fonts → Dublin</span><span class="drift-time">12m ago</span></div>
+          <div class="f-row"><span class="f-dot" style="background:var(--red)"></span><span style="flex:1;color:var(--red);">Foreign data routing — Analytics → Singapore</span><span class="drift-time">12m ago</span></div>
+          <div class="f-row"><span class="f-dot" style="background:var(--orange)"></span><span style="flex:1;color:var(--orange);">Address mismatch — NPI vs website</span><span class="drift-time">2d ago</span></div>
+          <div class="f-row"><span class="f-dot" style="background:var(--amber)"></span><span style="flex:1;color:var(--amber);">New tracker detected — Meta Pixel</span><span class="drift-time">5d ago</span></div>
+          <div class="f-row"><span class="f-dot" style="background:var(--amber)"></span><span style="flex:1;color:var(--amber);">Provider roster changed — 12 → 10</span><span class="drift-time">1w ago</span></div>
+        </div></div>
+        <div class="d-card"><h4>Recent Scans</h4><div style="margin-top:6px;">
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-dark);font-size:10px;"><span><strong style="color:var(--red)">58</strong> <span style="color:var(--muted)">batch_v2</span></span><span class="drift-time">14 findings · Feb 15 10:30am</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-dark);font-size:10px;"><span><strong style="color:var(--amber)">63</strong> <span style="color:var(--muted)">monthly</span></span><span class="drift-time">12 findings · Feb 1 6:00am</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:10px;"><span><strong style="color:var(--amber)">67</strong> <span style="color:var(--muted)">initial</span></span><span class="drift-time">10 findings · Jan 15 2:00pm</span></div>
+        </div></div>
+      </div>
+
+      <!-- NPI -->
+      <div class="tab-section" id="tab-npi">
+        <div class="d-card"><h4>NPI Registry Verification</h4><div class="sub">Comparing NPPES data against your website</div>
+          <div class="npi-check"><div class="npi-header"><span style="color:var(--red)">✗</span><span class="title" style="color:var(--red)">Address mismatch</span><span class="code">NPI-01</span><span class="badge" style="background:rgba(248,113,113,0.1);color:var(--red);">FAIL</span></div><div class="npi-compare"><div class="npi-side"><div class="sl">NPI Registry</div><div class="sv">1706 HWY 1431 W, MARBLE FALLS, TX 78654</div></div><div class="npi-side"><div class="sl">Your Website</div><div class="sv">2204 Hwy 1431 West, Marble Falls, TX 78654</div></div></div><div class="npi-tip">💡 Update either NPPES or website. Mismatched addresses affect insurance claims and patient navigation.</div></div>
+          <div class="npi-check"><div class="npi-header"><span style="color:var(--red)">✗</span><span class="title" style="color:var(--red)">Phone mismatch</span><span class="code">NPI-02</span><span class="badge" style="background:rgba(248,113,113,0.1);color:var(--red);">FAIL</span></div><div class="npi-compare"><div class="npi-side"><div class="sl">NPI Registry</div><div class="sv">(830) 693-4466</div></div><div class="npi-side"><div class="sl">Your Website</div><div class="sv">(830) 693-7500</div></div></div><div class="npi-tip">💡 Inconsistent phone numbers reduce patient trust and affect directory listings.</div></div>
+          <div class="npi-check"><div class="npi-header"><span style="color:var(--amber)">⚠</span><span class="title" style="color:var(--amber)">Specialty discrepancy</span><span class="code">NPI-03</span><span class="badge" style="background:rgba(251,191,36,0.1);color:var(--amber);">WARN</span></div><div class="npi-compare"><div class="npi-side"><div class="sl">NPI Registry</div><div class="sv">Internal Medicine</div></div><div class="npi-side"><div class="sl">Your Website</div><div class="sv">Family Practice</div></div></div><div class="npi-tip">💡 Align specialty language with NPI taxonomy for credentialing accuracy.</div></div>
+          <div class="npi-check"><div class="npi-header"><span style="color:var(--green)">✓</span><span class="title" style="color:var(--green)">NPI Status Valid</span><span class="code">RST-01</span><span class="badge" style="background:rgba(52,211,153,0.1);color:var(--green);">PASS</span></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">NPI 1234567890 active. Entity type: Type 2 Organization. Texas residency confirmed.</div></div>
+        </div>
+      </div>
+
+      <!-- Border Map -->
+      <div class="tab-section" id="tab-border">
+        <div class="d-grid c2"><div class="d-card" style="background:rgba(52,211,153,0.04);border-color:rgba(52,211,153,0.15);"><div style="font-size:24px;font-weight:900;color:var(--green);">4</div><div style="font-size:10px;color:var(--green);opacity:.7;">US-Sovereign</div></div><div class="d-card" style="background:rgba(248,113,113,0.04);border-color:rgba(248,113,113,0.15);"><div style="font-size:24px;font-weight:900;color:var(--red);">3</div><div style="font-size:10px;color:var(--red);opacity:.7;">Foreign</div></div></div>
+        <div class="d-card">
+          <div class="border-row hdr"><div>Domain</div><div>Country</div><div>City</div><div>Status</div></div>
+          <div class="border-row"><div>fonts.googleapis.com</div><div>Ireland</div><div>Dublin</div><div><span class="border-status" style="background:rgba(248,113,113,0.1);color:var(--red);">⚠️ FOREIGN</span></div></div>
+          <div class="border-row"><div>analytics.google.com</div><div>Singapore</div><div>Singapore</div><div><span class="border-status" style="background:rgba(248,113,113,0.1);color:var(--red);">⚠️ FOREIGN</span></div></div>
+          <div class="border-row"><div>cdn.meta.com</div><div>Netherlands</div><div>Amsterdam</div><div><span class="border-status" style="background:rgba(248,113,113,0.1);color:var(--red);">⚠️ FOREIGN</span></div></div>
+          <div class="border-row"><div>hillcountryfamilymed.com</div><div>United States</div><div>Dallas, TX</div><div><span class="border-status" style="background:rgba(52,211,153,0.1);color:var(--green);">🇺🇸 SOVEREIGN</span></div></div>
+          <div class="border-row"><div>cloudflare.com</div><div>United States</div><div>San Jose</div><div><span class="border-status" style="background:rgba(52,211,153,0.1);color:var(--green);">🇺🇸 SOVEREIGN</span></div></div>
+          <div class="border-row"><div>stripe.com</div><div>United States</div><div>San Francisco</div><div><span class="border-status" style="background:rgba(52,211,153,0.1);color:var(--green);">🇺🇸 SOVEREIGN</span></div></div>
+          <div class="border-row"><div>aws.amazon.com</div><div>United States</div><div>Virginia</div><div><span class="border-status" style="background:rgba(52,211,153,0.1);color:var(--green);">🇺🇸 SOVEREIGN</span></div></div>
+        </div>
+      </div>
+
+      <!-- Drift -->
+      <div class="tab-section" id="tab-alerts">
+        <div class="d-card"><h4>Compliance Drift Timeline</h4><div class="sub">Changes detected between scans</div><div style="margin-top:10px;">
+          <div class="drift-item"><div class="drift-dot" style="background:var(--red);"></div><div class="drift-content"><div class="drift-title" style="color:var(--red);">Foreign data routing — Google Fonts → Dublin</div><div class="drift-desc">fonts.googleapis.com resolving to foreign IP. Patient IPs exposed.</div></div><div class="drift-time">12m ago</div></div>
+          <div class="drift-item"><div class="drift-dot" style="background:var(--red);"></div><div class="drift-content"><div class="drift-title" style="color:var(--red);">Foreign data routing — Analytics → Singapore</div><div class="drift-desc">analytics.google.com at 35.186.xx. Browsing data leaving US.</div></div><div class="drift-time">12m ago</div></div>
+          <div class="drift-item"><div class="drift-dot" style="background:var(--orange);"></div><div class="drift-content"><div class="drift-title" style="color:var(--orange);">Address changed on website</div><div class="drift-desc">Changed from "1706 HWY 1431 W" to "2204 Hwy 1431 West" — NPI not updated.</div></div><div class="drift-time">2d ago</div></div>
+          <div class="drift-item"><div class="drift-dot" style="background:var(--amber);"></div><div class="drift-content"><div class="drift-title" style="color:var(--amber);">New tracking script — Meta Pixel</div><div class="drift-desc">Facebook/Meta pixel added. Data routed to cdn.meta.com (Netherlands).</div></div><div class="drift-time">5d ago</div></div>
+          <div class="drift-item"><div class="drift-dot" style="background:var(--amber);"></div><div class="drift-content"><div class="drift-title" style="color:var(--amber);">Provider roster changed — 12 → 10</div><div class="drift-desc">2 providers removed from the team page since last scan.</div></div><div class="drift-time">1w ago</div></div>
+          <div class="drift-item"><div class="drift-dot" style="background:var(--green);"></div><div class="drift-content"><div class="drift-title" style="color:var(--green);">SSL certificate renewed ✓</div><div class="drift-desc">New expiry: Dec 15, 2026. No action needed.</div></div><div class="drift-time">2w ago<br><span style="color:var(--green);font-weight:700;font-size:8px;">RESOLVED</span></div></div>
+        </div></div>
+      </div>
+
+      <!-- Scan History -->
+      <div class="tab-section" id="tab-history">
+        <div class="d-card"><h4>Scan History</h4><div style="margin-top:10px;">
+          <div style="display:grid;grid-template-columns:50px 70px 1fr 70px 1fr;gap:6px;padding:6px 0;font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border-dark);"><div>Score</div><div>Status</div><div>Type</div><div>Findings</div><div>Date</div></div>
+          <div style="display:grid;grid-template-columns:50px 70px 1fr 70px 1fr;gap:6px;padding:6px 0;font-size:11px;border-bottom:1px solid var(--border-dark);"><div style="font-weight:900;color:var(--red);">58</div><div><span style="font-size:8px;font-weight:700;background:rgba(248,113,113,0.1);color:var(--red);padding:2px 5px;border-radius:3px;">Violation</span></div><div style="color:var(--muted);">batch_v2</div><div style="color:var(--muted);">14</div><div class="drift-time">Feb 15 10:30am</div></div>
+          <div style="display:grid;grid-template-columns:50px 70px 1fr 70px 1fr;gap:6px;padding:6px 0;font-size:11px;border-bottom:1px solid var(--border-dark);"><div style="font-weight:900;color:var(--amber);">63</div><div><span style="font-size:8px;font-weight:700;background:rgba(251,191,36,0.1);color:var(--amber);padding:2px 5px;border-radius:3px;">Drift</span></div><div style="color:var(--muted);">monthly</div><div style="color:var(--muted);">12</div><div class="drift-time">Feb 1 6:00am</div></div>
+          <div style="display:grid;grid-template-columns:50px 70px 1fr 70px 1fr;gap:6px;padding:6px 0;font-size:11px;"><div style="font-weight:900;color:var(--amber);">67</div><div><span style="font-size:8px;font-weight:700;background:rgba(251,191,36,0.1);color:var(--amber);padding:2px 5px;border-radius:3px;">Drift</span></div><div style="color:var(--muted);">initial</div><div style="color:var(--muted);">10</div><div class="drift-time">Jan 15 2:00pm</div></div>
+        </div></div>
+      </div>
+
+      <!-- Documents -->
+      <div class="tab-section" id="tab-docs">
+        <div class="d-card" style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">📄</span><div><div style="font-size:12px;font-weight:700;color:white;">Compliance Audit Report</div><div style="font-size:9px;color:var(--muted);">Generated Feb 15, 2026</div></div></div><div style="padding:6px 12px;border-radius:6px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);color:var(--green);font-size:10px;font-weight:700;cursor:pointer;">⬇ Download PDF</div></div>
+        <div class="d-card" style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">📋</span><div><div style="font-size:12px;font-weight:700;color:white;">Safe Harbor™ Policy Pack</div><div style="font-size:9px;color:var(--muted);">SB 1188 compliance templates</div></div></div><div style="padding:6px 12px;border-radius:6px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);color:var(--green);font-size:10px;font-weight:700;cursor:pointer;">⬇ Download</div></div>
+        <div class="d-card" style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">📝</span><div><div style="font-size:12px;font-weight:700;color:white;">AI Disclosure Template</div><div style="font-size:9px;color:var(--muted);">HB 149 patient notice</div></div></div><div style="padding:6px 12px;border-radius:6px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);color:var(--green);font-size:10px;font-weight:700;cursor:pointer;">⬇ Download</div></div>
+      </div>
+
+      <!-- Settings -->
+      <div class="tab-section" id="tab-settings">
+        <div class="d-card"><h4>Widget Embed Code</h4><div class="sub" style="margin-bottom:8px;">Add before &lt;/body&gt;</div><pre style="background:rgba(0,0,0,0.3);border:1px solid var(--border-dark);border-radius:6px;padding:10px;font-family:var(--mono);font-size:10px;color:var(--green);overflow-x:auto;">&lt;script src="https://kairologic.net/sentry.js" data-npi="1234567890" data-mode="shield"&gt;&lt;/script&gt;</pre></div>
+        <div class="d-card"><h4>Subscription</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;font-size:11px;"><div><div style="font-size:9px;color:var(--muted);">Plan</div><div style="font-weight:700;color:white;">Sentry Shield</div></div><div><div style="font-size:9px;color:var(--muted);">Status</div><div style="font-weight:700;color:var(--green);">Active</div></div><div><div style="font-size:9px;color:var(--muted);">Billing</div><div style="font-weight:700;color:white;">$79/month</div></div><div><div style="font-size:9px;color:var(--muted);">Next scan</div><div style="font-weight:700;color:white;">Mar 1, 2026</div></div></div></div>
+      </div>
+
+    </div>
+  </div>
+  <div style="padding:12px 24px;border-top:1px solid var(--border-dark);"><div style="font-size:8px;color:var(--muted);font-family:var(--mono);">Powered by KairoLogic Sentry Shield™ · © 2026 KairoLogic</div></div>
+</div>
+
+<script>
+function showDashTab(tab) {
+  document.querySelectorAll('.tab-section').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.dash-side .nav-item').forEach(function(n){n.classList.remove('active');});
+  document.querySelector('[data-tab="'+tab+'"]').classList.add('active');
+}
+</script>
+</body>
+</html>
