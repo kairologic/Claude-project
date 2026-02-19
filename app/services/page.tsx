@@ -94,7 +94,7 @@ export default function ServicesPage() {
                 <Check>Data border summary (US vs. foreign endpoints)</Check>
               </ul>
               <Link href="/scan">
-                <button className="btn-primary text-lg px-8 py-4">Run Free Scan</button>
+                <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors">Run Free Scan</button>
               </Link>
             </div>
 
@@ -152,10 +152,10 @@ export default function ServicesPage() {
               </ul>
               <div className="flex flex-wrap gap-4">
                 <Link href="/scan">
-                  <button className="btn-primary text-lg px-8 py-4">Get My Report</button>
+                  <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors">Get My Report</button>
                 </Link>
                 <Link href="/sample-report.pdf">
-                  <button className="btn-outline text-lg px-6 py-4">Preview a sample report (PDF)</button>
+                  <button className="border-2 border-gold text-gold font-bold text-lg px-6 py-4 rounded-lg hover:bg-gold/10 transition-colors">Preview a sample report (PDF)</button>
                 </Link>
               </div>
             </div>
@@ -209,7 +209,7 @@ export default function ServicesPage() {
             Every deliverable is ready to use &mdash; no customization required.
           </p>
           <Link href="/scan">
-            <button className="btn-primary text-lg px-8 py-4 mb-12">Get Safe Harbor Bundle</button>
+            <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors mb-12">Get Safe Harbor Bundle</button>
           </Link>
 
           {/* Bundle cards */}
@@ -504,7 +504,7 @@ export default function ServicesPage() {
             the right roadmap for your practice.
           </p>
           <Link href="/scan">
-            <button className="bg-white text-orange font-bold text-lg px-10 py-5 rounded-lg hover:bg-gray-100 transition-colors shadow-xl">
+            <button className="bg-gold text-navy font-bold text-lg px-10 py-5 rounded-lg hover:bg-gold/90 transition-colors shadow-xl">
               Run My Free Scan
             </button>
           </Link>
