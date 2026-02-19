@@ -299,6 +299,10 @@ export default function ServicesPage() {
               </ul>
 
               <div className="mt-2">
+                <a href="/shield-demo.html" target="_blank" 
+   className="block text-center text-sm text-gold underline hover:text-white transition-colors mb-4">
+  View Sample Dashboard →
+</a>
                 <StripeBuyButton buyButtonId="buy_btn_1T1pNnGg3oiiGF7gOiPuXc0N" />
                 <p className="text-xs text-gray-500 mt-3">Cancel anytime. Secure checkout via Stripe.</p>
               </div>
