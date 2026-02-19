@@ -496,7 +496,7 @@ export default function ServicesPage() {
       </section>
 
       {/* ═══════════ FINAL CTA ═══════════ */}
-      <section className="py-20 bg-gradient-to-br from-orange to-orange-dark text-white">
+      <section className="py-20 bg-navy text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl md:text-5xl font-display font-extrabold mb-4">Not Sure Which Tier You Need?</h2>
           <p className="text-xl mb-8 opacity-90">
