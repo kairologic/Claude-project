@@ -1,12 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
 import { 
   BookOpen, Calendar, Clock, ArrowRight, ArrowLeft, Shield, Eye, AlertTriangle,
   Globe, Server, Bot, FileText, Scale, ChevronRight, MapPin, X,
   Users, Cloud, Plug, MessageSquare, ClipboardList, CalendarClock, FileCheck
 } from 'lucide-react';
+
+// ─── Supabase Client ────────────────────────────────────────────────────────
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
+
+// ─── Dynamic Article Renderer ───────────────────────────────────────────────
+
+function DynamicArticle({ html }: { html: string }) {
+  return (
+    <div 
+      className="article-body prose prose-lg max-w-none"
+      dangerouslySetInnerHTML={{ __html: html }} 
+    />
+  );
+}
+
+// ─── Icon Map (for DB posts that store icon as string) ──────────────────────
+
+const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  Globe, Shield, Eye, AlertTriangle, FileText, ClipboardList, FileCheck,
+  Server, Bot, Users, Cloud, Plug, MessageSquare, CalendarClock, Scale, BookOpen,
+};
 
 // ─── Blog Data ───────────────────────────────────────────────────────────────
 
@@ -610,8 +636,51 @@ const articleComponents: Record<string, React.FC> = {
 
 export default function InsightsPage() {
   const [activeBlog, setActiveBlog] = useState<string | null>(null);
+  const [dbPosts, setDbPosts] = useState<any[]>([]);
+
+  // Fetch published posts from Supabase
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        const { data, error } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .eq('content_status', 'published')
+          .order('published_at', { ascending: false });
+        if (!error && data) setDbPosts(data);
+      } catch (e) {
+        console.error('Error fetching blog posts:', e);
+      }
+    }
+    fetchPosts();
+  }, []);
+
+  // Convert DB posts to the same shape as hardcoded posts
+  const dbPostsMapped = dbPosts
+    .filter(p => !blogs.some(b => b.id === p.slug)) // skip duplicates of hardcoded
+    .map(p => {
+      const d = new Date(p.published_at);
+      return {
+        id: p.slug,
+        category: p.category || 'Compliance',
+        statute: p.statute || 'SB 1188',
+        title: p.title,
+        excerpt: p.excerpt || '',
+        author: p.author || 'KairoLogic Compliance Team',
+        date: d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }),
+        timestamp: p.published_at,
+        readTime: p.read_time || '5 min read',
+        icon: iconMap[p.icon] || Shield,
+        accentColor: p.accent_color || 'orange',
+        dbContent: p.content_html, // flag: this is a DB post with HTML content
+      };
+    });
+
+  // Merge: DB posts first (newest), then hardcoded
+  const allPosts = [...dbPostsMapped, ...blogs];
   
-  const activePost = blogs.find(b => b.id === activeBlog);
+  const activePost = allPosts.find(b => b.id === activeBlog);
   const ArticleContent = activeBlog ? articleComponents[activeBlog] : null;
 
   // ── Blog List View ──
@@ -640,7 +709,7 @@ export default function InsightsPage() {
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <button
-              onClick={() => setActiveBlog(blogs[blogs.length - 1].id)}
+              onClick={() => setActiveBlog(allPosts[0].id)}
               className="w-full text-left group"
             >
               <div className="bg-gradient-to-br from-navy to-navy-dark rounded-3xl p-8 md:p-12 relative overflow-hidden hover:shadow-2xl transition-shadow">
@@ -650,23 +719,23 @@ export default function InsightsPage() {
                 <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-4">
                     <span className="bg-orange/20 text-orange text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">Featured</span>
-                    <span className="bg-white/10 text-gold text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">{blogs[blogs.length - 1].statute}</span>
+                    <span className="bg-white/10 text-gold text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">{allPosts[0].statute}</span>
                   </div>
                   <h2 className="text-2xl md:text-4xl font-display font-bold text-white mb-4 group-hover:text-gold transition-colors leading-tight">
-                    {blogs[blogs.length - 1].title}
+                    {allPosts[0].title}
                   </h2>
                   <p className="text-gray-400 max-w-2xl mb-6 leading-relaxed">
-                    {blogs[blogs.length - 1].excerpt}
+                    {allPosts[0].excerpt}
                   </p>
                   <div className="flex items-center gap-6 text-sm">
                     <span className="flex items-center gap-2 text-gray-500">
-                      <Calendar size={14} /> {blogs[blogs.length - 1].date}
+                      <Calendar size={14} /> {allPosts[0].date}
                     </span>
                     <span className="flex items-center gap-2 text-gray-500">
-                      <Clock size={14} /> {blogs[blogs.length - 1].time}
+                      <Clock size={14} /> {allPosts[0].time}
                     </span>
                     <span className="flex items-center gap-2 text-gray-500">
-                      <BookOpen size={14} /> {blogs[blogs.length - 1].readTime}
+                      <BookOpen size={14} /> {allPosts[0].readTime}
                     </span>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-gold font-bold text-sm uppercase tracking-wider group-hover:gap-3 transition-all">
@@ -682,7 +751,7 @@ export default function InsightsPage() {
         <section className="pb-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
-              {blogs.slice(0, blogs.length - 1).map((post) => {
+              {allPosts.slice(1).map((post) => {
                 const Icon = post.icon;
                 return (
                   <button
@@ -789,7 +858,10 @@ export default function InsightsPage() {
       {/* Article Content */}
       <section className="py-12">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          {ArticleContent && <ArticleContent />}
+          {(activePost as any)?.dbContent 
+            ? <DynamicArticle html={(activePost as any).dbContent} />
+            : ArticleContent && <ArticleContent />
+          }
         </div>
       </section>
 
@@ -803,7 +875,7 @@ export default function InsightsPage() {
                 <Shield size={20} className="text-gold" />
               </div>
               <div>
-                <div className="font-display font-bold text-navy">KairoLogic Compliance Team</div>
+                <div className="font-display font-bold text-navy">{activePost?.author || 'KairoLogic Compliance Team'}</div>
                 <div className="text-sm text-gray-500">Statutory Vanguard Division &bull; Austin, Texas</div>
               </div>
             </div>
@@ -827,8 +899,8 @@ export default function InsightsPage() {
               <ArrowLeft size={16} /> All Insights
             </button>
             {(() => {
-              const idx = blogs.findIndex(b => b.id === activeBlog);
-              const next = blogs[(idx + 1) % blogs.length];
+              const idx = allPosts.findIndex(b => b.id === activeBlog);
+              const next = allPosts[(idx + 1) % allPosts.length];
               return (
                 <button
                   onClick={() => setActiveBlog(next.id)}
