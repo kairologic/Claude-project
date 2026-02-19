@@ -94,7 +94,7 @@ export default function ServicesPage() {
                 <Check>Data border summary (US vs. foreign endpoints)</Check>
               </ul>
               <Link href="/scan">
-                <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors">Run Free Scan</button>
+                <button className="bg-orange text-white font-bold text-lg px-8 py-4 rounded-lg hover:bg-orange-dark transition-colors">Run Free Scan</button>
               </Link>
             </div>
 
@@ -152,10 +152,10 @@ export default function ServicesPage() {
               </ul>
               <div className="flex flex-wrap gap-4">
                 <Link href="/scan">
-                  <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors">Get My Report</button>
+                  <button className="bg-orange text-white font-bold text-lg px-8 py-4 rounded-lg hover:bg-orange-dark transition-colors">Get My Report</button>
                 </Link>
                 <Link href="/sample-report.pdf">
-                  <button className="border-2 border-gold text-gold font-bold text-lg px-6 py-4 rounded-lg hover:bg-gold/10 transition-colors">Preview a sample report (PDF)</button>
+                  <button className="border-2 border-orange text-orange font-bold text-lg px-6 py-4 rounded-lg hover:bg-orange/10 transition-colors">Preview a sample report (PDF)</button>
                 </Link>
               </div>
             </div>
@@ -209,7 +209,7 @@ export default function ServicesPage() {
             Every deliverable is ready to use &mdash; no customization required.
           </p>
           <Link href="/scan">
-            <button className="bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors mb-12">Get Safe Harbor Bundle</button>
+            <button className="bg-orange text-white font-bold text-lg px-8 py-4 rounded-lg hover:bg-orange-dark transition-colors mb-12">Get Safe Harbor Bundle</button>
           </Link>
 
           {/* Bundle cards */}
@@ -278,7 +278,7 @@ export default function ServicesPage() {
 
               <div className="mt-2 space-y-3">
                 <a href="https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06" target="_blank"
-                   className="block w-full bg-gold text-navy font-bold text-lg px-8 py-4 rounded-lg hover:bg-gold/90 transition-colors text-center">
+                   className="block w-full bg-orange text-white font-bold text-lg px-8 py-4 rounded-lg hover:bg-orange-dark transition-colors text-center">
                   Subscribe to Shield
                 </a>
                 <p className="text-xs text-gray-500 text-center">$79/month · Cancel anytime · Secure checkout via Stripe</p>
@@ -504,7 +504,7 @@ export default function ServicesPage() {
             the right roadmap for your practice.
           </p>
           <Link href="/scan">
-            <button className="bg-gold text-navy font-bold text-lg px-10 py-5 rounded-lg hover:bg-gold/90 transition-colors shadow-xl">
+            <button className="bg-orange text-white font-bold text-lg px-10 py-5 rounded-lg hover:bg-orange-dark transition-colors shadow-xl">
               Run My Free Scan
             </button>
           </Link>
