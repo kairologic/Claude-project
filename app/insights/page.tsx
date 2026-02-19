@@ -29,7 +29,7 @@ function DynamicArticle({ html }: { html: string }) {
 
 // ─── Icon Map (for DB posts that store icon as string) ──────────────────────
 
-const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const iconMap: Record<string, any> = {
   Globe, Shield, Eye, AlertTriangle, FileText, ClipboardList, FileCheck,
   Server, Bot, Users, Cloud, Plug, MessageSquare, CalendarClock, Scale, BookOpen,
 };
