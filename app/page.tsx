@@ -379,12 +379,16 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/scan">
+              <a href="https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06" target="_blank" rel="noopener noreferrer">
                 <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors">
                   Start Monitoring
                 </button>
-              </Link>
-              <p className="text-center text-xs text-gray-400 mt-3">Cancel anytime. No long-term contracts.</p>
+              </a>
+              <a href="/shield-demo.html" target="_blank" rel="noopener noreferrer"
+                className="block text-center text-sm text-green-600 underline hover:text-green-700 transition-colors mt-3">
+                View Sample Dashboard →
+              </a>
+              <p className="text-center text-xs text-gray-400 mt-2">Cancel anytime. No long-term contracts.</p>
             </div>
           </div>
 
