@@ -244,7 +244,7 @@ export default function ServicesPage() {
             <div className="lg:col-span-3">
               <h2 className="text-3xl md:text-4xl font-display font-extrabold mb-2">Sentry Shield &mdash; Continuous Compliance</h2>
               <p className="text-2xl font-extrabold text-gold mb-1">$79<span className="text-base font-normal text-gray-400">/month</span></p>
-              <p className="text-sm text-green-400 font-bold mb-6">Includes free Audit Report</p>
+              <p className="text-sm text-green-400 font-bold mb-6">Continuous compliance monitoring</p>
               <p className="text-gray-300 leading-relaxed mb-4">
                 Fixes don&apos;t stay fixed. Plugin updates, hosting changes, and new third-party scripts
                 can silently break your compliance overnight. Sentry Shield keeps you protected around the clock.
@@ -257,7 +257,6 @@ export default function ServicesPage() {
               <h3 className="text-lg font-bold text-gold mb-4">Everything You Need</h3>
               <ul className="space-y-3 mb-8">
                 {[
-                  'Free Sovereignty Audit Report (Check Engine v2)',
                   '24/7 continuous compliance monitoring',
                   'Shield Dashboard \u2014 7 views: Overview, NPI Integrity, Data Border Map, Drift Monitor, Scan History, Documents, Settings',
                   '\u201CData & AI Trust\u201D website badge with interactive trust pane',
@@ -335,7 +334,7 @@ export default function ServicesPage() {
             <h3 className="text-xl font-bold text-white mb-3">Already buying a Report or Safe Harbor?</h3>
             <p className="text-gray-300 max-w-2xl mx-auto leading-relaxed">
               Every Audit Report ($149) and Safe Harbor Bundle ($249) purchase includes <strong className="text-white">3 months of Sentry Shield monitoring FREE</strong>.
-              After your trial, continue at $79/mo, switch to basic monitoring at $39/mo, or cancel anytime.
+              After your trial, continue at $79/mo or cancel anytime. You&apos;ll get advance notice before the trial ends.
             </p>
             <div className="mt-6 inline-flex items-center gap-3 bg-gold/10 border border-gold/30 rounded-full px-6 py-2">
               <span className="text-3xl font-extrabold text-gold">90 days</span>
@@ -430,8 +429,7 @@ export default function ServicesPage() {
             <FAQItem question="What happens after the 3-month Shield trial?">
               <p>
                 After your 90-day free trial, you can continue Sentry Shield at $79/month for full
-                enterprise-grade monitoring (dashboard, quarterly reports, certification seal), switch to
-                basic Sentry Watch at $39/month (monthly scans and drift alerts), or cancel entirely.
+                enterprise-grade monitoring (dashboard, quarterly reports, certification seal) or cancel entirely.
                 You&apos;ll get advance notice before the trial ends so there are no surprises.
               </p>
             </FAQItem>
