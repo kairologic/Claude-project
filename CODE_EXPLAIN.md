@@ -641,4 +641,4 @@ Tests run on every push and PR via `.github/workflows/page-tests.yml`:
 
 ## 12. Doc Sync
 
-Generated from commit `6f6b50d52fe2f1fdd28eb84ab355e17f4bbfd61c` on 2026-02-25T23:40:00Z UTC.
+Generated from commit `94b0d887bece39474e57faa9d97674164d9c62e2` on 2026-02-25T23:50:54Z UTC UTC.
