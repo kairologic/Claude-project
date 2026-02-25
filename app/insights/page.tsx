@@ -814,8 +814,10 @@ export default function InsightsPage() {
       };
     });
 
-  // Merge: DB posts first (newest), then hardcoded
-  const allPosts = [...dbPostsMapped, ...blogs];
+  // Merge and sort by timestamp (newest first) so the latest article is featured
+  const allPosts = [...dbPostsMapped, ...blogs].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
   
   const activePost = allPosts.find(b => b.id === activeBlog);
   const ArticleContent = activeBlog ? articleComponents[activeBlog] : null;
