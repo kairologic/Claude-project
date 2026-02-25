@@ -38,6 +38,20 @@ const iconMap: Record<string, any> = {
 
 const blogs = [
   {
+    id: '47-states-healthcare-ai-bills',
+    category: 'AI Regulation',
+    statute: 'SB 1188 · HB 149',
+    title: '47 States Introduced Healthcare AI Bills. Congress Passed Zero.',
+    excerpt: 'In 2025, 47 states introduced more than 250 bills regulating AI in healthcare. 33 were signed into law across 21 states. Congress hasn\'t passed a single comprehensive AI law — so states are building their own enforcement frameworks.',
+    author: 'KairoLogic Compliance Team',
+    date: 'February 24, 2026',
+    time: '10:00 AM CST',
+    timestamp: '2026-02-24T10:00:00-06:00',
+    readTime: '4 min read',
+    icon: Scale,
+    accentColor: 'orange',
+  },
+  {
     id: 'sb-1188-patient-data',
     category: 'Data Sovereignty',
     statute: 'SB 1188',
@@ -624,7 +638,130 @@ function Article5() {
   );
 }
 
+function Article6() {
+  return (
+    <div className="article-body">
+      {/* Cover Image */}
+      <div className="relative rounded-2xl overflow-hidden mb-10" style={{ background: '#0a0f1a' }}>
+        <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(52,211,153,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.03) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'linear-gradient(90deg, #34d399, #059669, #34d399)' }} />
+        <div className="relative z-10 p-8 md:p-12">
+          <div className="flex gap-6 mb-8">
+            <div className="pl-4" style={{ borderLeft: '2px solid #34d399' }}>
+              <div className="text-3xl font-extrabold" style={{ color: '#34d399' }}>47</div>
+              <div className="text-[10px] tracking-widest uppercase" style={{ color: '#64748b' }}>States with AI Bills</div>
+            </div>
+            <div className="pl-4" style={{ borderLeft: '2px solid #fbbf24' }}>
+              <div className="text-3xl font-extrabold" style={{ color: '#fbbf24' }}>33</div>
+              <div className="text-[10px] tracking-widest uppercase" style={{ color: '#64748b' }}>Laws Signed</div>
+            </div>
+            <div className="pl-4" style={{ borderLeft: '2px solid #f87171' }}>
+              <div className="text-3xl font-extrabold" style={{ color: '#f87171' }}>0</div>
+              <div className="text-[10px] tracking-widest uppercase" style={{ color: '#64748b' }}>Federal AI Laws</div>
+            </div>
+          </div>
+          <h2 className="text-2xl md:text-3xl font-extrabold leading-tight mb-4" style={{ color: '#f1f5f9', letterSpacing: '-0.5px' }}>
+            47 States Introduced Healthcare AI Bills.<br /><span style={{ color: '#34d399' }}>Congress Passed Zero.</span>
+          </h2>
+          <p className="text-base" style={{ color: '#94a3b8', maxWidth: 560 }}>
+            How 21 states built their own enforcement frameworks while Washington did nothing, and what it means for every provider in the country.
+          </p>
+        </div>
+        <div className="px-8 md:px-12 py-4 flex justify-between items-center" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <span className="font-mono text-sm font-bold"><span style={{ color: '#f1f5f9' }}>Kairo</span><span style={{ color: '#D4A017' }}>Logic</span></span>
+          <span className="text-xs tracking-wider" style={{ color: '#475569' }}>SB 1188 · HB 149 · AB 3030 · TRAIGA</span>
+        </div>
+      </div>
+
+      <p className="text-lg text-gray-700 leading-relaxed mb-8 font-medium">
+        40 million people ask ChatGPT health questions every day. ECRI just named AI chatbot misuse the #1 health technology hazard for 2026. And states are scrambling to figure out what to do about it.
+      </p>
+
+      <p className="text-gray-700 leading-relaxed mb-8">
+        In 2025, <span className="text-orange font-bold">47 states</span> introduced more than 250 bills regulating AI in healthcare. 33 were signed into law across 21 states. Congress hasn&apos;t passed a single comprehensive AI law, so states are building their own frameworks, each with different scopes, triggers, and penalties.
+      </p>
+
+      <p className="text-gray-600 leading-relaxed mb-10">
+        I track this closely because I work in this space every day.
+      </p>
+
+      {/* Texas */}
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">Texas: First Mover, Hard Enforcer</h2>
+      <p className="text-gray-700 leading-relaxed mb-6">
+        Texas went first and went hard. <span className="font-semibold text-navy">SB 1188</span> requires data sovereignty for patient health information. <span className="font-semibold text-navy">HB 149</span> and <span className="font-semibold text-navy">TRAIGA</span> require AI disclosure in diagnosis or treatment, with civil penalties up to <span className="text-orange font-bold">$200,000 per violation</span>.
+      </p>
+      <p className="text-gray-700 leading-relaxed mb-6">
+        And this isn&apos;t theoretical. In September 2024, the Texas AG settled with Pieces Technologies, a Dallas AI company marketing clinical documentation tools to four Texas hospitals. Pieces claimed a &quot;severe hallucination rate&quot; of less than 1 in 100,000. The AG found those metrics were likely inaccurate, potentially deceiving hospital staff.
+      </p>
+      <div className="bg-gradient-to-br from-orange/5 to-red-50 border-2 border-orange/20 rounded-2xl p-8 mb-10">
+        <div className="flex items-start gap-4">
+          <div className="bg-orange/10 p-3 rounded-full shrink-0">
+            <AlertTriangle size={24} className="text-orange" />
+          </div>
+          <div>
+            <div className="font-display font-bold text-navy text-lg mb-2">Enforcement Before the Law</div>
+            <p className="text-gray-700 leading-relaxed">
+              That case landed <em>before</em> SB 1188 and HB 149 even took effect. The AG used existing consumer protection law. Now imagine enforcement with purpose-built statutes.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* California */}
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">California: Disclosure-First</h2>
+      <p className="text-gray-700 leading-relaxed mb-6">
+        California arrived at the same conclusion differently. <span className="font-semibold text-navy">AB 3030</span> requires providers to disclose when GenAI generates patient communications. <span className="font-semibold text-navy">AB 489</span> prohibits AI from implying it holds a healthcare license, with penalties up to <span className="text-orange font-bold">$25,000 per incident</span>.
+      </p>
+
+      {/* Other States */}
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">The Growing Patchwork</h2>
+      <div className="space-y-4 mb-10">
+        {[
+          { state: 'Illinois', detail: 'Banned AI from making independent therapeutic decisions entirely', color: 'bg-red-50 border-red-100 text-red-800' },
+          { state: 'Colorado', detail: 'Delayed its broad AI act to June 2026', color: 'bg-purple-50 border-purple-100 text-purple-800' },
+          { state: 'Ohio & Pennsylvania', detail: 'Introduced written patient consent requirements for any AI use', color: 'bg-blue-50 border-blue-100 text-blue-800' },
+        ].map((s, i) => (
+          <div key={i} className={`border rounded-2xl p-6 ${s.color}`}>
+            <div className="font-display font-bold mb-1">{s.state}</div>
+            <p className="text-sm">{s.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* The Invisible Gap */}
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">The Invisible Compliance Gap</h2>
+      <p className="text-gray-700 leading-relaxed mb-6">
+        Here&apos;s what gets missed: while everyone debates AI in clinical decisions, most providers haven&apos;t addressed the AI already on their websites. Scheduling chatbots, symptom checkers, AI-powered intake forms — live right now, interacting with patients, with nobody checking whether they comply with the new disclosure laws.
+      </p>
+      <p className="text-gray-700 leading-relaxed mb-6">
+        I scan healthcare provider websites for exactly this exposure. The pattern is consistent across states. Providers adopt tools without realizing the regulatory obligations. The compliance gap isn&apos;t malicious — it&apos;s invisible.
+      </p>
+
+      {/* Federal Void */}
+      <h2 className="text-2xl md:text-3xl font-display font-bold text-navy mb-6">The Federal Void</h2>
+      <p className="text-gray-700 leading-relaxed mb-6">
+        The federal government pushed a December executive order for a &quot;minimally burdensome national standard.&quot; But an executive order without legislation doesn&apos;t have the teeth to preempt state law.
+      </p>
+      <p className="text-gray-700 leading-relaxed mb-8">
+        So where does this leave providers? Operating in a patchwork where Texas, California, Illinois, Colorado, and a growing list of states each have different requirements. Compliance is no longer a single checklist.
+      </p>
+
+      {/* Bottom Line */}
+      <div className="bg-navy rounded-2xl p-8 text-white">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-gold mb-3">Bottom Line</div>
+        <p className="text-lg font-display font-bold leading-relaxed mb-3">
+          The organizations that figure this out early won&apos;t just avoid penalties. They&apos;ll be the ones patients trust.
+        </p>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          We started KairoLogic focused on Texas because enforcement was real and immediate. But the problem applies everywhere this wave is heading. And it&apos;s heading everywhere.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const articleComponents: Record<string, React.FC> = {
+  '47-states-healthcare-ai-bills': Article6,
   'sb-1188-patient-data': Article1,
   'hb-149-ai-transparency': Article2,
   'combined-threat-solution': Article3,
