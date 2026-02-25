@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 627px;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: #0a0f1a;
+    overflow: hidden;
+    position: relative;
+  }
+  /* Subtle grid */
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(52,211,153,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(52,211,153,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: 0;
+  }
+  /* Gradient accent bar */
+  .accent-bar {
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, #34d399, #059669, #34d399);
+    z-index: 5;
+  }
+  /* US map outline - simplified abstract representation */
+  .map-container {
+    position: absolute;
+    right: 60px; top: 50%; transform: translateY(-50%);
+    width: 420px; height: 320px;
+    z-index: 1;
+    opacity: 0.12;
+  }
+  .map-container svg { width: 100%; height: 100%; }
+  /* State highlight dots */
+  .state-dot {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    z-index: 2;
+  }
+  .state-dot::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid;
+    opacity: 0.4;
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.8); opacity: 0; }
+  }
+  .dot-tx { right: 310px; top: 340px; background: #34d399; }
+  .dot-tx::after { border-color: #34d399; }
+  .dot-ca { right: 440px; top: 240px; background: #60a5fa; }
+  .dot-ca::after { border-color: #60a5fa; animation-delay: 0.5s; }
+  .dot-il { right: 260px; top: 240px; background: #fbbf24; }
+  .dot-il::after { border-color: #fbbf24; animation-delay: 1s; }
+  .dot-co { right: 360px; top: 260px; background: #a78bfa; }
+  .dot-co::after { border-color: #a78bfa; animation-delay: 1.5s; }
+  .dot-oh { right: 220px; top: 230px; background: #f87171; }
+  .dot-oh::after { border-color: #f87171; animation-delay: 0.8s; }
+  /* State labels */
+  .state-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    z-index: 3;
+  }
+  .label-tx { right: 282px; top: 345px; color: #34d399; }
+  .label-ca { right: 458px; top: 245px; color: #60a5fa; }
+  .label-il { right: 248px; top: 220px; color: #fbbf24; }
+  .label-co { right: 340px; top: 278px; color: #a78bfa; }
+  /* Content */
+  .content {
+    position: relative; z-index: 4;
+    padding: 70px 60px 60px;
+    max-width: 700px;
+  }
+  .stat-row {
+    display: flex; gap: 24px; margin-bottom: 36px;
+  }
+  .stat {
+    padding: 10px 16px;
+    border-left: 2px solid;
+    background: rgba(255,255,255,0.02);
+  }
+  .stat-num {
+    font-size: 28px; font-weight: 800; line-height: 1;
+  }
+  .stat-label {
+    font-size: 10px; letter-spacing: 1.5px; color: #64748b;
+    margin-top: 4px; text-transform: uppercase;
+  }
+  .stat-green { border-color: #34d399; }
+  .stat-green .stat-num { color: #34d399; }
+  .stat-yellow { border-color: #fbbf24; }
+  .stat-yellow .stat-num { color: #fbbf24; }
+  .stat-red { border-color: #f87171; }
+  .stat-red .stat-num { color: #f87171; }
+  h1 {
+    font-size: 42px; font-weight: 800; line-height: 1.15;
+    color: #f1f5f9; margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+  h1 span { color: #34d399; }
+  .subtitle {
+    font-size: 17px; color: #94a3b8; line-height: 1.5;
+    max-width: 560px;
+  }
+  /* Footer bar */
+  .footer {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 16px 60px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    z-index: 4;
+  }
+  .footer-logo {
+    font-size: 15px; font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+  .footer-logo .k { color: #f1f5f9; }
+  .footer-logo .l { color: #D4A017; }
+  .footer-tag {
+    font-size: 11px; color: #475569;
+    letter-spacing: 1px;
+  }
+  /* Scan lines for subtle texture */
+  .scanline {
+    position: absolute;
+    left: 60px; right: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(52,211,153,0.08), transparent);
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="accent-bar"></div>
+<!-- Scan lines for texture -->
+<div class="scanline" style="top: 180px;"></div>
+<div class="scanline" style="top: 280px;"></div>
+<div class="scanline" style="top: 380px;"></div>
+<!-- State dots with pulse -->
+<div class="state-dot dot-tx"></div>
+<div class="state-dot dot-ca"></div>
+<div class="state-dot dot-il"></div>
+<div class="state-dot dot-co"></div>
+<div class="state-dot dot-oh"></div>
+<div class="state-label label-tx">TX</div>
+<div class="state-label label-ca">CA</div>
+<div class="state-label label-il">IL</div>
+<div class="state-label label-co">CO</div>
+<!-- Content -->
+<div class="content">
+  <div class="stat-row">
+    <div class="stat stat-green">
+      <div class="stat-num">47</div>
+      <div class="stat-label">States with AI Bills</div>
+    </div>
+    <div class="stat stat-yellow">
+      <div class="stat-num">33</div>
+      <div class="stat-label">Laws Signed</div>
+    </div>
+    <div class="stat stat-red">
+      <div class="stat-num">0</div>
+      <div class="stat-label">Federal AI Laws</div>
+    </div>
+  </div>
+  <h1>47 States Introduced<br>Healthcare AI Bills.<br><span>Congress Passed Zero.</span></h1>
+  <p class="subtitle">How 21 states built their own enforcement frameworks while Washington did nothing, and what it means for every provider in the country.</p>
+</div>
+<!-- Footer -->
+<div class="footer">
+  <div class="footer-logo">
+    <span class="k">Kairo</span><span class="l">Logic</span>
+  </div>
+  <div class="footer-tag">SB 1188 · HB 149 · AB 3030 · TRAIGA</div>
+</div>
+</body>
+</html>

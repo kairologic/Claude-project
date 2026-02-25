@@ -6,28 +6,38 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npx playwright test",
+    "test:content": "npx playwright test static-content",
+    "test:visual": "npx playwright test visual-regression",
+    "test:links": "npx playwright test broken-links",
+    "test:functionality": "npx playwright test functionality",
+    "test:structure": "npx playwright test page-structure",
+    "test:guide": "npx playwright test dashboard-guide",
+    "test:update-snapshots": "npx playwright test visual-regression --update-snapshots",
+    "test:report": "npx playwright show-report"
   },
   "dependencies": {
-    "next": "14.2.18",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "typescript": "^5.7.2",
     "@supabase/supabase-js": "^2.47.10",
-    "stripe": "^17.5.0",
-    "nodemailer": "^6.9.16",
-    "lucide-react": "^0.263.1",
+    "date-fns": "^4.1.0",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
-    "date-fns": "^4.1.0"
+    "lucide-react": "^0.263.1",
+    "next": "14.2.18",
+    "nodemailer": "^6.9.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "stripe": "^17.5.0",
+    "typescript": "^5.7.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^22.10.2",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
-    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
-    "autoprefixer": "^10.4.20"
+    "tailwindcss": "^3.4.17"
   }
 }
