@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit
+# ─────────────────────────────────────────────────────────────────
+# Pre-commit hook: checks that CODE_EXPLAIN.md Doc Sync section
+# is updated when source files are changed.
+#
+# Install:
+#   git config core.hooksPath .githooks
+#
+# Skip for a single commit:
+#   git commit --no-verify
+# ─────────────────────────────────────────────────────────────────
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+DOC_FILE="$REPO_ROOT/CODE_EXPLAIN.md"
+
+# Only check if CODE_EXPLAIN.md exists — don't block first-time setup
+if [[ ! -f "$DOC_FILE" ]]; then
+  exit 0
+fi
+
+# Check if any source/config files are staged (not just CODE_EXPLAIN.md itself)
+SOURCE_CHANGES=$(git diff --cached --name-only -- \
+  '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.css' '*.sql' '*.yml' '*.yaml' '*.sh' \
+  | grep -v 'CODE_EXPLAIN.md' || true)
+
+# If no source files changed, no need to check doc freshness
+if [[ -z "$SOURCE_CHANGES" ]]; then
+  exit 0
+fi
+
+# Check if CODE_EXPLAIN.md is also being updated in this commit
+DOC_STAGED=$(git diff --cached --name-only -- 'CODE_EXPLAIN.md' || true)
+
+if [[ -z "$DOC_STAGED" ]]; then
+  echo ""
+  echo "WARNING: Source files changed but CODE_EXPLAIN.md was not updated."
+  echo ""
+  echo "Changed source files:"
+  echo "$SOURCE_CHANGES" | head -10
+  TOTAL=$(echo "$SOURCE_CHANGES" | wc -l)
+  if [[ "$TOTAL" -gt 10 ]]; then
+    echo "  ... and $((TOTAL - 10)) more"
+  fi
+  echo ""
+  echo "Consider updating CODE_EXPLAIN.md to reflect your changes."
+  echo "To update the Doc Sync section:"
+  echo "  bash scripts/update-code-explain.sh --fix"
+  echo ""
+  echo "To skip this check:"
+  echo "  git commit --no-verify"
+  echo ""
+  # Warning only — don't block the commit
+  # Change 'exit 0' to 'exit 1' to make this a hard block
+  exit 0
+fi
+
+echo "CODE_EXPLAIN.md is staged — documentation will be updated."
+exit 0
