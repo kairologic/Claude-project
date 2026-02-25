@@ -9,6 +9,8 @@ import {
   ChevronRight, Bell, FileText, Map, Settings,
   BarChart3, Eye, Code, Calendar, Award
 } from 'lucide-react';
+import Tooltip from '@/components/Tooltip';
+import { TOOLTIPS } from '@/lib/dashboard-tooltips';
 
 // ─── Types ──────────────────────────────
 interface DashboardData {
@@ -435,6 +437,9 @@ function DashboardContent() {
           {subscription.is_trial && (
             <p className="text-[10px] text-slate-500">{subscription.trial_days_remaining} days remaining</p>
           )}
+          <Link href="/dashboard/guide" target="_blank" className="flex items-center gap-2 text-slate-500 hover:text-gold text-xs mt-3 transition-colors">
+            <FileText size={12} /> User Guide
+          </Link>
           <button onClick={handleLogout} className="flex items-center gap-2 text-slate-500 hover:text-slate-300 text-xs mt-3 transition-colors">
             <LogOut size={12} /> Sign out
           </button>
@@ -509,7 +514,9 @@ function DashboardContent() {
                         className="transition-all duration-1000" />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-4xl font-mono font-extrabold text-white">{score}</span>
+                      <Tooltip content={TOOLTIPS.compositeScore}>
+                        <span className="text-4xl font-mono font-extrabold text-white">{score}</span>
+                      </Tooltip>
                       <span className={`text-[11px] font-bold uppercase tracking-wider ${scoreColor}`}>{scoreLabel}</span>
                     </div>
                   </div>
@@ -527,10 +534,22 @@ function DashboardContent() {
                 {/* Category Cards */}
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(categories).length > 0 ? (
-                    Object.entries(categories).map(([key, cat]: [string, any]) => (
+                    Object.entries(categories).map(([key, cat]: [string, any]) => {
+                      const catTooltip = key.includes('residen') || key.includes('sovereign') ? TOOLTIPS.dataResidency
+                        : key.includes('ai') || key.includes('transparen') ? TOOLTIPS.aiTransparency
+                        : key.includes('clinical') ? TOOLTIPS.clinicalIntegrity
+                        : key.includes('alert') ? TOOLTIPS.activeAlerts
+                        : key.includes('npi') ? TOOLTIPS.npiIntegrity : '';
+                      return (
                       <div key={key} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{cat.name}</span>
+                          {catTooltip ? (
+                            <Tooltip content={catTooltip} position="bottom">
+                              <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{cat.name}</span>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{cat.name}</span>
+                          )}
                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                             cat.percentage >= 75 ? 'bg-green-500/10 text-green-400' :
                             cat.percentage >= 50 ? 'bg-amber-500/10 text-amber-400' :
@@ -549,16 +568,23 @@ function DashboardContent() {
                           }`} style={{ width: `${cat.percentage}%` }} />
                         </div>
                       </div>
-                    ))
+                    );})
                   ) : (
                     <>
-                      {['Data Residency', 'AI Transparency', 'Clinical Integrity', 'Active Alerts'].map(name => (
+                      {['Data Residency', 'AI Transparency', 'Clinical Integrity', 'Active Alerts'].map(name => {
+                        const placeholderTooltip = name === 'Data Residency' ? TOOLTIPS.dataResidency
+                          : name === 'AI Transparency' ? TOOLTIPS.aiTransparency
+                          : name === 'Clinical Integrity' ? TOOLTIPS.clinicalIntegrity
+                          : TOOLTIPS.activeAlerts;
+                        return (
                         <div key={name} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
-                          <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">{name}</div>
+                          <Tooltip content={placeholderTooltip} position="bottom">
+                            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">{name}</span>
+                          </Tooltip>
                           <div className="text-2xl font-mono font-extrabold text-white">—</div>
                           <div className="text-[11px] text-slate-500 mt-1">Run a scan to see results</div>
                         </div>
-                      ))}
+                      );})}
                     </>
                   )}
                 </div>
@@ -569,7 +595,7 @@ function DashboardContent() {
                 {/* Recent Scans */}
                 <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
                   <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                    <Calendar size={15} /> Scan History
+                    <Calendar size={15} /> <Tooltip content={TOOLTIPS.scanScore}><span>Scan History</span></Tooltip>
                   </h3>
                   {scanHistory.length > 0 ? scanHistory.slice(0, 5).map(scan => (
                     <div key={scan.id} className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-0">
@@ -593,7 +619,7 @@ function DashboardContent() {
                 {/* Drift Alerts */}
                 <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
                   <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                    <Bell size={15} /> Drift Alerts
+                    <Bell size={15} /> <Tooltip content={TOOLTIPS.driftMonitor}><span>Drift Alerts</span></Tooltip>
                     {openAlerts > 0 && <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{openAlerts}</span>}
                   </h3>
                   {driftAlerts.length > 0 ? driftAlerts.slice(0, 5).map(alert => (
@@ -620,13 +646,21 @@ function DashboardContent() {
           {activeTab === 'border-map' && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-white/[0.06]">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2"><Map size={15} /> Data Border Map — Live</h3>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2"><Map size={15} /> <Tooltip content={TOOLTIPS.dataResidency}><span>Data Border Map — Live</span></Tooltip></h3>
               </div>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
-                    {['Endpoint', 'IP Address', 'Location', 'Status', 'Last Check'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-[10px] text-slate-500 font-bold uppercase tracking-wider">{h}</th>
+                    {[
+                      { label: 'Endpoint', tip: TOOLTIPS.borderMapEndpoint },
+                      { label: 'IP Address', tip: TOOLTIPS.borderMapIP },
+                      { label: 'Location', tip: TOOLTIPS.borderMapLocation },
+                      { label: 'Status', tip: TOOLTIPS.borderMapStatus },
+                      { label: 'Last Check', tip: TOOLTIPS.lastScan },
+                    ].map(h => (
+                      <th key={h.label} className="text-left px-4 py-3 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        <Tooltip content={h.tip} position="bottom"><span>{h.label}</span></Tooltip>
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -657,7 +691,7 @@ function DashboardContent() {
           {/* ═══ ALERTS TAB ═══ */}
           {activeTab === 'alerts' && (
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Bell size={15} /> All Drift Alerts</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Bell size={15} /> <Tooltip content={TOOLTIPS.driftMonitor}><span>All Drift Alerts</span></Tooltip></h3>
               {driftAlerts.length > 0 ? driftAlerts.map(alert => (
                 <div key={alert.id} className={`flex items-start gap-3 p-4 rounded-xl border ${
                   alert.resolved ? 'bg-green-500/5 border-green-500/10' : 'bg-white/[0.02] border-white/[0.06]'
@@ -686,7 +720,7 @@ function DashboardContent() {
           {activeTab === 'history' && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-white/[0.06]">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2"><Calendar size={15} /> Scan History</h3>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2"><Calendar size={15} /> <Tooltip content={TOOLTIPS.scanScore}><span>Scan History</span></Tooltip></h3>
               </div>
               {scanHistory.length > 0 ? scanHistory.map(scan => (
                 <div key={scan.id} className="flex items-center justify-between px-5 py-3 border-b border-white/[0.04] last:border-0">
@@ -718,7 +752,7 @@ function DashboardContent() {
           {/* ═══ AUDIT REPORT TAB ═══ */}
           {activeTab === 'audit' && (
             <div className="max-w-2xl space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2"><FileText size={15} /> Audit Report</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2"><FileText size={15} /> <Tooltip content={TOOLTIPS.auditReport}><span>Audit Report</span></Tooltip></h3>
 
               {/* PDF Preview Card */}
               <div className="bg-white rounded-xl p-6 relative overflow-hidden">
@@ -754,7 +788,7 @@ function DashboardContent() {
           {/* ═══ WIDGET TAB ═══ */}
           {activeTab === 'widget' && (
             <div className="max-w-2xl space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Code size={15} /> Your Compliance Widget</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Code size={15} /> <Tooltip content={TOOLTIPS.widgetEmbed}><span>Your Compliance Widget</span></Tooltip></h3>
               <p className="text-xs text-slate-400">Embed this on your website footer to show patients your compliance status.</p>
 
               {/* Widget Preview */}

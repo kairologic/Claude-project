@@ -13,6 +13,7 @@
     "test:links": "npx playwright test broken-links",
     "test:functionality": "npx playwright test functionality",
     "test:structure": "npx playwright test page-structure",
+    "test:guide": "npx playwright test dashboard-guide",
     "test:update-snapshots": "npx playwright test visual-regression --update-snapshots",
     "test:report": "npx playwright show-report"
   },

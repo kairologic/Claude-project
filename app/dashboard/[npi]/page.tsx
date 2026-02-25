@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import Link from 'next/link';
+import Tooltip from '@/components/Tooltip';
+import { TOOLTIPS } from '@/lib/dashboard-tooltips';
 
 // ═══════════════════════════════════════════════════════════
 // TYPES
@@ -189,7 +191,7 @@ function OverviewTab({ data }: { data: DashboardData }) {
               </div>
             </div>
             <div>
-              <div className="text-white font-bold text-sm mb-1">Composite Score</div>
+              <Tooltip content={TOOLTIPS.compositeScore} position="bottom"><span className="text-white font-bold text-sm mb-1">Composite Score</span></Tooltip>
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold"
                 style={{ background: tier.bg, color: tier.color, border: `1px solid ${tier.color}33` }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: tier.color }} />
@@ -204,9 +206,9 @@ function OverviewTab({ data }: { data: DashboardData }) {
 
         {/* Category Cards */}
         {[
-          { key: 'npi-integrity', label: 'NPI Integrity', sub: 'NPPES Verification' },
-          { key: 'data_sovereignty', label: 'Data Residency', sub: 'SB 1188' },
-          { key: 'ai_transparency', label: 'AI Transparency', sub: 'HB 149' },
+          { key: 'npi-integrity', label: 'NPI Integrity', sub: 'NPPES Verification', tip: TOOLTIPS.npiIntegrity },
+          { key: 'data_sovereignty', label: 'Data Residency', sub: 'SB 1188', tip: TOOLTIPS.dataResidency },
+          { key: 'ai_transparency', label: 'AI Transparency', sub: 'HB 149', tip: TOOLTIPS.aiTransparency },
         ].filter(cat => cats[cat.key]).map(cat => {
           const c = cats[cat.key];
           const pct = c?.percentage ?? 0;
@@ -215,7 +217,7 @@ function OverviewTab({ data }: { data: DashboardData }) {
             <div key={cat.key} className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-white font-bold text-sm">{cat.label}</div>
+                  <Tooltip content={cat.tip} position="bottom"><span className="text-white font-bold text-sm">{cat.label}</span></Tooltip>
                   <div className="text-slate-500 text-[10px]">{cat.sub}</div>
                 </div>
                 <div className="text-right">
@@ -318,7 +320,7 @@ function NpiIntegrityTab({ data }: { data: DashboardData }) {
       {/* NPI Check Results */}
       <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="text-white font-bold text-sm">NPI Registry Verification</div>
+          <Tooltip content={TOOLTIPS.npiRegistryVerification} position="bottom"><span className="text-white font-bold text-sm">NPI Registry Verification</span></Tooltip>
           <div className="text-slate-500 text-[10px]">Comparing NPPES data against your website</div>
         </div>
 
@@ -355,11 +357,11 @@ function NpiIntegrityTab({ data }: { data: DashboardData }) {
                     return (
                       <div className="grid grid-cols-2 gap-3 mt-3">
                         <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">NPI Registry</div>
+                          <Tooltip content={TOOLTIPS.npiVsSite} position="bottom"><span className="text-[10px] font-bold text-slate-500 uppercase mb-1">NPI Registry</span></Tooltip>
                           <div className="text-slate-300 text-xs">{npiVal || '—'}</div>
                         </div>
                         <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">Your Website</div>
+                          <Tooltip content={TOOLTIPS.npiVsSite} position="bottom"><span className="text-[10px] font-bold text-slate-500 uppercase mb-1">Your Website</span></Tooltip>
                           <div className="text-slate-300 text-xs">{siteVal || '—'}</div>
                         </div>
                       </div>
@@ -382,7 +384,7 @@ function NpiIntegrityTab({ data }: { data: DashboardData }) {
       {/* Provider Roster */}
       <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="text-white font-bold text-sm">Provider Roster Integrity</div>
+          <Tooltip content={TOOLTIPS.providerRoster} position="bottom"><span className="text-white font-bold text-sm">Provider Roster Integrity</span></Tooltip>
           <div className="text-slate-500 text-[10px]">Credentialing & directory consistency</div>
         </div>
 
@@ -416,7 +418,7 @@ function NpiIntegrityTab({ data }: { data: DashboardData }) {
       {alerts.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-white font-bold text-sm">Mismatch History</div>
+            <Tooltip content={TOOLTIPS.mismatchHistory} position="bottom"><span className="text-white font-bold text-sm">Mismatch History</span></Tooltip>
           </div>
           <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
             {alerts.map((a, i) => {
@@ -456,11 +458,11 @@ function BorderMapTab({ data }: { data: DashboardData }) {
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-xl p-5" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.15)' }}>
           <div className="text-3xl font-black text-emerald-400">{sovereign}</div>
-          <div className="text-emerald-400/60 text-xs">US-Sovereign Endpoints</div>
+          <Tooltip content={TOOLTIPS.usSovereignCount} position="bottom"><span className="text-emerald-400/60 text-xs">US-Sovereign Endpoints</span></Tooltip>
         </div>
         <div className="rounded-xl p-5" style={{ background: foreign > 0 ? 'rgba(248,113,113,0.05)' : 'rgba(52,211,153,0.05)', border: `1px solid ${foreign > 0 ? 'rgba(248,113,113,0.15)' : 'rgba(52,211,153,0.15)'}` }}>
           <div className={`text-3xl font-black ${foreign > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{foreign}</div>
-          <div className={`text-xs ${foreign > 0 ? 'text-red-400/60' : 'text-emerald-400/60'}`}>Foreign Endpoints</div>
+          <Tooltip content={TOOLTIPS.foreignEndpointCount} position="bottom"><span className={`text-xs ${foreign > 0 ? 'text-red-400/60' : 'text-emerald-400/60'}`}>Foreign Endpoints</span></Tooltip>
         </div>
       </div>
 
@@ -517,7 +519,7 @@ function DriftTab({ data }: { data: DashboardData }) {
     <div className="space-y-5">
       <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="text-white font-bold text-sm">Compliance Drift Timeline</div>
+          <Tooltip content={TOOLTIPS.driftMonitor} position="bottom"><span className="text-white font-bold text-sm">Compliance Drift Timeline</span></Tooltip>
           <div className="text-slate-500 text-[10px]">Changes detected between scans</div>
         </div>
 
@@ -641,7 +643,7 @@ function SettingsTab({ data }: { data: DashboardData }) {
     <div className="space-y-5">
       {/* Widget Embed */}
       <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="text-white font-bold text-sm mb-1">Widget Embed Code</div>
+        <Tooltip content={TOOLTIPS.widgetEmbed} position="bottom"><span className="text-white font-bold text-sm mb-1">Widget Embed Code</span></Tooltip>
         <p className="text-slate-500 text-xs mb-3">Add this to your website's HTML, just before the closing &lt;/body&gt; tag.</p>
         <div className="relative">
           <pre className="rounded-lg p-4 text-xs text-emerald-300 overflow-x-auto" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -657,7 +659,7 @@ function SettingsTab({ data }: { data: DashboardData }) {
 
       {/* Subscription Info */}
       <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="text-white font-bold text-sm mb-3">Subscription</div>
+        <Tooltip content={TOOLTIPS.subscriptionTier} position="bottom"><span className="text-white font-bold text-sm mb-3">Subscription</span></Tooltip>
         <div className="grid grid-cols-2 gap-4 text-xs">
           <div>
             <div className="text-slate-500 mb-0.5">Plan</div>
@@ -990,9 +992,14 @@ function DashboardInner() {
 
       {/* ── FOOTER ── */}
       <div className="max-w-6xl mx-auto px-4 py-6 mt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <p className="text-slate-600 text-[10px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          Powered by KairoLogic Sentry {isShield(data) ? 'Shield' : 'Watch'}™ &middot; &copy; {new Date().getFullYear()} KairoLogic
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-slate-600 text-[10px]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            Powered by KairoLogic Sentry {isShield(data) ? 'Shield' : 'Watch'}™ &middot; &copy; {new Date().getFullYear()} KairoLogic
+          </p>
+          <Link href="/dashboard/guide" target="_blank" className="text-slate-600 hover:text-emerald-400 text-[10px] transition-colors">
+            User Guide
+          </Link>
+        </div>
       </div>
     </div>
   );
