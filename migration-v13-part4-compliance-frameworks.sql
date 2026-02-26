@@ -4,6 +4,13 @@
 -- framework system, framework display configs for widgets,
 -- and multi-page monitoring support.
 -- Run AFTER Part 3.
+--
+-- Review fixes applied:
+--   [Critical #1] RLS: public tables read-only for anon,
+--     provider-scoped tables read-only for anon.
+--     All writes via service_role from server-side.
+--   [Critical #2] FK constraints to registry(npi) on provider tables
+--   [Improvement #10] Shared timestamp trigger function
 -- ============================================================
 
 -- -----------------------------------------------
@@ -11,6 +18,7 @@
 -- Defines compliance frameworks that can be assigned
 -- to providers. Enables multi-state, multi-industry
 -- expansion beyond TX SB 1188 / HB 149.
+-- PUBLIC table: anyone can read, only admin can write.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS compliance_frameworks (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -45,6 +53,7 @@ CREATE TABLE IF NOT EXISTS compliance_frameworks (
 -- Widget display configuration per framework.
 -- Controls trust rows, banner text, legal refs
 -- shown in the embeddable widget per framework.
+-- PUBLIC table: anyone can read, only admin can write.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS framework_display_configs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -78,10 +87,11 @@ CREATE TABLE IF NOT EXISTS framework_display_configs (
 -- Table: provider_frameworks
 -- Maps providers to their assigned compliance
 -- frameworks. A provider can have multiple frameworks.
+-- PROVIDER-SCOPED: read-only for anon.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS provider_frameworks (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    npi TEXT NOT NULL,
+    npi TEXT NOT NULL REFERENCES registry(npi) ON DELETE CASCADE,
     registry_id TEXT,
     framework_id TEXT NOT NULL REFERENCES compliance_frameworks(framework_id),
 
@@ -103,10 +113,11 @@ CREATE TABLE IF NOT EXISTS provider_frameworks (
 -- Multi-URL support per provider (V4).
 -- Currently single page per NPI; this enables
 -- monitoring multiple pages/domains.
+-- PROVIDER-SCOPED: read-only for anon.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS provider_sites (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    npi TEXT NOT NULL,
+    npi TEXT NOT NULL REFERENCES registry(npi) ON DELETE CASCADE,
     registry_id TEXT,
 
     -- Site details
@@ -154,73 +165,46 @@ CREATE INDEX IF NOT EXISTS idx_ps_npi_primary ON provider_sites(npi, is_primary)
 
 -- -----------------------------------------------
 -- Row Level Security
+-- PUBLIC tables (compliance_frameworks, framework_display_configs):
+--   anon SELECT only. Admin writes via service_role.
+-- PROVIDER-SCOPED tables (provider_frameworks, provider_sites):
+--   anon SELECT only. Server-side writes via service_role.
 -- -----------------------------------------------
 ALTER TABLE compliance_frameworks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE framework_display_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_frameworks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provider_sites ENABLE ROW LEVEL SECURITY;
 
--- compliance_frameworks policies
-CREATE POLICY "Allow anon select compliance_frameworks"
+-- compliance_frameworks: read-only for anon
+CREATE POLICY "Public read compliance_frameworks"
     ON compliance_frameworks FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert compliance_frameworks"
-    ON compliance_frameworks FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update compliance_frameworks"
-    ON compliance_frameworks FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
--- framework_display_configs policies
-CREATE POLICY "Allow anon select framework_display_configs"
+-- framework_display_configs: read-only for anon
+CREATE POLICY "Public read framework_display_configs"
     ON framework_display_configs FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert framework_display_configs"
-    ON framework_display_configs FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update framework_display_configs"
-    ON framework_display_configs FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
--- provider_frameworks policies
-CREATE POLICY "Allow anon select provider_frameworks"
+-- provider_frameworks: read-only for anon
+CREATE POLICY "Public read provider_frameworks"
     ON provider_frameworks FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert provider_frameworks"
-    ON provider_frameworks FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update provider_frameworks"
-    ON provider_frameworks FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
--- provider_sites policies
-CREATE POLICY "Allow anon select provider_sites"
+-- provider_sites: read-only for anon
+CREATE POLICY "Public read provider_sites"
     ON provider_sites FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert provider_sites"
-    ON provider_sites FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update provider_sites"
-    ON provider_sites FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
 -- -----------------------------------------------
--- Auto-update timestamp triggers
+-- Auto-update timestamp triggers (shared function from Part 1)
 -- -----------------------------------------------
-CREATE OR REPLACE FUNCTION update_compliance_frameworks_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
-
 CREATE TRIGGER trigger_compliance_frameworks_updated
     BEFORE UPDATE ON compliance_frameworks
-    FOR EACH ROW EXECUTE FUNCTION update_compliance_frameworks_timestamp();
-
-CREATE OR REPLACE FUNCTION update_framework_display_configs_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 CREATE TRIGGER trigger_framework_display_configs_updated
     BEFORE UPDATE ON framework_display_configs
-    FOR EACH ROW EXECUTE FUNCTION update_framework_display_configs_timestamp();
-
-CREATE OR REPLACE FUNCTION update_provider_sites_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 CREATE TRIGGER trigger_provider_sites_updated
     BEFORE UPDATE ON provider_sites
-    FOR EACH ROW EXECUTE FUNCTION update_provider_sites_timestamp();
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 -- -----------------------------------------------
 -- Verify tables

@@ -149,6 +149,7 @@ export type ScanSchedule = {
   id?: string;
   npi: string;
   registry_id?: string;
+  state?: string;
   schedule_type: 'monthly' | 'quarterly' | 'annual' | 'custom';
   cron_expression?: string;
   is_active?: boolean;
@@ -167,6 +168,7 @@ export type ScheduledReport = {
   id?: string;
   npi: string;
   registry_id?: string;
+  state?: string;
   report_type: 'monthly_compliance' | 'quarterly_forensic' | 'annual_certification';
   schedule_type: 'monthly' | 'quarterly' | 'annual';
   is_active?: boolean;
@@ -186,7 +188,8 @@ export type CertificationHistory = {
   id?: string;
   npi: string;
   registry_id?: string;
-  month_year: string;
+  state?: string;
+  month_date: string;  // DATE: always 1st of month, e.g. '2026-02-01'
   sovereignty_score: number;
   compliance_status: 'Sovereign' | 'Drift' | 'Violation';
   is_compliant?: boolean;
@@ -205,6 +208,7 @@ export type Notification = {
   id?: string;
   npi: string;
   registry_id?: string;
+  state?: string;
   notification_type: 'drift_alert' | 'scan_complete' | 'trial_expiry_warning' | 'trial_expired' | 'certification_earned' | 'certification_expiring' | 'report_ready' | 'payment_received' | 'dashboard_link' | 'system';
   title: string;
   message: string;
@@ -405,6 +409,39 @@ export type StateProduct = {
   meta_description?: string;
   display_order?: number;
   created_at?: string;
+  updated_at?: string;
+};
+
+export type ProviderComplianceCurrent = {
+  npi: string;
+  registry_id?: string;
+  state?: string;
+  latest_scan_id?: string;
+  latest_scan_date?: string;
+  latest_scan_type?: 'manual' | 'auto' | 'global';
+  composite_score?: number;
+  risk_level?: 'Sovereign' | 'Drift' | 'Violation' | 'unknown';
+  frameworks_status?: Record<string, {
+    score: number;
+    status: string;
+    last_checked: string;
+  }>;
+  data_sovereignty_score?: number;
+  ai_transparency_score?: number;
+  clinical_integrity_score?: number;
+  npi_integrity_score?: number;
+  sanctions_status?: 'unchecked' | 'clear' | 'flagged' | 'excluded';
+  license_status?: 'unchecked' | 'active' | 'expired' | 'revoked' | 'not_found';
+  has_active_alerts?: boolean;
+  alert_count?: number;
+  critical_alert_count?: number;
+  total_findings?: number;
+  critical_findings?: number;
+  high_findings?: number;
+  medium_findings?: number;
+  low_findings?: number;
+  certification_status?: string;
+  consecutive_compliant_months?: number;
   updated_at?: string;
 };
 

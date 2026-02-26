@@ -11,39 +11,46 @@
 -- One template renders all states. Adding a new state is
 -- a data task (INSERT rows), not a development task.
 -- Run AFTER Part 5.
+--
+-- Review fixes applied:
+--   [Critical #1] RLS: public tables read-only for anon.
+--     All writes via service_role from server-side.
+--   [Critical #3] state_code UNIQUE constraint explicit.
+--   [Improvement #10] Shared timestamp trigger function.
 -- ============================================================
 
 -- -----------------------------------------------
 -- Table: state_configs
 -- State-level CMS for landing pages.
 -- Each row powers /[state]/ landing page content.
+-- PUBLIC table: anyone can read, only admin can write.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS state_configs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    state_code TEXT NOT NULL UNIQUE,         -- e.g. 'TX', 'CA', 'WA'
+    state_code TEXT NOT NULL,                -- e.g. 'TX', 'CA', 'WA'
     state_name TEXT NOT NULL,                -- e.g. 'Texas', 'California'
-    slug TEXT NOT NULL UNIQUE,               -- URL slug: 'texas', 'california', 'washington'
+    slug TEXT NOT NULL,                      -- URL slug: 'texas', 'california', 'washington'
 
     -- Hero section content
-    headline TEXT NOT NULL,                  -- e.g. "Texas Healthcare Data Sovereignty & AI Compliance"
-    subheadline TEXT,                        -- e.g. "Monitor your practice's compliance with SB 1188 and HB 149"
-    hero_stat TEXT,                          -- e.g. "481,000+ providers affected"
-    hero_stat_label TEXT,                    -- e.g. "Texas Healthcare Providers"
-    urgency_message TEXT,                    -- e.g. "SB 1188 enforcement begins September 2025"
+    headline TEXT NOT NULL,                  -- e.g. "California Healthcare AI Compliance"
+    subheadline TEXT,                        -- e.g. "Monitor your practice's compliance with AB 3030"
+    hero_stat TEXT,                          -- e.g. "120,000+ providers affected"
+    hero_stat_label TEXT,                    -- e.g. "California Healthcare Providers"
+    urgency_message TEXT,                    -- e.g. "AB 3030 is enforceable now"
 
     -- State metadata
     provider_count INTEGER DEFAULT 0,
     regulation_count INTEGER DEFAULT 0,
 
     -- SEO
-    meta_title TEXT,                         -- e.g. "Texas Healthcare Compliance Scanner | KairoLogic"
-    meta_description TEXT,                   -- e.g. "Monitor SB 1188 data sovereignty and HB 149 AI transparency..."
+    meta_title TEXT,                         -- e.g. "California Healthcare Compliance Scanner | KairoLogic"
+    meta_description TEXT,                   -- e.g. "Monitor AB 3030 AI transparency compliance..."
     og_image_url TEXT,                       -- Social share image per state
 
     -- IP geolocation hint config
     geo_lat NUMERIC(10,6),                   -- State center latitude (for IP hint matching)
     geo_lng NUMERIC(10,6),                   -- State center longitude
-    geo_hint_message TEXT,                   -- e.g. "It looks like you're in Texas. See Texas compliance requirements →"
+    geo_hint_message TEXT,                   -- e.g. "It looks like you're in California. →"
 
     -- Display
     display_order INTEGER DEFAULT 0,         -- Order on national homepage state grid
@@ -55,7 +62,11 @@ CREATE TABLE IF NOT EXISTS state_configs (
     state_icon TEXT DEFAULT 'map-pin',        -- Lucide icon identifier
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    -- Explicit UNIQUE constraints for FK references [Critical #3]
+    CONSTRAINT state_configs_state_code_unique UNIQUE (state_code),
+    CONSTRAINT state_configs_slug_unique UNIQUE (slug)
 );
 
 -- -----------------------------------------------
@@ -63,6 +74,7 @@ CREATE TABLE IF NOT EXISTS state_configs (
 -- Per-regulation content for deep dive pages.
 -- Each row powers /[state]/[regulation]/ page.
 -- Links to compliance_frameworks for engine-side config.
+-- PUBLIC table: anyone can read, only admin can write.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS regulations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -126,6 +138,7 @@ CREATE TABLE IF NOT EXISTS regulations (
 -- State-specific product configurations.
 -- Powers the state-aware pricing page and
 -- product descriptions on state landing pages.
+-- PUBLIC table: anyone can read, only admin can write.
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS state_products (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -207,64 +220,39 @@ CREATE INDEX IF NOT EXISTS idx_state_products_available ON state_products(is_ava
 
 -- -----------------------------------------------
 -- Row Level Security
+-- PUBLIC tables: anon SELECT only.
+-- All writes via service_role from server-side / admin.
 -- -----------------------------------------------
 ALTER TABLE state_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE regulations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE state_products ENABLE ROW LEVEL SECURITY;
 
--- state_configs policies
-CREATE POLICY "Allow anon select state_configs"
+-- state_configs: read-only for anon
+CREATE POLICY "Public read state_configs"
     ON state_configs FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert state_configs"
-    ON state_configs FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update state_configs"
-    ON state_configs FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
--- regulations policies
-CREATE POLICY "Allow anon select regulations"
+-- regulations: read-only for anon
+CREATE POLICY "Public read regulations"
     ON regulations FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert regulations"
-    ON regulations FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update regulations"
-    ON regulations FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
--- state_products policies
-CREATE POLICY "Allow anon select state_products"
+-- state_products: read-only for anon
+CREATE POLICY "Public read state_products"
     ON state_products FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert state_products"
-    ON state_products FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update state_products"
-    ON state_products FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
 -- -----------------------------------------------
--- Auto-update timestamp triggers
+-- Auto-update timestamp triggers (shared function from Part 1)
 -- -----------------------------------------------
-CREATE OR REPLACE FUNCTION update_state_configs_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
-
 CREATE TRIGGER trigger_state_configs_updated
     BEFORE UPDATE ON state_configs
-    FOR EACH ROW EXECUTE FUNCTION update_state_configs_timestamp();
-
-CREATE OR REPLACE FUNCTION update_regulations_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 CREATE TRIGGER trigger_regulations_updated
     BEFORE UPDATE ON regulations
-    FOR EACH ROW EXECUTE FUNCTION update_regulations_timestamp();
-
-CREATE OR REPLACE FUNCTION update_state_products_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
-$$ LANGUAGE plpgsql;
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 CREATE TRIGGER trigger_state_products_updated
     BEFORE UPDATE ON state_products
-    FOR EACH ROW EXECUTE FUNCTION update_state_products_timestamp();
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 -- -----------------------------------------------
 -- Verify tables

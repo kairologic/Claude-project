@@ -49,6 +49,34 @@ CREATE INDEX IF NOT EXISTS idx_registry_consecutive_months ON registry(consecuti
   WHERE consecutive_compliant_months >= 12;
 
 -- -----------------------------------------------
+-- Ensure UNIQUE constraint on registry.npi
+-- Required by FK references in Parts 2, 3, 4, 6.
+-- Safe to run if already unique (will no-op on conflict).
+-- -----------------------------------------------
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'registry'::regclass
+          AND contype = 'u'
+          AND (SELECT array_agg(attname ORDER BY attnum)
+               FROM pg_attribute
+               WHERE attrelid = conrelid AND attnum = ANY(conkey)) = ARRAY['npi']
+    ) THEN
+        ALTER TABLE registry ADD CONSTRAINT registry_npi_unique UNIQUE (npi);
+    END IF;
+END $$;
+
+-- -----------------------------------------------
+-- Shared timestamp trigger function (used by all v13 tables)
+-- Consolidates duplicate per-table functions into one.
+-- -----------------------------------------------
+CREATE OR REPLACE FUNCTION update_v13_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+-- -----------------------------------------------
 -- Verify new columns
 -- -----------------------------------------------
 SELECT column_name, data_type, column_default

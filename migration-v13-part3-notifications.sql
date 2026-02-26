@@ -3,6 +3,12 @@
 -- Creates tables for V1 drift email alerts, V2 automated
 -- notifications, and V2.5 trial expiry alerts.
 -- Run AFTER Part 2.
+--
+-- Review fixes applied:
+--   [Critical #1] RLS: server-write only, anon read-only
+--   [Critical #2] FK constraints to registry(npi)
+--   [Improvement #9] state column on notifications
+--   [Improvement #10] Shared timestamp trigger function
 -- ============================================================
 
 -- -----------------------------------------------
@@ -13,8 +19,9 @@
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    npi TEXT NOT NULL,
+    npi TEXT NOT NULL REFERENCES registry(npi) ON DELETE CASCADE,
     registry_id TEXT,
+    state TEXT,                -- Provider's state code for filtered queries
 
     -- Notification type and content
     notification_type TEXT NOT NULL,
@@ -59,7 +66,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- -----------------------------------------------
 CREATE TABLE IF NOT EXISTS notification_preferences (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    npi TEXT NOT NULL UNIQUE,
+    npi TEXT NOT NULL UNIQUE REFERENCES registry(npi) ON DELETE CASCADE,
     registry_id TEXT,
 
     -- Email notification toggles
@@ -94,6 +101,7 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 -- -----------------------------------------------
 -- notifications
 CREATE INDEX IF NOT EXISTS idx_notifications_npi ON notifications(npi);
+CREATE INDEX IF NOT EXISTS idx_notifications_state ON notifications(state);
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(notification_type);
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(delivery_status)
   WHERE delivery_status = 'pending';
@@ -106,40 +114,26 @@ CREATE INDEX IF NOT EXISTS idx_notif_prefs_npi ON notification_preferences(npi);
 
 -- -----------------------------------------------
 -- Row Level Security
+-- Provider-scoped tables: anon SELECT only.
+-- Writes go through service_role from server-side.
 -- -----------------------------------------------
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 
--- notifications policies
-CREATE POLICY "Allow anon select notifications"
+-- notifications: read-only for anon
+CREATE POLICY "Public read notifications"
     ON notifications FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert notifications"
-    ON notifications FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update notifications"
-    ON notifications FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
--- notification_preferences policies
-CREATE POLICY "Allow anon select notification_preferences"
+-- notification_preferences: read-only for anon
+CREATE POLICY "Public read notification_preferences"
     ON notification_preferences FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow anon insert notification_preferences"
-    ON notification_preferences FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "Allow anon update notification_preferences"
-    ON notification_preferences FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
 -- -----------------------------------------------
--- Auto-update timestamp trigger
+-- Auto-update timestamp trigger (shared function from Part 1)
 -- -----------------------------------------------
-CREATE OR REPLACE FUNCTION update_notification_preferences_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 CREATE TRIGGER trigger_notification_preferences_updated
     BEFORE UPDATE ON notification_preferences
-    FOR EACH ROW EXECUTE FUNCTION update_notification_preferences_timestamp();
+    FOR EACH ROW EXECUTE FUNCTION update_v13_timestamp();
 
 -- -----------------------------------------------
 -- Verify tables

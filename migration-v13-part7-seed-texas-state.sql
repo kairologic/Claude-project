@@ -220,6 +220,7 @@ INSERT INTO state_products (
     state_code, product_key, display_name, tagline,
     description, features, includes,
     price_cents, price_display, price_type,
+    original_price_cents, original_price_display,
     regulations_covered, checks_included,
     tier_level, is_popular, cta_text,
     display_order
@@ -244,6 +245,7 @@ VALUES (
         {"item":"Safe Harbor Declaration Package","description":"Documentation to establish your good-faith compliance effort."}
     ]'::jsonb,
     9900, '$99', 'one_time',
+    19900, '$199',
     '["sb-1188","hb-149"]'::jsonb,
     '["NPI-01","NPI-02","NPI-03","RST-01"]'::jsonb,
     1, FALSE, 'Get Your Audit',
@@ -253,6 +255,8 @@ ON CONFLICT (state_code, product_key) DO UPDATE SET
     display_name = EXCLUDED.display_name, description = EXCLUDED.description,
     features = EXCLUDED.features, includes = EXCLUDED.includes,
     price_cents = EXCLUDED.price_cents, price_display = EXCLUDED.price_display,
+    original_price_cents = EXCLUDED.original_price_cents,
+    original_price_display = EXCLUDED.original_price_display,
     updated_at = NOW();
 
 -- Product 2: Safe Harbor Package (premium report)
@@ -260,6 +264,7 @@ INSERT INTO state_products (
     state_code, product_key, display_name, tagline,
     description, features, includes,
     price_cents, price_display, price_type,
+    original_price_cents, original_price_display,
     regulations_covered, checks_included,
     tier_level, is_popular, cta_text,
     display_order
@@ -285,6 +290,7 @@ VALUES (
         {"item":"Trust Seal Widget","description":"Embeddable compliance badge for your website."}
     ]'::jsonb,
     14900, '$149', 'one_time',
+    29900, '$299',
     '["sb-1188","hb-149"]'::jsonb,
     '["NPI-01","NPI-02","NPI-03","RST-01"]'::jsonb,
     2, TRUE, 'Protect Your Practice',
@@ -294,6 +300,8 @@ ON CONFLICT (state_code, product_key) DO UPDATE SET
     display_name = EXCLUDED.display_name, description = EXCLUDED.description,
     features = EXCLUDED.features, includes = EXCLUDED.includes,
     price_cents = EXCLUDED.price_cents, price_display = EXCLUDED.price_display,
+    original_price_cents = EXCLUDED.original_price_cents,
+    original_price_display = EXCLUDED.original_price_display,
     updated_at = NOW();
 
 -- Product 3: SentryShield Monthly Monitoring
@@ -301,6 +309,7 @@ INSERT INTO state_products (
     state_code, product_key, display_name, tagline,
     description, features, includes,
     price_cents, price_display, price_type,
+    original_price_cents, original_price_display,
     regulations_covered, checks_included,
     tier_level, is_popular, cta_text,
     display_order
@@ -326,6 +335,7 @@ VALUES (
         {"item":"Monthly Compliance Reports","description":"PDF reports auto-generated and emailed monthly."}
     ]'::jsonb,
     3900, '$39/mo', 'monthly',
+    5900, '$59/mo',
     '["sb-1188","hb-149"]'::jsonb,
     '["NPI-01","NPI-02","NPI-03","RST-01"]'::jsonb,
     3, FALSE, 'Start Monitoring',
@@ -335,6 +345,8 @@ ON CONFLICT (state_code, product_key) DO UPDATE SET
     display_name = EXCLUDED.display_name, description = EXCLUDED.description,
     features = EXCLUDED.features, includes = EXCLUDED.includes,
     price_cents = EXCLUDED.price_cents, price_display = EXCLUDED.price_display,
+    original_price_cents = EXCLUDED.original_price_cents,
+    original_price_display = EXCLUDED.original_price_display,
     updated_at = NOW();
 
 -- -----------------------------------------------
