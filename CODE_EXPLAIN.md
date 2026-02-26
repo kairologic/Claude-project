@@ -84,7 +84,7 @@ STRIPE_SHIELD_PRICE_ID=price_...
 STRIPE_WATCH_PRICE_ID=price_...
 
 # Campaign Landing Pages
-REPORT_CODE_SECRET=your_random_32_byte_hex_string
+REPORT_CODE_SECRET=b6f59bad31ffd504440de822bde1d3d84c08658969a2207b23671fe92a373de8
 
 # Optional
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
