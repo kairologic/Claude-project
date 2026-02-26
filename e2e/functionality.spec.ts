@@ -338,6 +338,23 @@ test.describe('Page-to-page navigation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Report Landing Page (Campaign)
+// ---------------------------------------------------------------------------
+test.describe('Report landing page – invalid code', () => {
+  test('shows "Report Not Found" for invalid code', async ({ page }) => {
+    await page.goto('/report/invalid99');
+
+    await expect(
+      page.getByRole('heading', { name: /report not found/i })
+    ).toBeVisible({ timeout: 10000 });
+
+    await expect(
+      page.getByText(/ravi@kairologic\.net/i)
+    ).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // No JavaScript Errors
 // ---------------------------------------------------------------------------
 test.describe('Runtime error detection', () => {

@@ -83,6 +83,9 @@ STRIPE_SECRET_KEY=sk_live_...
 STRIPE_SHIELD_PRICE_ID=price_...
 STRIPE_WATCH_PRICE_ID=price_...
 
+# Campaign Landing Pages
+REPORT_CODE_SECRET=your_random_32_byte_hex_string
+
 # Optional
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 BROWSERLESS_API_KEY=your_browserless_key
@@ -191,6 +194,7 @@ Patient/Provider → Browser
 | `app/intake/page.tsx` | Patient intake form | Page component | — | Patient |
 | `app/intake/success/page.tsx` | Intake success confirmation | Page component | — | Patient |
 | `app/payment/success/page.tsx` | Payment success + deliverables | Page component | — | Payments |
+| `app/report/[code]/page.tsx` | Email campaign landing page — personalized compliance findings + product cards | Page component | `lucide-react`, `next/image` | Campaign |
 | `app/privacy/page.tsx` | Privacy policy | Page component | — | Legal |
 | `app/terms/page.tsx` | Terms of service | Page component | — | Legal |
 | `app/dashboard/login/page.tsx` | Provider dashboard login | Page component | — | Auth |
@@ -231,6 +235,7 @@ Patient/Provider → Browser
 | `app/api/shield/dashboard/route.ts` | Shield dashboard data endpoint | `GET` | — | Dashboard |
 | `app/api/admin/bulk-scan/route.ts` | Admin bulk scan trigger | `POST` | — | Admin |
 | `app/api/admin/generate-asset/route.ts` | Admin asset generation | `POST` | — | Admin |
+| `app/api/report-lookup/route.ts` | Campaign report code lookup — resolves HMAC code to provider data + scan findings | `GET` | Supabase REST | Campaign |
 | `app/api/fillout/webhook/route.ts` | Fillout form webhook | `POST` | — | Integrations |
 
 ### Check Engine (checks/)
@@ -253,6 +258,7 @@ Patient/Provider → Browser
 |------|---------|---------------------|---------------|------------|
 | `lib/supabase.ts` | Supabase client (lazy singleton) + all database types (`Registry`, `ViolationEvidence`, `ScanHistory`, `EmailTemplate`, `Purchase`, `CalendarSlot`) | `getSupabase`, types | `@supabase/supabase-js` | Data |
 | `lib/crawler.ts` | Adaptive web crawler v1.0: direct fetch → Browserless.io fallback, SPA detection, HTML-to-text | `crawlPage`, `stripHtmlToText`, `CrawlResult` | — | Crawling |
+| `lib/report-code.ts` | HMAC-SHA256 report code generation + lookup for email campaign landing pages | `generateReportCode`, `findNpiByCode` | `crypto` | Campaign |
 
 ### Services (services/)
 
@@ -333,6 +339,7 @@ Patient/Provider → Browser
 | `migration-v12-part1-registry.sql` | v12 part 1: Registry table extensions | SQL DDL | Supabase | Database |
 | `migration-v12-part2-email-table.sql` | v12 part 2: Email template table refinements | SQL DDL | Supabase | Database |
 | `migration-v12-part3-seed-templates.sql` | v12 part 3: Seed email templates | SQL DML | Supabase | Database |
+| `database-migration-campaign-outreach.sql` | campaign_outreach table for email campaign tracking + report code lookup | SQL DDL | Supabase | Database |
 | `database-seed-page-content.sql` | CMS content seed data (~100+ sections) | SQL DML | Supabase | Database |
 
 ### Configuration Files
@@ -480,6 +487,7 @@ Patient/Provider → Browser
 | `BROWSERLESS_API_KEY` | No | `lib/crawler.ts` | Browserless.io API key for JS-rendered sites |
 | `NEXT_PUBLIC_BASE_URL` | No | `app/api/auth/magic-link/route.ts` | Public base URL (default: https://kairologic.net) |
 | `ADMIN_PASSWORD` | No | Admin pages | Admin dashboard password |
+| `REPORT_CODE_SECRET` | Yes (campaign) | `lib/report-code.ts` | 32-byte hex secret for HMAC-based report code generation |
 | `BASE_URL` | No | Playwright tests, CI | Test server base URL (default: http://localhost:3000) |
 | `CI` | Auto | `playwright.config.ts` | Set by GitHub Actions |
 
@@ -542,6 +550,7 @@ No distributed tracing. Scan duration is captured in `CrawlResult.duration` and 
 | `calendar_slots` | `date`, `start_time`, `end_time`, `is_available`, `booked_by` | Consultation calendar | `database-migration.sql` |
 | `email_logs` | `recipient`, `template_id`, `status`, `sent_at` | Email audit trail | `database-migration.sql` |
 | `dashboard_tokens` | `token`, `email`, `npi`, `expires_at`, `used_at` | Magic link auth tokens | `app/api/auth/magic-link/route.ts` |
+| `campaign_outreach` | `npi`, `report_code`, `email_sent_to`, `sent_at`, `campaign_name`, `opened`, `purchased` | Email campaign tracking + report code lookup | `database-migration-campaign-outreach.sql` |
 
 ### Key TypeScript Types (lib/supabase.ts)
 
@@ -641,4 +650,4 @@ Tests run on every push and PR via `.github/workflows/page-tests.yml`:
 
 ## 12. Doc Sync
 
-Generated from commit `94b0d887bece39474e57faa9d97674164d9c62e2` on 2026-02-25T23:50:54Z UTC UTC.
+Generated from commit `3589740fa9b218852a0ae551ee59cb51e3df884c` on 2026-02-26.
