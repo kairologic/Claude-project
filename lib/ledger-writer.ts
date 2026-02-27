@@ -2,17 +2,11 @@
 // ═══════════════════════════════════════════════════════════════
 // KairoLogic Phase 2: Compliance Ledger Dual-Write Module
 // 
-// Called after every scan to write results to the new tables:
+// Writes scan results to the new compliance tables:
 //   - compliance_findings
-//   - compliance_ledger_events
+//   - compliance_ledger_events  
 //   - infrastructure_snapshots
 //   - registry updates (cdn_detected, cdn_provider, last_scan_at)
-//   - scan_sessions updates (cdn fields, engine_version)
-//
-// Usage in route.ts:
-//   import { writeLedgerData } from '@/lib/ledger-writer';
-//   // ... after existing scan_sessions + check_results writes ...
-//   const ledgerResult = await writeLedgerData({ npi, url, scanSessionId, ... });
 // ═══════════════════════════════════════════════════════════════
 
 import { createClient } from '@supabase/supabase-js';
@@ -30,7 +24,7 @@ function getSupabase() {
 
 // ─── Types ─────────────────────────────────────────────────────
 
-interface ScanFinding {
+interface LedgerFinding {
   id: string;
   status: string;
   severity?: string;
@@ -66,7 +60,7 @@ export interface LedgerWriteInput {
   scanSessionId: string;
   riskScore: number;
   riskLevel: string;
-  findings: ScanFinding[];
+  findings: LedgerFinding[];
   cdnDetection: CDNDetection;
   meta: ScanMeta;
   triggeredBy?: string;
@@ -78,10 +72,13 @@ export interface LedgerWriteInput {
 
 // ─── Helpers ───────────────────────────────────────────────────
 
+const VALID_CATEGORIES = ['data_sovereignty', 'ai_transparency', 'clinical_integrity', 'npi_integrity'];
+const VALID_SEVERITIES = ['critical', 'high', 'medium', 'low', 'advisory'];
+
 function mapCategory(checkId: string, category?: string): string {
   if (category) {
     const c = category.toLowerCase().replace(/[- ]/g, '_');
-    if (['data_sovereignty', 'ai_transparency', 'clinical_integrity', 'npi_integrity'].includes(c)) return c;
+    if (VALID_CATEGORIES.includes(c)) return c;
   }
   if (checkId.startsWith('DR-')) return 'data_sovereignty';
   if (checkId.startsWith('AI-')) return 'ai_transparency';
@@ -90,10 +87,10 @@ function mapCategory(checkId: string, category?: string): string {
   return 'data_sovereignty';
 }
 
-function mapSeverity(finding: ScanFinding): string {
+function mapSeverity(finding: LedgerFinding): string {
   if (finding.severity) {
     const s = finding.severity.toLowerCase();
-    if (['critical', 'high', 'medium', 'low', 'advisory'].includes(s)) return s;
+    if (VALID_SEVERITIES.includes(s)) return s;
   }
   if (finding.status === 'fail') return 'high';
   if (finding.status === 'warn') return 'medium';
@@ -140,7 +137,7 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
         .eq('npi', input.npi)
         .single();
       practiceGroupId = data?.practice_group_id || null;
-    } catch { /* no group */ }
+    } catch { /* no group — fine */ }
   }
 
   // ─── 2. Write compliance_findings ────────────────────────────
@@ -156,17 +153,17 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
         .limit(1);
 
       if (existing && existing.length > 0) {
-        // Update: refresh last_detected_at, update evidence
+        // Update existing finding
         const updateData: Record<string, any> = {
           last_detected_at: now,
-          scan_session_id: input.scanSessionId,
           severity: mapSeverity(f),
           title: f.title,
           detail: f.detail || '',
           evidence: f.evidence || null,
           score: f.score ?? null,
         };
-        // If previously failing and now passes, mark remediated
+        if (input.scanSessionId) updateData.scan_session_id = input.scanSessionId;
+        // If previously failing and now passes → remediated
         if (f.status === 'pass') {
           updateData.status = 'remediated';
           updateData.resolved_at = now;
@@ -179,27 +176,29 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
         if (error) errors.push(`cf update ${f.id}: ${error.message}`);
         else findingsWritten++;
       } else if (f.status !== 'pass') {
-        // Insert new finding (only for non-pass results)
+        // Insert new finding (only for non-pass)
+        const insertData: Record<string, any> = {
+          npi: input.npi,
+          practice_group_id: practiceGroupId,
+          check_id: f.id,
+          category: mapCategory(f.id, f.category),
+          severity: mapSeverity(f),
+          status: 'open',
+          title: f.title,
+          description: f.detail || '',
+          detail: f.detail || '',
+          evidence: f.evidence || null,
+          remediation_steps: f.recommendedFix ? [f.recommendedFix] : null,
+          score: f.score ?? null,
+          is_domain_level: isDomainLevel(f.id),
+          first_detected_at: now,
+          last_detected_at: now,
+        };
+        if (input.scanSessionId) insertData.scan_session_id = input.scanSessionId;
+
         const { error } = await supabase
           .from('compliance_findings')
-          .insert({
-            npi: input.npi,
-            practice_group_id: practiceGroupId,
-            scan_session_id: input.scanSessionId,
-            check_id: f.id,
-            category: mapCategory(f.id, f.category),
-            severity: mapSeverity(f),
-            status: 'open',
-            title: f.title,
-            description: f.detail || '',
-            detail: f.detail || '',
-            evidence: f.evidence || null,
-            remediation_steps: f.recommendedFix ? [f.recommendedFix] : null,
-            score: f.score ?? null,
-            is_domain_level: isDomainLevel(f.id),
-            first_detected_at: now,
-            last_detected_at: now,
-          });
+          .insert(insertData);
 
         if (error) errors.push(`cf insert ${f.id}: ${error.message}`);
         else findingsWritten++;
@@ -221,7 +220,7 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
         practice_group_id: practiceGroupId,
         event_type: 'scan_completed',
         event_data: {
-          scan_session_id: input.scanSessionId,
+          scan_session_id: input.scanSessionId || null,
           risk_score: input.riskScore,
           risk_level: input.riskLevel,
           checks_total: input.findings.length,
@@ -268,7 +267,7 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
         mx_providers: input.mxRecords || null,
         third_party_scripts: input.thirdPartyScripts || null,
         response_headers: input.responseHeaders || null,
-        scan_session_id: input.scanSessionId,
+        scan_session_id: input.scanSessionId || null,
         snapshot_at: now,
       })
       .select('id')
@@ -294,20 +293,22 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
     errors.push(`registry: ${err.message}`);
   }
 
-  // ─── 6. Update scan_sessions ─────────────────────────────────
-  try {
-    await supabase
-      .from('scan_sessions')
-      .update({
-        cdn_detected: input.cdnDetection.detected || false,
-        cdn_provider: input.cdnDetection.provider || null,
-        cdn_detected_via: input.cdnDetection.detectedVia || null,
-        engine_version: input.meta.engine || 'SENTRY-3.3.0',
-        practice_group_id: practiceGroupId,
-      })
-      .eq('id', input.scanSessionId);
-  } catch (err: any) {
-    errors.push(`scan_sessions: ${err.message}`);
+  // ─── 6. Update scan_sessions (only if we have an ID) ────────
+  if (input.scanSessionId) {
+    try {
+      await supabase
+        .from('scan_sessions')
+        .update({
+          cdn_detected: input.cdnDetection.detected || false,
+          cdn_provider: input.cdnDetection.provider || null,
+          cdn_detected_via: input.cdnDetection.detectedVia || null,
+          engine_version: input.meta.engine || 'SENTRY-3.3.0',
+          practice_group_id: practiceGroupId,
+        })
+        .eq('id', input.scanSessionId);
+    } catch (err: any) {
+      errors.push(`scan_sessions: ${err.message}`);
+    }
   }
 
   return { findingsWritten, ledgerEventId, snapshotId, practiceGroupId, errors };
