@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crawlPage, stripHtmlToText } from '@/lib/crawler';
+import { detectCDN, isKnownUSSaaS, isKnownUSMailProvider, type CDNDetectionResult } from '@/lib/cdn-detection';
 
 /**
- * KairoLogic Sentry Scanner API v3.1
- * ===================================
- * REAL compliance scans with intelligent risk weighting.
+ * KairoLogic Sentry Scanner API v3.2 (CDN-Aware)
+ * ================================================
+ * REAL compliance scans with CDN-aware data residency analysis.
+ * 
+ * v3.2 IMPROVEMENTS (CDN Patch):
+ * 1. Three-layer CDN detection: IP CIDR ranges, CNAME patterns, HTTP headers
+ * 2. DR-01 updated: CDN-detected sites PASS (not fail) with advisory note
+ * 3. NEW DR-05: CDN Data Path Transparency advisory finding
+ * 4. DR-04 updated: Known US SaaS providers excluded from foreign script classification
+ * 5. DR-03 updated: Known US mail platforms (Google Workspace, M365) recognized
+ * 6. Advisory scoring: advisory findings deduct 5 points each (max 15), not treated as fails
  * 
  * v3.1 IMPROVEMENTS:
  * 1. Adaptive web crawler — direct fetch + Browserless.io for JS-rendered sites
@@ -19,7 +28,7 @@ import { crawlPage, stripHtmlToText } from '@/lib/crawler';
  * 5. Data Border Map (geo evidence for visualization)
  * 
  * Scan Categories:
- * - DR-01..04: Data Sovereignty & Residency (SB 1188)
+ * - DR-01..05: Data Sovereignty & Residency (SB 1188)
  * - AI-01..04: AI Transparency & Disclosure (HB 149)
  * - ER-01..04: EHR System Integrity
  * 
@@ -29,7 +38,7 @@ import { crawlPage, stripHtmlToText } from '@/lib/crawler';
 
 // ─── TYPES ──────────────────────────────────────────────
 
-type RiskTier = 'critical' | 'high' | 'medium' | 'low' | 'info';
+type RiskTier = 'critical' | 'high' | 'medium' | 'low' | 'advisory' | 'info';
 
 interface ScanFinding {
   id: string;
@@ -74,7 +83,7 @@ interface DataBorderNode {
 
 // ─── CONSTANTS ──────────────────────────────────────────
 
-const ENGINE_VERSION = 'SENTRY-3.1.0';
+const ENGINE_VERSION = 'SENTRY-3.2.0';
 
 // Category weights for composite score (must sum to 1.0)
 const CATEGORY_WEIGHTS = {
@@ -89,8 +98,12 @@ const SEVERITY_DEDUCTIONS: Record<RiskTier, number> = {
   high: 20,
   medium: 10,
   low: 5,
+  advisory: 5,  // Advisory findings have minimal scoring impact
   info: 0,
 };
+
+// Maximum total deduction from advisory findings (prevents advisory-heavy scans from tanking scores)
+const MAX_ADVISORY_DEDUCTION = 15;
 
 // AI transparency keywords required by HB 149
 const AI_DISCLOSURE_KEYWORDS = [
@@ -291,34 +304,65 @@ function detectPageContext(pageHtml: string, pageText: string): {
 
 // ─── SCAN MODULES ───────────────────────────────────────
 
-async function scanDR01(domain: string, borderMap: DataBorderNode[]): Promise<ScanFinding> {
+async function scanDR01(domain: string, borderMap: DataBorderNode[], responseHeaders: Record<string, string>): Promise<{ finding: ScanFinding; cdnResult: CDNDetectionResult }> {
   const geo = await resolveIPGeo(domain);
   if (!geo) {
     return {
-      id: 'DR-01', name: 'Primary Domain IP Geo-Location',
-      status: 'warn', severity: 'high', category: 'data_sovereignty', phiRisk: 'direct',
-      detail: `Unable to resolve IP geolocation for ${domain}. Manual verification recommended.`,
-      clause: 'SB 1188 Sec. 183.002(a)', evidence: { domain, resolution: 'failed' },
-      recommendedFix: `Manually verify server hosting location for ${domain}. Confirm primary hosting is within US borders using your hosting provider's control panel or by running 'dig ${domain}' and checking the resolved IP against a geo-IP service.`,
+      finding: {
+        id: 'DR-01', name: 'Primary Domain IP Geo-Location',
+        status: 'warn', severity: 'high', category: 'data_sovereignty', phiRisk: 'direct',
+        detail: `Unable to resolve IP geolocation for ${domain}. Manual verification recommended.`,
+        clause: 'SB 1188 Sec. 183.002(a)', evidence: { domain, resolution: 'failed' },
+        recommendedFix: `Manually verify server hosting location for ${domain}. Confirm primary hosting is within US borders using your hosting provider's control panel or by running 'dig ${domain}' and checking the resolved IP against a geo-IP service.`,
+      },
+      cdnResult: { detected: false, provider: '', detectedVia: 'none', confidence: 'low', details: {} },
     };
   }
+
+  // Run CDN detection BEFORE determining pass/fail
+  const cdnResult = await detectCDN(geo.ip, domain, responseHeaders);
+
   borderMap.push({
     domain, ip: geo.ip, country: geo.country, countryCode: geo.countryCode,
-    city: geo.city, type: 'primary', isSovereign: geo.isSovereign, phiRisk: 'direct',
-    purpose: 'Primary website hosting',
+    city: geo.city, type: 'primary', isSovereign: geo.isSovereign || cdnResult.detected, phiRisk: 'direct',
+    purpose: cdnResult.detected ? `Website via ${cdnResult.provider} CDN (US edge nodes)` : 'Primary website hosting',
   });
+
+  // CDN-detected: PASS even if geo says non-US (the IP is an anycast CDN address)
+  if (cdnResult.detected && !geo.isSovereign) {
+    return {
+      finding: {
+        id: 'DR-01', name: 'Primary Domain IP Geo-Location',
+        status: 'pass', severity: 'low', category: 'data_sovereignty', phiRisk: 'indirect',
+        detail: `IP ${geo.ip} geolocates to ${geo.city}, ${geo.country}, but this is a ${cdnResult.provider} CDN anycast address (detected via ${cdnResult.detectedVia}). ${cdnResult.provider} maintains US edge nodes that serve US traffic domestically. Data residency is satisfied at the edge level. See DR-05 for documentation recommendations.`,
+        clause: 'SB 1188 Sec. 183.002(a)',
+        evidence: {
+          ip: geo.ip, country: geo.countryCode, city: geo.city, org: geo.org,
+          isSovereign: false, cdnDetected: true, cdnProvider: cdnResult.provider,
+          cdnDetectedVia: cdnResult.detectedVia, cdnConfidence: cdnResult.confidence,
+        },
+        recommendedFix: undefined,
+      },
+      cdnResult,
+    };
+  }
+
+  // Standard pass/fail (no CDN or genuinely US-hosted)
   return {
-    id: 'DR-01', name: 'Primary Domain IP Geo-Location',
-    status: geo.isSovereign ? 'pass' : 'fail', severity: 'critical',
-    category: 'data_sovereignty', phiRisk: 'direct',
-    detail: geo.isSovereign
-      ? `Server resolved to ${geo.ip} in ${geo.city}, ${geo.country} (${geo.org}). Data residency confirmed within US borders.`
-      : `Server resolved to ${geo.ip} in ${geo.city}, ${geo.country} (${geo.org}). PHI may transit non-sovereign infrastructure.`,
-    clause: 'SB 1188 Sec. 183.002(a)',
-    evidence: { ip: geo.ip, country: geo.countryCode, city: geo.city, org: geo.org, isSovereign: geo.isSovereign },
-    recommendedFix: geo.isSovereign
-      ? undefined
-      : `Migrate primary hosting to a US-based data center. Current server is in ${geo.city}, ${geo.country} (${geo.org}). Consider AWS us-east-1/us-west-2, Azure US regions, or a Texas-based hosting provider to ensure SB 1188 data residency compliance.`,
+    finding: {
+      id: 'DR-01', name: 'Primary Domain IP Geo-Location',
+      status: geo.isSovereign ? 'pass' : 'fail', severity: 'critical',
+      category: 'data_sovereignty', phiRisk: 'direct',
+      detail: geo.isSovereign
+        ? `Server resolved to ${geo.ip} in ${geo.city}, ${geo.country} (${geo.org}). Data residency confirmed within US borders.`
+        : `Server resolved to ${geo.ip} in ${geo.city}, ${geo.country} (${geo.org}). PHI may transit non-sovereign infrastructure. No CDN detected that would explain this as an anycast address.`,
+      clause: 'SB 1188 Sec. 183.002(a)',
+      evidence: { ip: geo.ip, country: geo.countryCode, city: geo.city, org: geo.org, isSovereign: geo.isSovereign, cdnDetected: false },
+      recommendedFix: geo.isSovereign
+        ? undefined
+        : `Migrate primary hosting to a US-based data center. Current server is in ${geo.city}, ${geo.country} (${geo.org}). Consider AWS us-east-1/us-west-2, Azure US regions, or a Texas-based hosting provider to ensure SB 1188 data residency compliance.`,
+    },
+    cdnResult,
   };
 }
 
@@ -406,14 +450,24 @@ async function scanDR03(domain: string, borderMap: DataBorderNode[]): Promise<Sc
     }
   }
 
-  const foreignMX = mxGeo.filter(r => r.geo && !r.geo.isSovereign);
+  const foreignMX = mxGeo.filter(r => {
+    if (!r.geo || r.geo.isSovereign) return false;
+    // Check if this is a known US mail provider (geo may be wrong due to anycast)
+    const knownUS = isKnownUSMailProvider(r.exchange);
+    if (knownUS) return false; // Known US provider, not foreign
+    return true;
+  });
+  const knownUSProviders = mxGeo.filter(r => isKnownUSMailProvider(r.exchange)).map(r => {
+    const info = isKnownUSMailProvider(r.exchange);
+    return `${r.exchange} (${info?.provider})`;
+  });
   const pass = foreignMX.length === 0;
   return {
     id: 'DR-03', name: 'Mail Exchange (MX) Pathing',
     status: pass ? 'pass' : 'fail', severity: pass ? 'low' : 'critical',
     category: 'data_sovereignty', phiRisk: 'direct',
     detail: pass
-      ? `${mxRecords.length} MX record(s). All US-based. Primary: ${mxRecords[0].exchange}. Email is a direct PHI channel — US residency confirmed.`
+      ? `${mxRecords.length} MX record(s). All US-based${knownUSProviders.length > 0 ? ` (recognized: ${knownUSProviders.join(', ')})` : ''}. Primary: ${mxRecords[0].exchange}. Email is a direct PHI channel — US residency confirmed.`
       : `${foreignMX.length} mail server(s) in non-US locations: ${foreignMX.map(f => `${f.exchange} → ${f.geo?.city}, ${f.geo?.country}`).join('; ')}. HIGH RISK — email carrying PHI may transit foreign infrastructure.`,
     clause: 'SB 1188 Sec. 183.002(a)',
     evidence: {
@@ -482,7 +536,17 @@ async function scanDR04(targetUrl: string, pageHtml: string, borderMap: DataBord
     return { domain, geo, phiRisk: info.phiRisk, urls: info.urls };
   }));
 
-  const foreignAll = geoResults.filter(r => r.geo && !r.geo.isSovereign);
+  const foreignAll = geoResults.filter(r => {
+    if (!r.geo || r.geo.isSovereign) return false;
+    // Check if this is a known US SaaS provider (geo may be wrong due to anycast/CDN)
+    const knownUS = isKnownUSSaaS(r.domain);
+    if (knownUS) return false; // Known US provider, skip
+    return true;
+  });
+  const recognizedUS = geoResults.filter(r => isKnownUSSaaS(r.domain)).map(r => {
+    const info = isKnownUSSaaS(r.domain);
+    return { domain: r.domain, provider: info?.provider, category: info?.category };
+  });
   const foreignPHI = foreignAll.filter(r => r.phiRisk === 'direct');
   const foreignStatic = foreignAll.filter(r => r.phiRisk !== 'direct');
 
@@ -508,6 +572,9 @@ async function scanDR04(targetUrl: string, pageHtml: string, borderMap: DataBord
   let detail = `${externalDomains.size} external domain(s) detected. `;
   if (foreignAll.length === 0) {
     detail += `Sampled ${toCheck.length} — all US-based.`;
+    if (recognizedUS.length > 0) {
+      detail += ` Recognized US SaaS providers: ${recognizedUS.map(r => `${r.domain} (${r.provider})`).join(', ')}.`;
+    }
   } else {
     if (foreignPHI.length > 0) {
       detail += `⚠ HIGH RISK: ${foreignPHI.length} foreign domain(s) handle PHI-capable endpoints: ${foreignPHI.map(f => `${f.domain} (${f.geo?.country})`).join(', ')}. `;
@@ -534,6 +601,23 @@ async function scanDR04(targetUrl: string, pageHtml: string, borderMap: DataBord
       foreignStatic: foreignStatic.map(f => ({ domain: f.domain, country: f.geo?.country })),
     },
     recommendedFix,
+  };
+}
+
+function scanDR05(cdnResult: CDNDetectionResult): ScanFinding {
+  return {
+    id: 'DR-05', name: 'CDN Data Path Transparency',
+    status: 'warn', severity: 'advisory',
+    category: 'data_sovereignty', phiRisk: 'indirect',
+    detail: `Your site uses ${cdnResult.provider} CDN (detected via ${cdnResult.detectedVia}). While ${cdnResult.provider} maintains US edge nodes, SB 1188 requires documented evidence of data residency compliance. Without a CDN configuration audit, you cannot prove patient metadata stays in US borders.`,
+    clause: 'SB 1188 Sec. 183.002(a)',
+    evidence: {
+      cdnProvider: cdnResult.provider,
+      detectedVia: cdnResult.detectedVia,
+      confidence: cdnResult.confidence,
+      details: cdnResult.details,
+    },
+    recommendedFix: `1. Execute ${cdnResult.provider}'s Data Processing Agreement (DPA) confirming US data residency.\n2. Create a Data Flow Map documenting how patient data routes through ${cdnResult.provider}'s edge network.\n3. Add a compliance attestation to your website confirming data residency practices.\n4. Configure ${cdnResult.provider} to restrict edge caching to US-only Points of Presence where possible.\n5. Monitor for CDN configuration drift that could change data routing.`,
   };
 }
 
@@ -775,9 +859,20 @@ function calculateCategoryScore(findings: ScanFinding[], category: string): Cate
   if (catF.length === 0) return { name: category, score: 100, maxScore: 100, percentage: 100, level: 'Sovereign', findings: 0, passed: 0, failed: 0, warnings: 0 };
 
   let score = 100;
+  let advisoryDeduction = 0;
   for (const f of catF) {
-    if (f.status === 'fail') score -= SEVERITY_DEDUCTIONS[f.severity] || 10;
-    else if (f.status === 'warn') score -= Math.floor((SEVERITY_DEDUCTIONS[f.severity] || 10) / 3);
+    if (f.severity === 'advisory') {
+      // Cap advisory deductions
+      const deduct = Math.min(SEVERITY_DEDUCTIONS.advisory, MAX_ADVISORY_DEDUCTION - advisoryDeduction);
+      if (f.status === 'warn' || f.status === 'fail') {
+        advisoryDeduction += deduct;
+        score -= deduct;
+      }
+    } else if (f.status === 'fail') {
+      score -= SEVERITY_DEDUCTIONS[f.severity] || 10;
+    } else if (f.status === 'warn') {
+      score -= Math.floor((SEVERITY_DEDUCTIONS[f.severity] || 10) / 3);
+    }
   }
   score = Math.max(0, Math.min(100, score));
 
@@ -857,11 +952,19 @@ export async function POST(request: NextRequest) {
     const findings: ScanFinding[] = [];
     const dataBorderMap: DataBorderNode[] = [];
 
-    // Data Sovereignty
-    findings.push(await scanDR01(domain, dataBorderMap));
+    // Data Sovereignty (CDN-aware)
+    const dr01Result = await scanDR01(domain, dataBorderMap, responseHeaders);
+    findings.push(dr01Result.finding);
+    const cdnResult = dr01Result.cdnResult;
+
     findings.push(scanDR02(targetUrl, responseHeaders, dataBorderMap));
     findings.push(await scanDR03(domain, dataBorderMap));
     findings.push(await scanDR04(targetUrl, pageHtml, dataBorderMap));
+
+    // DR-05: CDN Data Path Transparency (only if CDN was detected)
+    if (cdnResult.detected) {
+      findings.push(scanDR05(cdnResult));
+    }
 
     // AI Transparency
     if (fetchSuccess) {
@@ -919,6 +1022,12 @@ export async function POST(request: NextRequest) {
       npi, url: targetUrl, riskScore: score, riskLevel, riskMeterLevel,
       complianceStatus,
       findings, topIssues, categoryScores: catScores, dataBorderMap,
+      cdnDetection: {
+        detected: cdnResult.detected,
+        provider: cdnResult.provider,
+        detectedVia: cdnResult.detectedVia,
+        confidence: cdnResult.confidence,
+      },
       scanTimestamp: Date.now(), scanDuration: Date.now() - startTime,
       engineVersion: ENGINE_VERSION, npiVerification: npiResult, pageContext: pageCtx,
       meta: {
@@ -932,6 +1041,8 @@ export async function POST(request: NextRequest) {
         crawlDuration: `${crawl.duration}ms`,
         isJSRendered: crawl.isJSRendered,
         crawlError: crawl.error || null,
+        cdnDetected: cdnResult.detected,
+        cdnProvider: cdnResult.provider || null,
       },
     });
   } catch (error) {
