@@ -136,7 +136,7 @@ export async function writeLedgerData(input: LedgerWriteInput): Promise<{
         .select('practice_group_id')
         .eq('npi', input.npi)
         .single();
-      practiceGroupId = data?.practice_group_id || null;
+      practiceGroupId = (data as any)?.practice_group_id || null;
     } catch { /* no group — fine */ }
   }
 
