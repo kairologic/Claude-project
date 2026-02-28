@@ -23,7 +23,7 @@ export default function AboutPage() {
           </p>
           <p>
             Texas passed SB 1188 and HB 149 in 2023, creating state-level requirements for data
-            sovereignty and AI transparency that go well beyond HIPAA. California followed with
+            sovereignty and AI transparency that go well beyond HIPAA. In fact, the The Texas Responsible AI Governance Act (TRAIGA) requires broad compliance.  California followed with
             AB 3030, mandating disclosure when AI is used in clinical decision-making. More states
             are drafting their own versions. The pattern is clear: healthcare compliance is going
             local, fast, and the federal floor is no longer the ceiling.
@@ -45,12 +45,12 @@ export default function AboutPage() {
             Our Sentry engine scans 14 compliance checkpoints in 60 seconds: data residency (where
             is your patient data actually going?), AI transparency (are you disclosing it?), and NPI
             integrity (does your public information match your federal records?). Providers get a
-            score, a breakdown by category, and a clear path to fix what&apos;s broken.
+            Risk Mitigation Index, a breakdown by category, and a clear path to fix what&apos;s broken.
           </p>
           <p>
             For providers who need ongoing coverage, our Shield dashboard monitors compliance drift
             in real time, flagging new trackers, foreign data routing changes, roster mismatches, and
-            other shifts that happen silently between point-in-time audits.
+            other shifts that happen silently between point-in-time audits. As more states move toward 'Sovereign Data' models, KairoLogic is building the universal translation layer that allows a single dashboard to govern multi-state requirements simultaneously.
           </p>
 
           <h2>The NPI Problem Nobody Talks About</h2>
@@ -80,7 +80,7 @@ export default function AboutPage() {
             The regulatory map is getting more complex, not less. Every state that passes its own AI
             transparency law or data sovereignty requirement adds another layer providers have to
             track. A practice operating in Texas and California already faces two different compliance
-            regimes, and they&apos;re not always compatible.
+            regimes, and they&apos;re not always compatible. 
           </p>
           <p>
             We believe the right answer isn&apos;t more consultants or more manual checklists.
