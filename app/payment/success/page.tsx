@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Download, Code, Shield, FileText, Clock, ArrowRight, AlertTriangle, Copy, ExternalLink, Zap } from 'lucide-react';
+import { generateAuditPDF } from '@/lib/generateAuditPDF';
 
 // ── Types ──
 interface ScanReport {
@@ -169,147 +170,35 @@ function SuccessPageInner() {
     init();
   }, [searchParams, fetchReport]);
 
-  // ── PDF Generation (client-side jsPDF) ──
+  // ── PDF Generation (shared v3.3 template) ──
   const handleDownloadReport = async () => {
     if (!purchaseInfo?.reportData) return;
     setGenerating(true);
     setError('');
     try {
-      const jsPDF = (await import('jspdf')).default;
-      await import('jspdf-autotable');
       const report = purchaseInfo.reportData;
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      // Header
-      doc.setFillColor(0, 35, 78);
-      doc.rect(0, 0, pageWidth, 45, 'F');
-      doc.setFillColor(197, 160, 89);
-      doc.rect(0, 0, pageWidth, 3, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
-      doc.setTextColor(255, 255, 255);
-      doc.text('KAIROLOGIC', 15, 22);
-      doc.setFontSize(8);
-      doc.setTextColor(197, 160, 89);
-      doc.text('STATUTORY AUDIT REPORT', 15, 30);
-      doc.setTextColor(150, 160, 180);
-      doc.text(`Report: ${report.report_id}`, pageWidth - 15, 18, { align: 'right' });
-      doc.text(`Date: ${new Date(report.report_date).toLocaleDateString()}`, pageWidth - 15, 24, { align: 'right' });
-      doc.text(`Engine: ${report.engine_version || 'SENTRY-3.1.0'}`, pageWidth - 15, 30, { align: 'right' });
-
-      // Score
-      let y = 55;
       const score = report.sovereignty_score || 0;
-      const scoreColor: [number, number, number] = score >= 80 ? [22, 163, 74] : score >= 50 ? [217, 119, 6] : [220, 38, 38];
-      doc.setDrawColor(...scoreColor);
-      doc.setLineWidth(2);
-      doc.circle(30, y + 10, 14, 'S');
-      doc.setFontSize(22);
-      doc.setTextColor(...scoreColor);
-      doc.text(String(score), 30, y + 12, { align: 'center' });
-      doc.setFontSize(7);
-      doc.text(report.compliance_status?.toUpperCase() || 'UNKNOWN', 30, y + 20, { align: 'center' });
 
-      // Practice info
-      doc.setFontSize(13);
-      doc.setTextColor(0, 35, 78);
-      doc.text(report.practice_name || 'Healthcare Practice', 55, y + 5);
-      doc.setFontSize(9);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`NPI: ${report.npi}`, 55, y + 12);
-      doc.text(`URL: ${report.website_url || 'N/A'}`, 55, y + 18);
-      y = 90;
-
-      // Category scores
-      if (report.category_scores) {
-        const cats = report.category_scores;
-        const catList = [
-          { name: 'Data Residency', score: cats.data_sovereignty?.percentage || cats.dataResidency?.percentage || 0, color: [0, 100, 200] as [number, number, number] },
-          { name: 'AI Transparency', score: cats.ai_transparency?.percentage || cats.aiTransparency?.percentage || 0, color: [180, 100, 0] as [number, number, number] },
-          { name: 'Clinical Integrity', score: cats.clinical_integrity?.percentage || cats.ehrIntegrity?.percentage || 0, color: [0, 150, 80] as [number, number, number] },
-        ];
-        catList.forEach((cat, i) => {
-          const cx = 15 + i * 62;
-          doc.setFillColor(245, 247, 250);
-          doc.roundedRect(cx, y, 56, 20, 3, 3, 'F');
-          doc.setFontSize(7);
-          doc.setTextColor(100, 100, 100);
-          doc.text(cat.name, cx + 5, y + 7);
-          doc.setFontSize(16);
-          doc.setTextColor(...cat.color);
-          doc.text(`${cat.score}%`, cx + 5, y + 16);
-        });
-        y += 30;
-      }
-
-      // Findings
-      if (report.findings?.length > 0) {
-        doc.setFontSize(12);
-        doc.setTextColor(0, 35, 78);
-        doc.text('Findings', 15, y);
-        y += 8;
-        report.findings.forEach((f: any) => {
-          if (y > 260) { doc.addPage(); y = 20; }
-          const sColor: [number, number, number] = f.status === 'pass' ? [22, 163, 74] : f.status === 'warn' ? [217, 119, 6] : [220, 38, 38];
-          doc.setFillColor(...sColor);
-          doc.rect(15, y, 2, 12, 'F');
-          doc.setFontSize(8);
-          doc.setTextColor(0, 35, 78);
-          doc.text(`${f.id || ''} \u2014 ${f.name || ''}`, 20, y + 4);
-          doc.setFontSize(7);
-          doc.setTextColor(...sColor);
-          doc.text((f.status || '').toUpperCase(), 20, y + 9);
-          if (f.description) {
-            doc.setTextColor(100, 100, 100);
-            const lines = doc.splitTextToSize(f.description, pageWidth - 40);
-            doc.text(lines.slice(0, 2), 20, y + 13);
-            y += 5 * Math.min(lines.length, 2);
-          }
-          if (f.recommendedFix || f.technicalFix || f.recommended_fix) {
-            const fix = f.recommendedFix || f.technicalFix || f.recommended_fix;
-            doc.setFillColor(240, 253, 244);
-            doc.roundedRect(20, y + 10, pageWidth - 40, 10, 1, 1, 'F');
-            doc.setFontSize(6);
-            doc.setTextColor(22, 100, 50);
-            doc.text('FIX: ' + fix.substring(0, 120), 22, y + 16);
-            y += 12;
-          }
-          y += 16;
-        });
-      }
-
-      // Data border map
-      if (report.data_border_map?.length > 0) {
-        if (y > 200) { doc.addPage(); y = 20; }
-        doc.setFontSize(12);
-        doc.setTextColor(0, 35, 78);
-        doc.text('Data Border Map', 15, y);
-        y += 8;
-        const tableData = report.data_border_map.map((e: any) => [
-          e.domain || e.ip || '', e.location || e.country || '', e.type || '', e.sovereign ? '\u2713 US' : '\u2717 Foreign',
-        ]);
-        (doc as any).autoTable({
-          startY: y,
-          head: [['Endpoint', 'Location', 'Type', 'Sovereign']],
-          body: tableData,
-          styles: { fontSize: 7, cellPadding: 2 },
-          headStyles: { fillColor: [0, 35, 78], textColor: 255 },
-          margin: { left: 15, right: 15 },
-        });
-      }
-
-      // Footer
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(7);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`KairoLogic\u2122 Sovereignty Audit Report \u2014 ${report.report_id} \u2014 Page ${i}/${pageCount}`, pageWidth / 2, 290, { align: 'center' });
-        doc.text('CONFIDENTIAL \u2014 FOR AUTHORIZED RECIPIENTS ONLY', pageWidth / 2, 294, { align: 'center' });
-      }
-
-      doc.save(`KairoLogic-Audit-${report.npi}-${report.report_id}.pdf`);
+      await generateAuditPDF({
+        practiceName: report.practice_name || 'Healthcare Practice',
+        npi: report.npi,
+        websiteUrl: report.website_url || '',
+        score,
+        complianceStatus: report.compliance_status,
+        categoryScores: report.category_scores,
+        findings: report.findings || [],
+        dataBorderMap: report.data_border_map || [],
+        reportId: report.report_id,
+        reportDate: report.report_date,
+        engineVersion: report.engine_version || 'SENTRY-3.3.0',
+        checksRun: report.scan_meta?.checksRun || report.findings?.length || 0,
+        scanDuration: report.scan_meta?.duration || undefined,
+        cdnDetection: report.scan_meta?.cdnDetected ? {
+          detected: true,
+          provider: report.scan_meta?.cdnProvider || undefined,
+          detectedVia: report.scan_meta?.cdnDetectedVia || undefined,
+        } : undefined,
+      });
     } catch (err) {
       console.error('PDF generation failed:', err);
       setError('PDF generation failed. Please try again or contact support.');
