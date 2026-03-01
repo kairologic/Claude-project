@@ -292,6 +292,49 @@ export default function ReportLandingPage() {
         </div>
       </section>
 
+      {/* Shield Explainer */}
+      <section className="py-12 border-t border-white/5">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="bg-[#0d1a2e] border border-white/10 rounded-2xl p-6 md:p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[#c9a84c]/10 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-5 h-5 text-[#c9a84c]" />
+              </div>
+              <h3 className="text-lg font-bold text-white">What is Sentry Shield monitoring?</h3>
+            </div>
+            <p className="text-sm text-gray-300 leading-relaxed mb-4">
+              Compliance is not a one-time fix. Your website changes, third-party scripts update, and new regulations take effect. Sentry Shield watches your site continuously so you do not have to.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="bg-[#0a1628] rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm font-bold text-white">Drift Alerts</span>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">If your site drifts out of compliance, such as new third-party scripts, changed data routing, or removed policies, we alert you before it becomes a problem.</p>
+              </div>
+              <div className="bg-[#0a1628] rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Database className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm font-bold text-white">Live Dashboard</span>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">Access a private compliance dashboard for your practice showing your current score, scan history, NPI integrity status, and any open issues.</p>
+              </div>
+              <div className="bg-[#0a1628] rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-bold text-white">Trust Badge</span>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed">Display a compliance verification badge on your website, showing patients and partners that your practice takes data sovereignty seriously.</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              Both purchase options include 3 months of Sentry Shield at no extra cost. After that, monitoring continues at $79/month, or you can cancel anytime.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Trust Bar */}
       <section className="py-10">
         <div className="max-w-3xl mx-auto px-4">
