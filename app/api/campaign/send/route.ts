@@ -108,7 +108,11 @@ function extractFindingSummary(scan: ScanResult, findingText: string): string {
   }
 
   if (parts.length === 0) {
-    parts.push(`We identified ${sbFails.length + hbFails.length} compliance gap${(sbFails.length + hbFails.length) !== 1 ? 's' : ''} on your website.`);
+    if (sbFails.length + hbFails.length > 0) {
+      parts.push(`We identified ${sbFails.length + hbFails.length} compliance gap${(sbFails.length + hbFails.length) !== 1 ? 's' : ''} on your website that may require remediation under Texas law.`);
+    } else {
+      parts.push(`Our scan detected areas on your website that may not fully comply with Texas SB 1188 data sovereignty requirements.`);
+    }
   }
 
   return parts.join(' ');
@@ -120,9 +124,16 @@ function generateEmailHtml(
   findingSummary: string,
   reportUrl: string,
   contactName: string,
+  npi: string,
 ): string {
   const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
   const riskLabel = score >= 80 ? 'Sovereign' : score >= 60 ? 'Drift' : 'At Risk';
+
+  const scoreContext = score < 60
+    ? 'Scores below 60 indicate immediate compliance risk under Texas law.'
+    : score < 80
+    ? 'Scores between 60-79 indicate compliance drift that should be addressed promptly.'
+    : 'Your practice is largely compliant, but some areas may need attention.';
 
   return `<!DOCTYPE html>
 <html>
@@ -134,7 +145,7 @@ function generateEmailHtml(
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
 
 <!-- Wrapper -->
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 16px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
@@ -145,72 +156,78 @@ function generateEmailHtml(
   </td></tr>
 
   <!-- Body -->
-  <tr><td style="background:#ffffff;padding:32px 28px;">
+  <tr><td style="background:#ffffff;padding:36px 32px;">
 
     <!-- Greeting -->
-    <p style="margin:0 0 20px;font-size:15px;color:#1e293b;line-height:1.6;">
+    <p style="margin:0 0 24px;font-size:15px;color:#1e293b;line-height:1.7;">
       ${contactName ? `Hi ${contactName},` : `Dear Practice Administrator,`}
     </p>
 
-    <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
+    <p style="margin:0 0 24px;font-size:15px;color:#1e293b;line-height:1.7;">
       We recently conducted a compliance assessment of Texas healthcare provider websites under <strong>SB 1188</strong> (data sovereignty) and <strong>HB 149</strong> (AI transparency). Your practice, <strong>${practiceName}</strong>, was included in our analysis.
     </p>
 
     <!-- Score Box -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid ${scoreColor};border-radius:8px;">
-    <tr><td style="padding:20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid ${scoreColor};border-radius:8px;">
+    <tr><td style="padding:24px;">
       <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
-        <td style="width:70px;vertical-align:top;">
-          <div style="width:56px;height:56px;border-radius:50%;border:3px solid ${scoreColor};text-align:center;line-height:50px;font-size:22px;font-weight:800;color:${scoreColor};">${score}</div>
+        <td style="width:76px;vertical-align:top;">
+          <div style="width:60px;height:60px;border-radius:50%;border:3px solid ${scoreColor};text-align:center;line-height:54px;font-size:24px;font-weight:800;color:${scoreColor};">${score}</div>
+          <div style="font-size:9px;color:#94a3b8;text-align:center;margin-top:4px;">out of 100</div>
         </td>
-        <td style="vertical-align:top;padding-left:12px;">
+        <td style="vertical-align:top;padding-left:16px;">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:4px;">Compliance Score</div>
-          <div style="font-size:14px;font-weight:700;color:${scoreColor};margin-bottom:6px;">${riskLabel} Risk</div>
-          <div style="font-size:13px;color:#475569;line-height:1.5;">${findingSummary}</div>
+          <div style="font-size:15px;font-weight:700;color:${scoreColor};margin-bottom:8px;">${riskLabel}</div>
+          <div style="font-size:13px;color:#475569;line-height:1.6;">${findingSummary}</div>
         </td>
       </tr>
       </table>
     </td></tr>
     </table>
 
+    <!-- Score context -->
+    <p style="margin:0 0 28px;font-size:13px;color:#64748b;line-height:1.6;font-style:italic;">
+      ${scoreContext}
+    </p>
+
     <!-- Main message -->
-    <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6;">
+    <p style="margin:0 0 20px;font-size:15px;color:#1e293b;line-height:1.7;">
       Under SB 1188, healthcare providers that route patient data through foreign servers face fines of up to <strong>$50,000 per violation</strong>. Most practices we've assessed are unaware these issues exist, often caused by common tools like Google Fonts, analytics scripts, or scheduling widgets.
     </p>
 
-    <p style="margin:0 0 24px;font-size:15px;color:#1e293b;line-height:1.6;">
-      You can review the full details of your findings and explore options to get your complete remediation report with step-by-step fixes.
+    <p style="margin:0 0 32px;font-size:15px;color:#1e293b;line-height:1.7;">
+      We've prepared a personalized compliance snapshot for your practice. You can review the full details of your findings and explore options to get your complete remediation report with step-by-step fixes.
     </p>
 
     <!-- CTA Button -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
     <tr><td align="center">
-      <a href="${reportUrl}" style="display:inline-block;background:#c9a84c;color:#0a1628;font-size:15px;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;">
+      <a href="${reportUrl}" style="display:inline-block;background:#c9a84c;color:#0a1628;font-size:15px;font-weight:700;padding:16px 36px;border-radius:8px;text-decoration:none;letter-spacing:0.3px;">
         View Your Compliance Findings &rarr;
       </a>
     </td></tr>
     </table>
 
     <!-- PS -->
-    <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;border-top:1px solid #e2e8f0;padding-top:16px;">
-      <strong>P.S.</strong> Patient awareness of SB 1188 is growing. We recommend reviewing your compliance status before questions arise from patients or regulatory bodies. The link above is unique to your practice.
+    <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;border-top:1px solid #e2e8f0;padding-top:20px;">
+      <strong>P.S.</strong> Patient awareness of SB 1188 is growing. We recommend reviewing your compliance status before questions arise from patients or regulatory bodies. The link above is unique to your practice and expires in 30 days.
     </p>
 
   </td></tr>
 
   <!-- Footer -->
-  <tr><td style="background:#f8fafc;padding:20px 28px;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;">
-    <p style="margin:0 0 8px;font-size:12px;color:#64748b;">
+  <tr><td style="background:#f8fafc;padding:24px 32px;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;">
+    <p style="margin:0 0 10px;font-size:12px;color:#64748b;">
       <span style="font-weight:700;color:#1e293b;">Kairo</span><span style="font-weight:700;color:#c9a84c;">Logic</span> &middot; Texas Healthcare Compliance Platform
     </p>
-    <p style="margin:0 0 8px;font-size:11px;color:#94a3b8;">
-      This email was sent to you because your practice is registered with the National Provider Identifier (NPI) registry and your website was included in a statewide compliance assessment.
+    <p style="margin:0 0 10px;font-size:11px;color:#94a3b8;line-height:1.5;">
+      This email was sent because your practice is registered with the National Provider Identifier (NPI) registry and your website was included in a statewide compliance assessment.
     </p>
     <p style="margin:0;font-size:11px;color:#94a3b8;">
       <a href="mailto:compliance@kairologic.net" style="color:#64748b;">compliance@kairologic.net</a> &middot;
       <a href="https://kairologic.net" style="color:#64748b;">kairologic.net</a> &middot;
-      <a href="https://kairologic.net/unsubscribe?npi=NPI_PLACEHOLDER" style="color:#64748b;">Unsubscribe</a>
+      <a href="https://kairologic.net/unsubscribe?npi=${npi}" style="color:#64748b;">Unsubscribe</a>
     </p>
   </td></tr>
 
@@ -275,7 +292,15 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const practiceName = (provider.name as string) || 'Healthcare Provider';
+      const practiceNameRaw = (provider.name as string) || 'Healthcare Provider';
+      // Title-case: "EMERALD PEDIATRIC CLINIC PA" → "Emerald Pediatric Clinic PA"
+      const practiceName = practiceNameRaw.replace(/\b\w+/g, (word) => {
+        // Keep short words like PA, LLC, PLLC, INC, DBA uppercase
+        if (['PA', 'LLC', 'PLLC', 'INC', 'PC', 'DBA', 'MD', 'DO', 'DC', 'DDS', 'DMD', 'OD', 'DPM'].includes(word.toUpperCase())) {
+          return word.toUpperCase();
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      });
       const scan = parseScanResult(provider.last_scan_result);
       const score = scan.score ?? (provider.risk_score as number) ?? 50;
       const reportUrl = `https://kairologic.net/report/${reportCode}`;
@@ -286,7 +311,7 @@ export async function POST(request: NextRequest) {
       // Get finding text - check if there's a custom one or generate
       const findingSummary = extractFindingSummary(scan, '');
 
-      const html = generateEmailHtml(practiceName, score, findingSummary, reportUrl, contactName);
+      const html = generateEmailHtml(practiceName, score, findingSummary, reportUrl, contactName, npi);
 
       const subject = `We scanned ${practiceName}, here's what we found`;
 
