@@ -6,6 +6,11 @@ import { NextRequest, NextResponse } from 'next/server';
  * Looks up a provider by their campaign report code.
  * Returns provider info + scan findings for the /report/[code] landing page.
  * Parses last_scan_result JSON from registry for grouped findings.
+ *
+ * Handles TWO formats:
+ *   1. Live scan API (v3.x): flat `findings` array with `category` field,
+ *      plus `dataBorderMap`, `riskScore`, `riskLevel`, `categoryScores`
+ *   2. Legacy pre-grouped: `sb1188_findings`, `hb149_findings`, `npi_checks`
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
@@ -36,6 +41,21 @@ interface ScanFinding {
   score?: number;
   regulation?: string;
   fix_priority?: string;
+  phiRisk?: string;
+  recommendedFix?: string;
+}
+
+interface BorderNode {
+  domain?: string;
+  ip?: string;
+  country?: string;
+  countryCode?: string;
+  city?: string;
+  type?: string;
+  sovereign?: boolean;
+  isSovereign?: boolean;
+  phiRisk?: string;
+  purpose?: string;
 }
 
 interface ParsedScanResult {
@@ -45,13 +65,7 @@ interface ParsedScanResult {
   hb149_findings: ScanFinding[];
   npi_checks: ScanFinding[];
   technical_fixes: ScanFinding[];
-  data_border_map: Array<{
-    domain?: string;
-    country?: string;
-    city?: string;
-    type?: string;
-    sovereign?: boolean;
-  }>;
+  data_border_map: BorderNode[];
 }
 
 function parseScanResult(raw: unknown): ParsedScanResult {
@@ -76,46 +90,134 @@ function parseScanResult(raw: unknown): ParsedScanResult {
     return defaults;
   }
 
-  // Build data_border_map from DR-01 and DR-04 evidence
-  const borderMap: ParsedScanResult['data_border_map'] = [];
-  const sb1188 = (parsed.sb1188_findings as ScanFinding[]) || [];
+  // ── Detect format: live scan (v3.x) vs legacy ──
+  const hasFindings = Array.isArray(parsed.findings);
+  const hasLegacy = Array.isArray(parsed.sb1188_findings);
 
-  for (const finding of sb1188) {
-    if (finding.id === 'DR-01' && finding.evidence) {
-      const geo = finding.evidence.geo as string;
-      const ip = finding.evidence.ip as string;
-      const isUS = finding.evidence.isUS as boolean;
-      if (ip) {
+  // ── LIVE SCAN FORMAT (v3.x) ──
+  // Has: findings[], dataBorderMap[], riskScore, riskLevel, categoryScores, complianceStatus
+  if (hasFindings) {
+    const findings = parsed.findings as ScanFinding[];
+    const score = (parsed.riskScore as number) ?? null;
+    const complianceStatus = (parsed.complianceStatus as string) || '';
+    const riskLevel = (parsed.riskLevel as string) || '';
+    const level = complianceStatus || riskLevel || '';
+
+    // Group findings by category
+    const sb1188: ScanFinding[] = [];
+    const hb149: ScanFinding[] = [];
+    const clinical: ScanFinding[] = [];
+
+    for (const f of findings) {
+      const cat = (f.category || '').toLowerCase();
+      // Normalize: scan engine uses 'name', landing page expects 'title'
+      const normalized: ScanFinding = {
+        ...f,
+        title: f.title || f.name,
+        name: f.name || f.title,
+      };
+
+      if (cat === 'data_sovereignty') {
+        sb1188.push(normalized);
+      } else if (cat === 'ai_transparency') {
+        hb149.push(normalized);
+      } else if (cat === 'clinical_integrity') {
+        clinical.push(normalized);
+      }
+    }
+
+    // Parse dataBorderMap from scan result
+    const borderMap: BorderNode[] = [];
+    const rawMap = parsed.dataBorderMap as BorderNode[] | undefined;
+    if (Array.isArray(rawMap)) {
+      for (const node of rawMap) {
         borderMap.push({
-          domain: ip.replace(/\.$/, ''),
-          country: geo || 'Unknown',
-          type: 'Primary Domain',
-          sovereign: isUS,
+          domain: node.domain || node.ip || 'unknown',
+          ip: node.ip,
+          country: node.country || 'Unknown',
+          countryCode: node.countryCode,
+          city: node.city,
+          type: node.type || 'unknown',
+          sovereign: node.isSovereign ?? node.sovereign ?? false,
+          isSovereign: node.isSovereign ?? node.sovereign ?? false,
+          phiRisk: node.phiRisk,
+          purpose: node.purpose,
         });
       }
     }
-    if (finding.id === 'DR-04' && finding.evidence) {
-      const nonUS = (finding.evidence.non_us as Array<{ domain?: string; country?: string }>) || [];
-      for (const ep of nonUS) {
-        borderMap.push({
-          domain: ep.domain || 'unknown',
-          country: ep.country || 'Foreign',
-          type: 'Third-Party',
-          sovereign: false,
-        });
-      }
+
+    // Parse NPI verification as a finding group
+    const npiChecks: ScanFinding[] = [];
+    const npiResult = parsed.npiVerification as Record<string, unknown> | undefined;
+    if (npiResult) {
+      const verified = npiResult.verified as boolean;
+      const name = npiResult.name as string;
+      const taxonomy = npiResult.taxonomy as string;
+      npiChecks.push({
+        id: 'NPI-01',
+        title: 'NPI Registry Verification',
+        name: 'NPI Registry Verification',
+        status: verified ? 'pass' : 'fail',
+        severity: verified ? 'low' : 'high',
+        category: 'npi_integrity',
+        detail: verified
+          ? `NPI verified in NPPES registry. Provider: ${name || 'confirmed'}. Taxonomy: ${taxonomy || 'confirmed'}.`
+          : `NPI could not be verified in the NPPES registry.`,
+      });
     }
+
+    return {
+      score,
+      level,
+      sb1188_findings: sb1188,
+      hb149_findings: hb149,
+      npi_checks: npiChecks,
+      technical_fixes: clinical,
+      data_border_map: borderMap,
+    };
   }
 
-  return {
-    score: (parsed.score as number) ?? null,
-    level: (parsed.level as string) || '',
-    sb1188_findings: sb1188,
-    hb149_findings: (parsed.hb149_findings as ScanFinding[]) || [],
-    npi_checks: (parsed.npi_checks as ScanFinding[]) || [],
-    technical_fixes: (parsed.technical_fixes as ScanFinding[]) || [],
-    data_border_map: borderMap,
-  };
+  // ── LEGACY FORMAT ──
+  // Has: sb1188_findings[], hb149_findings[], npi_checks[], score, level
+  if (hasLegacy) {
+    const sb1188 = (parsed.sb1188_findings as ScanFinding[]) || [];
+    const borderMap: BorderNode[] = [];
+
+    for (const finding of sb1188) {
+      if (finding.id === 'DR-01' && finding.evidence) {
+        const ev = finding.evidence;
+        borderMap.push({
+          domain: (ev.ip as string) || 'unknown',
+          country: (ev.geo as string) || 'Unknown',
+          type: 'Primary Domain',
+          sovereign: ev.isUS as boolean,
+        });
+      }
+      if (finding.id === 'DR-04' && finding.evidence) {
+        const nonUS = (finding.evidence.non_us as Array<{ domain?: string; country?: string }>) || [];
+        for (const ep of nonUS) {
+          borderMap.push({
+            domain: ep.domain || 'unknown',
+            country: ep.country || 'Foreign',
+            type: 'Third-Party',
+            sovereign: false,
+          });
+        }
+      }
+    }
+
+    return {
+      score: (parsed.score as number) ?? null,
+      level: (parsed.level as string) || '',
+      sb1188_findings: sb1188,
+      hb149_findings: (parsed.hb149_findings as ScanFinding[]) || [],
+      npi_checks: (parsed.npi_checks as ScanFinding[]) || [],
+      technical_fixes: (parsed.technical_fixes as ScanFinding[]) || [],
+      data_border_map: borderMap,
+    };
+  }
+
+  return defaults;
 }
 
 export async function GET(request: NextRequest) {
@@ -158,12 +260,23 @@ export async function GET(request: NextRequest) {
     reportId = (reports[0].report_id as string) || null;
   }
 
+  // Use scan result score if available, fall back to registry risk_score
+  const score = scan.score ?? (provider.risk_score as number) ?? null;
+
+  // Derive level from score if not in scan result
+  let level = scan.level;
+  if (!level && score !== null) {
+    if (score >= 80) level = 'Sovereign';
+    else if (score >= 60) level = 'Drift';
+    else level = 'Violation';
+  }
+
   return NextResponse.json({
     npi,
     practice_name: (provider.name as string) || 'Healthcare Provider',
     url: (provider.url as string) || '',
-    score: scan.score ?? (provider.risk_score as number) ?? null,
-    level: scan.level,
+    score,
+    level,
     sb1188_findings: scan.sb1188_findings,
     hb149_findings: scan.hb149_findings,
     npi_checks: scan.npi_checks,
