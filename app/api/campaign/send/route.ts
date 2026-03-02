@@ -163,8 +163,9 @@ function generateEmailHtml(
       ${contactName ? `Hi ${contactName},` : `Dear Practice Administrator,`}
     </p>
 
+    <!-- KairoLogic intro + findings -->
     <p style="margin:0 0 24px;font-size:15px;color:#1e293b;line-height:1.7;">
-      We recently conducted a compliance assessment of Texas healthcare provider websites under <strong>SB 1188</strong> (data sovereignty) and <strong>HB 149</strong> (AI transparency). Your practice, <strong>${practiceName}</strong>, was included in our analysis.
+      KairoLogic monitors over 39,000 Texas healthcare provider websites for violations of state data privacy laws. During a recent assessment under <strong>SB 1188</strong> (data sovereignty) and <strong>HB 149</strong> (AI transparency), your practice, <strong>${practiceName}</strong>, was flagged for review.
     </p>
 
     <!-- Score Box -->
