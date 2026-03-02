@@ -211,9 +211,20 @@ function generateEmailHtml(
     </table>
 
     <!-- PS -->
-    <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;border-top:1px solid #e2e8f0;padding-top:20px;">
+    <p style="margin:0 0 28px;font-size:13px;color:#64748b;line-height:1.6;border-top:1px solid #e2e8f0;padding-top:20px;">
       <strong>P.S.</strong> Patient awareness of SB 1188 is growing. We recommend reviewing your compliance status before questions arise from patients or regulatory bodies. The link above is unique to your practice and expires in 30 days.
     </p>
+
+    <!-- Signature -->
+    <table cellpadding="0" cellspacing="0" style="margin:0;">
+    <tr>
+      <td style="border-left:3px solid #c9a84c;padding-left:14px;">
+        <div style="font-size:14px;font-weight:700;color:#0a1628;">KairoLogic Compliance Team</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;">Texas Healthcare Data Sovereignty</div>
+        <div style="font-size:12px;margin-top:2px;"><a href="mailto:compliance@kairologic.net" style="color:#c9a84c;text-decoration:none;">compliance@kairologic.net</a></div>
+      </td>
+    </tr>
+    </table>
 
   </td></tr>
 
