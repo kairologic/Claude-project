@@ -31,6 +31,7 @@ interface PurchaseInfo {
   reportData: ScanReport | null;
   reportAge: number;
   includesShieldTrial: boolean;
+  dashboardToken: string;
 }
 
 const SUPABASE_URL = 'https://mxrtltezhkxhqizvxvsz.supabase.co';
@@ -111,15 +112,60 @@ function SuccessPageInner() {
   const [error, setError] = useState('');
 
   const fetchReport = useCallback(async (npi: string): Promise<{ report: ScanReport | null; ageDays: number }> => {
+    // Try scan_reports table first (formal reports)
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/scan_reports?npi=eq.${npi}&order=report_date.desc&limit=1`, {
         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
       });
-      if (!res.ok) return { report: null, ageDays: 999 };
-      const data = await res.json();
-      if (!data || data.length === 0) return { report: null, ageDays: 999 };
-      const report = data[0] as ScanReport;
-      const ageDays = Math.floor((Date.now() - new Date(report.report_date).getTime()) / (1000 * 60 * 60 * 24));
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const report = data[0] as ScanReport;
+          const ageDays = Math.floor((Date.now() - new Date(report.report_date).getTime()) / (1000 * 60 * 60 * 24));
+          return { report, ageDays };
+        }
+      }
+    } catch { /* fall through to registry */ }
+
+    // Fallback: read last_scan_result from registry (campaign providers have data here)
+    try {
+      const regRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}&limit=1&select=npi,name,url,risk_score,last_scan_result,last_scan_timestamp`,
+        { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      if (!regRes.ok) return { report: null, ageDays: 999 };
+      const regData = await regRes.json();
+      if (!regData || regData.length === 0) return { report: null, ageDays: 999 };
+
+      const provider = regData[0];
+      const scanResult = typeof provider.last_scan_result === 'string'
+        ? JSON.parse(provider.last_scan_result)
+        : provider.last_scan_result;
+
+      if (!scanResult) return { report: null, ageDays: 999 };
+
+      // Map live scan format to ScanReport shape
+      const scanTs = scanResult.scanTimestamp || provider.last_scan_timestamp;
+      const reportDate = scanTs ? new Date(typeof scanTs === 'number' ? scanTs : scanTs).toISOString() : new Date().toISOString();
+      const ageDays = scanTs ? Math.floor((Date.now() - new Date(typeof scanTs === 'number' ? scanTs : scanTs).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+      const report: ScanReport = {
+        report_id: `LIVE-${npi}-${Date.now().toString(36)}`,
+        report_date: reportDate,
+        npi: scanResult.npi || npi,
+        website_url: scanResult.url || provider.url || '',
+        practice_name: provider.name || 'Healthcare Practice',
+        sovereignty_score: scanResult.riskScore ?? provider.risk_score ?? 0,
+        compliance_status: scanResult.complianceStatus || (scanResult.riskScore >= 80 ? 'Sovereign' : scanResult.riskScore >= 60 ? 'Drift' : 'Violation'),
+        findings: scanResult.findings || [],
+        category_scores: scanResult.categoryScores || {},
+        data_border_map: scanResult.dataBorderMap || [],
+        engine_version: scanResult.engineVersion || 'SENTRY-3.2.0',
+        scan_meta: scanResult.meta || { checksRun: scanResult.findings?.length || 0, duration: scanResult.scanDuration ? `${scanResult.scanDuration}ms` : undefined },
+        page_context: scanResult.pageContext || {},
+        npi_verification: scanResult.npiVerification || {},
+      };
+
       return { report, ageDays };
     } catch {
       return { report: null, ageDays: 999 };
@@ -161,9 +207,21 @@ function SuccessPageInner() {
 
       if (npi) {
         const { report, ageDays } = await fetchReport(npi);
-        setPurchaseInfo({ product, npi, email, reportData: report, reportAge: ageDays, includesShieldTrial });
+        // Fetch dashboard_token from registry
+        let dashboardToken = '';
+        try {
+          const tokenRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}&limit=1&select=dashboard_token`,
+            { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+          );
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json();
+            if (tokenData?.[0]?.dashboard_token) dashboardToken = tokenData[0].dashboard_token;
+          }
+        } catch { /* no token available yet */ }
+        setPurchaseInfo({ product, npi, email, reportData: report, reportAge: ageDays, includesShieldTrial, dashboardToken });
       } else {
-        setPurchaseInfo({ product, npi, email, reportData: null, reportAge: 999, includesShieldTrial });
+        setPurchaseInfo({ product, npi, email, reportData: null, reportAge: 999, includesShieldTrial, dashboardToken: '' });
       }
       setLoading(false);
     };
@@ -422,7 +480,7 @@ function SuccessPageInner() {
                   <p className="text-xs text-gray-600 mb-3">
                     Access your live compliance dashboard to monitor your practice&apos;s data sovereignty status in real time.
                   </p>
-                  <a href={`/dashboard/${purchaseInfo?.npi || ''}?email=${encodeURIComponent(purchaseInfo?.email || '')}`}
+                  <a href={`/dashboard/${purchaseInfo?.npi || ''}?token=${purchaseInfo?.dashboardToken || ''}`}
                     className={`inline-flex items-center gap-2 font-semibold py-3 px-5 rounded-lg text-sm transition-colors ${
                       monitoringMode === 'shield'
                         ? 'bg-green-600 hover:bg-green-700 text-white'
@@ -495,7 +553,7 @@ function SuccessPageInner() {
                   Your website is now being monitored 24/7. You&apos;ll receive drift alerts if anything changes.
                   After 90 days, continue Shield at $79/mo, switch to Watch at $39/mo, or cancel anytime.
                 </p>
-                <a href={`/dashboard/${purchaseInfo?.npi || ''}?email=${encodeURIComponent(purchaseInfo?.email || '')}`}
+                <a href={`/dashboard/${purchaseInfo?.npi || ''}?token=${purchaseInfo?.dashboardToken || ''}`}
                   className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-sm transition-colors">
                   View Your Dashboard &rarr;
                 </a>
