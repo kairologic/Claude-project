@@ -362,6 +362,13 @@ export async function POST(request: NextRequest) {
           registryUpdate.trial_source_product = product.type;
         }
 
+        // Generate dashboard_token if not already set
+        if (!provider.dashboard_token) {
+          const tokenBytes = new Uint8Array(24);
+          crypto.getRandomValues(tokenBytes);
+          registryUpdate.dashboard_token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
         await supabasePatch('registry', `id=eq.${provider.id}`, registryUpdate);
         console.log(`[Stripe Webhook] Registry updated: ${provider.name} (${provider.npi}) — ${product.type}${product.includesShieldTrial ? ' (90-day Shield trial)' : ''}`);
       } else {
