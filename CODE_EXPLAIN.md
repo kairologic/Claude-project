@@ -31,7 +31,8 @@ The platform provides:
 | Payments | Stripe (checkout sessions, subscriptions, webhooks) |
 | Email | Amazon SES via Nodemailer (SMTP) |
 | External APIs | NPPES (NPI Registry), NLM Clinical Tables, Browserless.io |
-| Testing | Playwright (e2e: content, structure, visual regression, links, functionality) |
+| Testing (e2e) | Playwright (content, structure, visual regression, links, functionality) |
+| Testing (unit) | Vitest 4.x (checks engine, utils, CDN detection, report codes) |
 | Deployment | Vercel (auto-deploy from GitHub) |
 | CI | GitHub Actions (`page-tests.yml`) |
 | Analytics | Apollo.io (tracking), Snitcher (visitor identification) |
@@ -105,6 +106,11 @@ npm run start      # Production server
 ### Test
 
 ```bash
+# ── Unit Tests (Vitest — no server required, ~1.5s) ──
+npm run test:unit            # Run all 137 unit tests
+npm run test:unit:watch      # Watch mode for development
+
+# ── E2E Tests (Playwright — requires dev server) ──
 npm test                     # Run all Playwright e2e tests
 npm run test:content         # Static content tests only
 npm run test:structure       # Page structure tests only
@@ -258,7 +264,7 @@ Patient/Provider → Browser
 |------|---------|---------------------|---------------|------------|
 | `lib/supabase.ts` | Supabase client (lazy singleton) + all database types (`Registry`, `ViolationEvidence`, `ScanHistory`, `EmailTemplate`, `Purchase`, `CalendarSlot`) | `getSupabase`, types | `@supabase/supabase-js` | Data |
 | `lib/crawler.ts` | Adaptive web crawler v1.0: direct fetch → Browserless.io fallback, SPA detection, HTML-to-text | `crawlPage`, `stripHtmlToText`, `CrawlResult` | — | Crawling |
-| `lib/report-code.ts` | HMAC-SHA256 report code generation + lookup for email campaign landing pages | `generateReportCode`, `findNpiByCode` | `crypto` | Campaign |
+| `lib/report-code.ts` | HMAC-SHA256 report code generation + lookup for email campaign landing pages. Uses `REPORT_CODE_SECRET` env var with empty-string fallback (previously used non-null assertion which crashed if env var was missing) | `generateReportCode`, `findNpiByCode` | `crypto` | Campaign |
 
 ### Services (services/)
 
@@ -329,6 +335,18 @@ Patient/Provider → Browser
 | `e2e/visual-regression.spec.ts` | Screenshot-based visual regression tests | Playwright test suite | `@playwright/test` | QA |
 | `e2e/dashboard-guide.spec.ts` | Dashboard guide walkthrough tests | Playwright test suite | `@playwright/test` | QA |
 
+### Unit Tests (Vitest)
+
+| Path | Purpose | Test Count | External Deps | Owner/Area |
+|------|---------|------------|---------------|------------|
+| `checks/utils.unit.test.ts` | Tests for `normalizeAddress`, `addressesMatch`, `normalizePhone`, `phonesMatch`, `normalizeName`, `fuzzyNameMatch`, `specialtyMatches`, `levenshtein` | 43 | `vitest` | Check Engine |
+| `checks/registry.unit.test.ts` | Tests for `CHECK_REGISTRY`, `getChecksForTier`, `getChecksByCategory`, `getCheckById`, `CATEGORY_META` | 15 | `vitest` | Check Engine |
+| `checks/npi-checks.unit.test.ts` | Tests for NPI-01 (address), NPI-02 (phone), NPI-03 (taxonomy) check modules with pass/fail/inconclusive scenarios | 18 | `vitest` | Check Engine |
+| `checks/roster-checks.unit.test.ts` | Tests for RST-01 (roster count) and RST-02 (roster name matching) with variance thresholds | 13 | `vitest` | Check Engine |
+| `checks/crawler.unit.test.ts` | Tests for `crawlSite` with mocked `fetch` — address/phone/specialty/provider extraction from HTML and JSON-LD | 12 | `vitest` | Check Engine |
+| `lib/cdn-detection.unit.test.ts` | Tests for `detectCDNByIP` (CIDR ranges), `detectCDNByHeaders`, `isKnownUSSaaS`, `isKnownUSMailProvider` | 27 | `vitest` | CDN Detection |
+| `lib/report-code.unit.test.ts` | Tests for `generateReportCode` (determinism, format) and `findNpiByCode` (lookup) | 9 | `vitest` | Campaign |
+
 ### Database Migrations
 
 | Path | Purpose | Key Exports/Classes | External Deps | Owner/Area |
@@ -352,6 +370,7 @@ Patient/Provider → Browser
 | `tailwind.config.js` | Tailwind config: brand colors (navy, gold, orange), fonts (Inter, Montserrat) | TW config | — | Config |
 | `postcss.config.js` | PostCSS: Tailwind + Autoprefixer | PostCSS config | — | Config |
 | `playwright.config.ts` | Playwright config: chromium + mobile-chrome, webServer, e2e dir | Playwright config | — | Config |
+| `vitest.config.ts` | Vitest config: node environment, `@/` path alias, `**/*.unit.test.ts` include pattern | Vitest config | — | Config |
 | `vercel.json` | Vercel deployment config (nextjs framework) | Vercel config | — | Config |
 | `.gitignore` | Ignored paths: node_modules, .next, out, Playwright artifacts | — | — | Config |
 
@@ -575,11 +594,26 @@ No distributed tracing. Scan duration is captured in `CrawlResult.duration` and 
 
 ## 10. Testing Strategy
 
-### Test Framework
+### Test Frameworks
 
-**Playwright** with e2e test suites in `e2e/` directory.
+| Framework | Purpose | Config | Files |
+|-----------|---------|--------|-------|
+| **Vitest 4.x** | Unit tests for core business logic (no server required) | `vitest.config.ts` | `**/*.unit.test.ts` (7 files, 137 tests) |
+| **Playwright** | E2E tests against running dev server | `playwright.config.ts` | `e2e/*.spec.ts` (6 files) |
 
-### Test Categories
+### Unit Test Suites (Vitest)
+
+| Suite | File | Tests | What It Tests |
+|-------|------|-------|---------------|
+| Utils | `checks/utils.unit.test.ts` | 43 | Address normalization & matching, phone normalization & matching, name normalization & fuzzy matching, specialty synonym resolution, Levenshtein distance |
+| Registry | `checks/registry.unit.test.ts` | 15 | Tier-based check filtering (free/report/shield), category grouping, check ID lookup, category metadata |
+| NPI Checks | `checks/npi-checks.unit.test.ts` | 18 | NPI-01 address verification (match, mismatch, secondary address, inconclusive), NPI-02 phone (match, format normalization), NPI-03 taxonomy (synonym matching) |
+| Roster Checks | `checks/roster-checks.unit.test.ts` | 13 | RST-01 count variance thresholds (<=10% pass, 11-30% warn, >30% fail), RST-02 name matching (fuzzy match, evidence) |
+| Crawler | `checks/crawler.unit.test.ts` | 12 | crawlSite with mocked fetch: phone from tel: links, address from JSON-LD, specialty keyword detection, provider names from schema.org, content hash generation |
+| CDN Detection | `lib/cdn-detection.unit.test.ts` | 27 | IP CIDR matching (Cloudflare, CloudFront, Fastly, Vercel), HTTP header detection, US SaaS allowlist, US mail provider recognition |
+| Report Codes | `lib/report-code.unit.test.ts` | 9 | HMAC-SHA256 code generation (format, determinism, uniqueness), NPI-to-code reverse lookup |
+
+### E2E Test Suites (Playwright)
 
 | Suite | File | Coverage | What It Tests |
 |-------|------|----------|---------------|
@@ -590,7 +624,7 @@ No distributed tracing. Scan duration is captured in `CrawlResult.duration` and 
 | Visual Regression | `e2e/visual-regression.spec.ts` | All public pages | Screenshot comparison against baselines |
 | Dashboard Guide | `e2e/dashboard-guide.spec.ts` | Admin dashboard | Dashboard walkthrough flow |
 
-### Browser Matrix
+### Browser Matrix (Playwright)
 
 - Chromium (Desktop Chrome)
 - Mobile Chrome (Pixel 5 viewport)
@@ -606,13 +640,16 @@ Tests run on every push and PR via `.github/workflows/page-tests.yml`:
 ### Coverage Hotspots
 
 **Strong coverage**:
-- All public page content and structure
-- Visual regression across all pages (desktop + mobile)
-- Broken link detection
-- Navigation flows
+- Check engine core logic: utils, registry, NPI checks, roster checks, crawler (137 unit tests)
+- CDN detection: IP ranges, headers, SaaS/mail provider allowlists
+- Report code generation and lookup
+- All public page content and structure (e2e)
+- Visual regression across all pages (e2e, desktop + mobile)
+- Broken link detection (e2e)
+- Navigation flows (e2e)
 
 **Weak / Missing coverage**:
-- No unit tests for `checks/` engine, fetchers, or utils
+- No unit tests for `checks/engine.ts` (scan orchestration) or `checks/fetchers.ts` (external API calls)
 - No API route integration tests
 - No Stripe webhook integration tests
 - No email sending tests (SES mocked only in manual testing)
@@ -627,7 +664,9 @@ Tests run on every push and PR via `.github/workflows/page-tests.yml`:
 ### Code Quality
 - [ ] `scanReportService.ts` has hardcoded Supabase URL and anon key at the top of the file — should use env vars consistently
 - [ ] Root-level standalone files (`RiskScanWidget.tsx`, `dashboard-page.tsx`, `page.tsx`, `scan-results-page.tsx`, `prospects-route.ts`) appear to be development copies — consider removing or documenting their purpose
-- [ ] No unit tests for the check engine (`checks/`) — critical business logic lacks test coverage
+- [x] ~~No unit tests for the check engine (`checks/`) — critical business logic lacks test coverage~~ → Added 137 Vitest unit tests covering utils, registry, NPI checks, roster checks, crawler, CDN detection, and report codes
+- [x] ~~`lib/report-code.ts` used non-null assertion (`!`) for `REPORT_CODE_SECRET` env var — would crash at runtime if env var was missing~~ → Fixed to use empty-string fallback
+- [ ] No unit tests for `checks/engine.ts` (scan orchestration) or `checks/fetchers.ts` (external API calls)
 - [ ] No API integration tests for any route handlers
 
 ### Security
@@ -650,4 +689,11 @@ Tests run on every push and PR via `.github/workflows/page-tests.yml`:
 
 ## 12. Doc Sync
 
-Generated from commit `3589740fa9b218852a0ae551ee59cb51e3df884c` on 2026-02-26.
+Updated from commit `1f20e40` on 2026-03-03.
+
+### Changelog
+
+| Date | Commit | Changes |
+|------|--------|---------|
+| 2026-02-26 | `3589740` | Initial CODE_EXPLAIN.md |
+| 2026-03-03 | `1f20e40` | Added Vitest unit test suite (137 tests across 7 files), `vitest.config.ts`, `test:unit` / `test:unit:watch` scripts; fixed `lib/report-code.ts` non-null assertion crash |
