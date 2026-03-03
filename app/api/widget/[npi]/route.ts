@@ -56,7 +56,7 @@ export async function GET(
 
     // Fetch provider data from Supabase
     const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}&select=id,npi,name,url,risk_score,widget_status,subscription_status,last_scan_timestamp,updated_at,is_visible`,
+      `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}&select=id,npi,name,url,risk_score,widget_status,subscription_status,subscription_tier,last_scan_timestamp,updated_at,is_visible`,
       {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -168,6 +168,7 @@ export async function GET(
 function determineWidgetStatus(provider: {
   widget_status?: string;
   subscription_status?: string;
+  subscription_tier?: string;
   is_visible?: boolean;
   risk_score?: number;
 }): { publicStatus: string; adminStatus: string } {
@@ -188,8 +189,18 @@ function determineWidgetStatus(provider: {
     return { publicStatus: 'hidden', adminStatus: 'hidden' };
   }
 
-  // THRESHOLD CHECK - This is the key business rule
-  // Below threshold: Widget HIDDEN from public, Admin sees WARNING/YELLOW
+  // Active subscribers (Shield/Watch/trialing) always show widget regardless of score
+  // This is the value prop: they pay for the badge even when score is below threshold
+  const isActiveSubscriber = 
+    provider.widget_status === 'active' ||
+    provider.subscription_status === 'active' ||
+    provider.subscription_status === 'trialing';
+
+  if (isActiveSubscriber) {
+    return { publicStatus: 'active', adminStatus: score < COMPLIANCE_THRESHOLD ? 'warning' : 'active' };
+  }
+
+  // THRESHOLD CHECK - Only applies to non-subscribers
   if (score < COMPLIANCE_THRESHOLD) {
     return { publicStatus: 'hidden', adminStatus: 'warning' };
   }
