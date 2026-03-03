@@ -1,6 +1,6 @@
 import { createHmac } from 'crypto';
 
-const SECRET = process.env.REPORT_CODE_SECRET!;
+const SECRET = process.env.REPORT_CODE_SECRET || '';
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 /**
