@@ -338,6 +338,8 @@ export async function POST(request: NextRequest) {
         if (providers?.length) provider = providers[0];
       }
 
+      let _dashToken = '';
+
       // ── 2. Update registry ──
       if (provider) {
         const registryUpdate: Record<string, unknown> = {
@@ -368,6 +370,7 @@ export async function POST(request: NextRequest) {
           crypto.getRandomValues(tokenBytes);
           registryUpdate.dashboard_token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
         }
+        _dashToken = (registryUpdate.dashboard_token as string) || (provider.dashboard_token as string) || '';
 
         await supabasePatch('registry', `id=eq.${provider.id}`, registryUpdate);
         console.log(`[Stripe Webhook] Registry updated: ${provider.name} (${provider.npi}) — ${product.type}${product.includesShieldTrial ? ' (90-day Shield trial)' : ''}`);
@@ -410,7 +413,7 @@ export async function POST(request: NextRequest) {
               product: product.type,
               practiceName: provider.name || 'Healthcare Provider',
               score: provider.risk_score || 0,
-              dashboardToken: registryUpdate.dashboard_token || provider.dashboard_token || '',
+              dashboardToken: _dashToken,
             }),
           });
           if (confirmRes.ok) {
