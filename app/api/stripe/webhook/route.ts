@@ -395,6 +395,34 @@ export async function POST(request: NextRequest) {
       });
       console.log(`[Stripe Webhook] Purchase logged: ${product.type}`);
 
+      // ── 3b. Send purchase confirmation email ──
+      if (provider && customerEmail) {
+        try {
+          const confirmRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net'}/api/email/purchase-confirmation`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.ADMIN_API_KEY || process.env.CRON_SECRET || ''}`,
+            },
+            body: JSON.stringify({
+              npi: provider.npi,
+              email: customerEmail,
+              product: product.type,
+              practiceName: provider.name || 'Healthcare Provider',
+              score: provider.risk_score || 0,
+              dashboardToken: registryUpdate.dashboard_token || provider.dashboard_token || '',
+            }),
+          });
+          if (confirmRes.ok) {
+            console.log(`[Stripe Webhook] Confirmation email sent to ${customerEmail}`);
+          } else {
+            console.warn(`[Stripe Webhook] Confirmation email failed: ${confirmRes.status}`);
+          }
+        } catch (emailErr) {
+          console.warn(`[Stripe Webhook] Confirmation email error:`, emailErr);
+        }
+      }
+
       // ── 4. Auto-create Shield subscription ──
       // For Report/Safe Harbor: 90-day trial
       // For standalone Shield: this is already handled by Stripe (it's a recurring product)
