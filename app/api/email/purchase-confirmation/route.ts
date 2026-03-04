@@ -85,6 +85,29 @@ Download Your Report &rarr;
 </td></tr>
 </table>
 
+${product === 'safe-harbor' ? `
+<!-- 1b. Safe Harbor Materials -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;margin-bottom:16px;">
+<tr><td style="padding:16px 20px;">
+<div style="font-size:14px;font-weight:700;color:#9a3412;margin-bottom:6px;">&#128221; Safe Harbor Compliance Kit</div>
+<p style="margin:0 0 12px;font-size:13px;color:#c2410c;line-height:1.5;">
+Your complete remediation kit with ready-to-use documents aligned to Texas SB 1188 and HB 149. Customize with your practice details for best results.
+</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+<tr><td style="padding:6px 0;"><a href="${BASE_URL}/downloads/safe-harbor/sb1188-policy-pack.pdf" style="color:#9a3412;font-size:13px;font-weight:600;text-decoration:none;">&#128203; SB 1188 Data Sovereignty Policy</a></td></tr>
+<tr><td style="padding:6px 0;border-top:1px solid #fde8d8;"><a href="${BASE_URL}/downloads/safe-harbor/ai-disclosure-kit.zip" style="color:#9a3412;font-size:13px;font-weight:600;text-decoration:none;">&#129302; HB 149 AI Disclosure Kit</a></td></tr>
+<tr><td style="padding:6px 0;border-top:1px solid #fde8d8;"><a href="${BASE_URL}/downloads/safe-harbor/evidence-ledger.xlsx" style="color:#9a3412;font-size:13px;font-weight:600;text-decoration:none;">&#128193; Audit Evidence Ledger Templates</a></td></tr>
+<tr><td style="padding:6px 0;border-top:1px solid #fde8d8;"><a href="${BASE_URL}/downloads/safe-harbor/staff-training-guide.pdf" style="color:#9a3412;font-size:13px;font-weight:600;text-decoration:none;">&#128101; Staff Training Guide</a></td></tr>
+<tr><td style="padding:6px 0;border-top:1px solid #fde8d8;"><a href="${BASE_URL}/downloads/safe-harbor/compliance-roadmap.pdf" style="color:#9a3412;font-size:13px;font-weight:600;text-decoration:none;">&#128197; Annual Compliance Roadmap</a></td></tr>
+<tr><td style="padding:6px 0;border-top:1px solid #fde8d8;"><a href="${BASE_URL}/downloads/safe-harbor/implementation-blueprint.pdf" style="color:#9a3412;font-size:13px;font-weight:600;text-decoration:none;">&#128295; Implementation Blueprint</a></td></tr>
+</table>
+<a href="${successUrl}" style="display:inline-block;background:#ea580c;color:#fff;font-size:13px;font-weight:700;padding:10px 20px;border-radius:6px;text-decoration:none;">
+Download All Materials &rarr;
+</a>
+</td></tr>
+</table>
+` : ''}
+
 <!-- 2. Dashboard -->
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:16px;">
 <tr><td style="padding:16px 20px;">
