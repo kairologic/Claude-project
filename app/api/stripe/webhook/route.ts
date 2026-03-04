@@ -489,6 +489,8 @@ export async function POST(request: NextRequest) {
                 trial_days: product.includesShieldTrial ? SHIELD_TRIAL_DAYS : 0,
                 subscription_id: subscriptionResult.subscriptionId || '',
                 deliverables_url: `${origin}/payment/success?npi=${(provider?.npi as string) || npi}&product=${product.type}&email=${encodeURIComponent(customerEmail)}`,
+                dashboard_url: _dashToken ? `${origin}/dashboard/${(provider?.npi as string) || npi}?token=${_dashToken}` : '',
+                widget_code: `<script src="https://kairologic.net/sentry.js" data-npi="${(provider?.npi as string) || npi}" data-theme="light" async></script>`,
               },
             }),
           });
