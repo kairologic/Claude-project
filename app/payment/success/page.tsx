@@ -266,9 +266,9 @@ function SuccessPageInner() {
   };
 
   // ── Widget embed code ──
-  const getWidgetCode = (mode: 'watch' | 'shield') => {
+  const getWidgetCode = () => {
     const npiVal = purchaseInfo?.npi || 'YOUR_NPI';
-    return `<!-- KairoLogic Sentry ${mode === 'shield' ? 'Shield' : 'Watch'} Widget -->\n<script\n  src="https://kairologic.com/widget/sentry.js"\n  data-npi="${npiVal}"\n  data-mode="${mode}"\n  data-theme="light"\n  async>\n</script>\n<noscript>\n  <a href="https://kairologic.com/scan?npi=${npiVal}">\n    Compliance verified by KairoLogic\n  </a>\n</noscript>`;
+    return `<!-- KairoLogic Sentry Shield Widget -->\n<script\n  src="https://kairologic.net/sentry.js"\n  data-npi="${npiVal}"\n  data-theme="light"\n  async>\n</script>\n<noscript>\n  <a href="https://kairologic.net/scan?npi=${npiVal}">\n    Compliance verified by KairoLogic\n  </a>\n</noscript>`;
   };
 
   const handleCopyCode = (code: string) => {
@@ -497,9 +497,9 @@ function SuccessPageInner() {
                   <p className="text-xs text-gray-600 mb-3">Add this code to your website to display your live compliance status badge.</p>
                   <div className="relative">
                     <pre className="bg-slate-900 text-green-400 text-xs p-4 rounded-lg overflow-x-auto font-mono leading-relaxed">
-                      {getWidgetCode(monitoringMode)}
+                      {getWidgetCode()}
                     </pre>
-                    <button onClick={() => handleCopyCode(getWidgetCode(monitoringMode))}
+                    <button onClick={() => handleCopyCode(getWidgetCode())}
                       className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-md transition-colors" title="Copy to clipboard">
                       {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                     </button>
@@ -509,7 +509,7 @@ function SuccessPageInner() {
                   <div className="mt-4 bg-slate-50 border border-slate-100 rounded-lg p-4">
                     <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Installation Guide</h4>
                     <div className="space-y-2 text-xs text-slate-600">
-                      {['Copy the code snippet above', 'Paste it into your website\u2019s HTML \u2014 just before the closing </body> tag', 'The widget will automatically display your compliance badge and status'].map((step, i) => (
+                      {['Copy the code snippet above', 'Paste it into your website\u2019s HTML \u2014 just before the closing </body> tag', 'A small shield icon will appear in the corner of your site \u2014 patients can click it to see your compliance status'].map((step, i) => (
                         <div key={i} className="flex items-start gap-2">
                           <span className="bg-navy text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
                           <span>{step}</span>
@@ -520,7 +520,7 @@ function SuccessPageInner() {
                   </div>
 
                   <div className="mt-3">
-                    <Link href={`/widget/test?npi=${purchaseInfo?.npi || ''}&mode=${monitoringMode}`}
+                    <Link href={`/widget/test?npi=${purchaseInfo?.npi || ''}`}
                       className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
                       <ExternalLink className="w-3 h-3" /> Preview how the widget looks on your site &rarr;
                     </Link>
