@@ -15,10 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * Body: { npi, email, product, practiceName, score, dashboardToken }
  */
 
-const SES_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
-const SES_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
-const SES_USER = process.env.SES_SMTP_USER || '';
-const SES_PASS = process.env.SES_SMTP_PASS || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'ravi@kairologic.net';
 const FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Compliance';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net';
@@ -150,6 +147,9 @@ ${widgetCode}
 <p style="margin:0 0 8px;font-size:12px;color:#64748b;">
 <span style="font-weight:700;color:#1e293b;">Kairo</span><span style="font-weight:700;color:#c9a84c;">Logic</span> &middot; Texas Healthcare Compliance Platform
 </p>
+<p style="margin:0 0 6px;font-size:11px;color:#94a3b8;">
+1320 Arrow Point Dr, Cedar Park, TX 78613
+</p>
 <p style="margin:0;font-size:11px;color:#94a3b8;">
 Questions? Reply to this email or reach us at compliance@kairologic.net
 </p>
@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing npi or email' }, { status: 400 });
     }
 
-    if (!SES_USER || !SES_PASS) {
-      return NextResponse.json({ error: 'SES credentials not configured' }, { status: 500 });
+    if (!RESEND_API_KEY) {
+      return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
     }
 
     const html = buildConfirmationEmail({
@@ -193,20 +193,29 @@ export async function POST(request: NextRequest) {
     const productLabel = product === 'safe-harbor' ? 'Safe Harbor Bundle' : 'Audit Report';
     const subject = `Your KairoLogic ${productLabel} is ready, ${titleCase(practiceName || 'Healthcare Provider')}`;
 
-    const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.default.createTransport({
-      host: SES_HOST,
-      port: SES_PORT,
-      secure: false,
-      auth: { user: SES_USER, pass: SES_PASS },
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [email],
+        subject,
+        html,
+        tags: [
+          { name: 'type', value: 'purchase-confirmation' },
+          { name: 'npi', value: npi },
+          { name: 'product', value: product || 'report' },
+        ],
+      }),
     });
 
-    await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-      to: email,
-      subject,
-      html,
-    });
+    if (!resendRes.ok) {
+      const errBody = await resendRes.text();
+      throw new Error(`Resend ${resendRes.status}: ${errBody}`);
+    }
 
     return NextResponse.json({ success: true, to: email, subject });
   } catch (err) {
