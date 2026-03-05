@@ -26,6 +26,21 @@ async function supabaseGet(table: string, query: string): Promise<Record<string,
   } catch { return null; }
 }
 
+async function supabasePatch(table: string, query: string, data: Record<string, unknown>): Promise<void> {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(data),
+    });
+  } catch { /* non-blocking */ }
+}
+
 interface ScanFinding {
   id?: string;
   name?: string;
@@ -235,6 +250,15 @@ export async function GET(request: NextRequest) {
   }
 
   const npi = outreach[0].npi as string;
+
+  // Track landing page visit (non-blocking, fire-and-forget)
+  if (!outreach[0].first_viewed_at) {
+    supabasePatch(
+      'campaign_outreach',
+      `report_code=eq.${encodeURIComponent(code)}`,
+      { first_viewed_at: new Date().toISOString(), opened: true }
+    );
+  }
 
   // Fetch provider from registry (includes last_scan_result JSON)
   const providers = await supabaseGet(
