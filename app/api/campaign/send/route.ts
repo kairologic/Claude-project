@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 
 /**
  * POST /api/campaign/send
@@ -12,7 +11,7 @@ import nodemailer from 'nodemailer';
  * - Pulls unsent records from campaign_outreach
  * - Joins with registry for scan data
  * - Generates personalized HTML email
- * - Sends via SES SMTP
+ * - Sends via Resend API
  * - Updates campaign_outreach with sent_at
  */
 
@@ -20,11 +19,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
-const SES_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
-const SES_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
-const SES_USER = process.env.SES_SMTP_USER || '';
-const SES_PASS = process.env.SES_SMTP_PASS || '';
-const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.net';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'ravi@kairologic.net';
 const FROM_NAME = 'KairoLogic Compliance';
 
 interface ScanFinding {
@@ -236,6 +232,9 @@ function generateEmailHtml(
     <p style="margin:0 0 10px;font-size:11px;color:#94a3b8;line-height:1.5;">
       This email was sent because your practice is registered with the National Provider Identifier (NPI) registry and your website was included in a statewide compliance assessment.
     </p>
+    <p style="margin:0 0 6px;font-size:11px;color:#94a3b8;">
+      1320 Arrow Point Dr, Cedar Park, TX 78613
+    </p>
     <p style="margin:0;font-size:11px;color:#94a3b8;">
       <a href="mailto:compliance@kairologic.net" style="color:#64748b;">compliance@kairologic.net</a> &middot;
       <a href="https://kairologic.net" style="color:#64748b;">kairologic.net</a> &middot;
@@ -274,13 +273,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'No unsent emails in this campaign', sent: 0 });
   }
 
-  // Set up SMTP transport
-  const transporter = nodemailer.createTransport({
-    host: SES_HOST,
-    port: SES_PORT,
-    secure: false,
-    auth: { user: SES_USER, pass: SES_PASS },
-  });
+  // Validate Resend API key
+  if (!RESEND_API_KEY) {
+    return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
+  }
 
   const results: Array<{ npi: string; email: string; status: string; error?: string; subject?: string; html?: string }> = [];
 
@@ -332,17 +328,29 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Send email
-      await transporter.sendMail({
-        from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-        to: email,
-        subject,
-        html,
+      // Send email via Resend API
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
         headers: {
-          'X-Campaign': campaignName,
-          'X-NPI': npi,
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          from: `${FROM_NAME} <${FROM_EMAIL}>`,
+          to: [email],
+          subject,
+          html,
+          tags: [
+            { name: 'campaign', value: campaignName },
+            { name: 'npi', value: npi },
+          ],
+        }),
       });
+
+      if (!resendRes.ok) {
+        const errBody = await resendRes.text();
+        throw new Error(`Resend ${resendRes.status}: ${errBody}`);
+      }
 
       // Update campaign_outreach
       await supabaseUpdate(
