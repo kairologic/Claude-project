@@ -45,7 +45,7 @@ export default function HomePage() {
               className="w-full bg-white/10 border-2 border-white/20 hover:border-gold hover:bg-gold/10 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 flex items-center gap-2 justify-center">
               <Play size={18} className="text-gold" />
               Watch How It Works
-              <span className="text-xs text-gray-400 ml-1">(1 min)</span>
+              <span className="text-xs text-gray-400 ml-1">(~2 min)</span>
             </button>
             <Link href="/scan" className="w-full">
               <button className="w-full btn-primary text-lg px-10 py-4 flex items-center gap-2 justify-center shadow-xl shadow-orange/20">
