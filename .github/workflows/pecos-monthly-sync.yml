@@ -1,0 +1,96 @@
+# .github/workflows/pecos-monthly-sync.yml
+# ═══ KairoLogic PECOS Monthly Sync ═══
+# Runs on the 1st of each month at 7am UTC
+# Downloads CMS PECOS public enrollment data, enriches with
+# reassignment data, upserts into provider_pecos table.
+#
+# Manual trigger: Actions tab → Run workflow
+
+name: PECOS Monthly Sync
+
+on:
+  schedule:
+    # 1st of every month at 7:00 UTC (1am Central)
+    - cron: '0 7 1 * *'
+
+  workflow_dispatch:
+    inputs:
+      states:
+        description: 'Comma-separated states to sync (default: TX,CA)'
+        required: false
+        default: 'TX,CA'
+      dry_run:
+        description: 'Dry run (parse only, no DB writes)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      skip_reassignment:
+        description: 'Skip reassignment file (faster, less data)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  sync:
+    name: PECOS Enrollment Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx runner
+        run: npm install -g tsx
+
+      - name: Run PECOS sync
+        run: |
+          ARGS=""
+
+          # States
+          STATES="${{ github.event.inputs.states || 'TX,CA' }}"
+          ARGS="$ARGS --states $STATES"
+
+          # Dry run
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          # Skip reassignment
+          if [ "${{ github.event.inputs.skip_reassignment || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --skip-reassignment"
+          fi
+
+          echo "Running: npx tsx scripts/pecos-monthly-sync.ts $ARGS"
+          npx tsx scripts/pecos-monthly-sync.ts $ARGS
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "### PECOS Sync Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **States:** ${{ github.event.inputs.states || 'TX,CA' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Clean up work directory
+        if: always()
+        run: rm -rf .pecos-work
