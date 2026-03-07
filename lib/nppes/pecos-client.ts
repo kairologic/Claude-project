@@ -15,7 +15,6 @@
 // We primarily use (1) base enrollment for the NPI resolution bridge,
 // augmented with (2) reassignment for group practice associations.
 
-import { execSync } from 'fs';
 import { createReadStream, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { createInterface } from 'readline';
