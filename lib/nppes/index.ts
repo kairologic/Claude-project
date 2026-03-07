@@ -16,3 +16,21 @@ export {
   type SnapshotRow,
   type DeltaEventRow,
 } from './supabase-client';
+
+export {
+  parsePecosFile,
+  parseReassignmentFile,
+  enrichWithReassignments,
+  upsertPecosRecords,
+  PECOS_URLS,
+  type PecosRecord,
+  type PecosParseResult,
+} from './pecos-client';
+
+export {
+  parseRecord as parseTmbRecord,
+  parseTMBFile,
+  toProviderLicenseRow,
+  upsertTmbRecords,
+  type TMBPhysician,
+} from './tmb-parser';
