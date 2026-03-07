@@ -1,0 +1,97 @@
+# .github/workflows/tmb-monthly-sync.yml
+# ═══ KairoLogic TMB ORSSP Monthly Sync ═══
+# MANUAL TRIGGER ONLY — requires ORSSP file download first.
+#
+# Workflow:
+#   1. Download PHY report from http://orssp.tmb.state.tx.us ($0.26)
+#   2. Commit the file to data/tmb/ in the repo (or upload as artifact)
+#   3. Trigger this workflow from Actions tab
+#
+# Unlike NPPES/PECOS, TMB ORSSP requires login + payment,
+# so this cannot be fully automated on a cron.
+
+name: TMB ORSSP Monthly Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_path:
+        description: 'Path to TMB PHY file in repo (e.g., data/tmb/PHY_20260401.txt)'
+        required: true
+        default: 'data/tmb/latest.txt'
+      active_only:
+        description: 'Only process active licenses'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      dry_run:
+        description: 'Dry run (parse only, no DB writes)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  sync:
+    name: TMB License Data Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify TMB file exists
+        run: |
+          FILE="${{ github.event.inputs.file_path }}"
+          if [ ! -f "$FILE" ]; then
+            echo "❌ TMB file not found: $FILE"
+            echo "Download from http://orssp.tmb.state.tx.us and commit to repo first."
+            exit 1
+          fi
+          echo "✅ Found TMB file: $FILE ($(wc -l < "$FILE") lines)"
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx runner
+        run: npm install -g tsx
+
+      - name: Run TMB sync
+        run: |
+          ARGS="${{ github.event.inputs.file_path }}"
+
+          if [ "${{ github.event.inputs.active_only }}" = "true" ]; then
+            ARGS="$ARGS --active-only"
+          fi
+
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: npx tsx scripts/tmb-monthly-sync.ts $ARGS"
+          npx tsx scripts/tmb-monthly-sync.ts $ARGS
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "### TMB ORSSP Sync Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **File:** ${{ github.event.inputs.file_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Active only:** ${{ github.event.inputs.active_only }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry run:** ${{ github.event.inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
