@@ -22,6 +22,7 @@ import {
   enrichWithReassignments,
   upsertPecosRecords,
   downloadCmsFile,
+  resolvePecosDownloadUrls,
   PECOS_URLS,
 } from '../lib/nppes/pecos-client';
 
