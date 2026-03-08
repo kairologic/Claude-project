@@ -14,9 +14,13 @@
 //
 // We primarily use (1) base enrollment for the NPI resolution bridge,
 // augmented with (2) reassignment for group practice associations.
+//
+// ── URL resolution ───────────────────────────────────────────────
+// CMS rotates actual file paths on every quarterly release.
+// NEVER hardcode download URLs — always resolve from data.cms.gov/data.json
+// at runtime. See resolvePecosDownloadUrls() below.
 
-import { createReadStream, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
@@ -24,15 +28,12 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const BASE_URL = `${SUPABASE_URL}/rest/v1`;
 
-// ── CMS download URLs ────────────────────────────────────────────
-// These are the direct CSV download endpoints from data.cms.gov.
-// The base enrollment file contains the core fields we need for NPI resolution.
+// ── CMS catalog constants ────────────────────────────────────────
+// The data.json catalog is the stable entry point. Dataset titles are stable
+// even as the underlying file paths change each release.
 
-const PECOS_BASE_ENROLLMENT_URL =
-  'https://data.cms.gov/provider-characteristics/medicare-provider-supplier-enrollment/medicare-fee-for-service-public-provider-enrollment/data.csv';
-
-const PECOS_REASSIGNMENT_URL =
-  'https://data.cms.gov/provider-characteristics/medicare-provider-supplier-enrollment/reassignment-sub-file/data.csv';
+const CMS_DATA_JSON_URL = 'https://data.cms.gov/data.json';
+const PPEF_DATASET_TITLE = 'Medicare Fee-For-Service Public Provider Enrollment';
 
 // ── Field mapping ────────────────────────────────────────────────
 // CMS PPEF base enrollment file columns (header names, case-sensitive):
@@ -67,6 +68,163 @@ export interface PecosRecord {
   reassignment_name: string | null;
   source_file: string;
   source_date: string;
+}
+
+// ── Dynamic URL resolver ─────────────────────────────────────────
+
+/**
+ * Resolve the current download URLs for the PPEF base enrollment CSV
+ * and the reassignment sub-file from the CMS open data catalog.
+ *
+ * CMS rotates actual file paths on every quarterly release — this function
+ * always finds the latest paths by looking them up in data.json at runtime,
+ * following CMS's own recommended approach (see CMS API Guide v1.6).
+ */
+export async function resolvePecosDownloadUrls(): Promise<{
+  baseEnrollmentUrl: string;
+  reassignmentUrl: string;
+}> {
+  console.log('[PECOS] Resolving download URLs from CMS catalog...');
+
+  const catalogRes = await fetch(CMS_DATA_JSON_URL);
+  if (!catalogRes.ok) {
+    throw new Error(
+      `Failed to fetch CMS data.json: HTTP ${catalogRes.status}`,
+    );
+  }
+
+  const catalog = await catalogRes.json();
+
+  const dataset = catalog.dataset?.find(
+    (ds: any) => ds.title === PPEF_DATASET_TITLE,
+  );
+  if (!dataset) {
+    throw new Error(
+      `Dataset "${PPEF_DATASET_TITLE}" not found in CMS catalog. ` +
+        `The title may have changed — check https://data.cms.gov/data.json`,
+    );
+  }
+
+  // Base enrollment: first CSV distribution entry is always the most recent release
+  const csvDist = dataset.distribution?.find(
+    (d: any) => d.mediaType === 'text/csv',
+  );
+  if (!csvDist?.downloadURL) {
+    throw new Error(
+      'No CSV downloadURL found for PPEF base enrollment in CMS catalog',
+    );
+  }
+
+  console.log(`[PECOS] Base enrollment URL: ${csvDist.downloadURL}`);
+
+  // Reassignment sub-file: fetched via the resourcesAPI on the same distribution
+  const resourcesApiUrl = csvDist.resourcesAPI;
+  if (!resourcesApiUrl) {
+    throw new Error(
+      'No resourcesAPI URL found in PPEF distribution. Cannot locate reassignment sub-file.',
+    );
+  }
+
+  const resourcesRes = await fetch(resourcesApiUrl);
+  if (!resourcesRes.ok) {
+    throw new Error(
+      `Failed to fetch PPEF resources list: HTTP ${resourcesRes.status}`,
+    );
+  }
+
+  const resources = await resourcesRes.json();
+
+  const reassignmentResource = resources.data?.find((r: any) =>
+    r.name?.toLowerCase().includes('reassignment'),
+  );
+  if (!reassignmentResource?.downloadURL) {
+    throw new Error(
+      'Reassignment Sub-File not found in PPEF resources. ' +
+        `Available resources: ${resources.data?.map((r: any) => r.name).join(', ')}`,
+    );
+  }
+
+  console.log(`[PECOS] Reassignment URL: ${reassignmentResource.downloadURL}`);
+
+  return {
+    baseEnrollmentUrl: csvDist.downloadURL,
+    reassignmentUrl: reassignmentResource.downloadURL,
+  };
+}
+
+// ── Download helper ──────────────────────────────────────────────
+
+/**
+ * Download a CMS file to disk using curl.
+ * Includes retry logic and guards against empty downloads.
+ */
+export function downloadCmsFile(
+  url: string,
+  destPath: string,
+  label: string,
+): void {
+  console.log(`[PECOS] Downloading ${label}...`);
+  const { execSync } = require('child_process');
+  const { statSync } = require('fs');
+
+  execSync(`curl -sS -L --retry 3 --retry-delay 5 -o "${destPath}" "${url}"`, {
+    stdio: 'inherit',
+    timeout: 600_000, // 10 min — base file is ~500MB
+  });
+
+  const size = statSync(destPath).size;
+  console.log(
+    `[PECOS] Downloaded ${label}: ${(size / 1024 / 1024).toFixed(1)} MB`,
+  );
+
+  // Guard against silent empty downloads — 1KB threshold catches HTML error pages too
+  if (size < 1024) {
+    throw new Error(
+      `[PECOS] ${label} download appears empty or invalid (${size} bytes). ` +
+        `The resolved URL may be stale — re-run resolvePecosDownloadUrls() to refresh.`,
+    );
+  }
+}
+
+// ── CSV parser (header-based) ────────────────────────────────────
+
+function parseCSVLineQuoted(line: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < line.length) {
+    const char = line[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i += 2;
+        } else {
+          inQuotes = false;
+          i++;
+        }
+      } else {
+        current += char;
+        i++;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+        i++;
+      } else if (char === ',') {
+        fields.push(current);
+        current = '';
+        i++;
+      } else {
+        current += char;
+        i++;
+      }
+    }
+  }
+  fields.push(current);
+  return fields;
 }
 
 /**
@@ -117,47 +275,6 @@ export function parsePecosRow(
     source_file: sourceFile,
     source_date: sourceDate,
   };
-}
-
-// ── CSV parser (header-based) ────────────────────────────────────
-
-function parseCSVLineQuoted(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const char = line[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"';
-          i += 2;
-        } else {
-          inQuotes = false;
-          i++;
-        }
-      } else {
-        current += char;
-        i++;
-      }
-    } else {
-      if (char === '"') {
-        inQuotes = true;
-        i++;
-      } else if (char === ',') {
-        fields.push(current);
-        current = '';
-        i++;
-      } else {
-        current += char;
-        i++;
-      }
-    }
-  }
-  fields.push(current);
-  return fields;
 }
 
 export interface PecosParseResult {
@@ -394,32 +511,11 @@ export async function upsertPecosRecords(
   return upserted;
 }
 
-// ── Download helper ──────────────────────────────────────────────
-
-/**
- * Download a CSV file from CMS using curl.
- */
-export function downloadCmsFile(
-  url: string,
-  destPath: string,
-  label: string,
-): void {
-  console.log(`[PECOS] Downloading ${label}...`);
-  const { execSync } = require('child_process');
-  execSync(`curl -sS -L -o "${destPath}" "${url}"`, {
-    stdio: 'inherit',
-    timeout: 300_000, // 5 minute timeout
-  });
-
-  const { statSync } = require('fs');
-  const size = statSync(destPath).size;
-  console.log(
-    `[PECOS] Downloaded ${label}: ${(size / 1024 / 1024).toFixed(1)} MB`,
-  );
-}
-
-// Export URLs for use in the sync script
+// ── Backwards-compat export ──────────────────────────────────────
+// PECOS_URLS is retained so existing imports don't break, but these are
+// no longer used directly for downloads. Call resolvePecosDownloadUrls()
+// at the start of your sync script instead.
 export const PECOS_URLS = {
-  baseEnrollment: PECOS_BASE_ENROLLMENT_URL,
-  reassignment: PECOS_REASSIGNMENT_URL,
+  catalog: CMS_DATA_JSON_URL,
+  datasetTitle: PPEF_DATASET_TITLE,
 };
