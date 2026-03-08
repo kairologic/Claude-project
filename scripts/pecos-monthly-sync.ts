@@ -82,7 +82,9 @@ async function main() {
   downloadCmsFile(PECOS_URLS.baseEnrollment, baseFilePath, 'Base Enrollment');
 
   if (!options.skipReassignment) {
-    downloadCmsFile(PECOS_URLS.reassignment, reassignFilePath, 'Reassignment Sub-file');
+    const { baseEnrollmentUrl, reassignmentUrl } = await resolvePecosDownloadUrls();
+downloadCmsFile(baseEnrollmentUrl, baseFilePath, 'Base Enrollment');
+downloadCmsFile(reassignmentUrl, reassignmentFilePath, 'Reassignment Sub-file');
   }
 
   // 3. Parse base enrollment
