@@ -643,7 +643,7 @@ export async function upsertPecosRecords(
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
 
-    const response = await fetch(`${BASE_URL}/provider_pecos`, {
+    const response = await fetch(`${BASE_URL}/provider_pecos?on_conflict=npi`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_SERVICE_KEY,
