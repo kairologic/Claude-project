@@ -118,7 +118,7 @@ export class ValidationGateStatusService {
     // Query validated sample records
     const { data: validatedRecords, error } = await this.supabase
       .from('provider_npi_resolutions')
-      .select('resolution_method, is_validated, is_false_positive')
+      .select('method, is_validated, is_false_positive')
       .eq('is_validated', true);
 
     if (error || !validatedRecords) {
