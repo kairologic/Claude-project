@@ -19,6 +19,7 @@
 //   weekly   → 7 days (practice plan)
 //   daily    → 1 day (CVO/network plan)
 
+import { isValidProviderName } from './name-quality-filter';
 import { crawlPage, type CrawlResult } from '../crawler';
 import { extractAddressFromSite, type ExtractionSummary } from '../address/index';
 import {
@@ -192,7 +193,8 @@ async function matchProviders(
 
   // Strategy 2: Name matching against state providers
   if (state && names.length > 0 && names.length <= 50) {
-    for (const name of names) {
+    const cleanNames = names.filter(isValidProviderName);
+    for (const name of cleanNames) {
       // Parse name into parts
       const parts = name.replace(/^Dr\.?\s*/i, '').split(/\s+/);
       if (parts.length < 2) continue;
