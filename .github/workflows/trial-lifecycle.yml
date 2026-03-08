@@ -1,0 +1,46 @@
+# .github/workflows/trial-lifecycle.yml
+# ═══ Daily Trial Lifecycle ═══
+# Runs daily: downgrades expired trials and sends email sequences.
+
+name: Trial Lifecycle
+
+on:
+  schedule:
+    - cron: '0 11 * * *'  # Daily at 11am UTC (5am Central)
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+  SES_SMTP_HOST: ${{ secrets.SES_SMTP_HOST }}
+  SES_SMTP_USER: ${{ secrets.SES_SMTP_USER }}
+  SES_SMTP_PASS: ${{ secrets.SES_SMTP_PASS }}
+  SES_FROM_EMAIL: ${{ secrets.SES_FROM_EMAIL }}
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run trial lifecycle
+        run: npx tsx scripts/run-trial-lifecycle.ts
+
+      - name: Report
+        if: always()
+        run: |
+          echo "### Trial Lifecycle" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
