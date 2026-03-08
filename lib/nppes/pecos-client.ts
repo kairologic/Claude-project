@@ -7,84 +7,282 @@
 // Auth: None. Free public data.
 // Update cadence: Quarterly from CMS, we sync monthly to catch any updates.
 //
-// Three files published:
-//   1. Base enrollment file (individual + org providers)
-//   2. Reassignment file (provider → group billing relationships)
-//   3. Practice location file (secondary practice locations)
+// ── API-first approach (v2) ─────────────────────────────────────
+// The original approach downloaded a 500MB CSV via the data.json catalog
+// resolver. This failed because data.json itself is 100MB+ and times out.
 //
-// We primarily use (1) base enrollment for the NPI resolution bridge,
-// augmented with (2) reassignment for group practice associations.
-//
-// ── URL resolution ───────────────────────────────────────────────
-// CMS rotates actual file paths on every quarterly release.
-// NEVER hardcode download URLs — always resolve from data.cms.gov/data.json
-// at runtime. See resolvePecosDownloadUrls() below.
+// New approach: Hit the CMS Data API directly with the known dataset ID.
+// Benefits: no temp files, server-side state filtering, JSON pagination.
+// The file-based functions are retained as fallback for GitHub Actions.
 
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const BASE_URL = `${SUPABASE_URL}/rest/v1`;
 
-// ── CMS catalog constants ────────────────────────────────────────
-// The data.json catalog is the stable entry point. Dataset titles are stable
-// even as the underlying file paths change each release.
+// ── CMS Data API constants ────────────────────────────────────────
+// Dataset IDs are stable across releases. These point to the "latest" version.
+// Confirmed working as of March 2026.
 
+const CMS_DATA_API_BASE = 'https://data.cms.gov/data-api/v1/dataset';
+
+/** Base enrollment dataset — individual + org providers */
+const PECOS_BASE_DATASET_ID = '2457ea29-fc82-48b0-86ec-3b0755de7515';
+
+/** Reassignment dataset — provider → group billing relationships */
+// TODO: Discover this ID. For now reassignment enrichment is skipped
+// when using the API path. The base enrollment data alone is sufficient
+// for the NPI resolution bridge (name + state + specialty).
+const PECOS_REASSIGNMENT_DATASET_ID = '';
+
+// Legacy catalog constants (kept for backwards compat)
 const CMS_DATA_JSON_URL = 'https://data.cms.gov/data.json';
 const PPEF_DATASET_TITLE = 'Medicare Fee-For-Service Public Provider Enrollment';
 
 // ── Field mapping ────────────────────────────────────────────────
-// CMS PPEF base enrollment file columns (header names, case-sensitive):
-//
-// NPI, PECOS ID, ENRLMT_ID, PROVIDER_TYPE_CD, PROVIDER_TYPE_DESC,
-// STATE_CD, FIRST_NAME, MDL_NAME, LAST_NAME, ORG_NAME,
+// CMS PPEF base enrollment API returns JSON with these keys:
+// NPI, MULTIPLE_NPI_FLAG, PECOS_ASCT_CNTL_ID, ENRLMT_ID,
+// PROVIDER_TYPE_CD, PROVIDER_TYPE_DESC, STATE_CD,
+// FIRST_NAME, MDL_NAME, LAST_NAME, ORG_NAME,
 // GNDR_SW, CRED, MED_SCH, GRD_YR,
 // PRI_SPEC, SEC_SPEC_1, SEC_SPEC_2, SEC_SPEC_3, SEC_SPEC_4,
 // CITY, ZIP, RNDRNG_PRVDR_RUCA, RNDRNG_PRVDR_RUCA_DESC
 
-// Reassignment file columns:
-// RNDRNG_NPI, RNDRNG_PRVDR_LAST_NAME_ORG, RNDRNG_PRVDR_FIRST_NAME,
-// RCV_NPI, RCV_PRVDR_LAST_NAME_ORG, RCV_PRVDR_FIRST_NAME,
-// STATE_CD, RNDRNG_PRVDR_RUCA, RNDRNG_PRVDR_RUCA_DESC
-
 export interface PecosRecord {
   npi: string;
   enrollment_id: string | null;
-  enrollment_status: string;          // 'Approved' for active enrollees
-  enrollment_type: string | null;     // individual / organization
-  practice_type: string | null;       // provider type description
-  provider_name: string | null;       // combined display name
+  enrollment_status: string;
+  enrollment_type: string | null;
+  practice_type: string | null;
+  provider_name: string | null;
   first_name: string | null;
   last_name: string | null;
   organization_name: string | null;
-  specialty: string | null;           // primary specialty
-  pecos_specialty: string | null;     // CMS provider type code
+  specialty: string | null;
+  pecos_specialty: string | null;
   city: string | null;
   state: string | null;
   zip_code: string | null;
-  reassignment_npi: string | null;    // populated from reassignment file
+  reassignment_npi: string | null;
   reassignment_name: string | null;
   source_file: string;
   source_date: string;
 }
 
-// ── Dynamic URL resolver ─────────────────────────────────────────
+export interface PecosParseResult {
+  records: PecosRecord[];
+  totalLines: number;
+  matched: number;
+  skipped: number;
+  errors: number;
+  durationMs: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NEW: API-based fetch (primary method)
+// ═══════════════════════════════════════════════════════════════════
 
 /**
- * Resolve the current download URLs for the PPEF base enrollment CSV
- * and the reassignment sub-file from the CMS open data catalog.
+ * Fetch PECOS enrollment data directly from the CMS Data API.
+ * Uses server-side state filtering and pagination — no temp files needed.
  *
- * CMS rotates actual file paths on every quarterly release — this function
- * always finds the latest paths by looking them up in data.json at runtime,
- * following CMS's own recommended approach (see CMS API Guide v1.6).
+ * This replaces the download-CSV-then-parse approach which failed because
+ * the data.json catalog resolver times out (100MB+ JSON file).
+ *
+ * @param states - Array of state codes to fetch (e.g., ['TX', 'CA'])
+ * @param options - limit, onProgress callback
+ */
+export async function fetchPecosFromApi(
+  states: string[],
+  options: {
+    limit?: number;
+    pageSize?: number;
+    onProgress?: (fetched: number, state: string) => void;
+  } = {},
+): Promise<PecosParseResult> {
+  const startTime = Date.now();
+  const { limit = 0, pageSize = 5000, onProgress } = options;
+
+  const allRecords: PecosRecord[] = [];
+  let totalFetched = 0;
+  let skipped = 0;
+  let errors = 0;
+  const sourceDate = new Date().toISOString().split('T')[0];
+
+  for (const state of states) {
+    console.log(`[PECOS API] Fetching ${state} providers...`);
+    let offset = 0;
+    let stateTotal = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      if (limit > 0 && allRecords.length >= limit) {
+        hasMore = false;
+        break;
+      }
+
+      const url =
+        `${CMS_DATA_API_BASE}/${PECOS_BASE_DATASET_ID}/data` +
+        `?filter[STATE_CD]=${state}` +
+        `&size=${pageSize}` +
+        `&offset=${offset}`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error(`[PECOS API] HTTP ${res.status} at offset ${offset} for ${state}`);
+          errors++;
+          // Retry once after a brief pause
+          await sleep(2000);
+          const retry = await fetch(url);
+          if (!retry.ok) {
+            console.error(`[PECOS API] Retry failed, skipping batch`);
+            errors++;
+            break;
+          }
+          const retryData = await retry.json();
+          processPage(retryData);
+          continue;
+        }
+
+        const data = await res.json();
+
+        // API returns an array of objects
+        const rows: any[] = Array.isArray(data) ? data : [];
+
+        if (rows.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        for (const row of rows) {
+          const record = apiRowToPecosRecord(row, sourceDate);
+          if (record) {
+            allRecords.push(record);
+            stateTotal++;
+          } else {
+            skipped++;
+          }
+        }
+
+        totalFetched += rows.length;
+        offset += pageSize;
+
+        if (onProgress) {
+          onProgress(totalFetched, state);
+        }
+
+        // If we got fewer than pageSize, we've reached the end
+        if (rows.length < pageSize) {
+          hasMore = false;
+        }
+
+        // Small delay between pages to be respectful
+        if (hasMore) {
+          await sleep(200);
+        }
+      } catch (err: any) {
+        console.error(`[PECOS API] Error at offset ${offset}: ${err.message}`);
+        errors++;
+        break;
+      }
+    }
+
+    console.log(`[PECOS API] ${state}: ${stateTotal.toLocaleString()} records fetched`);
+  }
+
+  function processPage(data: any) {
+    const rows: any[] = Array.isArray(data) ? data : [];
+    for (const row of rows) {
+      const record = apiRowToPecosRecord(row, sourceDate);
+      if (record) {
+        allRecords.push(record);
+      } else {
+        skipped++;
+      }
+    }
+    totalFetched += rows.length;
+    offset += pageSize;
+  }
+
+  return {
+    records: allRecords,
+    totalLines: totalFetched,
+    matched: allRecords.length,
+    skipped,
+    errors,
+    durationMs: Date.now() - startTime,
+  };
+}
+
+/**
+ * Convert a CMS API JSON row to a PecosRecord.
+ */
+function apiRowToPecosRecord(
+  row: Record<string, string>,
+  sourceDate: string,
+): PecosRecord | null {
+  const npi = row['NPI']?.trim();
+  if (!npi || npi.length !== 10) return null;
+
+  const firstName = row['FIRST_NAME']?.trim() || null;
+  const lastName = row['LAST_NAME']?.trim() || null;
+  const orgName = row['ORG_NAME']?.trim() || null;
+
+  let providerName: string | null = null;
+  if (orgName) {
+    providerName = orgName;
+  } else if (firstName && lastName) {
+    providerName = `${lastName}, ${firstName}`;
+  }
+
+  const providerTypeCd = row['PROVIDER_TYPE_CD']?.trim() || '';
+  const isOrg = !firstName && !!orgName;
+
+  return {
+    npi,
+    enrollment_id: row['ENRLMT_ID']?.trim() || null,
+    enrollment_status: 'Approved',
+    enrollment_type: isOrg ? 'organization' : 'individual',
+    practice_type: row['PROVIDER_TYPE_DESC']?.trim() || null,
+    provider_name: providerName,
+    first_name: firstName,
+    last_name: lastName,
+    organization_name: orgName,
+    specialty: row['PRI_SPEC']?.trim() || null,
+    pecos_specialty: providerTypeCd || null,
+    city: row['CITY']?.trim() || null,
+    state: row['STATE_CD']?.trim() || null,
+    zip_code: row['ZIP']?.trim() || null,
+    reassignment_npi: null,
+    reassignment_name: null,
+    source_file: `pecos_api_${sourceDate}`,
+    source_date: sourceDate,
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LEGACY: File-based functions (retained for GitHub Actions fallback)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Resolve download URLs from CMS catalog.
+ * WARNING: data.json is 100MB+ and may time out on local machines.
+ * Use fetchPecosFromApi() instead for interactive runs.
  */
 export async function resolvePecosDownloadUrls(): Promise<{
   baseEnrollmentUrl: string;
   reassignmentUrl: string;
 }> {
   console.log('[PECOS] Resolving download URLs from CMS catalog...');
+  console.log('[PECOS] WARNING: data.json is ~100MB. This may take several minutes.');
 
   const catalogRes = await fetch(CMS_DATA_JSON_URL);
   if (!catalogRes.ok) {
@@ -105,7 +303,6 @@ export async function resolvePecosDownloadUrls(): Promise<{
     );
   }
 
-  // Base enrollment: first CSV distribution entry is always the most recent release
   const csvDist = dataset.distribution?.find(
     (d: any) => d.mediaType === 'text/csv',
   );
@@ -117,11 +314,10 @@ export async function resolvePecosDownloadUrls(): Promise<{
 
   console.log(`[PECOS] Base enrollment URL: ${csvDist.downloadURL}`);
 
-  // Reassignment sub-file: fetched via the resourcesAPI on the same distribution
   const resourcesApiUrl = csvDist.resourcesAPI;
   if (!resourcesApiUrl) {
     throw new Error(
-      'No resourcesAPI URL found in PPEF distribution. Cannot locate reassignment sub-file.',
+      'No resourcesAPI URL found in PPEF distribution.',
     );
   }
 
@@ -152,12 +348,6 @@ export async function resolvePecosDownloadUrls(): Promise<{
   };
 }
 
-// ── Download helper ──────────────────────────────────────────────
-
-/**
- * Download a CMS file to disk using curl.
- * Includes retry logic and guards against empty downloads.
- */
 export function downloadCmsFile(
   url: string,
   destPath: string,
@@ -169,7 +359,7 @@ export function downloadCmsFile(
 
   execSync(`curl -sS -L --retry 3 --retry-delay 5 -o "${destPath}" "${url}"`, {
     stdio: 'inherit',
-    timeout: 600_000, // 10 min — base file is ~500MB
+    timeout: 600_000,
   });
 
   const size = statSync(destPath).size;
@@ -177,7 +367,6 @@ export function downloadCmsFile(
     `[PECOS] Downloaded ${label}: ${(size / 1024 / 1024).toFixed(1)} MB`,
   );
 
-  // Guard against silent empty downloads — 1KB threshold catches HTML error pages too
   if (size < 1024) {
     throw new Error(
       `[PECOS] ${label} download appears empty or invalid (${size} bytes). ` +
@@ -227,10 +416,6 @@ function parseCSVLineQuoted(line: string): string[] {
   return fields;
 }
 
-/**
- * Parse a single row from the PECOS base enrollment CSV.
- * Uses header-based field lookup (not positional) for robustness.
- */
 export function parsePecosRow(
   row: Record<string, string>,
   sourceFile: string,
@@ -243,7 +428,6 @@ export function parsePecosRow(
   const lastName = row['LAST_NAME']?.trim() || null;
   const orgName = row['ORG_NAME']?.trim() || null;
 
-  // Build display name
   let providerName: string | null = null;
   if (orgName) {
     providerName = orgName;
@@ -251,14 +435,13 @@ export function parsePecosRow(
     providerName = `${lastName}, ${firstName}`;
   }
 
-  // Determine entity type from provider type code
   const providerTypeCd = row['PROVIDER_TYPE_CD']?.trim() || '';
   const isOrg = !firstName && !!orgName;
 
   return {
     npi,
     enrollment_id: row['ENRLMT_ID']?.trim() || null,
-    enrollment_status: 'Approved', // PPEF only contains approved/active enrollees
+    enrollment_status: 'Approved',
     enrollment_type: isOrg ? 'organization' : 'individual',
     practice_type: row['PROVIDER_TYPE_DESC']?.trim() || null,
     provider_name: providerName,
@@ -270,26 +453,13 @@ export function parsePecosRow(
     city: row['CITY']?.trim() || null,
     state: row['STATE_CD']?.trim() || null,
     zip_code: row['ZIP']?.trim() || null,
-    reassignment_npi: null,       // populated later from reassignment file
+    reassignment_npi: null,
     reassignment_name: null,
     source_file: sourceFile,
     source_date: sourceDate,
   };
 }
 
-export interface PecosParseResult {
-  records: PecosRecord[];
-  totalLines: number;
-  matched: number;
-  skipped: number;
-  errors: number;
-  durationMs: number;
-}
-
-/**
- * Parse the PECOS base enrollment CSV file with header-based field lookup.
- * Streams line-by-line for memory efficiency.
- */
 export async function parsePecosFile(
   filePath: string,
   sourceDate: string,
@@ -328,7 +498,7 @@ export async function parsePecosFile(
     try {
       const fields = parseCSVLineQuoted(line);
       const row: Record<string, string> = {};
-      headers.forEach((h, idx) => {
+      headers.forEach((h: any, idx: any) => {
         row[h] = fields[idx] || '';
       });
 
@@ -338,7 +508,6 @@ export async function parsePecosFile(
         continue;
       }
 
-      // State filter
       if (filterStates && record.state && !filterStates.has(record.state)) {
         skipped++;
         continue;
@@ -373,10 +542,6 @@ interface ReassignmentRecord {
   receivingName: string;
 }
 
-/**
- * Parse the reassignment file and build a lookup map:
- *   rendering NPI → receiving NPI (the group/org they bill through)
- */
 export async function parseReassignmentFile(
   filePath: string,
 ): Promise<Map<string, ReassignmentRecord>> {
@@ -392,7 +557,7 @@ export async function parseReassignmentFile(
 
   for await (const line of rl) {
     if (isHeader) {
-      headers = parseCSVLineQuoted(line).map((h) => h.trim());
+      headers = parseCSVLineQuoted(line).map((h: any) => h.trim());
       isHeader = false;
       continue;
     }
@@ -400,7 +565,7 @@ export async function parseReassignmentFile(
     try {
       const fields = parseCSVLineQuoted(line);
       const row: Record<string, string> = {};
-      headers.forEach((h, idx) => {
+      headers.forEach((h: any, idx: any) => {
         row[h] = fields[idx] || '';
       });
 
@@ -413,7 +578,6 @@ export async function parseReassignmentFile(
         row['RCV_PRVDR_FIRST_NAME']?.trim() ||
         '';
 
-      // Keep first reassignment per rendering NPI (primary)
       if (!map.has(renderNpi)) {
         map.set(renderNpi, {
           renderingNpi: renderNpi,
@@ -429,9 +593,6 @@ export async function parseReassignmentFile(
   return map;
 }
 
-/**
- * Enrich base enrollment records with reassignment data.
- */
 export function enrichWithReassignments(
   records: PecosRecord[],
   reassignments: Map<string, ReassignmentRecord>,
@@ -448,16 +609,12 @@ export function enrichWithReassignments(
 
 // ── Supabase upsert ──────────────────────────────────────────────
 
-/**
- * Batch upsert PECOS records into provider_pecos table.
- * Uses ON CONFLICT (npi) to update existing records.
- */
 export async function upsertPecosRecords(
   records: PecosRecord[],
 ): Promise<number> {
   if (records.length === 0) return 0;
 
-  const rows = records.map((r) => ({
+  const rows = records.map((r: any) => ({
     npi: r.npi,
     enrollment_id: r.enrollment_id,
     enrollment_status: r.enrollment_status,
@@ -480,7 +637,6 @@ export async function upsertPecosRecords(
     updated_at: new Date().toISOString(),
   }));
 
-  // Batch in chunks of 500
   const BATCH_SIZE = 500;
   let upserted = 0;
 
@@ -506,16 +662,18 @@ export async function upsertPecosRecords(
     }
 
     upserted += batch.length;
+
+    if (upserted % 5000 === 0) {
+      console.log(`[PECOS] Upserted ${upserted.toLocaleString()} records...`);
+    }
   }
 
   return upserted;
 }
 
 // ── Backwards-compat export ──────────────────────────────────────
-// PECOS_URLS is retained so existing imports don't break, but these are
-// no longer used directly for downloads. Call resolvePecosDownloadUrls()
-// at the start of your sync script instead.
 export const PECOS_URLS = {
   catalog: CMS_DATA_JSON_URL,
   datasetTitle: PPEF_DATASET_TITLE,
+  baseDatasetId: PECOS_BASE_DATASET_ID,
 };
