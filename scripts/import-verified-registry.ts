@@ -40,7 +40,7 @@ async function main() {
   console.log('═══════════════════════════════════════════════\n');
 
   // Find the JSON file
-  const jsonPath = ['verified-tx-import.json', 'scripts/verified-tx-import.json', '../verified-tx-import.json']
+  const jsonPath = ['data/verified-tx-import.json', 'verified-tx-import.json', 'scripts/verified-tx-import.json', '../verified-tx-import.json']
     .find(p => fs.existsSync(p));
 
   if (!jsonPath) {

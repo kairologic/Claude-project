@@ -2,8 +2,24 @@ node_modules/
 .next/
 out/
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+tsconfig.tsbuildinfo
+
 # Playwright
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
