@@ -136,10 +136,10 @@ export class ValidationGateStatusService {
 
     // Separate by method
     const pecosRecords = validatedRecords.filter(
-      (r) => r.resolution_method === 'PECOS_EXACT'
+      (r) => r.method === 'PECOS_EXACT'
     );
     const fuzzyRecords = validatedRecords.filter(
-      (r) => r.resolution_method === 'NPPES_FUZZY'
+      (r) => r.method === 'NPPES_FUZZY'
     );
 
     const pecosFP = pecosRecords.filter((r) => r.is_false_positive).length;
