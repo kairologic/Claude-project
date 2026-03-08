@@ -142,30 +142,7 @@ export class TMBNewsroomMonitor {
       }
 
       // 3. Process each new release by type
-      for (const release of newReleases) {
-        try {
-          if (release.releaseType === 'EMERGENCY_SUSPENSION') {
-            result.suspensionsDetected++;
-            const matches = await this.processEmergencySuspension(release);
-            result.matchesFound += matches;
-            result.deltaEventsCreated += matches;
-          } else if (release.releaseType === 'BOARD_MEETING_ACTIONS') {
-            const actions = await this.processBoardMeetingRelease(release);
-            result.boardActionsDetected += actions.total;
-            result.matchesFound += actions.matched;
-            result.deltaEventsCreated += actions.eventsCreated;
-          }
-          // PA_SUSPENSION and OTHER are logged but not yet processed
-
-          // Mark release as processed
-          await this.markReleaseProcessed(release);
-
-        } catch (err) {
-          const msg = `Error processing release "${release.title}": ${err instanceof Error ? err.message : String(err)}`;
-          result.errors.push(msg);
-          console.error(`[TMB Monitor] ${msg}`);
-        }
-      }
+      await this.processReleases(newReleases, result);
 
     } catch (err) {
       const msg = `Fatal error: ${err instanceof Error ? err.message : String(err)}`;
@@ -176,23 +153,156 @@ export class TMBNewsroomMonitor {
     return result;
   }
 
+  /**
+   * Backfill: crawl multiple pages of the TMB newsroom to catch
+   * historical disciplinary actions. Use for initial bootstrap.
+   * 
+   * TMB newsroom has ~10 pages of press releases going back ~2 years.
+   * Each page has ~10 entries.
+   * 
+   * Usage:
+   *   const monitor = new TMBNewsroomMonitor();
+   *   const result = await monitor.backfill({ pages: 10, delayMs: 1000 });
+   */
+  async backfill(options: {
+    pages?: number;
+    delayMs?: number;
+    sinceDate?: string;  // ISO date, stop crawling when releases are older than this
+  } = {}): Promise<MonitorResult> {
+    const { pages = 10, delayMs = 1000, sinceDate } = options;
+    const cutoffDate = sinceDate ? new Date(sinceDate) : null;
+
+    const result: MonitorResult = {
+      newReleases: 0,
+      suspensionsDetected: 0,
+      boardActionsDetected: 0,
+      matchesFound: 0,
+      deltaEventsCreated: 0,
+      errors: [],
+    };
+
+    console.log(`[TMB Backfill] Crawling ${pages} pages of TMB newsroom...`);
+    if (cutoffDate) {
+      console.log(`[TMB Backfill] Cutoff date: ${sinceDate}`);
+    }
+
+    let totalReleases = 0;
+    let stoppedEarly = false;
+
+    for (let page = 0; page < pages; page++) {
+      try {
+        console.log(`[TMB Backfill] Fetching page ${page + 1}/${pages}...`);
+        const releases = await this.fetchNewsroomPage(page);
+
+        if (releases.length === 0) {
+          console.log(`[TMB Backfill] Page ${page + 1} is empty, stopping`);
+          break;
+        }
+
+        // Check if we've gone past the cutoff date
+        if (cutoffDate) {
+          const oldestOnPage = new Date(releases[releases.length - 1].date);
+          if (oldestOnPage < cutoffDate) {
+            // Filter this page to only include releases after cutoff
+            const filtered = releases.filter(r => new Date(r.date) >= cutoffDate);
+            console.log(`[TMB Backfill] Page ${page + 1}: ${filtered.length}/${releases.length} releases after cutoff`);
+            
+            const newReleases = await this.filterNewReleases(filtered);
+            if (newReleases.length > 0) {
+              await this.processReleases(newReleases, result);
+              result.newReleases += newReleases.length;
+              totalReleases += newReleases.length;
+            }
+            stoppedEarly = true;
+            break;
+          }
+        }
+
+        // Filter and process new releases on this page
+        const newReleases = await this.filterNewReleases(releases);
+        totalReleases += newReleases.length;
+        result.newReleases += newReleases.length;
+
+        if (newReleases.length > 0) {
+          console.log(`[TMB Backfill] Page ${page + 1}: ${newReleases.length} new releases to process`);
+          await this.processReleases(newReleases, result);
+        } else {
+          console.log(`[TMB Backfill] Page ${page + 1}: all releases already processed`);
+        }
+
+        // Respectful delay between pages
+        if (page < pages - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+
+      } catch (err) {
+        const msg = `Error on page ${page + 1}: ${err instanceof Error ? err.message : String(err)}`;
+        result.errors.push(msg);
+        console.error(`[TMB Backfill] ${msg}`);
+      }
+    }
+
+    console.log(`[TMB Backfill] Complete: ${totalReleases} new releases across ${pages} pages${stoppedEarly ? ' (stopped at cutoff date)' : ''}`);
+    return result;
+  }
+
+  /**
+   * Shared processing logic used by both checkForNewActions() and backfill().
+   */
+  private async processReleases(releases: PressRelease[], result: MonitorResult): Promise<void> {
+    for (const release of releases) {
+      try {
+        if (release.releaseType === 'EMERGENCY_SUSPENSION') {
+          result.suspensionsDetected++;
+          const matches = await this.processEmergencySuspension(release);
+          result.matchesFound += matches;
+          result.deltaEventsCreated += matches;
+        } else if (release.releaseType === 'BOARD_MEETING_ACTIONS') {
+          const actions = await this.processBoardMeetingRelease(release);
+          result.boardActionsDetected += actions.total;
+          result.matchesFound += actions.matched;
+          result.deltaEventsCreated += actions.eventsCreated;
+        }
+
+        // Mark release as processed
+        await this.markReleaseProcessed(release);
+
+      } catch (err) {
+        const msg = `Error processing release "${release.title}": ${err instanceof Error ? err.message : String(err)}`;
+        result.errors.push(msg);
+        console.error(`[TMB Monitor] ${msg}`);
+      }
+    }
+  }
+
   // ─── Newsroom Fetching ─────────────────────────────────────────────────
 
   /**
-   * Fetch and parse the TMB newsroom press release table.
-   * Returns structured release entries from the HTML table.
+   * Fetch and parse a single page of the TMB newsroom press release table.
+   * Page 0 = most recent, page 1 = next oldest, etc.
    */
-  async fetchNewsroomReleases(): Promise<PressRelease[]> {
-    const response = await fetch(TMB_NEWSROOM_URL, {
+  async fetchNewsroomPage(page: number = 0): Promise<PressRelease[]> {
+    const url = page === 0
+      ? TMB_NEWSROOM_URL
+      : `${TMB_NEWSROOM_URL}?page=${page}`;
+
+    const response = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT },
     });
 
     if (!response.ok) {
-      throw new Error(`TMB Newsroom returned HTTP ${response.status}`);
+      throw new Error(`TMB Newsroom returned HTTP ${response.status} for page ${page}`);
     }
 
     const html = await response.text();
     return this.parseNewsroomHtml(html);
+  }
+
+  /**
+   * Fetch page 0 (default). Backwards-compatible with existing callers.
+   */
+  async fetchNewsroomReleases(): Promise<PressRelease[]> {
+    return this.fetchNewsroomPage(0);
   }
 
   /**
