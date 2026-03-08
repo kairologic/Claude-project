@@ -1,0 +1,104 @@
+# .github/workflows/scan-and-delta.yml
+# ═══ KairoLogic Scan + Delta Detection ═══
+# Runs the practice website scan scheduler followed by
+# three-source delta detection. This is the primary
+# surveillance engine workflow.
+#
+# Runs weekly on Wednesdays (after NPPES Monday sync settles).
+# Can also be triggered manually or daily for CVO-tier sites.
+
+name: Scan + Delta Detection
+
+on:
+  schedule:
+    # Every Wednesday at 5am UTC (11pm Central Tuesday)
+    - cron: '0 5 * * 3'
+
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max sites to scan (default 50)'
+        required: false
+        default: '50'
+      mode:
+        description: 'Run mode'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full         # scan + delta
+          - scan-only    # scan only
+          - delta-only   # delta only (on previously scanned sites)
+      force_all:
+        description: 'Scan all sites regardless of schedule'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  BROWSERLESS_API_KEY: ${{ secrets.BROWSERLESS_API_KEY }}
+
+jobs:
+  scan:
+    name: Scan + Delta
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Run scan + delta
+        run: |
+          ARGS=""
+          LIMIT="${{ github.event.inputs.limit || '50' }}"
+          ARGS="$ARGS --limit $LIMIT"
+
+          MODE="${{ github.event.inputs.mode || 'full' }}"
+          if [ "$MODE" = "scan-only" ]; then ARGS="$ARGS --scan-only"; fi
+          if [ "$MODE" = "delta-only" ]; then ARGS="$ARGS --delta-only"; fi
+
+          if [ "${{ github.event.inputs.force_all || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --force-all"
+          fi
+
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: npx tsx scripts/run-scan-and-delta.ts $ARGS"
+          npx tsx scripts/run-scan-and-delta.ts $ARGS
+
+      - name: Report
+        if: always()
+        run: |
+          echo "### Scan + Delta Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ github.event.inputs.mode || 'full' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Limit:** ${{ github.event.inputs.limit || '50' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
