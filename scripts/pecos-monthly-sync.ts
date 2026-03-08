@@ -82,7 +82,8 @@ async function main() {
   downloadCmsFile(PECOS_URLS.baseEnrollment, baseFilePath, 'Base Enrollment');
 
   if (!options.skipReassignment) {
-    const { baseEnrollmentUrl, reassignmentUrl } = await resolvePecosDownloadUrls();
+    // NEW — resolve URLs dynamically first
+const { baseEnrollmentUrl, reassignmentUrl } = await resolvePecosDownloadUrls();
 downloadCmsFile(baseEnrollmentUrl, baseFilePath, 'Base Enrollment');
 downloadCmsFile(reassignmentUrl, reassignmentFilePath, 'Reassignment Sub-file');
   }
