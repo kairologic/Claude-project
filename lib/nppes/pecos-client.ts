@@ -614,7 +614,17 @@ export async function upsertPecosRecords(
 ): Promise<number> {
   if (records.length === 0) return 0;
 
-  const rows = records.map((r: any) => ({
+  // Deduplicate by NPI — keep first occurrence
+  // (PECOS can have multiple enrollments per NPI, e.g. different specialties)
+  const seen = new Set<string>();
+  const unique = records.filter((r: any) => {
+    if (seen.has(r.npi)) return false;
+    seen.add(r.npi);
+    return true;
+  });
+  console.log(`[PECOS] Deduplicated: ${records.length.toLocaleString()} → ${unique.length.toLocaleString()} unique NPIs`);
+
+  const rows = unique.map((r: any) => ({
     npi: r.npi,
     enrollment_id: r.enrollment_id,
     enrollment_status: r.enrollment_status,
