@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     const providerRows = [...byProvider.entries()].map(([npi, mismatches]) => {
       const name = mismatches[0].name;
-      const fields = mismatches.map(m =>
+      const fields = mismatches.map((m: any) =>
         `<li style="margin-bottom:4px;"><strong>${m.field}</strong>: <span style="color:#ef4444;text-decoration:line-through;">${m.oldValue}</span> → <span style="color:#10b981;">${m.newValue}</span>${m.corroborated ? ' <span style="color:#10b981;font-size:11px;">(corroborated)</span>' : ''}</li>`
       ).join('');
       return `
