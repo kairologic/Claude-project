@@ -672,7 +672,9 @@ export function selectBestAddress(
   // Check corroboration: how many other methods agree with the best?
   let corroborationCount = 1;
   for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].address && best.address && addressesMatch(sorted[i].address, best.address)) {
+    const a = sorted[i].address;
+    const b = best.address;
+    if (a && b && addressesMatch(a, b)) {
       corroborationCount++;
     }
   }
