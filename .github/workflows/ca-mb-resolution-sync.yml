@@ -1,0 +1,108 @@
+# .github/workflows/ca-mb-resolution-sync.yml
+# ═══ KairoLogic CA Medical Board + NPI Resolution Sync ═══
+# Monthly: downloads CA MB license data, upserts, then resolves
+# all unresolved provider_licenses records via PECOS bridge.
+#
+# This workflow handles both Task 1.8 (CA MB ingest) and
+# Task 1.6 (NPI resolution) in a single run.
+
+name: CA Medical Board + NPI Resolution Sync
+
+on:
+  schedule:
+    # 2nd Tuesday of each month at 8am UTC (2am Central)
+    # CA MB publishes weekly on Tuesdays
+    - cron: '0 8 8-14 * 2'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Sync mode'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full          # CA MB ingest + NPI resolution
+          - resolve-only  # Skip CA MB, only resolve unresolved records
+          - ingest-only   # CA MB ingest, skip resolution
+      file_path:
+        description: 'Local CA MB CSV file path (optional, downloads if blank)'
+        required: false
+        default: ''
+      states:
+        description: 'States to resolve (default: TX,CA)'
+        required: false
+        default: 'TX,CA'
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  sync:
+    name: CA MB + Resolution
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx runner
+        run: npm install -g tsx
+
+      - name: Run sync
+        run: |
+          ARGS=""
+          MODE="${{ github.event.inputs.mode || 'full' }}"
+
+          # Mode flags
+          if [ "$MODE" = "resolve-only" ]; then
+            ARGS="$ARGS --resolve-only"
+          elif [ "$MODE" = "ingest-only" ]; then
+            ARGS="$ARGS --skip-resolution"
+          fi
+
+          # File path
+          FILE="${{ github.event.inputs.file_path }}"
+          if [ -n "$FILE" ]; then
+            ARGS="$ARGS --file $FILE"
+          fi
+
+          # States
+          STATES="${{ github.event.inputs.states || 'TX,CA' }}"
+          ARGS="$ARGS --states $STATES"
+
+          # Dry run
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: npx tsx scripts/ca-mb-monthly-sync.ts $ARGS"
+          npx tsx scripts/ca-mb-monthly-sync.ts $ARGS
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "### CA MB + NPI Resolution Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ github.event.inputs.mode || 'full' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **States:** ${{ github.event.inputs.states || 'TX,CA' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
