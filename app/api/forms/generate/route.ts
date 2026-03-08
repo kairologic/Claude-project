@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
       if (format === 'pdf') {
         const pdf = await generateBulkPDF(bulkResult);
-        return new NextResponse(pdf, {
+        return new NextResponse(new Uint8Array(pdf), {
           headers: {
             'Content-Type': 'application/pdf',
             'Content-Disposition': `attachment; filename="NPPES-Updates-${bulkResult.practice_name?.replace(/[^a-zA-Z0-9]/g, '-') || 'practice'}-${Date.now()}.pdf"`,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     if (format === 'pdf') {
       const pdf = await generateFormPDF(formData);
-      return new NextResponse(pdf, {
+      return new NextResponse(new Uint8Array(pdf), {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="NPPES-Update-${npi}-${Date.now()}.pdf"`,
