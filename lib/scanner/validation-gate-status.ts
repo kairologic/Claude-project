@@ -68,7 +68,7 @@ export interface GateStatusResult {
 export interface DeltaEventVerification {
   delta_event_id: string;
   verification_status: VerificationStatus;
-  source_method: 'PECOS_EXACT' | 'NPPES_FUZZY' | 'DIRECT_DETECTION' | null;
+  source_method: 'web_scan' | 'state_board' | 'tmb_orssp' | 'ca_mb_bulk' | 'tmb_newsroom' | null;
   gate_status_at_creation: GateStatus;
 }
 
@@ -182,32 +182,45 @@ export class ValidationGateStatusService {
 
   /**
    * Determine the verification status for a delta event based on:
-   *   1. The source method (direct detection vs NPI resolution)
+   *   1. The detection source (web_scan vs state_board)
    *   2. The current gate status
    * 
    * Direct detections (web scan found address/phone mismatch with NPPES)
    * are ALWAYS "verified" because they don't go through NPI resolution.
    * 
-   * NPI-resolution-derived findings (state board → NPI → comparison)
+   * State board findings (state_board → NPI resolution → comparison)
    * are "verified" only when the gate passes, otherwise "pending_verification".
+   * 
+   * detection_source values from delta-engine.ts:
+   *   'web_scan'     → direct website comparison, always verified
+   *   'state_board'  → requires NPI resolution, gate-dependent
+   *   'tmb_orssp'    → specific board source, gate-dependent
+   *   'ca_mb_bulk'   → specific board source, gate-dependent
+   *   'tmb_newsroom' → TMB newsroom monitor, always verified (authoritative press releases)
    */
   async getVerificationStatus(
-    sourceMethod: string | null,
+    detectionSource: string | null,
     confidence: number
   ): Promise<VerificationStatus> {
-    // Direct web scan detections bypass the gate entirely
+    // Web scan detections bypass the gate entirely
     // These compare website content directly against NPPES — no NPI resolution involved
-    if (!sourceMethod || sourceMethod === 'DIRECT_DETECTION') {
+    if (!detectionSource || detectionSource === 'web_scan') {
       return 'verified';
     }
 
-    // High-confidence PECOS matches (>= 0.95) are treated as verified
-    // even when the gate fails — the gate primarily protects against fuzzy match FPs
-    if (sourceMethod === 'PECOS_EXACT' && confidence >= 0.95) {
+    // TMB newsroom press releases are authoritative government publications
+    if (detectionSource === 'tmb_newsroom') {
       return 'verified';
     }
 
-    // Everything else depends on gate status
+    // High-confidence state board findings (>= 0.95) are treated as verified
+    // even when the gate fails — these were matched via PECOS exact match
+    if (confidence >= 0.95) {
+      return 'verified';
+    }
+
+    // State board findings with lower confidence depend on gate status
+    // These likely went through fuzzy NPI matching
     const gateStatus = await this.getGateStatus();
 
     if (gateStatus.status === 'PASSED') {
@@ -294,26 +307,25 @@ export class ValidationGateStatusService {
  * 
  *   import { stampDeltaEventVerification } from './validation-gate-status';
  *   
- *   // Before: gate check blocked the entire write
- *   // if (!gateResult.passed) return; // ← REMOVE THIS
- *   
- *   // After: always write, stamp with verification status
+ *   // Stamp each delta event before DB insert:
  *   const verification = await stampDeltaEventVerification(
- *     deltaEvent.id,
- *     deltaEvent.source_method,
- *     deltaEvent.confidence
+ *     '',                    // ID not yet assigned
+ *     d.detection_source,    // 'web_scan', 'state_board', 'tmb_orssp', etc.
+ *     d.confidence_score     // 0.0 - 1.0
  *   );
- *   deltaEvent.verification_status = verification.verification_status;
+ *   // Add to your insert row:
+ *   row.verification_status = verification.verification_status;
+ *   row.gate_status_at_creation = verification.gate_status_at_creation;
  */
 const gateService = new ValidationGateStatusService();
 
 export async function stampDeltaEventVerification(
   deltaEventId: string,
-  sourceMethod: string | null,
+  detectionSource: string | null,
   confidence: number
 ): Promise<DeltaEventVerification> {
   const verificationStatus = await gateService.getVerificationStatus(
-    sourceMethod,
+    detectionSource,
     confidence
   );
   const gateStatus = await gateService.getGateStatus();
@@ -321,7 +333,7 @@ export async function stampDeltaEventVerification(
   return {
     delta_event_id: deltaEventId,
     verification_status: verificationStatus,
-    source_method: sourceMethod as DeltaEventVerification['source_method'],
+    source_method: detectionSource as DeltaEventVerification['source_method'],
     gate_status_at_creation: gateStatus.status,
   };
 }
