@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Fetch provider names for the NPIs
-    const npis = [...new Set(events.map((e: any) => e.npi))];
+    const npis = [...new Set(events.map((e: any) => e.npi))] as string[];
     const npiList = npis.map((n: string) => `"${n}"`).join(',');
     const providers = await db(
       `providers?npi=in.(${npiList})&select=npi,first_name,last_name`
