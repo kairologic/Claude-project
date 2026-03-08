@@ -364,7 +364,14 @@ export class TMBNewsroomMonitor {
       return this.parseNewsroomFallback(html);
     }
 
-    return releases;
+    // Deduplicate — TMB renders table twice (desktop + mobile layout)
+    const seen = new Set<string>();
+    const unique = releases.filter(r => {
+      if (seen.has(r.url)) return false;
+      seen.add(r.url);
+      return true;
+    });
+    return unique;
   }
 
   /**
@@ -406,7 +413,14 @@ export class TMBNewsroomMonitor {
       });
     }
 
-    return releases;
+    // Deduplicate
+    const seen = new Set<string>();
+    const unique = releases.filter(r => {
+      if (seen.has(r.url)) return false;
+      seen.add(r.url);
+      return true;
+    });
+    return unique;
   }
 
   /**
