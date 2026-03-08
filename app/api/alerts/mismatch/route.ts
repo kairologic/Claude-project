@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { shouldSendAlert } from '@/lib/scanner/validation-gate-status';
 
 /**
  * Mismatch Alert Email API
@@ -11,6 +12,9 @@ import { NextRequest, NextResponse } from 'next/server';
  *
  * Finds unsent delta events for the practice, composes a summary email,
  * sends via SES, and marks events as alert_sent = true.
+ *
+ * GATE INTEGRATION: Only verified findings trigger alert emails.
+ * Pending verification findings are visible on the dashboard but silent.
  */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -70,16 +74,26 @@ export async function POST(request: NextRequest) {
     const orgEmail = orgs[0].contact_email;
 
     // 3. Fetch unsent delta events
-    const events = await db(
+    const allEvents = await db(
       `nppes_delta_events?practice_website_id=eq.${practice_website_id}&alert_sent=eq.false&order=detected_at.desc&limit=50`
     );
-    if (!events?.length) {
+    if (!allEvents?.length) {
       return NextResponse.json({ sent: false, reason: 'No new delta events to alert on' });
     }
 
+    // 3b. Filter to only verified findings (pending_verification = silent on dashboard only)
+    const events = allEvents.filter((e: any) => shouldSendAlert(e));
+    if (!events.length) {
+      return NextResponse.json({
+        sent: false,
+        reason: 'All new findings are pending verification — no alert sent',
+        pending_count: allEvents.length,
+      });
+    }
+
     // 4. Fetch provider names for the NPIs
-    const npis = [...new Set(events.map((e: any) => e.npi))];
-    const npiList = npis.map((n: string) => `"${n}"`).join(',');
+    const npis = [...new Set(events.map((e: any) => e.npi))] as string[];
+    const npiList = npis.map((n) => `"${n}"`).join(',');
     const providers = await db(
       `providers?npi=in.(${npiList})&select=npi,first_name,last_name`
     );
