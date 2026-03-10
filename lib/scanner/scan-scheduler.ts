@@ -20,6 +20,7 @@
 //   daily    → 1 day (CVO/network plan)
 
 import { isValidProviderName } from './name-quality-filter';
+import { isBlockedDomain } from './domain-blocklist';
 import { crawlPage, type CrawlResult } from '../crawler';
 import { extractAddressFromSite, type ExtractionSummary } from '../address/index';
 import {
@@ -193,7 +194,7 @@ async function matchProviders(
 
   // Strategy 2: Name matching against state providers
   if (state && names.length > 0 && names.length <= 50) {
-    const cleanNames = names.filter(isValidProviderName);
+   const cleanNames = names.filter(isValidProviderName);
     for (const name of cleanNames) {
       // Parse name into parts
       const parts = name.replace(/^Dr\.?\s*/i, '').split(/\s+/);
@@ -357,6 +358,22 @@ export async function scanSite(
   };
 
   try {
+    // 0. Domain blocklist pre-flight guard
+    if (isBlockedDomain(site.url)) {
+      console.log(`[Scheduler] Blocked (directory): ${site.url}`);
+      await db(`practice_websites?id=eq.${site.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          scan_status: 'unreachable',
+          last_error: 'Blocked: directory or aggregator domain',
+          updated_at: new Date().toISOString(),
+        }),
+      });
+      result.error = 'Blocked: directory or aggregator domain';
+      result.scan_duration_ms = Date.now() - startTime;
+      return result;
+    }
+
     // 1. Crawl the page
     const crawl = await crawlPage(site.url);
     result.crawl_strategy = crawl.strategy;
