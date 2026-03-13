@@ -17,9 +17,13 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Max sites to scan (default 50)'
+        description: 'Max sites to scan (default 500)'
         required: false
-        default: '50'
+        default: '500'
+      state:
+        description: 'State to scan (default TX)'
+        required: false
+        default: 'TX'
       mode:
         description: 'Run mode'
         required: true
@@ -55,7 +59,7 @@ jobs:
   scan:
     name: Scan + Delta
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -75,8 +79,11 @@ jobs:
       - name: Run scan + delta
         run: |
           ARGS=""
-          LIMIT="${{ github.event.inputs.limit || '50' }}"
+          LIMIT="${{ github.event.inputs.limit || '500' }}"
           ARGS="$ARGS --limit $LIMIT"
+
+          STATE="${{ github.event.inputs.state || 'TX' }}"
+          ARGS="$ARGS --state $STATE"
 
           MODE="${{ github.event.inputs.mode || 'full' }}"
           if [ "$MODE" = "scan-only" ]; then ARGS="$ARGS --scan-only"; fi
@@ -99,6 +106,7 @@ jobs:
           echo "### Scan + Delta Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Mode:** ${{ github.event.inputs.mode || 'full' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Limit:** ${{ github.event.inputs.limit || '50' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **State:** ${{ github.event.inputs.state || 'TX' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Limit:** ${{ github.event.inputs.limit || '500' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
