@@ -54,9 +54,9 @@ jobs:
       - name: Run TMB newsroom monitor
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
-            npx ts-node scripts/run-tmb-monitor.ts --dry-run
+            npx tsx scripts/run-tmb-monitor.ts --dry-run
           else
-            npx ts-node scripts/run-tmb-monitor.ts
+            npx tsx scripts/run-tmb-monitor.ts
           fi
 
       - name: Report results
