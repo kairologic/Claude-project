@@ -15,9 +15,8 @@
 import { writeFileSync } from 'fs';
 import { runScheduler } from '../lib/scanner/scan-scheduler';
 import { runDeltaDetectionBatch } from '../lib/scanner/delta-engine';
-
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -126,12 +125,13 @@ async function seedPracticeWebsites(state: string, limit: number): Promise<numbe
 
 // ── Export Target List ────────────────────────────────────
 
-async function exportTargetList(outputFile: string) {
+async function exportTargetList(outputFile: string, state?: string) {
   console.log('[Export] Building outreach target list...\n');
 
-  // Fetch practice websites with their mismatch data
+  // Fetch practice websites with their mismatch data (filtered by state if provided)
+  const stateFilter = state ? `&state=eq.${state}` : '';
   const practices: any[] = await db(
-    `practice_websites?mismatch_count=gt.0&order=mismatch_count.desc&select=id,npi,name,url,state,city,provider_count,mismatch_count,last_scan_at&limit=500`
+    `practice_websites?mismatch_count=gt.0${stateFilter}&order=mismatch_count.desc&select=id,npi,name,url,state,city,provider_count,mismatch_count,last_scan_at&limit=500`
   );
 
   if (practices.length === 0) {
@@ -146,7 +146,7 @@ async function exportTargetList(outputFile: string) {
 
     if (p.mismatch_count >= 2 && p.provider_count >= 6) {
       tier = 1; tierLabel = 'Tier 1 — High signal';
-    } else if (p.mismatch_count >= 1 && p.provider_count >= 4) {
+    } else if (p.mismatch_count >= 2 && p.provider_count >= 4) {
       tier = 2; tierLabel = 'Tier 2 — Movement signal';
     } else if (p.mismatch_count >= 1 && p.provider_count >= 4) {
       tier = 3; tierLabel = 'Tier 3 — Single mismatch';
@@ -190,8 +190,8 @@ async function exportTargetList(outputFile: string) {
   console.log(`[Export] Target list exported to ${outputFile}`);
   console.log(`  Total practices:  ${tiered.length}`);
   console.log(`  Tier 1 (strong):  ${tier1}  — 2+ mismatches, 6+ providers`);
-  console.log(`  Tier 2 (medium):  ${tier2}  — movement signal, 4+ providers`);
-  console.log(`  Tier 3 (single):  ${tier3}  — single mismatch, 4+ providers`);
+  console.log(`  Tier 2 (medium):  ${tier2}  — 2+ mismatches, 4+ providers`);
+  console.log(`  Tier 3 (single):  ${tier3}  — 1 mismatch, 4+ providers`);
   console.log(`  Tier 4 (low):     ${tier4}  — low signal`);
   console.log(`\n  Top 5 targets:`);
   tiered.slice(0, 5).forEach((t: any, i: number) => {
@@ -216,7 +216,7 @@ async function main() {
 
   // Export only mode
   if (opts.exportOnly) {
-    await exportTargetList(opts.outputFile);
+    await exportTargetList(opts.outputFile, opts.state);
     return;
   }
 
@@ -231,9 +231,10 @@ async function main() {
   const scanStart = new Date().toISOString();
   const scanResult = await runScheduler({
     limit: opts.limit,
-    forceAll: true,  // scan everything regardless of schedule
+    forceAll: false,  // rescan everything,
     dryRun: opts.dryRun,
     concurrency: 5,  // higher concurrency for batch jobs
+    state: opts.state,
     onProgress: (scanned, total) => {
       process.stdout.write(`\r  Scanning: ${scanned}/${total} sites`);
     },
@@ -268,7 +269,7 @@ async function main() {
   // Phase 4: Export target list
   if (!opts.dryRun) {
     console.log('\n─── Phase 3: Export Target List ──────────────────────\n');
-    await exportTargetList(opts.outputFile);
+    await exportTargetList(opts.outputFile, opts.state);
   }
 
   // Summary

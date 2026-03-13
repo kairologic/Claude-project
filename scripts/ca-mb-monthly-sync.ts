@@ -194,6 +194,7 @@ async function main() {
         process.stdout.write(`\r[Resolution] Processing batch ${batchNum}/${totalBatches}...`);
 
         const result = await resolveNpiBatch(batch);
+        await new Promise(r => setTimeout(r, 500)); // 500ms cooldown
         totalResult.total += result.total;
         totalResult.resolved_pecos += result.resolved_pecos;
         totalResult.resolved_fuzzy += result.resolved_fuzzy;
