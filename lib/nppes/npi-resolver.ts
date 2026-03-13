@@ -4,7 +4,7 @@
 //
 // Resolution path (from MVP plan):
 //   1. PECOS exact match: name + state + specialty → NPI (confidence ~97-99%)
-//   2. NPPES fuzzy match: Jaro-Winkler name + taxonomy → NPI (confidence ~85-90%)
+//   2. NPPES fuzzy match: Jaro-Winkler name + taxonomy → NPI (confidence ~85-92%)
 //   3. DCA API lookup: CA Medical Board license → NPI (confidence ~95%+) [CA only]
 //   4. Manual review queue: unresolved records for human review
 //
@@ -59,21 +59,47 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 async function dbRequest(path: string, options: RequestInit = {}): Promise<any> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      ...((options.headers as Record<string, string>) || {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`DB ${options.method || 'GET'} ${path}: ${res.status} ${err}`);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          ...((options.headers as Record<string, string>) || {}),
+        },
+      });
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`DB ${options.method || 'GET'} ${path}: ${res.status} ${err.substring(0, 200)}`);
+      }
+      const ct = res.headers.get('content-type') || '';
+      return ct.includes('json') ? res.json() : null;
+    } catch (err: any) {
+      if (attempt === 2) throw err;
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+    }
   }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('json') ? res.json() : null;
+}
+
+// ── Name Normalization ──────────────────────────────────
+
+/**
+ * Normalize a name by removing apostrophes, accents, and other
+ * characters that cause ILIKE mismatches in the database.
+ * O'BRIEN → OBRIEN, DE LA CRUZ → DE LA CRUZ, AL-HASHIMI → AL HASHIMI
+ */
+function normalizeName(name: string): string {
+  return name
+    .replace(/[''`´]/g, '')    // Remove apostrophes
+    .replace(/[-]/g, ' ')      // Hyphens to spaces
+    .replace(/\s+/g, ' ')      // Collapse multiple spaces
+    .trim();
 }
 
 // ── PECOS Exact Match (Method 1) ─────────────────────────
@@ -108,19 +134,20 @@ export async function resolvePecosExact(
 
   for (const candidate of candidates) {
     const nameSim = firstName
-      ? jaroWinkler(firstName.toLowerCase(), (candidate.first_name || '').toLowerCase())
+      ? jaroWinkler(firstName.toLowerCase(), normalizeName(candidate.first_name || '').toLowerCase())
       : 0.5; // no first name = partial credit
 
     const specMatch = license.specialty && candidate.specialty
       ? specialtiesOverlap(license.specialty, candidate.specialty)
       : false;
 
-    // Composite score
+    // If specialty is available on both sides, use it. If not, redistribute weight.
+    const specAvailable = !!(license.specialty && candidate.specialty);
     let score = 0;
-    score += nameSim * 0.50;                      // first name similarity: 50% weight
-    score += 0.25;                                // last name exact match: 25% (already filtered)
-    score += (specMatch ? 0.15 : 0);             // specialty match: 15%
-    score += 0.10;                                // state match: 10% (already filtered)
+    score += nameSim * (specAvailable ? 0.50 : 0.60);  // more weight on name if no specialty
+    score += specAvailable ? 0.25 : 0.30;               // more weight on last name if no specialty
+    score += (specMatch ? 0.15 : 0);                     // specialty (only when available)
+    score += 0.10;                                        // state match
 
     if (!bestMatch || score > bestMatch.score) {
       bestMatch = { candidate, score, nameSim, specMatch };
@@ -156,7 +183,7 @@ export async function resolvePecosExact(
 /**
  * Fallback: search providers table using fuzzy name matching.
  * For providers not in PECOS (Medicare opt-outs, newer licensees).
- * Lower confidence (~85-90%), conservative threshold.
+ * Lower confidence (~85-92%), conservative threshold.
  */
 export async function resolveNppesFuzzy(
   license: UnresolvedLicense,
@@ -177,7 +204,7 @@ export async function resolveNppesFuzzy(
 
   for (const candidate of candidates) {
     const nameSim = firstName
-      ? jaroWinkler(firstName.toLowerCase(), (candidate.first_name || '').toLowerCase())
+      ? jaroWinkler(firstName.toLowerCase(), normalizeName(candidate.first_name || '').toLowerCase())
       : 0.5;
 
     // Taxonomy-to-specialty comparison
@@ -190,9 +217,10 @@ export async function resolveNppesFuzzy(
       ? jaroWinkler(license.city.toLowerCase(), candidate.city.toLowerCase())
       : 0;
 
+    const specAvailable = !!(license.specialty && candidate.primary_taxonomy_code);
     let score = 0;
-    score += nameSim * 0.45;
-    score += 0.20;                                // last name match (filtered)
+    score += nameSim * (specAvailable ? 0.45 : 0.55);
+    score += specAvailable ? 0.20 : 0.25;
     score += (specMatch ? 0.20 : 0);
     score += addrSim * 0.15;
 
@@ -202,9 +230,9 @@ export async function resolveNppesFuzzy(
   }
 
   // Conservative threshold: prefer no match over wrong match
-  if (!bestMatch || bestMatch.nameSim < 0.90 || bestMatch.score < 0.75) return null;
+  if (!bestMatch || bestMatch.nameSim < 0.85 || bestMatch.score < 0.70) return null;
 
-  const confidence = Math.min(0.90, bestMatch.score);
+  const confidence = Math.min(0.92, bestMatch.score);
 
   return {
     license_id: license.id,
@@ -215,7 +243,7 @@ export async function resolveNppesFuzzy(
     specialty_match: bestMatch.specMatch,
     state_match: true,
     address_similarity: parseFloat(bestMatch.addrSim.toFixed(2)),
-    needs_review: true,  // fuzzy matches always flagged for review
+    needs_review: confidence < 0.85,  // high-confidence fuzzy matches auto-resolve
     input_name: license.licensee_name,
     input_specialty: license.specialty || null,
     input_state: license.state,
@@ -307,9 +335,9 @@ export async function resolveNpiBatch(
  */
 export async function fetchUnresolvedLicenses(
   states?: string[],
-  limit: number = 1000,
+  limit: number = 10000,
 ): Promise<UnresolvedLicense[]> {
-  let query = `provider_licenses?npi=is.null&select=id,license_number,state,licensee_name,specialty,city,zip_code&limit=${limit}`;
+  let query = `provider_licenses?npi=is.null&select=id,license_number,state,licensee_name,first_name,last_name,specialty,city,zip_code&limit=${limit}`;
   if (states && states.length > 0) {
     const stateList = states.map(s => `"${s}"`).join(',');
     query += `&state=in.(${stateList})`;
@@ -321,6 +349,8 @@ export async function fetchUnresolvedLicenses(
     license_number: r.license_number,
     state: r.state,
     licensee_name: r.licensee_name || '',
+    first_name: r.first_name || undefined,
+    last_name: r.last_name || undefined,
     specialty: r.specialty || undefined,
     city: r.city || undefined,
     zip_code: r.zip_code || undefined,
@@ -434,27 +464,28 @@ async function updateLicenseNpi(licenseId: string, npi: string): Promise<void> {
 // ── Name Parsing ─────────────────────────────────────────
 
 function extractLastName(license: UnresolvedLicense): string | null {
-  if (license.last_name) return license.last_name.trim();
+  if (license.last_name) return normalizeName(license.last_name);
   // Parse from full name: "Last, First" or "First Last"
   const name = license.licensee_name?.trim();
   if (!name) return null;
   if (name.includes(',')) {
-    return name.split(',')[0].trim();
+    return normalizeName(name.split(',')[0].trim());
   }
   const parts = name.split(/\s+/);
-  return parts[parts.length - 1] || null;
+  return normalizeName(parts[parts.length - 1] || '');
 }
 
 function extractFirstName(license: UnresolvedLicense): string | null {
-  if (license.first_name) return license.first_name.trim();
+  if (license.first_name) return normalizeName(license.first_name);
   const name = license.licensee_name?.trim();
   if (!name) return null;
   if (name.includes(',')) {
     const after = name.split(',')[1]?.trim();
-    return after?.split(/\s+/)[0] || null;
+    const first = after?.split(/\s+/)[0] || null;
+    return first ? normalizeName(first) : null;
   }
   const parts = name.split(/\s+/);
-  return parts.length > 1 ? parts[0] : null;
+  return parts.length > 1 ? normalizeName(parts[0]) : null;
 }
 
 // ── Jaro-Winkler String Similarity ───────────────────────
