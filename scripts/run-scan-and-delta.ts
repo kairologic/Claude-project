@@ -21,7 +21,8 @@ async function main() {
   const scanOnly = args.includes('--scan-only');
   const deltaOnly = args.includes('--delta-only');
   const dryRun = args.includes('--dry-run');
-  const limit = parseInt(getVal('--limit') || '50', 10);
+  const limit = parseInt(getVal('--limit') || '500', 10);
+  const state = getVal('--state') || 'TX';
   const since = getVal('--since');
   const forceAll = args.includes('--force-all');
 
@@ -31,6 +32,7 @@ async function main() {
   console.log('  KairoLogic Scan + Delta Detection Engine');
   console.log('═══════════════════════════════════════════════════════');
   console.log(`  Mode:      ${deltaOnly ? 'Delta only' : scanOnly ? 'Scan only' : 'Full (scan + delta)'}`);
+  console.log(`  State:     ${state}`);
   console.log(`  Max sites: ${limit}`);
   console.log(`  Dry run:   ${dryRun}`);
   if (since) console.log(`  Since:     ${since}`);
@@ -49,6 +51,7 @@ async function main() {
       limit,
       forceAll,
       dryRun,
+      state,
       onProgress: (scanned, total) => {
         process.stdout.write(`\r  Scanning: ${scanned}/${total}`);
       },
