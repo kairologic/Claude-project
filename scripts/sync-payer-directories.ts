@@ -144,7 +144,7 @@ async function main() {
 
     if (verbose && snap.fhir_raw_bundle) {
       console.log('  [RAW FHIR BUNDLE]:');
-      console.log(JSON.stringify(snap.fhir_raw_bundle, null, 2).substring(0, 2000));
+      console.log(JSON.stringify(snap.fhir_raw_bundle, null, 2).substring(0, 6000));
       console.log('  ...(truncated)');
     }
   }
@@ -216,7 +216,15 @@ async function loadNppesData(
   supabase: SupabaseClient,
   npi: string
 ): Promise<NppesProviderData | null> {
-  // Try provider_pecos first (has address, specialty)
+  // providers table has 1.8M records with correct column names
+  const { data: provider } = await supabase
+    .from('providers')
+    .select('npi, organization_name, first_name, last_name, credential, address_line_1, address_line_2, city, state, zip_code, phone, fax, primary_taxonomy_code, taxonomy_desc')
+    .eq('npi', npi)
+    .limit(1)
+    .single();
+
+  // Also try provider_pecos if populated (has specialty, enrollment info)
   const { data: pecos } = await supabase
     .from('provider_pecos')
     .select('npi, provider_name, first_name, last_name, organization_name, address_line_1, address_line_2, city, state, zip_code, specialty')
@@ -224,32 +232,24 @@ async function loadNppesData(
     .limit(1)
     .single();
 
-  // Also get from providers table (has phone, taxonomy)
-  const { data: provider } = await supabase
-    .from('providers')
-    .select('npi, provider_name, organization_name, practice_phone, taxonomy_code, taxonomy_desc, gender')
-    .eq('npi', npi)
-    .limit(1)
-    .single();
+  if (!provider && !pecos) return null;
 
-  if (!pecos && !provider) return null;
-
-  // Merge, prefer pecos for address, providers for phone/taxonomy
+  // Merge: providers is primary (1.8M), pecos supplements if available
   return {
     npi,
-    provider_name: pecos?.provider_name || provider?.provider_name || null,
-    first_name: pecos?.first_name || null,
-    last_name: pecos?.last_name || null,
-    organization_name: pecos?.organization_name || provider?.organization_name || null,
-    address_line_1: pecos?.address_line_1 || null,
-    address_line_2: pecos?.address_line_2 || null,
-    city: pecos?.city || null,
-    state: pecos?.state || null,
-    zip: pecos?.zip_code || null,
-    phone: provider?.practice_phone || null,
-    taxonomy_code: provider?.taxonomy_code || null,
-    taxonomy_desc: pecos?.specialty || provider?.taxonomy_desc || null,
-    gender: provider?.gender || null,
+    provider_name: provider?.organization_name || pecos?.provider_name || null,
+    first_name: provider?.first_name || pecos?.first_name || null,
+    last_name: provider?.last_name || pecos?.last_name || null,
+    organization_name: provider?.organization_name || pecos?.organization_name || null,
+    address_line_1: provider?.address_line_1 || pecos?.address_line_1 || null,
+    address_line_2: provider?.address_line_2 || pecos?.address_line_2 || null,
+    city: provider?.city || pecos?.city || null,
+    state: provider?.state || pecos?.state || null,
+    zip: provider?.zip_code || pecos?.zip_code || null,
+    phone: provider?.phone || null,
+    taxonomy_code: provider?.primary_taxonomy_code || null,
+    taxonomy_desc: provider?.taxonomy_desc || pecos?.specialty || null,
+    gender: null, // providers table doesn't have gender column
   };
 }
 
