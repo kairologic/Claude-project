@@ -129,9 +129,10 @@ async function exportTargetList(outputFile: string, state?: string) {
   console.log('[Export] Building outreach target list...\n');
 
   // Fetch practice websites with their mismatch data (filtered by state if provided)
+  // Exclude provider_count > 50 to filter out medical building false positives
   const stateFilter = state ? `&state=eq.${state}` : '';
   const practices: any[] = await db(
-    `practice_websites?mismatch_count=gt.0${stateFilter}&order=mismatch_count.desc&select=id,npi,name,url,state,city,provider_count,mismatch_count,last_scan_at&limit=500`
+    `practice_websites?mismatch_count=gt.0&provider_count=lt.50${stateFilter}&order=mismatch_count.desc&select=id,npi,name,url,state,city,provider_count,mismatch_count,last_scan_at&limit=5000`
   );
 
   if (practices.length === 0) {
