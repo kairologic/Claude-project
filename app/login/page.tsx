@@ -162,7 +162,7 @@ function LoginForm() {
       </div>
     </div>
   );
-}
+}}
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
