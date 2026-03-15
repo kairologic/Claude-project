@@ -11,11 +11,20 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 
 export default function SetPasswordPage() {
+  return (
+    <Suspense>
+      <SetPasswordForm />
+    </Suspense>
+  );
+}
+
+function SetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const practiceId = searchParams.get('practice_id');
