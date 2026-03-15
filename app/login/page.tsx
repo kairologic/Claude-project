@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@/lib/auth/auth-helpers';
+import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 
 export default function LoginPage() {
   const router = useRouter();
