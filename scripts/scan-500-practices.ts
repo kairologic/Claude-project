@@ -37,6 +37,72 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
   return ct.includes('json') ? res.json() : null;
 }
 
+// ── Update Practice Counts ───────────────────────────────
+
+/**
+ * Calls Supabase RPC functions to update provider_count and mismatch_count
+ * on practice_websites. These run server-side SQL — fast and atomic.
+ *
+ * Requires two RPC functions created once in Supabase SQL Editor:
+ *
+ * CREATE OR REPLACE FUNCTION update_provider_counts()
+ * RETURNS void AS $$
+ *   UPDATE practice_websites pw
+ *   SET provider_count = sub.cnt
+ *   FROM (SELECT practice_website_id, count(DISTINCT npi) as cnt
+ *         FROM practice_providers GROUP BY practice_website_id) sub
+ *   WHERE pw.id = sub.practice_website_id;
+ * $$ LANGUAGE sql;
+ *
+ * CREATE OR REPLACE FUNCTION update_mismatch_counts()
+ * RETURNS void AS $$
+ *   UPDATE practice_websites pw
+ *   SET mismatch_count = sub.cnt
+ *   FROM (SELECT pp.practice_website_id, count(DISTINCT de.id) as cnt
+ *         FROM practice_providers pp
+ *         JOIN nppes_delta_events de ON de.npi = pp.npi
+ *         GROUP BY pp.practice_website_id) sub
+ *   WHERE pw.id = sub.practice_website_id;
+ * $$ LANGUAGE sql;
+ */
+async function updatePracticeCounts(state: string): Promise<void> {
+  const rpcCall = async (fn: string): Promise<boolean> => {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    return res.ok;
+  };
+
+  try {
+    const pcOk = await rpcCall('update_provider_counts');
+    if (pcOk) {
+      console.log('  provider_count updated');
+    } else {
+      console.log('  [Counts] update_provider_counts RPC failed — create it in Supabase SQL Editor (see scan-500-practices.ts comments)');
+    }
+
+    const mcOk = await rpcCall('update_mismatch_counts');
+    if (mcOk) {
+      console.log('  mismatch_count updated');
+    } else {
+      console.log('  [Counts] update_mismatch_counts RPC failed — create it in Supabase SQL Editor (see scan-500-practices.ts comments)');
+    }
+
+    if (pcOk && mcOk) {
+      console.log('  Both counts updated successfully');
+    }
+  } catch (err) {
+    console.log(`  [Counts] Auto-update failed: ${err}`);
+    console.log('  Run the SQL manually in Supabase SQL Editor.');
+  }
+}
+
 // ── CLI ──────────────────────────────────────────────────
 
 function parseArgs() {
@@ -265,11 +331,15 @@ async function main() {
     console.log(`  Deltas created:      ${deltaResult.deltas_created}`);
     console.log(`  Providers w/ deltas: ${deltaResult.providers_with_deltas}`);
     console.log(`  Corroborated:        ${deltaResult.corroborated}`);
+
+    // Phase 3: Update provider_count and mismatch_count on practice_websites
+    console.log('\n─── Phase 3: Update Practice Counts ─────────────────\n');
+    await updatePracticeCounts(opts.state);
   }
 
   // Phase 4: Export target list
   if (!opts.dryRun) {
-    console.log('\n─── Phase 3: Export Target List ──────────────────────\n');
+    console.log('\n─── Phase 4: Export Target List ──────────────────────\n');
     await exportTargetList(opts.outputFile, opts.state);
   }
 
