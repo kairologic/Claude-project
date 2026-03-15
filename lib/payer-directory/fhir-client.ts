@@ -73,11 +73,14 @@ export class FhirDirectoryClient {
     const today = new Date().toISOString().split('T')[0];
 
     try {
+      // URL-encode the pipe: some FHIR servers reject raw | in query strings
+      const identifierParam = `${encodeURIComponent(NPI_SYSTEM + '|' + npi)}`;
+
       // ── Step 1: Find Practitioner by NPI ──
       await limiter.wait();
       const practitionerBundle = await this.fhirGet<FhirBundle>(
         endpoint,
-        `/Practitioner?identifier=${NPI_SYSTEM}|${npi}`
+        `/Practitioner?identifier=${identifierParam}`
       );
 
       const practitioner = this.findResourceInBundle<FhirPractitioner>(
@@ -94,7 +97,7 @@ export class FhirDirectoryClient {
       await limiter.wait();
       const roleBundle = await this.fhirGet<FhirBundle>(
         endpoint,
-        `/PractitionerRole?practitioner.identifier=${NPI_SYSTEM}|${npi}` +
+        `/PractitionerRole?practitioner.identifier=${identifierParam}` +
           `&_include=PractitionerRole:location` +
           `&_include=PractitionerRole:organization` +
           `&_include=PractitionerRole:network`
@@ -129,6 +132,12 @@ export class FhirDirectoryClient {
       const finalPractitioner = practitioner || containedPractitioner;
       const finalOrg = organization || containedOrg;
 
+      // Collect ALL Practitioner entries (UHC returns multiple with different data)
+      const allPractitioners = this.findAllResourcesInBundle<FhirPractitioner>(
+        practitionerBundle,
+        'Practitioner'
+      );
+
       // ── Step 3: Build snapshot ──
       const snapshot = this.buildSnapshot(
         npi,
@@ -139,7 +148,8 @@ export class FhirDirectoryClient {
         location,
         finalOrg,
         { practitioner: practitionerBundle, role: roleBundle },
-        batchId
+        batchId,
+        allPractitioners
       );
 
       return snapshot;
@@ -205,6 +215,12 @@ export class FhirDirectoryClient {
       signal: AbortSignal.timeout(30_000),
     });
 
+    // 404 and 400 are expected when a provider isn't in a payer's directory
+    if (res.status === 404 || res.status === 400) {
+      console.log(`    [${endpoint.payer_code}] ${res.status} — provider not in directory`);
+      return { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] } as T;
+    }
+
     if (!res.ok) {
       throw new Error(`FHIR ${res.status}: ${res.statusText} — ${url}`);
     }
@@ -251,6 +267,16 @@ export class FhirDirectoryClient {
       (e: FhirBundleEntry) => e.resource?.resourceType === resourceType
     );
     return (entry?.resource as T) || null;
+  }
+
+  private findAllResourcesInBundle<T extends { resourceType: string }>(
+    bundle: FhirBundle | null,
+    resourceType: string
+  ): T[] {
+    if (!bundle?.entry) return [];
+    return bundle.entry
+      .filter((e: FhirBundleEntry) => e.resource?.resourceType === resourceType)
+      .map((e: FhirBundleEntry) => e.resource as T);
   }
 
   private findContained<T extends { resourceType: string }>(
@@ -344,6 +370,53 @@ export class FhirDirectoryClient {
     };
   }
 
+  /**
+   * Fallback: Extract specialty from Practitioner.qualification.
+   * UHC/Optum puts the NUCC taxonomy code in qualification[].code.coding
+   * instead of PractitionerRole.specialty.
+   */
+  private extractSpecialtyFromQualification(
+    practitioner: FhirPractitioner
+  ): { code: string | null; display: string | null } | null {
+    const quals = (practitioner as unknown as Record<string, unknown>)['qualification'] as
+      Array<{ code?: FhirCodeableConcept; extension?: FhirExtension[] }> | undefined;
+    if (!quals) return null;
+
+    for (const qual of quals) {
+      const coding = qual.code?.coding;
+      if (!coding) continue;
+      for (const c of coding) {
+        if (c.system && NUCC_SYSTEM_PATTERNS.some((p) => c.system!.toLowerCase().includes(p))) {
+          return { code: c.code || null, display: c.display || qual.code?.text || null };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extract credentials (MD, DO, NP, etc.) from Practitioner.qualification.
+   */
+  private extractCredentialsFromQualification(
+    practitioner: FhirPractitioner
+  ): string | null {
+    const quals = (practitioner as unknown as Record<string, unknown>)['qualification'] as
+      Array<{ code?: FhirCodeableConcept }> | undefined;
+    if (!quals) return null;
+
+    for (const qual of quals) {
+      const coding = qual.code?.coding;
+      if (!coding) continue;
+      for (const c of coding) {
+        // Look for degree codes like MD, DO, DDS, NP, PA
+        if (c.display?.startsWith('Degree-') || /^(MD|DO|DDS|DMD|NP|PA|DPM|DC|OD|PhD|PharmD)$/.test(c.code || '')) {
+          return c.code || c.display?.replace('Degree-', '') || null;
+        }
+      }
+    }
+    return null;
+  }
+
   private extractAcceptingPatients(extensions?: FhirExtension[]): boolean | null {
     if (!extensions) return null;
 
@@ -388,7 +461,8 @@ export class FhirDirectoryClient {
     location: FhirLocation | null,
     organization: FhirOrganization | null,
     rawBundles: Record<string, unknown>,
-    batchId?: string
+    batchId?: string,
+    allPractitioners?: FhirPractitioner[]
   ): DirectorySnapshot {
     const name = this.extractName(practitioner?.name);
     const addr = this.extractAddress(
@@ -401,6 +475,27 @@ export class FhirDirectoryClient {
       this.extractFax(location?.telecom) ||
       this.extractFax(practitioner?.telecom);
     const specialty = this.extractSpecialty(role?.specialty);
+    // Fallback: UHC puts taxonomy in Practitioner.qualification, not PractitionerRole.specialty
+    // Check ALL Practitioner entries (UHC returns multiple, NUCC code may be on 2nd entry)
+    let qualSpecialty: { code: string | null; display: string | null } | null = null;
+    let qualCredentials: string | null = null;
+    const practitionersToCheck = allPractitioners?.length
+      ? allPractitioners
+      : (practitioner ? [practitioner] : []);
+
+    if (!specialty.code) {
+      for (const p of practitionersToCheck) {
+        qualSpecialty = this.extractSpecialtyFromQualification(p);
+        if (qualSpecialty) break;
+      }
+    }
+    for (const p of practitionersToCheck) {
+      qualCredentials = this.extractCredentialsFromQualification(p);
+      if (qualCredentials) break;
+    }
+
+    const finalSpecialty = specialty.code ? specialty : (qualSpecialty || specialty);
+
     const accepting = this.extractAcceptingPatients(role?.extension);
     const languages = this.extractLanguages(practitioner?.communication);
     const orgNpi = this.extractNpi(organization?.identifier);
@@ -416,7 +511,7 @@ export class FhirDirectoryClient {
       listed_name_first: name.first,
       listed_name_last: name.last,
       listed_name_full: name.full,
-      listed_credentials: name.credentials,
+      listed_credentials: name.credentials || qualCredentials,
       listed_gender: practitioner?.gender || null,
 
       listed_address_line1: addr.line1,
@@ -428,8 +523,8 @@ export class FhirDirectoryClient {
       listed_phone: phone,
       listed_fax: fax,
 
-      listed_specialty_code: specialty.code,
-      listed_specialty_display: specialty.display,
+      listed_specialty_code: finalSpecialty.code,
+      listed_specialty_display: finalSpecialty.display,
       listed_accepting_patients: accepting,
 
       listed_org_name: organization?.name || null,
