@@ -43,7 +43,7 @@ export default async function PracticeLayout({
   // Build sidebar props
   const practices = (auth.practices || []).map((p: any) => ({
     practice_id: p.practice_id,
-    practice_name: p.practice_websites?.practice_name || 'Unknown Practice',
+    practice_name: p.practice_websites?.name || 'Unknown Practice',
     city: p.practice_websites?.city || '',
     state: p.practice_websites?.state || '',
     provider_count: p.practice_websites?.provider_count || 0,
