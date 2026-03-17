@@ -156,7 +156,7 @@ export function WorkflowCard({ workflow: wf, onClick }: WorkflowCardProps) {
 
   // Due text
   let dueText = '';
-  let dueColor = colors.gray600;
+  let dueColor: string = colors.gray600;
   if (isOverdue && wf.overdue_at) {
     const days = Math.floor((Date.now() - new Date(wf.overdue_at).getTime()) / 86400000);
     dueText = `Overdue by ${days} day${days !== 1 ? 's' : ''}`;
