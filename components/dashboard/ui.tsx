@@ -156,12 +156,15 @@ export function WorkflowCard({ workflow: wf, onClick }: WorkflowCardProps) {
 
   // Due text
   let dueText = '';
+  let dueColor = colors.gray600;
   if (isOverdue && wf.overdue_at) {
     const days = Math.floor((Date.now() - new Date(wf.overdue_at).getTime()) / 86400000);
     dueText = `Overdue by ${days} day${days !== 1 ? 's' : ''}`;
+    dueColor = colors.red;
   } else if (wf.overdue_at) {
     const days = Math.floor((new Date(wf.overdue_at).getTime() - Date.now()) / 86400000);
     dueText = days > 0 ? `Due in ${days} day${days !== 1 ? 's' : ''}` : 'Due today';
+    dueColor = days <= 7 ? colors.gold : colors.gray600;
   }
 
   // Progress (action_needed = ~15%, in_progress = ~50%, awaiting = ~80%, resolved = 100%)
@@ -191,7 +194,7 @@ export function WorkflowCard({ workflow: wf, onClick }: WorkflowCardProps) {
           <div style={{ flex: 1, height: 4, background: colors.gray200, borderRadius: 2, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${progress}%`, background: borderColor, borderRadius: 2, transition: 'width .3s' }} />
           </div>
-          <span style={{ fontSize: 10, color: colors.gray400, whiteSpace: 'nowrap' }}>{dueText}</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: dueColor, whiteSpace: 'nowrap' }}>{dueText}</span>
         </div>
       )}
       {wf.status === 'resolved' && (
