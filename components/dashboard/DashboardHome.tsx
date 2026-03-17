@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/design-tokens';
 import { KPICard, WorkflowCard, AlertCard, PayerSyncPanel, Tooltip } from './ui';
+import WorkflowDetailPanel from './WorkflowDetailPanel';
 import type { WorkflowStatus } from '@/lib/types/dashboard-schema';
 
 interface KPIs {
@@ -65,6 +66,7 @@ export default function DashboardHome({
 }: DashboardHomeProps) {
   const router = useRouter();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const totalWorkflows = kpis.action_needed_count + kpis.in_progress_count + kpis.awaiting_count + kpis.resolved_count;
 
@@ -153,7 +155,7 @@ export default function DashboardHome({
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {workflows.slice(0, 3).map(wf => (
-              <WorkflowCard key={wf.id} workflow={wf} onClick={() => navigateTo(`/workflows?detail=${wf.id}`)} />
+              <WorkflowCard key={wf.id} workflow={wf} onClick={() => setDetailId(wf.id)} />
             ))}
             {workflows.length === 0 && (
               <div style={{ padding: 20, textAlign: 'center', color: colors.gray400, fontSize: 13 }}>
@@ -196,6 +198,15 @@ export default function DashboardHome({
           </div>
         </div>
       </div>
+
+      {/* Detail panel */}
+      {detailId && (
+        <WorkflowDetailPanel
+          workflowId={detailId}
+          practiceId={practiceId}
+          onClose={() => setDetailId(null)}
+        />
+      )}
     </div>
   );
 }

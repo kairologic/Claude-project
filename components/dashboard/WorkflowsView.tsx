@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { colors, statusColors, statusLabels } from '@/lib/design-tokens';
 import { WorkflowCard } from './ui';
+import WorkflowDetailPanel from './WorkflowDetailPanel';
 import type { WorkflowStatus } from '@/lib/types/dashboard-schema';
 
 interface WorkflowData {
@@ -61,7 +62,9 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialFilter = (searchParams.get('status') as FilterKey) || 'all';
+  const initialDetail = searchParams.get('detail') || null;
   const [activeFilter, setActiveFilter] = useState<FilterKey>(initialFilter);
+  const [detailId, setDetailId] = useState<string | null>(initialDetail);
 
   // Filter workflows
   const filtered = useMemo(() => {
@@ -80,8 +83,13 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
   }, [workflows, activeFilter]);
 
   function handleCardClick(id: string) {
-    // Phase 3D: will open detail panel
-    router.push(`/practice/${practiceId}/workflows?detail=${id}`);
+    setDetailId(id);
+  }
+
+  function closeDetail() {
+    setDetailId(null);
+    // Clean URL param
+    router.replace(`/practice/${practiceId}/workflows${activeFilter !== 'all' ? `?status=${activeFilter}` : ''}`, { scroll: false });
   }
 
   return (
@@ -131,6 +139,15 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
           </div>
         )}
       </div>
+
+      {/* Detail panel */}
+      {detailId && (
+        <WorkflowDetailPanel
+          workflowId={detailId}
+          practiceId={practiceId}
+          onClose={closeDetail}
+        />
+      )}
     </div>
   );
 }
