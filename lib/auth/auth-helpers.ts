@@ -67,7 +67,7 @@ export async function getUserPractices(userId: string) {
   const { data, error } = await admin
     .from('practice_users')
     .select(`practice_id, role, is_primary, joined_at,
-      practice_websites!inner (id, practice_name, city, state, provider_count, mismatch_count)`)
+     practice_websites!inner (id, name, city, state, provider_count, mismatch_count)`)
     .eq('user_id', userId)
     .order('is_primary', { ascending: false });
   if (error) throw new Error(`Failed to fetch user practices: ${error.message}`);
