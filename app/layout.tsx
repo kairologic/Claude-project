@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
-import TopBanner from '@/components/layout/TopBanner';
 
 export const metadata: Metadata = {
   title: 'KairoLogic - Statutory Vanguard | Texas Healthcare Compliance',
@@ -26,12 +23,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body>
-        <TopBanner />
-        <Header />
-        <main className="min-h-screen">
-          {children}
-        </main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
