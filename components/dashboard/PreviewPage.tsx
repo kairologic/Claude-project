@@ -515,7 +515,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dashOverlay: {
     position: 'absolute' as const, inset: 0,
-    background: 'rgba(250,250,250,.4)',
+    background: 'rgba(250,250,250,.2)',
     backdropFilter: 'blur(1px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
