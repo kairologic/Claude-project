@@ -191,6 +191,94 @@ export default function PreviewPage({ practice, findings, providers, totalProvid
         </div>
       </div>
 
+      {/* Blurred dashboard preview */}
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>Your Practice Intelligence Dashboard</div>
+        <div style={styles.dashPreviewWrap}>
+          {/* Mini dashboard mock */}
+          <div style={styles.dashMock}>
+            {/* Mini sidebar */}
+            <div style={styles.miniSidebar}>
+              <div style={{ fontSize: 8, fontWeight: 800, padding: '8px 6px' }}>
+                <span style={{ color: '#fff' }}>K</span><span style={{ color: colors.gold }}>L</span>
+              </div>
+              {['◉','⚡','👥','🔔','📄'].map((icon, i) => (
+                <div key={i} style={{ padding: '4px 6px', fontSize: 7, color: i === 0 ? '#fff' : 'rgba(139,163,184,.6)', background: i === 0 ? colors.navyMid : 'transparent', borderRadius: 3, marginBottom: 1 }}>
+                  {icon}
+                </div>
+              ))}
+            </div>
+            {/* Mini main content */}
+            <div style={styles.miniMain}>
+              {/* Mini KPI row */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                <div style={{ flex: 1, background: 'rgba(214,69,69,.12)', borderRadius: 4, padding: '6px 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: colors.red }}>{findings.total}</div>
+                  <div style={{ fontSize: 5, color: colors.gray400, textTransform: 'uppercase' }}>Action</div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(212,160,23,.12)', borderRadius: 4, padding: '6px 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: colors.gold }}>0</div>
+                  <div style={{ fontSize: 5, color: colors.gray400, textTransform: 'uppercase' }}>Progress</div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(24,95,165,.12)', borderRadius: 4, padding: '6px 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: colors.blue }}>0</div>
+                  <div style={{ fontSize: 5, color: colors.gray400, textTransform: 'uppercase' }}>Awaiting</div>
+                </div>
+                <div style={{ flex: 1, background: 'rgba(26,158,109,.12)', borderRadius: 4, padding: '6px 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: colors.green }}>0</div>
+                  <div style={{ fontSize: 5, color: colors.gray400, textTransform: 'uppercase' }}>Resolved</div>
+                </div>
+              </div>
+              {/* Mini workflow cards */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 5, color: colors.gray400, textTransform: 'uppercase', marginBottom: 3 }}>Workflows</div>
+                  {[1,2,3].map(i => (
+                    <div key={i} style={{ background: '#fff', border: '1px solid ' + colors.gray200, borderLeft: '2px solid ' + colors.red, borderRadius: 3, padding: '4px 5px', marginBottom: 3 }}>
+                      <div style={{ fontSize: 5, color: colors.gold, fontWeight: 700 }}>NPPES UPDATE</div>
+                      <div style={{ fontSize: 6, fontWeight: 700, color: colors.navy, marginTop: 1 }}>Provider — Address mismatch</div>
+                      <div style={{ height: 2, background: colors.gray200, borderRadius: 1, marginTop: 3 }}>
+                        <div style={{ height: '100%', width: '15%', background: colors.red, borderRadius: 1 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 5, color: colors.gray400, textTransform: 'uppercase', marginBottom: 3 }}>Alerts</div>
+                  {[1,2,3].map(i => (
+                    <div key={i} style={{ background: '#fff', border: '1px solid ' + colors.gray200, borderLeft: '2px solid ' + colors.red, borderRadius: 3, padding: '4px 5px', marginBottom: 3 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <div style={{ width: 4, height: 4, borderRadius: '50%', background: colors.red }} />
+                        <div style={{ fontSize: 6, fontWeight: 700, color: colors.navy }}>Mismatch detected</div>
+                      </div>
+                      <div style={{ fontSize: 5, color: colors.gray400, marginTop: 1 }}>Requires attention</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Blur + overlay */}
+          <div style={styles.dashOverlay}>
+            <div style={styles.dashOverlayContent}>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>🔒</div>
+              <div style={styles.dashOverlayTitle}>Your full dashboard is ready</div>
+              <div style={styles.dashOverlayDesc}>
+                Workflow tracking, pre-filled NPPES forms, payer directory monitoring, license alerts, and automatic confirmation — all waiting for you.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 12 }}>
+                {['Workflow tracking', 'Pre-filled forms', 'Payer monitoring', 'License alerts', 'Auto-confirmation'].map(f => (
+                  <span key={f} style={{
+                    fontSize: 10, fontWeight: 600, color: colors.navy, background: '#fff',
+                    padding: '3px 10px', borderRadius: 100, border: `1px solid ${colors.gray200}`,
+                  }}>{f}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Claim section */}
       <div style={styles.claimSection}>
         {!submitted ? (
@@ -362,4 +450,32 @@ const styles: Record<string, React.CSSProperties> = {
   },
   footerLogo: { fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 6 },
   footerText: { fontSize: 11, color: colors.gray400, lineHeight: 1.5, maxWidth: 400, margin: '0 auto' },
+  dashPreviewWrap: {
+    position: 'relative' as const, borderRadius: 12, overflow: 'hidden',
+    border: `1px solid ${colors.gray200}`, height: 260,
+  },
+  dashMock: {
+    display: 'flex', height: '100%', filter: 'blur(3px)', transform: 'scale(1.02)',
+  },
+  miniSidebar: {
+    width: 40, background: colors.navy, padding: '4px 4px', flexShrink: 0,
+  },
+  miniMain: {
+    flex: 1, background: colors.gray50, padding: 8, overflow: 'hidden',
+  },
+  dashOverlay: {
+    position: 'absolute' as const, inset: 0,
+    background: 'rgba(250,250,250,.75)',
+    backdropFilter: 'blur(2px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  dashOverlayContent: {
+    textAlign: 'center' as const, maxWidth: 380, padding: '0 20px',
+  },
+  dashOverlayTitle: {
+    fontSize: 16, fontWeight: 800, color: colors.navy, marginBottom: 6,
+  },
+  dashOverlayDesc: {
+    fontSize: 12, color: colors.gray600, lineHeight: 1.5,
+  },
 };
