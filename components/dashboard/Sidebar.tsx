@@ -69,6 +69,7 @@ export default function Sidebar({
     { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster' },
     { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
+    { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
   ];
 
   const comingSoon = [
@@ -85,6 +86,7 @@ export default function Sidebar({
     if (sub.startsWith('/roster')) return 'roster';
     if (sub.startsWith('/alerts')) return 'alerts';
     if (sub.startsWith('/documents')) return 'documents';
+    if (sub.startsWith('/payer-directory')) return 'payer-directory';
     return 'dashboard';
   }
 

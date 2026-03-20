@@ -189,10 +189,13 @@ export default function DashboardHome({
 
           {/* Payer sync */}
           <div>
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <Tooltip text="Real-time payer directory monitoring via FHIR PDex Plan-Net APIs">
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.gray400, cursor: 'help' }}>Payer sync status</span>
               </Tooltip>
+              <button onClick={() => navigateTo('/payer-directory')} style={{
+                background: 'none', border: 'none', color: colors.blue, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}>View details →</button>
             </div>
             <PayerSyncPanel payers={payers} />
           </div>
