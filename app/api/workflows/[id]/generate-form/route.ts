@@ -116,7 +116,7 @@ export async function POST(
     }
 
     // 10. Return PDF
-    return new Response(pdfBytes, {
+    return new Response(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
