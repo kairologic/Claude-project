@@ -106,7 +106,7 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
       if (b.priority !== a.priority) return b.priority - a.priority;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [workflows, activeFilter]);
+  }, [workflows, activeFilter, activeType]);
 
   function handleCardClick(id: string) {
     setDetailId(id);

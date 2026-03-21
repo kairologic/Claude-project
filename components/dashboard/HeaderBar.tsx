@@ -45,6 +45,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
+  const [createdWorkflowId, setCreatedWorkflowId] = useState<string | null>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -60,6 +61,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
     setAdding(false);
     setAddSuccess(false);
     setSearching(false);
+    setCreatedWorkflowId(null);
   }
 
   function closeModal() {
@@ -183,13 +185,26 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
         });
       }
 
+      setCreatedWorkflowId(wf?.id || null);
       setAddSuccess(true);
+
+      // Auto-navigate to the new workflow after a brief success flash
+      setTimeout(() => {
+        setShowAddModal(false);
+        if (wf?.id) {
+          // Use window.location for a full page reload so server re-fetches data
+          window.location.href = `/practice/${practiceId}/workflows?type=onboarding&detail=${wf.id}`;
+        } else {
+          router.push(`/practice/${practiceId}/workflows?type=onboarding`);
+          router.refresh();
+        }
+      }, 1200);
     } catch (err) {
       setError('Failed to add provider. Please try again.');
     } finally {
       setAdding(false);
     }
-  }, [result, practiceId]);
+  }, [result, practiceId, router]);
 
   return (
     <>
@@ -349,7 +364,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                   )}
                 </>
               ) : (
-                /* Success state */
+                /* Success state — auto-redirects to workflow detail */
                 <div style={{ textAlign: 'center', padding: '20px 0' }}>
                   <div style={{
                     width: 48, height: 48, borderRadius: '50%', background: colors.greenPale,
@@ -360,29 +375,17 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                     {result?.first_name} {result?.last_name} added
                   </div>
                   <div style={{ fontSize: 12, color: colors.gray400, marginBottom: 16 }}>
-                    Onboarding workflow created. You can track progress in Workflows.
+                    Onboarding workflow created. Taking you to the workflow...
                   </div>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                    <button
-                      onClick={() => { closeModal(); router.push(`/practice/${practiceId}/workflows?type=onboarding`); }}
-                      style={{
-                        padding: '8px 16px', background: colors.navy, color: '#fff', border: 'none',
-                        borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                      }}
-                    >
-                      View workflow
-                    </button>
-                    <button
-                      onClick={() => resetModal()}
-                      style={{
-                        padding: '8px 16px', background: '#fff', color: colors.navy,
-                        border: `1.5px solid ${colors.gray200}`, borderRadius: 8,
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                      }}
-                    >
-                      Add another
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <div style={{
+                      width: 16, height: 16, border: `2px solid ${colors.navy}`,
+                      borderTopColor: 'transparent', borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }} />
+                    <span style={{ fontSize: 12, color: colors.gray400 }}>Redirecting...</span>
                   </div>
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                 </div>
               )}
             </div>
