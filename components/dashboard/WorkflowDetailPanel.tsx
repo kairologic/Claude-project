@@ -669,12 +669,16 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         borderRadius: 8,
                         background: isActive ? colors.goldPale + '30' : 'transparent',
                       }}>
-                        <div style={{
-                          width: 18, height: 18, borderRadius: 4, border: `2px solid ${checkColor}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          fontSize: 10, marginTop: 1, color: '#fff',
-                          background: isDone ? colors.green : 'transparent',
-                        }}>{checkMark}</div>
+                        <div
+                          onClick={isActive && t.task_type === 'submit_nppes' ? () => handleMarkSubmitted() : undefined}
+                          style={{
+                            width: 18, height: 18, borderRadius: 4, border: `2px solid ${checkColor}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            fontSize: 10, marginTop: 1, color: '#fff',
+                            background: isDone ? colors.green : 'transparent',
+                            cursor: isActive && t.task_type === 'submit_nppes' ? 'pointer' : 'default',
+                          }}
+                        >{checkMark}</div>
                         <div style={{ flex: 1 }}>
                           <div style={{
                             fontSize: 12, fontWeight: 600, color: isDone ? colors.gray400 : colors.navy,
@@ -925,38 +929,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           }}>Download again</button>
                         </div>
                       )}
-                      {/* Legacy: active submit_nppes task */}
-                      {isActive && t.task_type === 'submit_nppes' && (
-                        <div style={{
-                          marginTop: 8, padding: 14, background: colors.gray50,
-                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                            <a
-                              href="https://nppes.cms.hhs.gov/"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ fontSize: 11, fontWeight: 600, color: colors.blue, textDecoration: 'underline' }}
-                            >
-                              Open NPPES Portal →
-                            </a>
-                            <span style={{ fontSize: 10, color: colors.gray400 }}>
-                              Upload or mail your correction form
-                            </span>
-                          </div>
-                          <button onClick={handleMarkSubmitted} disabled={submitMarking} style={{
-                            width: '100%', padding: '9px 14px', background: colors.navy, color: '#fff',
-                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                            cursor: submitMarking ? 'wait' : 'pointer', fontFamily: 'inherit',
-                            opacity: submitMarking ? 0.6 : 1,
-                          }}>
-                            {submitMarking ? 'Saving...' : "I've submitted to NPPES"}
-                          </button>
-                          <div style={{ fontSize: 10, color: colors.gray400, marginTop: 6, textAlign: 'center' }}>
-                            We'll monitor NPPES automatically to confirm your update was applied.
-                          </div>
-                        </div>
-                      )}
+                      {/* Legacy submit_nppes: no expanded UI — checkbox click completes it */}
                       {/* Legacy: completed submit_nppes tasks */}
                       {isDone && t.task_type === 'submit_nppes' && (
                         <div style={{
@@ -1114,6 +1087,84 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                     </div>
                   );
                 })}
+
+                {/* ── Complete Workflow button ── */}
+                {(() => {
+                  const visibleTasks = tasks.filter(t => t.status !== 'skipped');
+                  const humanTasksDone = visibleTasks
+                    .filter(t => t.task_type !== 'monitor_auto_confirm')
+                    .every(t => t.status === 'completed');
+                  const isStillInProgress = workflow?.status === 'in_progress' || workflow?.status === 'action_needed';
+
+                  if (humanTasksDone && isStillInProgress && visibleTasks.length > 0) {
+                    return (
+                      <button
+                        onClick={async () => {
+                          if (!workflow) return;
+                          // Complete any remaining auto tasks
+                          const pendingAuto = tasks.filter(t => t.task_type === 'monitor_auto_confirm' && t.status !== 'completed' && t.status !== 'skipped');
+                          for (const at of pendingAuto) {
+                            await supabase.from('workflow_tasks').update({
+                              status: 'completed', completed_at: new Date().toISOString(),
+                              metadata: { ...at.metadata, manually_completed: true },
+                            }).eq('id', at.id);
+                          }
+                          // Resolve workflow
+                          await supabase.from('workflow_instances')
+                            .update({ status: 'resolved', completed_at: new Date().toISOString() })
+                            .eq('id', workflow.id);
+                          await logEvent('completed', 'Workflow manually completed', { manually_completed: true });
+
+                          // For onboarding: add provider to roster
+                          if (workflow.workflow_type === 'onboarding' && workflow.provider_npi) {
+                            const { data: existing } = await supabase
+                              .from('practice_providers')
+                              .select('id')
+                              .eq('practice_website_id', practiceId)
+                              .eq('npi', workflow.provider_npi)
+                              .maybeSingle();
+                            if (!existing) {
+                              await supabase.from('practice_providers').insert({
+                                practice_website_id: practiceId, npi: workflow.provider_npi,
+                                provider_name: workflow.provider_name, roster_status: 'active',
+                              });
+                            } else {
+                              await supabase.from('practice_providers')
+                                .update({ roster_status: 'active' }).eq('id', existing.id);
+                            }
+                            await logEvent('roster_added', `${workflow.provider_name} added to roster`, { npi: workflow.provider_npi });
+                          }
+
+                          // Refresh
+                          const { data: freshTasks } = await supabase
+                            .from('workflow_tasks')
+                            .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                            .eq('workflow_id', workflow.id)
+                            .order('task_order', { ascending: true });
+                          if (freshTasks) setTasks(freshTasks);
+                          const { data: freshWf } = await supabase
+                            .from('workflow_instances')
+                            .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, priority, overdue_at, created_at, approved_value, approved_at, target_completion')
+                            .eq('id', workflow.id)
+                            .single();
+                          if (freshWf) setWorkflow(freshWf);
+                        }}
+                        style={{
+                          width: '100%', padding: '11px 18px', marginTop: 12,
+                          background: colors.green, color: '#fff', border: 'none',
+                          borderRadius: 8, fontSize: 13, fontWeight: 700,
+                          cursor: 'pointer', fontFamily: 'inherit',
+                          transition: 'opacity .15s',
+                        }}
+                        onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
+                        onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                      >
+                        Complete workflow
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* ── Source Comparison ───────────────────────────────── */}
