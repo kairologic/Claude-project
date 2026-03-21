@@ -74,6 +74,31 @@ interface PracticeProvider {
   license_issue_type: string | null;
 }
 
+// ─── Formatting helpers ─────────────────────────────────────────────────────
+
+function titleCase(str: string | null | undefined): string {
+  if (!str) return '';
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\b(Pa|Tx|Ca|Ny|Fl|Il|Oh|Nj|Nc|Va|Md|Mn|Wi|Co|Az|Or|Wa|Tn|In|Mo|Sc|Al|La|Ky|Ok|Ct|Ia|Ms|Ar|Ks|Ut|Nv|Ne|Nm|Nd|Sd|Mt|Wy|Vt|Nh|Me|Ri|De|Hi|Id|Wv|Dc)\b/g, m => m.toUpperCase())
+    .replace(/\bN\b/g, 'N').replace(/\bS\b/g, 'S').replace(/\bE\b/g, 'E').replace(/\bW\b/g, 'W')
+    .replace(/\bSte\b/g, 'Ste').replace(/\bExpy\b/g, 'Expy').replace(/\bSt\b/g, 'St')
+    .replace(/\bDr\b/g, 'Dr').replace(/\bAve\b/g, 'Ave').replace(/\bBlvd\b/g, 'Blvd')
+    .replace(/\bLn\b/g, 'Ln').replace(/\bRd\b/g, 'Rd').replace(/\bCt\b/g, 'Ct')
+    .replace(/\bPl\b/g, 'Pl').replace(/\bPkwy\b/g, 'Pkwy').replace(/\bHwy\b/g, 'Hwy');
+}
+
+function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return phone; // return as-is if unexpected format
+}
+
 // ─── Field label map ────────────────────────────────────────────────────────
 
 const FIELD_LABELS: Record<string, string> = {
@@ -167,8 +192,9 @@ export default function ProviderDetailPanel({
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   const isOpen = npi !== null;
-  const initials = provider?.provider_name
-    ? provider.provider_name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2)
+  const displayName = titleCase(provider?.provider_name);
+  const initials = displayName
+    ? displayName.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2)
     : '??';
 
   const healthColor = (provider?.health_score ?? 100) >= 80 ? colors.green
@@ -183,8 +209,8 @@ export default function ProviderDetailPanel({
 
   // ── Build comparison data ─────────────────────────────────────────────────
 
-  const nppesAddress = nppes ? `${nppes.address_line_1}, ${nppes.city}, ${nppes.state} ${nppes.zip_code}` : null;
-  const websiteAddress = practiceProvider?.web_address || null;
+  const nppesAddress = nppes ? titleCase(`${nppes.address_line_1}, ${nppes.city}, ${nppes.state} ${nppes.zip_code}`) : null;
+  const websiteAddress = practiceProvider?.web_address ? titleCase(practiceProvider.web_address) : null;
 
   const comparisonFields = [
     {
@@ -195,14 +221,15 @@ export default function ProviderDetailPanel({
     },
     {
       field: 'Phone',
-      nppes: nppes?.phone || null,
-      website: practiceProvider?.web_phone || null,
-      match: nppes?.phone && practiceProvider?.web_phone ? nppes.phone === practiceProvider.web_phone : null,
+      nppes: formatPhone(nppes?.phone),
+      website: formatPhone(practiceProvider?.web_phone),
+      match: nppes?.phone && practiceProvider?.web_phone
+        ? nppes.phone.replace(/\D/g, '') === practiceProvider.web_phone.replace(/\D/g, '') : null,
     },
     {
       field: 'Specialty',
-      nppes: nppes?.taxonomy_desc || null,
-      website: practiceProvider?.web_specialty || null,
+      nppes: titleCase(nppes?.taxonomy_desc),
+      website: titleCase(practiceProvider?.web_specialty),
       match: nppes?.taxonomy_desc && practiceProvider?.web_specialty
         ? nppes.taxonomy_desc.toLowerCase() === practiceProvider.web_specialty.toLowerCase() : null,
     },
@@ -268,7 +295,7 @@ export default function ProviderDetailPanel({
 
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: colors.navy }}>
-                    {provider.provider_name}
+                    {displayName}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
                     <span style={{ fontFamily: 'monospace', fontSize: 11, color: colors.gray400 }}>
@@ -354,7 +381,7 @@ export default function ProviderDetailPanel({
               </table>
               {nppes?.credential && (
                 <div style={{ fontSize: 11, color: colors.gray400, marginTop: 6 }}>
-                  Credential: {nppes.credential} · Specialty: {nppes.taxonomy_desc || 'N/A'}
+                  Credential: {nppes.credential} · Specialty: {titleCase(nppes.taxonomy_desc) || 'N/A'}
                 </div>
               )}
             </div>
@@ -430,6 +457,9 @@ export default function ProviderDetailPanel({
                 const details = w.finding_details || {};
                 const fieldLabel = FIELD_LABELS[details.field] || details.field || '';
                 const isExpanded = expandedAction === w.id;
+                const isPhone = details.field === 'phone';
+                const isAddr = details.field === 'address_line_1';
+                const fmtVal = (v: string) => isPhone ? formatPhone(v) : isAddr ? titleCase(v) : titleCase(v);
 
                 return (
                   <div key={w.id} style={{ marginBottom: 6 }}>
@@ -452,9 +482,9 @@ export default function ProviderDetailPanel({
                         </div>
                         <div style={{ fontSize: 11, color: colors.gray400, marginTop: 2 }}>
                           {details.website_value && details.nppes_value
-                            ? `${details.website_value} (website) vs ${details.nppes_value} (NPPES)`
+                            ? `${fmtVal(details.website_value)} (website) vs ${fmtVal(details.nppes_value)} (NPPES)`
                             : w.finding_summary}
-                          {w.approved_value ? ` · Approved: ${w.approved_value}` : ' · Approve correction'}
+                          {w.approved_value ? ` · Approved: ${fmtVal(w.approved_value)}` : ' · Approve correction'}
                         </div>
                       </div>
                       <span style={{ fontSize: 10, color: colors.gray400, flexShrink: 0, marginTop: 4 }}>
@@ -478,14 +508,14 @@ export default function ProviderDetailPanel({
                                 border: `1px solid ${colors.gray200}`, borderRadius: 6,
                               }}>
                                 <div style={{ fontSize: 9, fontWeight: 700, color: colors.gray400, textTransform: 'uppercase' }}>Website</div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy, marginTop: 2 }}>{details.website_value}</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy, marginTop: 2 }}>{fmtVal(details.website_value)}</div>
                               </div>
                               <div style={{
                                 flex: 1, padding: '8px 10px', background: '#fff',
                                 border: `1px solid ${colors.gray200}`, borderRadius: 6,
                               }}>
                                 <div style={{ fontSize: 9, fontWeight: 700, color: colors.gray400, textTransform: 'uppercase' }}>NPPES</div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy, marginTop: 2 }}>{details.nppes_value}</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy, marginTop: 2 }}>{fmtVal(details.nppes_value)}</div>
                               </div>
                             </div>
                           </div>
@@ -619,7 +649,7 @@ export default function ProviderDetailPanel({
               }}>
                 {[
                   { label: 'NPI', value: provider.npi, mono: true },
-                  { label: 'Specialty', value: provider.specialty || 'N/A' },
+                  { label: 'Specialty', value: titleCase(provider.specialty) || 'N/A' },
                   { label: 'Credential', value: provider.credential || 'N/A' },
                   { label: 'Status', value: rosterInfo.badge },
                 ].map((row, i) => (

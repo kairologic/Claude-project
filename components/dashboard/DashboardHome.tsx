@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { colors, rosterStatusMap } from '@/lib/design-tokens';
 import { KPICard, PayerSyncPanel, Tooltip } from './ui';
 import ProviderDetailPanel from './ProviderDetailPanel';
+import { titleCase } from '@/lib/format-helpers';
 
 interface KPIs {
   needs_attention: number;
@@ -203,9 +204,9 @@ export default function DashboardHome({
                     width: 32, height: 32, borderRadius: '50%', background: avatarBg,
                     color: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 11, fontWeight: 700, flexShrink: 0,
-                  }}>{getInitials(p.provider_name)}</div>
+                  }}>{getInitials(titleCase(p.provider_name))}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>{p.provider_name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>{titleCase(p.provider_name)}</div>
                     <div style={{ fontFamily: 'monospace', fontSize: 10, color: colors.gray400 }}>{p.npi}</div>
                   </div>
                   <span style={{
@@ -214,7 +215,7 @@ export default function DashboardHome({
                   }}>{p.open_issues} issue{p.open_issues !== 1 ? 's' : ''}</span>
                 </div>
                 <div style={{ fontSize: 11, color: colors.gray600 }}>
-                  {p.specialty || 'Specialty not listed'}
+                  {titleCase(p.specialty) || 'Specialty not listed'}
                   {p.open_issues > 0 && ' · '}
                   {p.open_issues > 0 && (
                     <span style={{ color: colors.red, fontWeight: 500 }}>

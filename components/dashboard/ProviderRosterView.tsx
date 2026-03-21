@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { colors, rosterStatusMap, avatarColors } from '@/lib/design-tokens';
 import { Tooltip } from './ui';
 import ProviderDetailPanel from './ProviderDetailPanel';
+import { titleCase } from '@/lib/format-helpers';
 
 interface ProviderData {
   id: string;
@@ -121,7 +122,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
                     color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0,
                   }}>{getInitials(p.provider_name)}</div>
                   <span style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
-                    {p.provider_name || 'Unknown'}
+                    {titleCase(p.provider_name) || 'Unknown'}
                   </span>
                 </div>
 
