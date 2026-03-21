@@ -925,7 +925,39 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           }}>Download again</button>
                         </div>
                       )}
-                      {/* Legacy: old submit_nppes tasks */}
+                      {/* Legacy: active submit_nppes task */}
+                      {isActive && t.task_type === 'submit_nppes' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                            <a
+                              href="https://nppes.cms.hhs.gov/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 11, fontWeight: 600, color: colors.blue, textDecoration: 'underline' }}
+                            >
+                              Open NPPES Portal →
+                            </a>
+                            <span style={{ fontSize: 10, color: colors.gray400 }}>
+                              Upload or mail your correction form
+                            </span>
+                          </div>
+                          <button onClick={handleMarkSubmitted} disabled={submitMarking} style={{
+                            width: '100%', padding: '9px 14px', background: colors.navy, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                            cursor: submitMarking ? 'wait' : 'pointer', fontFamily: 'inherit',
+                            opacity: submitMarking ? 0.6 : 1,
+                          }}>
+                            {submitMarking ? 'Saving...' : "I've submitted to NPPES"}
+                          </button>
+                          <div style={{ fontSize: 10, color: colors.gray400, marginTop: 6, textAlign: 'center' }}>
+                            We'll monitor NPPES automatically to confirm your update was applied.
+                          </div>
+                        </div>
+                      )}
+                      {/* Legacy: completed submit_nppes tasks */}
                       {isDone && t.task_type === 'submit_nppes' && (
                         <div style={{
                           marginTop: 8, padding: '8px 14px', borderRadius: 8,
