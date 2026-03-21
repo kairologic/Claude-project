@@ -124,35 +124,42 @@ export default function Sidebar({
       {/* Site selector */}
       <div className="sidebar-dropdown-area" style={styles.siteSelector}>
         <button
-          onClick={(e) => { e.stopPropagation(); setSiteOpen(!siteOpen); setHelpOpen(false); setUserOpen(false); }}
-          style={styles.siteBtn}
+          onClick={(e) => {
+            if (practices.length > 1) {
+              e.stopPropagation(); setSiteOpen(!siteOpen); setHelpOpen(false); setUserOpen(false);
+            }
+          }}
+          style={{
+            ...styles.siteBtn,
+            cursor: practices.length > 1 ? 'pointer' : 'default',
+          }}
         >
           <div style={styles.siteName}>{currentPractice?.practice_name || 'Select practice'}</div>
           <div style={styles.siteMeta}>
             {currentPractice?.city}, {currentPractice?.state} · {currentPractice?.provider_count || 0} providers
           </div>
-          <span style={styles.siteArrow}>▼</span>
+          {practices.length > 1 && <span style={styles.siteArrow}>▼</span>}
         </button>
-        {siteOpen && (
+        {siteOpen && practices.length > 1 && (
           <div style={styles.dropdown}>
-            <div style={styles.ddHeader}>Your practice sites</div>
-            {practices.map(p => (
+            <div style={styles.ddHeader}>Switch practice site</div>
+            {practices.filter(p => p.practice_id !== currentPracticeId).map(p => (
               <button
                 key={p.practice_id}
                 onClick={() => switchPractice(p.practice_id)}
-                style={{
-                  ...styles.ddItem,
-                  background: p.practice_id === currentPracticeId ? `${colors.navy}80` : 'transparent',
-                  fontWeight: p.practice_id === currentPracticeId ? 600 : 400,
-                }}
+                style={styles.ddItem}
               >
-                {p.practice_id === currentPracticeId && '✓ '}{p.practice_name}
+                {p.practice_name}
               </button>
             ))}
-            <button style={styles.ddAdd}>+ Add practice site</button>
           </div>
         )}
       </div>
+
+      {/* Add practice — always visible */}
+      <button style={styles.addSiteBtn}>
+        <span style={{ color: colors.gold, fontWeight: 700 }}>+</span> Add practice site
+      </button>
 
       {/* Navigation */}
       <nav style={styles.nav}>
@@ -253,7 +260,15 @@ const styles: Record<string, React.CSSProperties> = {
   logo: {
     padding: '18px 18px 14px', fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em',
   },
-  siteSelector: { padding: '0 12px 12px', position: 'relative' },
+  siteSelector: { padding: '0 12px 4px', position: 'relative' },
+  addSiteBtn: {
+    width: 'calc(100% - 24px)', margin: '0 12px 12px', padding: '6px 12px',
+    background: 'none', border: `1px dashed ${colors.navyLight}40`,
+    borderRadius: 6, color: colors.navyLight, fontSize: 11, fontWeight: 500,
+    cursor: 'pointer', textAlign: 'left' as const, fontFamily: 'inherit',
+    display: 'flex', alignItems: 'center', gap: 6,
+    transition: 'border-color .15s, color .15s',
+  },
   siteBtn: {
     width: '100%', background: colors.navyMid, border: 'none', borderRadius: 8,
     padding: '10px 12px', cursor: 'pointer', textAlign: 'left' as const, color: '#fff',
