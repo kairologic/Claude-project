@@ -13,7 +13,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { colors, rosterStatusMap, avatarColors } from '@/lib/design-tokens';
 import { Tooltip } from './ui';
-import WorkflowDetailPanel from './WorkflowDetailPanel';
+import ProviderDetailPanel from './ProviderDetailPanel';
 
 interface ProviderData {
   id: string;
@@ -33,13 +33,14 @@ interface ProviderData {
 interface ProviderRosterViewProps {
   providers: ProviderData[];
   practiceId: string;
-  workflowMap: Record<string, string>; // NPI → first workflow_id for that provider
+  workflowMap: Record<string, string>;
+  healthMap?: Record<string, { health_score: number; open_issues: number; specialty: string | null }>;
 }
 
-export default function ProviderRosterView({ providers, practiceId, workflowMap }: ProviderRosterViewProps) {
+export default function ProviderRosterView({ providers, practiceId, workflowMap, healthMap = {} }: ProviderRosterViewProps) {
   const router = useRouter();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [detailWorkflowId, setDetailWorkflowId] = useState<string | null>(null);
+  const [selectedNpi, setSelectedNpi] = useState<string | null>(null);
 
   function getInitials(name: string | null): string {
     if (!name) return '??';
@@ -84,11 +85,11 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
       <div style={{ background: '#fff', borderRadius: 10, border: `1px solid ${colors.gray200}`, overflow: 'hidden' }}>
         {/* Header */}
         <div style={{
-          display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.8fr 0.9fr 40px',
+          display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.7fr 0.7fr 0.7fr 40px',
           padding: '10px 16px', background: colors.gray100, borderBottom: `1px solid ${colors.gray200}`,
           fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.gray400,
         }}>
-          <span>Provider</span><span>Specialty</span><span>NPI</span><span>Status</span><span>Issues</span><span></span>
+          <span>Provider</span><span>Specialty</span><span>NPI</span><span>Health</span><span>Issues</span><span>Status</span><span></span>
         </div>
 
         {/* Rows */}
@@ -103,17 +104,14 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
             <div key={p.id} style={{ position: 'relative' }}>
               <div
                 style={{
-                  display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.8fr 0.9fr 40px',
+                  display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.7fr 0.7fr 0.7fr 40px',
                   padding: '10px 16px', alignItems: 'center',
                   borderBottom: `1px solid ${colors.gray100}`,
                   cursor: 'pointer', transition: 'background .1s',
                 }}
                 onMouseOver={e => (e.currentTarget as HTMLElement).style.background = colors.gray50}
                 onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                onClick={() => {
-                  const wfId = workflowMap[p.npi];
-                  if (wfId) setDetailWorkflowId(wfId);
-                }}
+                onClick={() => setSelectedNpi(p.npi)}
               >
                 {/* Provider name + avatar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -137,14 +135,20 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
                   {p.npi}
                 </span>
 
-                {/* Status badge */}
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
-                  background: statusInfo.bg, color: statusInfo.color,
-                  display: 'inline-block', width: 'fit-content', textTransform: 'uppercase',
-                }}>
-                  {statusInfo.badge}
-                </span>
+                {/* Health score */}
+                {(() => {
+                  const h = healthMap[p.npi];
+                  const score = h?.health_score ?? 100;
+                  const hColor = score >= 80 ? colors.green : score >= 50 ? colors.gold : colors.red;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 40, height: 6, background: colors.gray200, borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${score}%`, background: hColor, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 10, color: hColor, fontWeight: 600 }}>{score}%</span>
+                    </div>
+                  );
+                })()}
 
                 {/* Issues */}
                 <Tooltip text={getIssueTooltip(p)}>
@@ -164,6 +168,15 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
                   )}
                 </Tooltip>
 
+                {/* Status badge */}
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                  background: statusInfo.bg, color: statusInfo.color,
+                  display: 'inline-block', width: 'fit-content', textTransform: 'uppercase',
+                }}>
+                  {statusInfo.badge}
+                </span>
+
                 {/* Action menu trigger */}
                 <button
                   onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === p.id ? null : p.id); }}
@@ -181,7 +194,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
                   background: '#fff', border: `1px solid ${colors.gray200}`, borderRadius: 8,
                   boxShadow: '0 8px 24px rgba(0,0,0,.12)', overflow: 'hidden', minWidth: 200,
                 }}>
-                  <button onClick={() => { setOpenMenu(null); const wfId = workflowMap[p.npi]; if (wfId) setDetailWorkflowId(wfId); }}
+                  <button onClick={() => { setOpenMenu(null); setSelectedNpi(p.npi); }}
                     style={menuItemStyle}>
                     <span style={menuIconStyle}>👤</span> View provider details
                   </button>
@@ -222,12 +235,12 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
         )}
       </div>
 
-      {/* Workflow detail panel */}
-      {detailWorkflowId && (
-        <WorkflowDetailPanel
-          workflowId={detailWorkflowId}
+      {/* Provider detail panel */}
+      {selectedNpi && (
+        <ProviderDetailPanel
+          npi={selectedNpi}
           practiceId={practiceId}
-          onClose={() => setDetailWorkflowId(null)}
+          onClose={() => setSelectedNpi(null)}
         />
       )}
     </div>

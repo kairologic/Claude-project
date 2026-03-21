@@ -65,11 +65,9 @@ export default function Sidebar({
 
   const navItems = [
     { id: 'dashboard', path: '', icon: '◉', label: 'Dashboard' },
-    { id: 'workflows', path: '/workflows', icon: '⚡', label: 'Workflows' },
-    { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster' },
-    { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
+    { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster', badge: unseenAlertCount > 0 ? unseenAlertCount : undefined },
+    { id: 'compliance', path: '/compliance', icon: '◈', label: 'Compliance' },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
-    { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
     { id: 'audit', path: '/audit', icon: '📋', label: 'Audit trail' },
   ];
 

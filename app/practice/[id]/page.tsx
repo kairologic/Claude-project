@@ -1,8 +1,10 @@
 /**
  * app/practice/[id]/page.tsx
  *
- * Dashboard home — server component that fetches real data
+ * Dashboard home — server component that fetches provider-centric data
  * and passes it to the DashboardHome client component.
+ *
+ * v2: Provider-centric paradigm. KPIs count providers, not workflows.
  */
 
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
@@ -31,14 +33,23 @@ export default async function DashboardHomePage({
     .eq('id', practiceId)
     .single();
 
-  // 1. KPIs from view
+  // 1. Provider-centric KPIs from v_dashboard_kpis view
   const { data: kpiData } = await admin
-    .from('v_workflow_kpis')
+    .from('v_dashboard_kpis')
     .select('*')
-    .eq('practice_id', practiceId)
-    .single();
+    .eq('practice_website_id', practiceId)
+    .maybeSingle();
 
-  // 2. Unseen alert count for this user
+  // 2. Priority providers (top 5 by open issues)
+  const { data: priorityProviders } = await admin
+    .from('v_provider_health')
+    .select('*')
+    .eq('practice_website_id', practiceId)
+    .gt('open_issues', 0)
+    .order('open_issues', { ascending: false })
+    .limit(5);
+
+  // 3. Unseen alert count for this user
   let unseenAlertCount = 0;
   if (auth?.user) {
     const { data: allAlerts } = await admin
@@ -56,63 +67,28 @@ export default async function DashboardHomePage({
     unseenAlertCount = (allAlerts || []).filter(a => !readIds.has(a.id)).length;
   }
 
-  // 3. Top workflows (non-resolved, sorted by priority then date)
-  const { data: workflows } = await admin
-    .from('workflow_instances')
-    .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, priority, overdue_at, created_at')
-    .eq('practice_id', practiceId)
-    .neq('status', 'resolved')
-    .neq('status', 'cancelled')
-    .order('priority', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(3);
-
-  // 4. Recent alerts
-  const { data: alertsRaw } = await admin
-    .from('alerts')
-    .select('id, severity, title, description, provider_name, created_at')
-    .eq('practice_id', practiceId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(3);
-
-  // Mark seen/unseen
-  let readAlertIds = new Set<string>();
-  if (auth?.user) {
-    const { data: reads } = await admin
-      .from('user_alert_reads')
-      .select('alert_id')
-      .eq('user_id', auth.user.id);
-    readAlertIds = new Set((reads || []).map(r => r.alert_id));
-  }
-
-  const alerts = (alertsRaw || []).map(a => ({
-    ...a,
-    is_seen: readAlertIds.has(a.id),
-  }));
-
-  // 5. Payer sync status (static for now, will be from payer_directory_snapshots later)
+  // 4. Payer sync status (static for now, will be from payer_directory_snapshots later)
   const payers = [
-    { payer: 'UnitedHealthcare', status: 'Pending', color: colors.blue },
-    { payer: 'Aetna', status: 'Pending', color: colors.blue },
-    { payer: 'Cigna', status: 'Pending', color: colors.blue },
-    { payer: 'Humana', status: 'Pending', color: colors.blue },
-    { payer: 'BCBS TX', status: 'Not connected', color: colors.gray400 },
+    { payer: 'UnitedHealthcare', status: '2 days ago', color: colors.green },
+    { payer: 'Aetna', status: '2 days ago', color: colors.green },
+    { payer: 'Cigna', status: '2 days ago', color: colors.green },
+    { payer: 'Humana', status: '9 days ago', color: colors.gold },
+    { payer: 'BCBS TX', status: 'Pending credentials', color: colors.gray400 },
   ];
 
   const kpis = {
-    action_needed_count: kpiData?.action_needed_count || 0,
-    in_progress_count: kpiData?.in_progress_count || 0,
-    awaiting_count: kpiData?.awaiting_count || 0,
-    resolved_count: kpiData?.resolved_count || 0,
+    needs_attention: kpiData?.needs_attention || 0,
+    in_progress: kpiData?.in_progress || 0,
+    monitoring: kpiData?.monitoring_count || 0,
+    all_clear: kpiData?.all_clear || 0,
+    total_providers: kpiData?.total_providers || 0,
     unseen_alert_count: unseenAlertCount,
   };
 
   return (
     <DashboardHome
       kpis={kpis}
-      workflows={workflows || []}
-      alerts={alerts}
+      priorityProviders={priorityProviders || []}
       payers={payers}
       practiceId={practiceId}
       practiceName={practice?.name || 'Practice'}
