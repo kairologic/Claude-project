@@ -3,14 +3,14 @@
  *
  * Slide-over panel showing full workflow detail:
  * - Header with type, title, status, progress
- * - Task checklist (done/active/pending) — NEW 4-step structure
- * - Step 1: Review & Approve (merged comparison + approval radio cards)
- * - Step 2: Download pre-filled NPPES form (active after approval)
- * - Step 3: Submit to NPPES (optional, independent)
- * - Step 4: Monitor & Auto-confirm (automated, parallel with step 3)
+ * - Task checklist — simplified 3-step NPPES flow:
+ *   Step 1: Review & Approve (compare + pick correct value)
+ *   Step 2: Download & Submit (PDF + NPPES portal + single "I've submitted" button)
+ *   Step 3: Monitor & Auto-confirm (automated, parallel with step 2)
  * - Source comparison table
- * - Document/artifact link
  * - Timeline of events
+ * - Cancel workflow button
+ * - Full audit trail with actor tracking
  */
 
 'use client';
@@ -86,7 +86,30 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
   // Download state
   const [downloadGenerating, setDownloadGenerating] = useState(false);
 
+  // Current user for audit trail
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
+
   const supabase = createBrowserSupabaseClient();
+
+  // Fetch current user on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setCurrentUser({ id: data.user.id, email: data.user.email || '' });
+    });
+  }, []);
+
+  /** Helper: create an audit event with user tracking */
+  function logEvent(eventType: string, title: string, details: Record<string, any> = {}) {
+    return supabase.from('workflow_events').insert({
+      workflow_id: workflow!.id,
+      event_type: eventType,
+      actor_type: 'user',
+      actor_id: currentUser?.id || null,
+      actor_email: currentUser?.email || null,
+      title,
+      details,
+    });
+  }
 
   // ── Fetch workflow details ──────────────────────────────────────────────
   useEffect(() => {
@@ -219,16 +242,16 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
     }
 
     if (!isNppesCorrect) {
-      // 3. Activate download_form (step 2) — sequential dependency
-      const downloadTask = tasks.find(t => t.task_type === 'download_form');
-      if (downloadTask) {
+      // 3. Activate download_submit (merged step 2) — or fallback to download_form for legacy tasks
+      const dsTask = tasks.find(t => t.task_type === 'download_submit') || tasks.find(t => t.task_type === 'download_form');
+      if (dsTask) {
         await supabase
           .from('workflow_tasks')
           .update({ status: 'active' })
-          .eq('id', downloadTask.id);
+          .eq('id', dsTask.id);
       }
 
-      // 4. Activate monitor_auto_confirm (step 4) — parallel, always starts
+      // 4. Activate monitor_auto_confirm (step 3) — parallel, always starts
       const monitorTask = tasks.find(t => t.task_type === 'monitor_auto_confirm');
       if (monitorTask) {
         await supabase
@@ -244,14 +267,12 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
       }
     }
 
-    // 5. Log event
-    await supabase.from('workflow_events').insert({
-      workflow_id: workflow.id,
-      event_type: 'approved',
-      actor_type: 'user',
-      title: isNppesCorrect ? 'NPPES data confirmed correct' : `Correction approved: ${chosenValue}`,
-      details: { approved_value: chosenValue, is_nppes_correct: isNppesCorrect },
-    });
+    // 5. Log event with user tracking
+    await logEvent(
+      'approved',
+      isNppesCorrect ? 'NPPES data confirmed correct' : `Correction approved: ${chosenValue}`,
+      { approved_value: chosenValue, is_nppes_correct: isNppesCorrect }
+    );
 
     setApprovalSubmitted(true);
     setApprovalResult({
@@ -335,14 +356,8 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
           .eq('id', submitTask.id);
       }
 
-      // Log event
-      await supabase.from('workflow_events').insert({
-        workflow_id: workflow.id,
-        event_type: 'form_downloaded',
-        actor_type: 'user',
-        title: 'NPPES update form downloaded',
-        details: { download_count: currentCount + 1 },
-      });
+      // Log event with user tracking
+      await logEvent('form_downloaded', 'NPPES update form downloaded', { download_count: currentCount + 1 });
 
       // Refetch tasks
       const { data: freshTasks } = await supabase
@@ -399,6 +414,43 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
     setSubmitMarking(false);
   }
 
+  // ── Download & Submit combined handler (new simplified step 2) ──────────
+  async function handleDownloadSubmitComplete() {
+    if (!workflow) return;
+    setSubmitMarking(true);
+
+    // Find the download_submit task (or fallback to submit_nppes for legacy)
+    const dsTask = tasks.find(t => t.task_type === 'download_submit') || tasks.find(t => t.task_type === 'submit_nppes');
+    if (dsTask) {
+      await supabase.from('workflow_tasks').update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        metadata: { ...dsTask.metadata, submitted_at: new Date().toISOString() },
+      }).eq('id', dsTask.id);
+    }
+
+    // Also complete download_form if it still exists as a separate legacy task
+    const dlTask = tasks.find(t => t.task_type === 'download_form' && t.status !== 'completed');
+    if (dlTask) {
+      await supabase.from('workflow_tasks').update({
+        status: 'completed', completed_at: new Date().toISOString(),
+      }).eq('id', dlTask.id);
+    }
+
+    // Log event with user tracking
+    await logEvent('submitted', 'NPPES correction form submitted', { submitted_at: new Date().toISOString() });
+
+    // Refetch tasks
+    const { data: freshTasks } = await supabase
+      .from('workflow_tasks')
+      .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+      .eq('workflow_id', workflow.id)
+      .order('task_order', { ascending: true });
+    if (freshTasks) setTasks(freshTasks);
+
+    setSubmitMarking(false);
+  }
+
   // ── Cancel/Delete workflow handler ──────────────────────────────────────
   async function handleCancelWorkflow() {
     if (!workflow) return;
@@ -415,14 +467,8 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
       .update({ status: 'cancelled' })
       .eq('id', workflow.id);
 
-    // Log event
-    await supabase.from('workflow_events').insert({
-      workflow_id: workflow.id,
-      event_type: 'cancelled',
-      actor_type: 'user',
-      title: `Workflow cancelled`,
-      details: { reason: 'User cancelled' },
-    });
+    // Log event with user tracking
+    await logEvent('cancelled', 'Workflow cancelled', { reason: 'User cancelled' });
 
     // Dismiss related alerts
     await supabase.from('alerts')
@@ -667,7 +713,93 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                       )}
 
-                      {/* ── Step 2: Download form button ── */}
+                      {/* ── Step 2: Download & Submit (merged step) ── */}
+                      {isActive && t.task_type === 'download_submit' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          {/* PDF download card */}
+                          <div style={{
+                            display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12,
+                            padding: 12, background: '#fff', border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                          }}>
+                            <div style={{
+                              width: 36, height: 36, borderRadius: 8, background: colors.navy,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#fff', fontSize: 16, flexShrink: 0,
+                            }}>📄</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
+                                NPPES Update Form — {workflow?.provider_name}
+                              </div>
+                              <div style={{ fontSize: 10, color: colors.gray400, marginTop: 2 }}>
+                                Pre-filled with your approved correction
+                              </div>
+                            </div>
+                            <button onClick={handleDownload} disabled={downloadGenerating} style={{
+                              padding: '7px 14px', background: colors.navy, color: '#fff', border: 'none',
+                              borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: downloadGenerating ? 'wait' : 'pointer',
+                              fontFamily: 'inherit', opacity: downloadGenerating ? 0.6 : 1,
+                            }}>
+                              {downloadGenerating ? 'Generating...' : 'Download PDF'}
+                            </button>
+                          </div>
+
+                          {/* Portal link */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                            <a
+                              href="https://nppes.cms.hhs.gov/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: 11, fontWeight: 600, color: colors.blue, textDecoration: 'underline' }}
+                            >
+                              Open NPPES Portal →
+                            </a>
+                            <span style={{ fontSize: 10, color: colors.gray400 }}>
+                              Upload your form here
+                            </span>
+                          </div>
+
+                          {/* Single action: I've submitted */}
+                          <button onClick={handleDownloadSubmitComplete} disabled={submitMarking} style={{
+                            width: '100%', padding: '9px 14px', background: colors.navy, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                            cursor: submitMarking ? 'wait' : 'pointer', fontFamily: 'inherit',
+                            opacity: submitMarking ? 0.6 : 1,
+                          }}>
+                            {submitMarking ? 'Saving...' : "I've submitted to NPPES"}
+                          </button>
+                          <div style={{ fontSize: 10, color: colors.gray400, marginTop: 6, textAlign: 'center' }}>
+                            We'll monitor NPPES automatically to confirm your update was applied.
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step 2: Already completed */}
+                      {isDone && t.task_type === 'download_submit' && (
+                        <div style={{
+                          marginTop: 8, padding: '10px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 14, color: colors.green }}>✓</span>
+                            <span style={{ fontSize: 11, color: colors.green, fontWeight: 600 }}>
+                              Submitted to NPPES {t.metadata?.submitted_at
+                                ? new Date(t.metadata.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                : ''}
+                            </span>
+                          </div>
+                          <button onClick={handleDownload} style={{
+                            padding: '4px 10px', background: 'transparent',
+                            color: colors.navy, border: `1px solid ${colors.gray200}`, borderRadius: 4,
+                            fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>Re-download PDF</button>
+                        </div>
+                      )}
+
+                      {/* Legacy support: old download_form tasks still work */}
                       {isActive && t.task_type === 'download_form' && (
                         <div style={{
                           marginTop: 8, padding: 14, background: colors.gray50,
@@ -683,9 +815,6 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                             <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
                               NPPES Update Form — {workflow?.provider_name}
                             </div>
-                            <div style={{ fontSize: 10, color: colors.gray400, marginTop: 2 }}>
-                              Pre-filled with your approved {findingField === 'address_line_1' ? 'address' : findingField} correction
-                            </div>
                           </div>
                           <button onClick={handleDownload} disabled={downloadGenerating} style={{
                             padding: '7px 14px', background: colors.navy, color: '#fff', border: 'none',
@@ -696,8 +825,6 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           </button>
                         </div>
                       )}
-
-                      {/* Step 2: Already downloaded */}
                       {isDone && t.task_type === 'download_form' && (
                         <div style={{
                           marginTop: 8, padding: '8px 14px', borderRadius: 8,
@@ -705,9 +832,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           display: 'flex', alignItems: 'center', gap: 8,
                         }}>
                           <span style={{ fontSize: 14, color: colors.green }}>✓</span>
-                          <span style={{ fontSize: 11, color: colors.green, fontWeight: 600 }}>
-                            Downloaded {t.metadata?.download_count || 1}x
-                          </span>
+                          <span style={{ fontSize: 11, color: colors.green, fontWeight: 600 }}>Downloaded</span>
                           <button onClick={handleDownload} style={{
                             marginLeft: 'auto', padding: '4px 10px', background: 'transparent',
                             color: colors.navy, border: `1px solid ${colors.gray200}`, borderRadius: 4,
@@ -715,55 +840,19 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           }}>Download again</button>
                         </div>
                       )}
-
-                      {/* ── Step 3: Submit to NPPES ── */}
-                      {isActive && t.task_type === 'submit_nppes' && (
-                        <div style={{
-                          marginTop: 8, padding: 14, background: colors.gray50,
-                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                            <a
-                              href="https://nppes.cms.hhs.gov/"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                fontSize: 11, fontWeight: 600, color: colors.blue,
-                                textDecoration: 'underline',
-                              }}
-                            >
-                              Open NPPES Portal →
-                            </a>
-                          </div>
-                          <div style={{ fontSize: 10, color: colors.gray400, marginBottom: 10 }}>
-                            Upload your pre-filled form at the NPPES portal. Then mark as submitted below.
-                            This step is optional. We monitor NPPES automatically regardless.
-                          </div>
-                          <button onClick={handleMarkSubmitted} disabled={submitMarking} style={{
-                            padding: '7px 14px', background: '#fff', color: colors.navy,
-                            border: `1.5px solid ${colors.navy}`, borderRadius: 6, fontSize: 11,
-                            fontWeight: 700, cursor: submitMarking ? 'wait' : 'pointer', fontFamily: 'inherit',
-                          }}>
-                            {submitMarking ? 'Saving...' : 'Mark as submitted'}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Step 3: Already submitted */}
+                      {/* Legacy: old submit_nppes tasks */}
                       {isDone && t.task_type === 'submit_nppes' && (
                         <div style={{
                           marginTop: 8, padding: '8px 14px', borderRadius: 8,
                           background: colors.greenPale, border: `1px solid ${colors.green}`,
                           fontSize: 11, color: colors.green, fontWeight: 600,
                         }}>
-                          ✓ Marked submitted {t.metadata?.marked_submitted_at
-                            ? new Date(t.metadata.marked_submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                            : ''}
+                          ✓ Submitted
                         </div>
                       )}
 
                       {/* ── Generic active task: Mark complete button ── */}
-                      {isActive && !['review_approve', 'download_form', 'submit_nppes', 'monitor_auto_confirm'].includes(t.task_type) && (
+                      {isActive && !['review_approve', 'download_form', 'download_submit', 'submit_nppes', 'monitor_auto_confirm'].includes(t.task_type) && (
                         <div style={{
                           marginTop: 8, padding: 14, background: colors.gray50,
                           border: `1px solid ${colors.gray200}`, borderRadius: 8,
@@ -792,10 +881,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                               await supabase.from('workflow_tasks').update({
                                 status: 'completed', completed_at: new Date().toISOString(),
                               }).eq('id', t.id);
-                              await supabase.from('workflow_events').insert({
-                                workflow_id: workflow!.id, event_type: 'task_completed', actor_type: 'user',
-                                title: `Completed: ${t.title}`, details: {},
-                              });
+                              await logEvent('task_completed', `Completed: ${t.title}`, {});
                               // Activate next pending task
                               const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending');
                               if (nextTask) {
@@ -816,6 +902,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
                                 await supabase.from('workflow_events').insert({
                                   workflow_id: workflow.id, event_type: 'completed', actor_type: 'system',
+                                  actor_id: currentUser?.id || null, actor_email: currentUser?.email || null,
                                   title: 'Workflow completed — all tasks done', details: {},
                                 });
 
@@ -845,6 +932,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
                                   await supabase.from('workflow_events').insert({
                                     workflow_id: workflow.id, event_type: 'roster_added', actor_type: 'system',
+                                    actor_id: currentUser?.id || null, actor_email: currentUser?.email || null,
                                     title: `${workflow.provider_name} added to roster`,
                                     details: { npi: workflow.provider_npi },
                                   });

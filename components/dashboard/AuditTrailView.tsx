@@ -7,6 +7,7 @@ interface Event {
   workflow_id: string;
   event_type: string;
   actor_type: string;
+  actor_email: string | null;
   title: string;
   details: any;
   created_at: string;
@@ -408,7 +409,7 @@ export default function AuditTrailView({ events, workflowMap, practiceId }: Prop
                                 textTransform: 'capitalize',
                               }}
                             >
-                              {event.actor_type}
+                              {event.actor_email || event.actor_type}
                             </span>
                           </div>
 

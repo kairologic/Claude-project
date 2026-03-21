@@ -95,24 +95,45 @@ export async function POST(
       generatedAt: new Date().toISOString(),
     });
 
-    // 9. Store artifact reference (if workflow_artifacts table exists)
+    // 9. Save artifact to workflow_artifacts for Documents page
+    const artifactName = `NPPES Update Form — ${workflow.provider_name} (${workflow.finding_details?.field || 'correction'})`;
     try {
-      await supabase.from('workflow_artifacts').insert({
-        workflow_id: workflowId,
-        artifact_type: 'nppes_correction_form',
-        file_name: `NPPES_Update_${workflow.provider_name?.replace(/\s+/g, '_')}_${workflow.finding_details?.field}.pdf`,
-        mime_type: 'application/pdf',
-        file_size: pdfBytes.length,
-        generated_by: user.id,
-        metadata: {
-          field: workflow.finding_details?.field,
-          approved_value: workflow.approved_value,
-          provider_npi: workflow.provider_npi,
-        },
-      });
-    } catch {
-      // Non-critical: artifact tracking is optional for MVP
-      console.warn('workflow_artifacts insert skipped (table may not have expected columns)');
+      // Upsert: update if re-generated, insert if first time
+      const { data: existingArtifact } = await supabase
+        .from('workflow_artifacts')
+        .select('id')
+        .eq('workflow_id', workflowId)
+        .eq('artifact_type', 'pdf')
+        .maybeSingle();
+
+      if (existingArtifact) {
+        await supabase.from('workflow_artifacts')
+          .update({
+            name: artifactName,
+            file_size_kb: Math.round(pdfBytes.length / 1024),
+            generated_by: user.email || user.id,
+            created_at: new Date().toISOString(),
+          })
+          .eq('id', existingArtifact.id);
+      } else {
+        await supabase.from('workflow_artifacts').insert({
+          workflow_id: workflowId,
+          practice_id: workflow.practice_id,
+          name: artifactName,
+          artifact_type: 'pdf',
+          category: 'auto_generated',
+          file_size_kb: Math.round(pdfBytes.length / 1024),
+          generated_by: user.email || user.id,
+          content: {
+            field: workflow.finding_details?.field,
+            approved_value: workflow.approved_value,
+            provider_npi: workflow.provider_npi,
+            provider_name: workflow.provider_name,
+          },
+        });
+      }
+    } catch (artifactErr) {
+      console.warn('workflow_artifacts save failed:', artifactErr);
     }
 
     // 10. Return PDF

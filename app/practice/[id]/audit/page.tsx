@@ -8,7 +8,7 @@ export default async function AuditPage({ params }: { params: { id: string } }) 
   // Fetch recent workflow events for this practice
   const { data: events } = await admin
     .from('workflow_events')
-    .select('id, workflow_id, event_type, actor_type, title, details, created_at')
+    .select('id, workflow_id, event_type, actor_type, actor_email, title, details, created_at')
     .order('created_at', { ascending: false })
     .limit(200);
 
