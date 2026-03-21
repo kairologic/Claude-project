@@ -186,13 +186,19 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap 
                     <span style={menuIconStyle}>👤</span> View provider details
                   </button>
                   {status !== 'departing' && status !== 'departed' && (
-                    <button onClick={() => setOpenMenu(null)}
+                    <button onClick={() => {
+                      setOpenMenu(null);
+                      router.push(`/practice/${practiceId}/release?npi=${p.npi}&name=${encodeURIComponent(p.provider_name || '')}`);
+                    }}
                       style={{ ...menuItemStyle, color: colors.red }}>
                       <span style={menuIconStyle}>🚪</span> Mark as departing
                     </button>
                   )}
                   {status === 'departing' && (
-                    <button onClick={() => setOpenMenu(null)}
+                    <button onClick={() => {
+                      setOpenMenu(null);
+                      router.push(`/practice/${practiceId}/workflows?type=release`);
+                    }}
                       style={menuItemStyle}>
                       <span style={menuIconStyle}>📋</span> View departure workflow
                     </button>

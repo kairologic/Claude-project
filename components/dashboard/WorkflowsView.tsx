@@ -10,7 +10,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { colors, statusColors, statusLabels } from '@/lib/design-tokens';
+import { colors, statusColors, statusLabels, workflowTypeLabels } from '@/lib/design-tokens';
 import { WorkflowCard } from './ui';
 import WorkflowDetailPanel from './WorkflowDetailPanel';
 import type { WorkflowStatus } from '@/lib/types/dashboard-schema';
@@ -41,6 +41,7 @@ interface WorkflowsViewProps {
 }
 
 type FilterKey = 'all' | 'action_needed' | 'in_progress' | 'awaiting' | 'resolved';
+type TypeFilterKey = 'all' | 'nppes_update' | 'payer_directory' | 'onboarding' | 'release' | 'license_renewal' | 'compliance';
 
 const filters: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -48,6 +49,16 @@ const filters: { key: FilterKey; label: string }[] = [
   { key: 'in_progress', label: 'In progress' },
   { key: 'awaiting', label: 'Awaiting' },
   { key: 'resolved', label: 'Resolved' },
+];
+
+const typeFilters: { key: TypeFilterKey; label: string }[] = [
+  { key: 'all', label: 'All types' },
+  { key: 'nppes_update', label: 'NPPES Update' },
+  { key: 'payer_directory', label: 'Payer Directory' },
+  { key: 'onboarding', label: 'Onboarding' },
+  { key: 'release', label: 'Provider Release' },
+  { key: 'license_renewal', label: 'License Renewal' },
+  { key: 'compliance', label: 'Compliance' },
 ];
 
 export default function WorkflowsView(props: WorkflowsViewProps) {
@@ -62,15 +73,30 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialFilter = (searchParams.get('status') as FilterKey) || 'all';
+  const initialType = (searchParams.get('type') as TypeFilterKey) || 'all';
   const initialDetail = searchParams.get('detail') || null;
   const [activeFilter, setActiveFilter] = useState<FilterKey>(initialFilter);
+  const [activeType, setActiveType] = useState<TypeFilterKey>(initialType);
   const [detailId, setDetailId] = useState<string | null>(initialDetail);
+
+  // Count workflows by type (for badges)
+  const typeCounts = useMemo(() => {
+    const c: Record<string, number> = { all: workflows.length };
+    for (const wf of workflows) {
+      c[wf.workflow_type] = (c[wf.workflow_type] || 0) + 1;
+    }
+    return c;
+  }, [workflows]);
 
   // Filter workflows
   const filtered = useMemo(() => {
-    const list = activeFilter === 'all'
+    let list = activeFilter === 'all'
       ? workflows
       : workflows.filter(w => w.status === activeFilter);
+
+    if (activeType !== 'all') {
+      list = list.filter(w => w.workflow_type === activeType);
+    }
 
     // Sort: overdue first, then by priority desc, then by date desc
     return [...list].sort((a, b) => {
@@ -119,10 +145,37 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
         })}
       </div>
 
+      {/* Type filter bar */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {typeFilters.map(f => {
+          const count = typeCounts[f.key] || 0;
+          const isActive = activeType === f.key;
+          if (f.key !== 'all' && count === 0) return null;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setActiveType(f.key)}
+              style={{
+                padding: '5px 12px', borderRadius: 100, fontSize: 11, fontWeight: 600,
+                border: `1px solid ${isActive ? colors.gold : colors.gray200}`,
+                background: isActive ? colors.goldPale : '#fff',
+                color: isActive ? colors.navy : colors.gray600,
+                cursor: 'pointer', transition: 'all .1s', fontFamily: 'inherit',
+              }}
+              onMouseOver={e => { if (!isActive) (e.currentTarget as HTMLElement).style.borderColor = colors.gold; }}
+              onMouseOut={e => { if (!isActive) (e.currentTarget as HTMLElement).style.borderColor = colors.gray200; }}
+            >
+              {f.label} {f.key !== 'all' && `(${count})`}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Results count */}
       <div style={{ fontSize: 11, color: colors.gray400, marginBottom: 12 }}>
         Showing {filtered.length} workflow{filtered.length !== 1 ? 's' : ''}
         {activeFilter !== 'all' && ` · ${filters.find(f => f.key === activeFilter)?.label}`}
+        {activeType !== 'all' && ` · ${typeFilters.find(f => f.key === activeType)?.label}`}
       </div>
 
       {/* Workflow list */}

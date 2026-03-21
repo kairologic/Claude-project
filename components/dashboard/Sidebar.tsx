@@ -70,11 +70,7 @@ export default function Sidebar({
     { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
     { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
-    { id: 'onboarding', path: '/onboarding', icon: '🔐', label: 'Onboarding' },
-    { id: 'release', path: '/release', icon: '📤', label: 'Provider release' },
-    { id: 'compliance', path: '/compliance', icon: '⚖️', label: 'Compliance' },
     { id: 'audit', path: '/audit', icon: '📋', label: 'Audit trail' },
-    { id: 'help', path: '/help', icon: '❓', label: 'Help center' },
   ];
 
   const comingSoon = [
@@ -91,11 +87,7 @@ export default function Sidebar({
     if (sub.startsWith('/alerts')) return 'alerts';
     if (sub.startsWith('/documents')) return 'documents';
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
-    if (sub.startsWith('/onboarding')) return 'onboarding';
-    if (sub.startsWith('/release')) return 'release';
-    if (sub.startsWith('/compliance')) return 'compliance';
     if (sub.startsWith('/audit')) return 'audit';
-    if (sub.startsWith('/help')) return 'help';
     return 'dashboard';
   }
 
@@ -209,11 +201,18 @@ export default function Sidebar({
         </button>
         {helpOpen && (
           <div style={styles.popupUp}>
-            {['Help center', 'Common questions', 'Report an issue', 'Request a feature'].map((item, i) => (
-              <button key={i} onClick={() => setHelpOpen(false)} style={styles.popupItem}>
-                {item}
-              </button>
-            ))}
+            <button onClick={() => { navigate('/help'); setHelpOpen(false); }} style={styles.popupItem}>
+              Help center
+            </button>
+            <button onClick={() => { navigate('/help'); setHelpOpen(false); }} style={styles.popupItem}>
+              Common questions
+            </button>
+            <button onClick={() => setHelpOpen(false)} style={styles.popupItem}>
+              Report an issue
+            </button>
+            <button onClick={() => setHelpOpen(false)} style={styles.popupItem}>
+              Request a feature
+            </button>
           </div>
         )}
       </div>

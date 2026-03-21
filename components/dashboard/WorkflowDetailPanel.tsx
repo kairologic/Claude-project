@@ -712,6 +712,64 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                       )}
 
+                      {/* ── Generic active task: Mark complete button ── */}
+                      {isActive && !['review_approve', 'download_form', 'submit_nppes', 'monitor_auto_confirm'].includes(t.task_type) && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                          <div>
+                            {t.metadata?.portal_url && (
+                              <a href={t.metadata.portal_url} target="_blank" rel="noopener noreferrer"
+                                style={{ fontSize: 11, fontWeight: 600, color: colors.blue, textDecoration: 'underline', marginRight: 12 }}>
+                                Open portal →
+                              </a>
+                            )}
+                            {t.metadata?.template_content && (
+                              <div style={{ fontSize: 11, color: colors.gray600, marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 100, overflow: 'auto' }}>
+                                {t.metadata.template_content}
+                              </div>
+                            )}
+                            {!t.metadata?.portal_url && !t.metadata?.template_content && (
+                              <div style={{ fontSize: 11, color: colors.gray400 }}>
+                                Complete this step and mark it done below.
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={async () => {
+                              await supabase.from('workflow_tasks').update({
+                                status: 'completed', completed_at: new Date().toISOString(),
+                              }).eq('id', t.id);
+                              await supabase.from('workflow_events').insert({
+                                workflow_id: workflow!.id, event_type: 'task_completed', actor_type: 'user',
+                                title: `Completed: ${t.title}`, details: {},
+                              });
+                              // Activate next pending task
+                              const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending');
+                              if (nextTask) {
+                                await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                              }
+                              // Refetch
+                              const { data: freshTasks } = await supabase
+                                .from('workflow_tasks')
+                                .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                                .eq('workflow_id', workflow!.id)
+                                .order('task_order', { ascending: true });
+                              if (freshTasks) setTasks(freshTasks);
+                            }}
+                            style={{
+                              padding: '7px 14px', background: colors.navy, color: '#fff', border: 'none',
+                              borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                              fontFamily: 'inherit', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Mark complete
+                          </button>
+                        </div>
+                      )}
+
                       {/* ── Step 4: Monitor & Auto-confirm ── */}
                       {isActive && t.task_type === 'monitor_auto_confirm' && (
                         <div style={{
