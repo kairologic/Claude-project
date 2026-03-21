@@ -415,7 +415,7 @@ function SearchResultItem({
   onClick,
   onHover,
 }: SearchResultItemProps) {
-  let statusColor = colors.gray400;
+  let statusColor: string = colors.gray400;
   let statusLabel = '';
 
   if (result.type === 'workflow') {

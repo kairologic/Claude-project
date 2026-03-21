@@ -228,7 +228,7 @@ export default function ProviderOnboardingView({
 
   const containerStyle: React.CSSProperties = {
     padding: '24px',
-    backgroundColor: colors.background,
+    backgroundColor: colors.gray50,
     minHeight: '100vh',
   };
 
@@ -335,7 +335,7 @@ export default function ProviderOnboardingView({
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '10px 12px',
-    border: `1px solid ${colors.gray300}`,
+    border: `1px solid ${colors.gray200}`,
     borderRadius: '6px',
     fontSize: '14px',
     boxSizing: 'border-box',
@@ -364,7 +364,7 @@ export default function ProviderOnboardingView({
   };
 
   const errorStyle: React.CSSProperties = {
-    color: statusColors.error,
+    color: colors.red,
     fontSize: '12px',
     marginTop: '4px',
   };
@@ -474,9 +474,7 @@ export default function ProviderOnboardingView({
               )}
             </div>
             <Badge
-              label={statusLabels[workflow.status] || workflow.status}
-              backgroundColor={statusColors[workflow.status] || colors.gray300}
-              textColor="white"
+              status={workflow.status}
             />
           </div>
         ))
@@ -565,7 +563,7 @@ export default function ProviderOnboardingView({
                 <button
                   style={{
                     ...startButtonStyle,
-                    backgroundColor: colors.gray300,
+                    backgroundColor: colors.gray200,
                     color: colors.navy,
                     marginTop: '8px',
                   }}

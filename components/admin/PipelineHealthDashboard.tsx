@@ -230,8 +230,7 @@ export default function PipelineHealthDashboard({
                     <span
                       style={{
                         display: 'inline-block',
-                        paddingX: 8,
-                        paddingY: 4,
+                        padding: '4px 8px',
                         backgroundColor: status.bgColor,
                         color: status.color,
                         borderRadius: 4,

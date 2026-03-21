@@ -792,7 +792,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
 
   const containerStyles: React.CSSProperties = {
     minHeight: '100vh',
-    backgroundColor: colors.background,
+    backgroundColor: colors.gray50,
     padding: '24px',
   };
 
@@ -809,7 +809,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
 
   const subtitleStyles: React.CSSProperties = {
     fontSize: '14px',
-    color: colors.text_secondary,
+    color: colors.gray400,
   };
 
   const searchContainerStyles: React.CSSProperties = {
@@ -825,13 +825,13 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
     borderRadius: '10px',
     fontFamily: 'inherit',
     backgroundColor: colors.white,
-    color: colors.text_primary,
+    color: colors.navy,
     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   };
 
   const breadcrumbStyles: React.CSSProperties = {
     fontSize: '13px',
-    color: colors.text_secondary,
+    color: colors.gray400,
     marginBottom: '24px',
     fontFamily: 'inherit',
   };
@@ -897,7 +897,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
 
   const topicDescriptionStyles: React.CSSProperties = {
     fontSize: '13px',
-    color: colors.text_secondary,
+    color: colors.gray400,
   };
 
   const detailContainerStyles: React.CSSProperties = {
@@ -917,7 +917,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
 
   const detailContentStyles: React.CSSProperties = {
     fontSize: '14px',
-    color: colors.text_primary,
+    color: colors.navy,
     lineHeight: '1.6',
     marginBottom: '32px',
     whiteSpace: 'pre-wrap',
@@ -932,7 +932,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
   const feedbackLabelStyles: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: '600',
-    color: colors.text_primary,
+    color: colors.navy,
     marginBottom: '12px',
   };
 
@@ -948,7 +948,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
     border: `1px solid ${isSelected ? colors.gold : colors.gray200}`,
     borderRadius: '6px',
     backgroundColor: isSelected ? colors.gold : colors.white,
-    color: isSelected ? colors.white : colors.text_primary,
+    color: isSelected ? colors.white : colors.navy,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     fontFamily: 'inherit',
@@ -1015,20 +1015,20 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
     padding: '16px',
     backgroundColor: '#fafafa',
     fontSize: '13px',
-    color: colors.text_primary,
+    color: colors.navy,
     lineHeight: '1.6',
   };
 
   const emptyStateStyles: React.CSSProperties = {
     textAlign: 'center',
     padding: '48px 24px',
-    color: colors.text_secondary,
+    color: colors.gray400,
   };
 
   const emptyStateTitleStyles: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: '600',
-    color: colors.text_primary,
+    color: colors.navy,
     marginBottom: '8px',
   };
 
@@ -1056,7 +1056,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
               {selectedCategory.name}
             </span>
             {' > '}
-            <span style={{ color: colors.text_secondary }}>{selectedTopic.title}</span>
+            <span style={{ color: colors.gray400 }}>{selectedTopic.title}</span>
           </div>
         </div>
 
@@ -1243,7 +1243,7 @@ export default function HelpCenter({ practiceId }: HelpCenterProps) {
               textAlign: 'center',
             }}
           >
-            <p style={{ fontSize: '14px', color: colors.text_primary, marginBottom: '12px' }}>
+            <p style={{ fontSize: '14px', color: colors.navy, marginBottom: '12px' }}>
               Can't find what you're looking for?
             </p>
             <button

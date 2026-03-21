@@ -346,7 +346,7 @@ export function calculateProgress(
   }
 
   const completedCount = tasks.filter(
-    (task) => task.status === 'complete'
+    (task) => task.status === 'completed'
   ).length;
   const inProgressCount = tasks.filter(
     (task) => task.status === 'active'
