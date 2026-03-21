@@ -26,7 +26,7 @@ export default async function PayerDirectoryPage({
   const { data: providers } = await admin
     .from('practice_providers')
     .select('npi, provider_name, roster_status')
-    .eq('practice_id', practiceId)
+    .eq('practice_website_id', practiceId)
     .order('provider_name');
 
   // Get NPI list for filtering snapshots/mismatches
@@ -56,7 +56,7 @@ export default async function PayerDirectoryPage({
   const { data: nppesData } = npiList.length > 0
     ? await admin
         .from('providers')
-        .select('npi, provider_first_name, provider_last_name_legal_name, provider_first_line_business_practice_location_address, provider_business_practice_location_address_city_name, provider_business_practice_location_address_state_name, provider_business_practice_location_address_postal_code, provider_business_practice_location_address_telephone_number, healthcare_provider_taxonomy_code_1')
+        .select('npi, first_name, last_name, address_line_1, city, state, zip_code, phone, primary_taxonomy_code, taxonomy_desc')
         .in('npi', npiList)
     : { data: [] };
 
@@ -73,14 +73,14 @@ export default async function PayerDirectoryPage({
       roster_status: p.roster_status || 'active',
       nppes_address: nppes
         ? [
-            nppes.provider_first_line_business_practice_location_address,
-            nppes.provider_business_practice_location_address_city_name,
-            nppes.provider_business_practice_location_address_state_name,
-            nppes.provider_business_practice_location_address_postal_code?.slice(0, 5),
+            nppes.address_line_1,
+            nppes.city,
+            nppes.state,
+            nppes.zip_code?.slice(0, 5),
           ].filter(Boolean).join(', ')
         : null,
-      nppes_phone: nppes?.provider_business_practice_location_address_telephone_number || null,
-      nppes_specialty: nppes?.healthcare_provider_taxonomy_code_1 || null,
+      nppes_phone: nppes?.phone || null,
+      nppes_specialty: nppes?.taxonomy_desc || nppes?.primary_taxonomy_code || null,
     };
   });
 
@@ -96,15 +96,10 @@ export default async function PayerDirectoryPage({
 }
 
 /** Keep only the latest snapshot per (npi, payer_code). */
-function deduplicateSnapshots(
-  snapshots: Array<{
-    npi: string;
-    payer_code: string;
-    snapshot_date: string;
-    [key: string]: unknown;
-  }>,
-) {
-  const seen = new Map<string, typeof snapshots[0]>();
+function deduplicateSnapshots<T extends { npi: string; payer_code: string }>(
+  snapshots: T[],
+): T[] {
+  const seen = new Map<string, T>();
   for (const snap of snapshots) {
     const key = `${snap.npi}_${snap.payer_code}`;
     if (!seen.has(key)) {

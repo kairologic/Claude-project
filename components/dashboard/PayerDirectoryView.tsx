@@ -423,8 +423,8 @@ function CellDetailPanel({
   // Field comparison rows
   const fields = [
     { label: 'Address', nppes: provider.nppes_address, payer: snap ? `${snap.listed_address_line1 || ''}${snap.listed_city ? ', ' + snap.listed_city : ''}${snap.listed_state ? ' ' + snap.listed_state : ''} ${snap.listed_zip || ''}`.trim() : null },
-    { label: 'Phone', nppes: provider.nppes_phone, payer: snap?.listed_phone },
-    { label: 'Specialty', nppes: provider.nppes_specialty, payer: snap?.listed_specialty_display },
+    { label: 'Phone', nppes: provider.nppes_phone, payer: snap?.listed_phone ?? null },
+    { label: 'Specialty', nppes: provider.nppes_specialty, payer: snap?.listed_specialty_display ?? null },
     { label: 'Accepting patients', nppes: null, payer: snap?.listed_accepting_patients != null ? (snap.listed_accepting_patients ? 'Yes' : 'No') : null },
   ];
 
