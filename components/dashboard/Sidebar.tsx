@@ -157,7 +157,12 @@ export default function Sidebar({
       </div>
 
       {/* Add practice — always visible */}
-      <button style={styles.addSiteBtn}>
+      <button
+        onClick={() => window.alert('Practice site creation is coming soon. Contact support@kairologic.net to add a new practice.')}
+        style={styles.addSiteBtn}
+        onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = colors.gold; (e.currentTarget as HTMLElement).style.color = colors.gold; }}
+        onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = `${colors.navyLight}40`; (e.currentTarget as HTMLElement).style.color = colors.navyLight; }}
+      >
         <span style={{ color: colors.gold, fontWeight: 700 }}>+</span> Add practice site
       </button>
 

@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/design-tokens';
 import GlobalSearch from './GlobalSearch';
 
@@ -21,6 +22,7 @@ interface HeaderBarProps {
 }
 
 export default function HeaderBar({ title, practiceName, providerCount, lastSync, practiceId, onSelectWorkflow }: HeaderBarProps) {
+  const router = useRouter();
   const [dateStr, setDateStr] = useState('');
 
   useEffect(() => {
@@ -46,7 +48,10 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
           />
         )}
         <span style={styles.date}>{dateStr}</span>
-        <button style={styles.addBtn}>
+        <button
+          onClick={() => practiceId && router.push(`/practice/${practiceId}/onboarding`)}
+          style={styles.addBtn}
+        >
           <span style={{ fontSize: 14 }}>+</span> Add provider
         </button>
         <div style={styles.status}>
