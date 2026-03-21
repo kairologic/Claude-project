@@ -40,6 +40,12 @@ const pageTitles: Record<string, string> = {
   '/roster': 'Provider roster',
   '/alerts': 'Alerts',
   '/documents': 'Documents',
+  '/payer-directory': 'Payer directories',
+  '/onboarding': 'Provider onboarding',
+  '/release': 'Provider release',
+  '/compliance': 'Compliance',
+  '/audit': 'Audit trail',
+  '/help': 'Help center',
 };
 
 export default function DashboardShell({
@@ -111,6 +117,7 @@ export default function DashboardShell({
           practiceName={currentPracticeName}
           providerCount={currentProviderCount}
           lastSync="2 hours ago"
+          practiceId={currentPracticeId}
         />
         <div style={styles.content}>
           {children}

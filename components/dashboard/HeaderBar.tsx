@@ -9,15 +9,18 @@
 
 import { useState, useEffect } from 'react';
 import { colors } from '@/lib/design-tokens';
+import GlobalSearch from './GlobalSearch';
 
 interface HeaderBarProps {
   title: string;
   practiceName: string;
   providerCount: number;
   lastSync?: string;
+  practiceId?: string;
+  onSelectWorkflow?: (id: string) => void;
 }
 
-export default function HeaderBar({ title, practiceName, providerCount, lastSync }: HeaderBarProps) {
+export default function HeaderBar({ title, practiceName, providerCount, lastSync, practiceId, onSelectWorkflow }: HeaderBarProps) {
   const [dateStr, setDateStr] = useState('');
 
   useEffect(() => {
@@ -36,6 +39,12 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
         </div>
       </div>
       <div style={styles.right}>
+        {practiceId && (
+          <GlobalSearch
+            practiceId={practiceId}
+            onSelectWorkflow={onSelectWorkflow || (() => {})}
+          />
+        )}
         <span style={styles.date}>{dateStr}</span>
         <button style={styles.addBtn}>
           <span style={{ fontSize: 14 }}>+</span> Add provider
