@@ -74,3 +74,22 @@ Each workflow follows this pattern:
 - Workflow cards show: type, provider, summary, status, due date.
 - Workflow detail panel shows: full task checklist, source comparison, timeline, documents.
 - Don't overwhelm the practice manager with everything at once.
+
+## 11. Resolved / Skipped Task Handling
+
+- When a workflow resolves with a "no action needed" outcome (e.g., "NPPES is correct"), remaining steps are marked `skipped` — not greyed-out or disabled.
+- Skipped tasks are **hidden** from the UI entirely. The user sees only the steps that were actually performed.
+- Skip metadata records the reason (`skip_reason: 'nppes_correct'`) for audit purposes.
+
+## 12. Reopen / Undo Capability
+
+- Every resolved or cancelled workflow displays a **"Reopen workflow"** button.
+- Reopening resets the workflow to `action_needed`, clears `approved_value` and `approved_at`, resets the first task to `active`, and sets all subsequent tasks to `pending`.
+- A `workflow_reopened` event is logged in the audit trail with the reason.
+- This allows practice managers to correct mistakes without creating duplicate workflows.
+
+## 13. Universal Field Support for NPPES Mismatches
+
+- The approval UI uses a `FIELD_LABELS` map to render human-friendly labels for any mismatch field: address, phone, specialty, taxonomy code, first name, last name, license status, credential, gender, etc.
+- The same workflow structure handles all NPPES mismatch types — no field-specific code paths.
+- The generated PDF and artifact metadata include the specific field type for downstream processing.

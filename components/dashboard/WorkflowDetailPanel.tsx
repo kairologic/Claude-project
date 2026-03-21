@@ -190,7 +190,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
   // ── Approval handlers (Step 1: review_approve) ─────────────────────────
   const reviewApproveTask = tasks.find(t => t.task_type === 'review_approve' && t.status === 'active');
   const approvalOptions = reviewApproveTask?.metadata?.options || [];
-  const findingField = workflow?.finding_details?.field || 'value';
+  // findingField replaced by fieldLabel (see FIELD_LABELS below)
 
   function selectOption(idx: number | 'custom') {
     setApprovalSelection(idx);
@@ -241,7 +241,17 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
         .eq('id', reviewApproveTask.id);
     }
 
-    if (!isNppesCorrect) {
+    if (isNppesCorrect) {
+      // NPPES is correct — skip all remaining tasks (nothing to download/submit/monitor)
+      const remainingTaskIds = tasks
+        .filter(t => t.id !== reviewApproveTask?.id && t.status !== 'completed')
+        .map(t => t.id);
+      if (remainingTaskIds.length > 0) {
+        await supabase.from('workflow_tasks')
+          .update({ status: 'skipped', metadata: { skip_reason: 'nppes_correct' } })
+          .in('id', remainingTaskIds);
+      }
+    } else {
       // 3. Activate download_submit (merged step 2) — or fallback to download_form for legacy tasks
       const dsTask = tasks.find(t => t.task_type === 'download_submit') || tasks.find(t => t.task_type === 'download_form');
       if (dsTask) {
@@ -451,6 +461,66 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
     setSubmitMarking(false);
   }
 
+  // ── Reopen workflow handler ────────────────────────────────────────────
+  const [reopening, setReopening] = useState(false);
+
+  async function handleReopenWorkflow() {
+    if (!workflow) return;
+    setReopening(true);
+
+    // Reset workflow status to action_needed
+    await supabase.from('workflow_instances')
+      .update({
+        status: 'action_needed',
+        approved_value: null,
+        approved_at: null,
+        completed_at: null,
+      })
+      .eq('id', workflow.id);
+
+    // Reset first task (review_approve) back to active
+    const reviewTask = tasks.find(t => t.task_type === 'review_approve');
+    if (reviewTask) {
+      await supabase.from('workflow_tasks')
+        .update({ status: 'active', completed_at: null, metadata: reviewTask.metadata })
+        .eq('id', reviewTask.id);
+    }
+
+    // Reset all other tasks back to pending
+    const otherTaskIds = tasks.filter(t => t.id !== reviewTask?.id).map(t => t.id);
+    if (otherTaskIds.length > 0) {
+      await supabase.from('workflow_tasks')
+        .update({ status: 'pending', completed_at: null })
+        .in('id', otherTaskIds);
+    }
+
+    // Log event
+    await logEvent('reopened', 'Workflow reopened for re-review', {});
+
+    // Reset UI state
+    setApprovalSubmitted(false);
+    setApprovalResult(null);
+    setApprovalSelection(null);
+    setCustomValue('');
+
+    // Refetch everything
+    const { data: freshWf } = await supabase
+      .from('workflow_instances')
+      .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, priority, overdue_at, created_at, approved_value, approved_at, target_completion')
+      .eq('id', workflow.id)
+      .single();
+    if (freshWf) setWorkflow(freshWf);
+
+    const { data: freshTasks } = await supabase
+      .from('workflow_tasks')
+      .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+      .eq('workflow_id', workflow.id)
+      .order('task_order', { ascending: true });
+    if (freshTasks) setTasks(freshTasks);
+
+    setReopening(false);
+  }
+
   // ── Cancel/Delete workflow handler ──────────────────────────────────────
   async function handleCancelWorkflow() {
     if (!workflow) return;
@@ -491,11 +561,26 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
     window.location.reload();
   }
 
+  // ── Field label helper ──────────────────────────────────────────────────
+  const FIELD_LABELS: Record<string, string> = {
+    address_line_1: 'Address',
+    phone: 'Phone',
+    taxonomy_desc: 'Specialty',
+    primary_taxonomy_code: 'Taxonomy code',
+    first_name: 'First name',
+    last_name: 'Last name',
+    name: 'Name',
+    license_status: 'License status',
+    credential: 'Credential',
+    gender: 'Gender',
+  };
+
   // ── Build comparison data from finding_details ─────────────────────────
   const details = workflow?.finding_details || {};
+  const fieldLabel = FIELD_LABELS[details.field] || details.field || 'Value';
   const comparisonRows = details.nppes_value && details.website_value ? [
     {
-      field: details.field === 'address_line_1' ? 'Address' : details.field === 'phone' ? 'Phone' : details.field || 'Value',
+      field: fieldLabel,
       website: details.website_value,
       nppes: details.nppes_value,
     },
@@ -570,7 +655,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
               {/* ── Task Checklist ──────────────────────────────────── */}
               <div style={{ marginBottom: 24 }}>
                 <div style={sectionTitle}>Task checklist</div>
-                {tasks.map(t => {
+                {tasks.filter(t => t.status !== 'skipped').map(t => {
                   const isDone = t.status === 'completed';
                   const isActive = t.status === 'active';
                   const checkColor = isDone ? colors.green : isActive ? colors.gold : colors.gray200;
@@ -620,7 +705,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           border: `1px solid ${colors.gray200}`, borderRadius: 8,
                         }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: colors.navy, marginBottom: 10 }}>
-                            Which {findingField === 'address_line_1' ? 'address' : findingField} is correct?
+                            Which {fieldLabel.toLowerCase()} is correct?
                           </div>
 
                           {approvalOptions.map((opt: any, i: number) => (
@@ -664,7 +749,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                                 <input
                                   type="text" value={customValue}
                                   onChange={e => setCustomValue(e.target.value)}
-                                  placeholder={`Enter correct ${findingField === 'address_line_1' ? 'address' : findingField}...`}
+                                  placeholder={`Enter correct ${fieldLabel.toLowerCase()}...`}
                                   autoFocus
                                   style={{
                                     width: '100%', marginTop: 6, padding: '7px 10px', borderRadius: 6,
@@ -1142,16 +1227,38 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 </div>
               )}
 
-              {/* Cancelled state indicator */}
-              {workflow.status === 'cancelled' && (
+              {/* Resolved / Cancelled — with Reopen option */}
+              {(workflow.status === 'resolved' || workflow.status === 'cancelled') && (
                 <div style={{
-                  marginBottom: 24, padding: '12px 16px', borderRadius: 8,
-                  background: colors.gray100, border: `1px solid ${colors.gray200}`,
-                  textAlign: 'center',
+                  marginBottom: 24, padding: 16, borderRadius: 8,
+                  background: workflow.status === 'resolved' ? colors.greenPale : colors.gray100,
+                  border: `1px solid ${workflow.status === 'resolved' ? colors.green : colors.gray200}`,
                 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: colors.gray400 }}>
-                    This workflow has been cancelled
-                  </span>
+                  <div style={{
+                    fontSize: 12, fontWeight: 600, textAlign: 'center', marginBottom: 10,
+                    color: workflow.status === 'resolved' ? colors.green : colors.gray400,
+                  }}>
+                    {workflow.status === 'resolved'
+                      ? (workflow.finding_details?.field && approvalResult?.type === 'nppes_correct'
+                        ? 'Resolved — NPPES data is correct'
+                        : 'Workflow completed')
+                      : 'This workflow has been cancelled'}
+                  </div>
+                  <button
+                    onClick={handleReopenWorkflow}
+                    disabled={reopening}
+                    style={{
+                      width: '100%', padding: '8px 14px', background: '#fff',
+                      color: colors.navy, border: `1.5px solid ${colors.gray200}`,
+                      borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: reopening ? 'wait' : 'pointer',
+                      fontFamily: 'inherit', opacity: reopening ? 0.6 : 1,
+                    }}
+                  >
+                    {reopening ? 'Reopening...' : 'Reopen workflow'}
+                  </button>
+                  <div style={{ fontSize: 10, color: colors.gray400, marginTop: 6, textAlign: 'center' }}>
+                    Made a mistake? Reopen to start from the review step.
+                  </div>
                 </div>
               )}
             </div>
