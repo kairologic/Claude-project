@@ -29,6 +29,108 @@ interface Props {
 type EventTypeFilter = 'all' | 'created' | 'task_completed' | 'status_changed' | 'approved' | 'auto_confirmed' | 'overdue' | 'comment' | 'artifact_generated' | 'escalated';
 type ActorTypeFilter = 'all' | 'user' | 'system' | 'automation';
 
+// ─── Field label map for human-readable details ────────────────────────────
+const FIELD_LABELS: Record<string, string> = {
+  address_line_1: 'Address', phone: 'Phone', taxonomy_desc: 'Specialty',
+  primary_taxonomy_code: 'Taxonomy code', first_name: 'First name',
+  last_name: 'Last name', name: 'Name', license_status: 'License status',
+  credential: 'Credential', gender: 'Gender',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  action_needed: 'Needs attention', in_progress: 'In progress',
+  awaiting: 'Awaiting confirmation', resolved: 'Resolved',
+  cancelled: 'Cancelled', pending: 'Pending', active: 'Active',
+  completed: 'Completed', skipped: 'Skipped',
+};
+
+function formatPhoneNumber(phone: string | null | undefined): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits[0] === '1') return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  return phone;
+}
+
+function titleCaseValue(str: string | null | undefined): string {
+  if (!str) return '';
+  // If it looks like a phone number (all digits, 10-11 chars), format it
+  if (/^\d{10,11}$/.test(str)) return formatPhoneNumber(str);
+  // If already mixed case or short, return as-is
+  if (str !== str.toUpperCase() || str.length < 3) return str;
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatDetailValue(key: string, value: any): string {
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value !== 'string') return String(value);
+  // Format based on the key context
+  if (key.includes('phone') || key === 'approved_value' && /^\d{10,11}$/.test(value)) {
+    return formatPhoneNumber(value);
+  }
+  if (key.includes('address') || key.includes('city') || key.includes('name') || key.includes('specialty')) {
+    return titleCaseValue(value);
+  }
+  if (key === 'approved_value') return titleCaseValue(value);
+  if (key === 'status' || key === 'new_status' || key === 'old_status') {
+    return STATUS_LABELS[value] || titleCaseValue(value);
+  }
+  return titleCaseValue(value);
+}
+
+function formatDetailKey(key: string): string {
+  // Use known labels first
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  // Convert snake_case to Title Case
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    .replace('Is Nppes Correct', 'NPPES is correct?')
+    .replace('Nppes', 'NPPES')
+    .replace('Npi', 'NPI');
+}
+
+function formatEventDetails(details: any, eventType: string): React.ReactNode {
+  if (!details || typeof details !== 'object') return null;
+
+  const entries = Object.entries(details).filter(([k]) =>
+    // Skip internal/redundant fields
+    !['id', 'workflow_id', 'provider_npi', 'practice_id', 'created_at', 'updated_at'].includes(k)
+  );
+
+  if (entries.length === 0) return null;
+
+  // Detect field context from details to improve formatting of approved_value
+  const fieldContext = details.field || '';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {entries.map(([key, value]) => {
+        // For approved_value, use the field context
+        const effectiveKey = key === 'approved_value' && fieldContext === 'phone' ? 'phone' :
+                             key === 'approved_value' && fieldContext === 'address_line_1' ? 'address' : key;
+        // If value is itself an object, format it nicely
+        const displayValue = typeof value === 'object' && value !== null
+          ? Object.entries(value as Record<string, any>).map(([k, v]) => `${formatDetailKey(k)}: ${formatDetailValue(k, v)}`).join(', ')
+          : formatDetailValue(effectiveKey, value);
+        const displayKey = key === 'field' ? 'Field' : formatDetailKey(key);
+        // For the 'field' key, use FIELD_LABELS
+        const finalValue = key === 'field' ? (FIELD_LABELS[value as string] || titleCaseValue(value as string)) : displayValue;
+
+        return (
+          <div key={key} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', minWidth: 120, flexShrink: 0 }}>
+              {displayKey}
+            </span>
+            <span style={{ fontSize: 12, color: '#1e293b', fontWeight: 500 }}>
+              {finalValue}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const EVENT_ICONS: Record<string, string> = {
   created: '✨',
   task_completed: '✓',
@@ -425,21 +527,20 @@ export default function AuditTrailView({ events, workflowMap, practiceId }: Prop
                               <p style={{ fontSize: '11px', fontWeight: '600', color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                                 Details
                               </p>
-                              <pre
+                              <div
                                 style={{
                                   backgroundColor: '#f8fafc',
                                   padding: '10px',
                                   borderRadius: '6px',
-                                  fontSize: '11px',
+                                  fontSize: '12px',
                                   color: '#1e293b',
                                   overflow: 'auto',
                                   margin: '0',
                                   maxHeight: '300px',
-                                  fontFamily: 'Monaco, Courier New, monospace',
                                 }}
                               >
-                                {JSON.stringify(event.details, null, 2)}
-                              </pre>
+                                {formatEventDetails(event.details, event.event_type)}
+                              </div>
                             </div>
                           )}
 

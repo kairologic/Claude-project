@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { colors, statusColors, statusBgColors, rosterStatusMap } from '@/lib/design-tokens';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
+import WorkflowDetailPanel from './WorkflowDetailPanel';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,24 @@ const FIELD_LABELS: Record<string, string> = {
   credential: 'Credential', gender: 'Gender',
 };
 
+const WORKFLOW_TYPE_LABELS: Record<string, string> = {
+  nppes_update: 'NPPES update',
+  payer_directory: 'Payer directory update',
+  onboarding: 'Provider onboarding',
+  release: 'Provider departure',
+  license_renewal: 'License renewal',
+  compliance: 'Compliance check',
+};
+
+const WORKFLOW_TYPE_ICONS: Record<string, string> = {
+  nppes_update: '🔄',
+  payer_directory: '🏥',
+  onboarding: '🚀',
+  release: '🚪',
+  license_renewal: '📜',
+  compliance: '◈',
+};
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function ProviderDetailPanel({
@@ -126,6 +145,7 @@ export default function ProviderDetailPanel({
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedAction, setExpandedAction] = useState<string | null>(null);
+  const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
 
   const supabase = createBrowserSupabaseClient();
 
@@ -460,11 +480,14 @@ export default function ProviderDetailPanel({
                 const isPhone = details.field === 'phone';
                 const isAddr = details.field === 'address_line_1';
                 const fmtVal = (v: string) => isPhone ? formatPhone(v) : isAddr ? titleCase(v) : titleCase(v);
+                const isMismatch = w.workflow_type === 'nppes_update' && details.field;
+                const typeLabel = WORKFLOW_TYPE_LABELS[w.workflow_type] || w.workflow_type;
+                const typeIcon = WORKFLOW_TYPE_ICONS[w.workflow_type] || '📋';
 
                 return (
                   <div key={w.id} style={{ marginBottom: 6 }}>
                     <div
-                      onClick={() => setExpandedAction(isExpanded ? null : w.id)}
+                      onClick={() => isMismatch ? setExpandedAction(isExpanded ? null : w.id) : setActiveWorkflowId(w.id)}
                       style={{
                         display: 'flex', alignItems: 'flex-start', gap: 10,
                         padding: '10px 14px', background: '#fff',
@@ -478,22 +501,40 @@ export default function ProviderDetailPanel({
                       }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
-                          {fieldLabel ? `${fieldLabel} mismatch` : w.finding_summary}
+                          {isMismatch
+                            ? `${fieldLabel} mismatch`
+                            : `${typeIcon} ${w.finding_summary || typeLabel}`}
                         </div>
                         <div style={{ fontSize: 11, color: colors.gray400, marginTop: 2 }}>
-                          {details.website_value && details.nppes_value
-                            ? `${fmtVal(details.website_value)} (website) vs ${fmtVal(details.nppes_value)} (NPPES)`
-                            : w.finding_summary}
-                          {w.approved_value ? ` · Approved: ${fmtVal(w.approved_value)}` : ' · Approve correction'}
+                          {isMismatch ? (
+                            <>
+                              {details.website_value && details.nppes_value
+                                ? `${fmtVal(details.website_value)} (website) vs ${fmtVal(details.nppes_value)} (NPPES)`
+                                : w.finding_summary}
+                              {w.approved_value ? ` · Approved: ${fmtVal(w.approved_value)}` : ' · Approve correction'}
+                            </>
+                          ) : (
+                            <>
+                              {typeLabel}
+                              {' · '}
+                              {w.status === 'action_needed' ? 'Needs attention' : 'In progress'}
+                            </>
+                          )}
                         </div>
                       </div>
-                      <span style={{ fontSize: 10, color: colors.gray400, flexShrink: 0, marginTop: 4 }}>
-                        {isExpanded ? '▲' : '▼'}
-                      </span>
+                      {isMismatch ? (
+                        <span style={{ fontSize: 10, color: colors.gray400, flexShrink: 0, marginTop: 4 }}>
+                          {isExpanded ? '▲' : '▼'}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: colors.blue, flexShrink: 0, marginTop: 2 }}>
+                          Open →
+                        </span>
+                      )}
                     </div>
 
-                    {/* Expanded: show correction details */}
-                    {isExpanded && (
+                    {/* Expanded: show correction details (only for mismatch workflows) */}
+                    {isMismatch && isExpanded && (
                       <div style={{
                         marginTop: -1, padding: 14, background: colors.gray50,
                         border: `1px solid ${colors.navy}`, borderTop: 'none',
@@ -529,17 +570,19 @@ export default function ProviderDetailPanel({
                           }}>
                             {w.status === 'action_needed' ? 'Needs action' : w.status === 'in_progress' ? 'In progress' : w.status}
                           </span>
-                          <a
-                            href={`?tab=workflows&detail=${w.id}`}
+                          <button
                             onClick={(e) => {
-                              e.preventDefault();
-                              // Navigate to workflow detail via query params
-                              window.location.href = `${window.location.pathname}?tab=workflows&detail=${w.id}`;
+                              e.stopPropagation();
+                              setActiveWorkflowId(w.id);
                             }}
-                            style={{ fontSize: 11, fontWeight: 600, color: colors.blue, textDecoration: 'underline', cursor: 'pointer' }}
+                            style={{
+                              background: 'none', border: 'none', padding: 0,
+                              fontSize: 11, fontWeight: 600, color: colors.blue,
+                              textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit',
+                            }}
                           >
                             Open workflow →
-                          </a>
+                          </button>
                         </div>
                       </div>
                     )}
@@ -553,13 +596,15 @@ export default function ProviderDetailPanel({
                   display: 'flex', alignItems: 'flex-start', gap: 10,
                   padding: '10px 14px', background: '#fff',
                   border: `1px solid ${colors.gray200}`, borderRadius: 8,
-                  marginBottom: 6,
-                }}>
+                  marginBottom: 6, cursor: 'pointer',
+                }}
+                  onClick={() => setActiveWorkflowId(w.id)}
+                >
                   <div style={{
                     width: 8, height: 8, borderRadius: '50%',
                     background: colors.blue, marginTop: 5, flexShrink: 0,
                   }} />
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
                       {w.finding_summary || 'Monitoring correction'}
                     </div>
@@ -567,6 +612,9 @@ export default function ProviderDetailPanel({
                       Awaiting confirmation · Approved: {w.approved_value || 'N/A'}
                     </div>
                   </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: colors.blue, flexShrink: 0, marginTop: 2 }}>
+                    Open →
+                  </span>
                 </div>
               ))}
             </div>
@@ -622,16 +670,20 @@ export default function ProviderDetailPanel({
               <div style={{ marginBottom: 20 }}>
                 <div style={sectionTitle}>Resolved ({resolvedWorkflows.length})</div>
                 {resolvedWorkflows.slice(0, 5).map(w => (
-                  <div key={w.id} style={{
+                  <div key={w.id} onClick={() => setActiveWorkflowId(w.id)} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 14px', background: colors.gray50,
                     border: `1px solid ${colors.gray200}`, borderRadius: 8,
                     marginBottom: 4, fontSize: 12, color: colors.gray400,
-                  }}>
+                    cursor: 'pointer', transition: 'border-color 0.15s',
+                  }}
+                    onMouseOver={e => (e.currentTarget.style.borderColor = colors.navy)}
+                    onMouseOut={e => (e.currentTarget.style.borderColor = colors.gray200)}
+                  >
                     <span style={{ color: w.status === 'resolved' ? colors.green : colors.gray400 }}>
                       {w.status === 'resolved' ? '✓' : '✕'}
                     </span>
-                    <span style={{ flex: 1 }}>{w.finding_summary}</span>
+                    <span style={{ flex: 1 }}>{w.finding_summary || WORKFLOW_TYPE_LABELS[w.workflow_type] || w.workflow_type}</span>
                     <span style={{ fontSize: 10 }}>
                       {new Date(w.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
@@ -670,6 +722,19 @@ export default function ProviderDetailPanel({
           </div>
         )}
       </div>
+
+      {/* WorkflowDetailPanel — opens on top of provider panel */}
+      {activeWorkflowId && (
+        <WorkflowDetailPanel
+          workflowId={activeWorkflowId}
+          practiceId={practiceId}
+          onClose={() => {
+            setActiveWorkflowId(null);
+            // Refresh data when closing workflow detail in case status changed
+            fetchData();
+          }}
+        />
+      )}
     </>
   );
 }
