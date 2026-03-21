@@ -79,6 +79,10 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
   // Submit state
   const [submitMarking, setSubmitMarking] = useState(false);
 
+  // Cancel/delete state
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
   // Download state
   const [downloadGenerating, setDownloadGenerating] = useState(false);
 
@@ -393,6 +397,52 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
     if (freshTasks) setTasks(freshTasks);
 
     setSubmitMarking(false);
+  }
+
+  // ── Cancel/Delete workflow handler ──────────────────────────────────────
+  async function handleCancelWorkflow() {
+    if (!workflow) return;
+    setCancelling(true);
+
+    // Cancel all non-completed tasks
+    await supabase.from('workflow_tasks')
+      .update({ status: 'skipped' })
+      .eq('workflow_id', workflow.id)
+      .in('status', ['pending', 'active']);
+
+    // Mark workflow as cancelled
+    await supabase.from('workflow_instances')
+      .update({ status: 'cancelled' })
+      .eq('id', workflow.id);
+
+    // Log event
+    await supabase.from('workflow_events').insert({
+      workflow_id: workflow.id,
+      event_type: 'cancelled',
+      actor_type: 'user',
+      title: `Workflow cancelled`,
+      details: { reason: 'User cancelled' },
+    });
+
+    // Dismiss related alerts
+    await supabase.from('alerts')
+      .update({ is_active: false })
+      .eq('workflow_id', workflow.id);
+
+    // If this was an onboarding workflow, remove any practice_providers entry with onboarding status
+    if (workflow.workflow_type === 'onboarding' && workflow.provider_npi) {
+      await supabase.from('practice_providers')
+        .delete()
+        .eq('practice_website_id', practiceId)
+        .eq('npi', workflow.provider_npi)
+        .eq('roster_status', 'onboarding');
+    }
+
+    setCancelling(false);
+    setShowCancelConfirm(false);
+    onClose();
+    // Refresh the page to reflect changes
+    window.location.reload();
   }
 
   // ── Build comparison data from finding_details ─────────────────────────
@@ -751,6 +801,56 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                               if (nextTask) {
                                 await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
                               }
+
+                              // Check if all tasks are now completed
+                              const remainingPending = tasks.filter(
+                                nt => nt.id !== t.id && nt.status !== 'completed' && nt.status !== 'skipped'
+                              );
+                              const isLastTask = remainingPending.length === 0;
+
+                              if (isLastTask && workflow) {
+                                // Mark workflow as resolved
+                                await supabase.from('workflow_instances')
+                                  .update({ status: 'resolved', completed_at: new Date().toISOString() })
+                                  .eq('id', workflow.id);
+
+                                await supabase.from('workflow_events').insert({
+                                  workflow_id: workflow.id, event_type: 'completed', actor_type: 'system',
+                                  title: 'Workflow completed — all tasks done', details: {},
+                                });
+
+                                // For onboarding: add provider to roster now
+                                if (workflow.workflow_type === 'onboarding' && workflow.provider_npi) {
+                                  // Check if already on roster
+                                  const { data: existing } = await supabase
+                                    .from('practice_providers')
+                                    .select('id')
+                                    .eq('practice_website_id', practiceId)
+                                    .eq('npi', workflow.provider_npi)
+                                    .maybeSingle();
+
+                                  if (!existing) {
+                                    await supabase.from('practice_providers').insert({
+                                      practice_website_id: practiceId,
+                                      npi: workflow.provider_npi,
+                                      provider_name: workflow.provider_name,
+                                      roster_status: 'active',
+                                    });
+                                  } else {
+                                    // Update existing to active if it was still onboarding
+                                    await supabase.from('practice_providers')
+                                      .update({ roster_status: 'active' })
+                                      .eq('id', existing.id);
+                                  }
+
+                                  await supabase.from('workflow_events').insert({
+                                    workflow_id: workflow.id, event_type: 'roster_added', actor_type: 'system',
+                                    title: `${workflow.provider_name} added to roster`,
+                                    details: { npi: workflow.provider_npi },
+                                  });
+                                }
+                              }
+
                               // Refetch
                               const { data: freshTasks } = await supabase
                                 .from('workflow_tasks')
@@ -758,6 +858,16 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                                 .eq('workflow_id', workflow!.id)
                                 .order('task_order', { ascending: true });
                               if (freshTasks) setTasks(freshTasks);
+
+                              // Refresh workflow status
+                              if (isLastTask) {
+                                const { data: freshWf } = await supabase
+                                  .from('workflow_instances')
+                                  .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, priority, overdue_at, created_at, approved_value, approved_at, target_completion')
+                                  .eq('id', workflow!.id)
+                                  .single();
+                                if (freshWf) setWorkflow(freshWf);
+                              }
                             }}
                             style={{
                               padding: '7px 14px', background: colors.navy, color: '#fff', border: 'none',
@@ -885,6 +995,75 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                       <span style={{ fontFamily: 'monospace', fontSize: 11, color: colors.navy }}>{workflow.provider_npi}</span>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ── Cancel / Delete Workflow ─────────────────────────── */}
+              {workflow.status !== 'cancelled' && workflow.status !== 'resolved' && (
+                <div style={{
+                  marginBottom: 24, padding: 16, borderRadius: 8,
+                  border: `1px solid ${colors.gray200}`, background: colors.gray50,
+                }}>
+                  {!showCancelConfirm ? (
+                    <button
+                      onClick={() => setShowCancelConfirm(true)}
+                      style={{
+                        width: '100%', padding: '8px 14px', background: 'transparent',
+                        color: colors.red, border: `1.5px solid ${colors.red}30`,
+                        borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        fontFamily: 'inherit', transition: 'all .15s',
+                      }}
+                      onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = colors.redPale; }}
+                      onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      {workflow.workflow_type === 'onboarding' ? 'Cancel onboarding' : 'Cancel workflow'}
+                    </button>
+                  ) : (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: colors.red, marginBottom: 8 }}>
+                        {workflow.workflow_type === 'onboarding'
+                          ? 'Cancel this onboarding? The provider will not be added to your roster.'
+                          : 'Cancel this workflow? All pending tasks will be skipped.'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={handleCancelWorkflow}
+                          disabled={cancelling}
+                          style={{
+                            padding: '7px 16px', background: colors.red, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                            cursor: cancelling ? 'wait' : 'pointer', fontFamily: 'inherit',
+                            opacity: cancelling ? 0.6 : 1,
+                          }}
+                        >
+                          {cancelling ? 'Cancelling...' : 'Yes, cancel'}
+                        </button>
+                        <button
+                          onClick={() => setShowCancelConfirm(false)}
+                          style={{
+                            padding: '7px 16px', background: '#fff', color: colors.navy,
+                            border: `1px solid ${colors.gray200}`, borderRadius: 6,
+                            fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          Keep workflow
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Cancelled state indicator */}
+              {workflow.status === 'cancelled' && (
+                <div style={{
+                  marginBottom: 24, padding: '12px 16px', borderRadius: 8,
+                  background: colors.gray100, border: `1px solid ${colors.gray200}`,
+                  textAlign: 'center',
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: colors.gray400 }}>
+                    This workflow has been cancelled
+                  </span>
                 </div>
               )}
             </div>

@@ -16,11 +16,12 @@ export default async function RosterPage({
   const practiceId = params.id;
   const admin = createAdminSupabaseClient();
 
-  // Fetch providers for this practice
+  // Fetch providers for this practice (exclude onboarding — they're not on the roster yet)
   const { data: providers } = await admin
     .from('practice_providers')
     .select('id, npi, provider_name, roster_status, active_mismatch_count, web_specialty, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type')
     .eq('practice_website_id', practiceId)
+    .neq('roster_status', 'onboarding')
     .order('active_mismatch_count', { ascending: false, nullsFirst: false });
 
   // Build NPI → first workflow_id map (for click-through to detail)

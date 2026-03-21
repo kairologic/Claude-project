@@ -82,16 +82,33 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
     try {
       const supabase = createBrowserSupabaseClient();
 
-      // Check if already on this practice roster
-      const { data: existing } = await supabase
+      // Check if already on roster as active/departing provider
+      const { data: existingRoster } = await supabase
         .from('practice_providers')
-        .select('npi')
+        .select('npi, roster_status')
         .eq('practice_website_id', practiceId)
         .eq('npi', npiInput)
+        .in('roster_status', ['active', 'departing'])
         .maybeSingle();
 
-      if (existing) {
+      if (existingRoster) {
         setError('This provider is already on your roster.');
+        setSearching(false);
+        return;
+      }
+
+      // Check if there's already an active onboarding workflow for this NPI
+      const { data: existingOnboarding } = await supabase
+        .from('workflow_instances')
+        .select('id')
+        .eq('practice_id', practiceId)
+        .eq('provider_npi', npiInput)
+        .eq('workflow_type', 'onboarding')
+        .in('status', ['action_needed', 'in_progress', 'awaiting'])
+        .maybeSingle();
+
+      if (existingOnboarding) {
+        setError('This provider already has an active onboarding workflow.');
         setSearching(false);
         return;
       }
@@ -124,15 +141,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
     try {
       const supabase = createBrowserSupabaseClient();
 
-      // 1. Add to practice_providers
-      await supabase.from('practice_providers').insert({
-        practice_website_id: practiceId,
-        npi: result.npi,
-        provider_name: `${result.first_name} ${result.last_name}`.trim(),
-        roster_status: 'onboarding',
-      });
-
-      // 2. Create onboarding workflow
+      // Create onboarding workflow (provider is NOT added to roster until onboarding completes)
       const { data: wf } = await supabase.from('workflow_instances').insert({
         practice_id: practiceId,
         workflow_type: 'onboarding',
@@ -150,7 +159,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
         priority: 3,
       }).select('id').single();
 
-      // 3. Create onboarding tasks
+      // 2. Create onboarding tasks
       if (wf) {
         const tasks = [
           { task_order: 1, task_type: 'data_snapshot', title: 'Day-one data snapshot', description: 'Review NPPES, PECOS, and license data for this provider.', status: 'active' },
@@ -162,12 +171,12 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
           tasks.map(t => ({ ...t, workflow_id: wf.id }))
         );
 
-        // 4. Create alert
+        // 3. Create alert
         await supabase.from('alerts').insert({
           practice_id: practiceId,
           severity: 'info',
           title: `New provider onboarding: ${result.first_name} ${result.last_name}`,
-          description: `${result.taxonomy_desc || 'Provider'} added to your roster. Onboarding workflow created.`,
+          description: `${result.taxonomy_desc || 'Provider'} onboarding started. Provider will be added to roster on completion.`,
           workflow_id: wf.id,
           provider_npi: result.npi,
           provider_name: `${result.first_name} ${result.last_name}`.trim(),
@@ -175,7 +184,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
           is_active: true,
         });
 
-        // 5. Log event
+        // 4. Log event
         await supabase.from('workflow_events').insert({
           workflow_id: wf.id,
           event_type: 'created',
