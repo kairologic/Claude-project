@@ -87,7 +87,7 @@ export async function runCredentialingAssessment(
   // 2. Fetch practice address for comparison
   const { data: practice } = await supabase
     .from('practice_websites')
-    .select('name, address, city, state, zip, phone')
+    .select('name, address, city, state')
     .eq('id', practiceId)
     .maybeSingle();
 

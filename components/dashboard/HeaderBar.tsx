@@ -223,8 +223,9 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
             practice_website_id: practiceId,
             npi: result.npi,
             provider_name: `${result.first_name} ${result.last_name}`.trim(),
-            specialty: result.taxonomy_desc || null,
+            web_specialty: result.taxonomy_desc || null,
             roster_status: 'onboarding',
+            added_date: new Date().toISOString().split('T')[0],
           });
         }
 
