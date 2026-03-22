@@ -175,6 +175,14 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
   const typeInfo = workflow ? (workflowTypeLabels[workflow.workflow_type] || { label: workflow.workflow_type, tooltip: '' }) : { label: '', tooltip: '' };
   const isOverdue = workflow?.overdue_at && new Date(workflow.overdue_at) < new Date() && workflow.status === 'action_needed';
 
+  // Check if all human tasks done and a monitor task is active (pending verification state)
+  const activeMonitorTask = tasks.find(t => ['monitor_auto_confirm', 'monitor_board'].includes(t.task_type) && t.status === 'active');
+  const humanTasksDone = tasks.filter(t => !['monitor_auto_confirm', 'monitor_board'].includes(t.task_type)).every(t => t.status === 'completed' || t.status === 'skipped');
+  const isPendingVerification = activeMonitorTask && humanTasksDone;
+  const pendingVerificationLabel = workflow?.workflow_type === 'license_renewal' ? 'Pending TMB verification'
+    : workflow?.workflow_type === 'payer_directory' ? 'Pending payer verification'
+    : 'Pending NPPES verification';
+
   // Due text
   let dueText = '';
   if (workflow) {
@@ -629,8 +637,16 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 {workflow.provider_name || 'Unknown'} — {workflow.finding_summary}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                 <Badge status={workflow.status} label={isOverdue ? 'Overdue' : undefined} />
+                {isPendingVerification && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                    background: colors.bluePale, color: colors.blue,
+                  }}>
+                    {pendingVerificationLabel}
+                  </span>
+                )}
                 <span style={{ fontSize: 11, color: colors.gray400 }}>
                   {dueText} · Created {new Date(workflow.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
@@ -658,8 +674,71 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 {tasks.filter(t => t.status !== 'skipped').map(t => {
                   const isDone = t.status === 'completed';
                   const isActive = t.status === 'active';
+                  const isMonitorTask = ['monitor_auto_confirm', 'monitor_board'].includes(t.task_type);
                   const checkColor = isDone ? colors.green : isActive ? colors.gold : colors.gray200;
-                  const checkMark = isDone ? '✓' : isActive ? '●' : '';
+                  const checkMark = isDone ? '✓' : isActive && !isMonitorTask ? '●' : '';
+
+                  // Contextual title overrides based on workflow type
+                  const contextTitle = (() => {
+                    if (t.task_type === 'review_approve' && workflow?.workflow_type === 'license_renewal') {
+                      return isDone ? 'Renewal application prepared' : 'Prepare renewal application';
+                    }
+                    return t.title;
+                  })();
+
+                  // Monitor tasks render differently — no checkbox, status indicator
+                  if (isMonitorTask) {
+                    const monitorLabel = workflow?.workflow_type === 'license_renewal' ? 'TMB'
+                      : workflow?.workflow_type === 'payer_directory' ? 'payer directory'
+                      : 'NPPES';
+                    return (
+                      <div key={t.id} style={{ marginBottom: 6 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                          border: `1px solid ${isDone ? colors.green + '40' : isActive ? colors.blue + '40' : colors.gray200}`,
+                          borderRadius: 8,
+                          background: isDone ? colors.greenPale + '30' : isActive ? colors.bluePale + '20' : 'transparent',
+                        }}>
+                          {/* Animated radar icon instead of checkbox */}
+                          <div style={{
+                            width: 18, height: 18, borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            fontSize: isDone ? 10 : 12, marginTop: 1, color: isDone ? '#fff' : colors.blue,
+                            background: isDone ? colors.green : colors.bluePale,
+                          }}>{isDone ? '✓' : '📡'}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontSize: 12, fontWeight: 600,
+                              color: isDone ? colors.gray400 : colors.navy,
+                              textDecoration: isDone ? 'line-through' : 'none',
+                            }}>
+                              {isDone ? `${monitorLabel.charAt(0).toUpperCase() + monitorLabel.slice(1)} update verified` : contextTitle}
+                              <span style={{
+                                marginLeft: 6, fontSize: 9, fontWeight: 700, color: colors.blue,
+                                background: colors.bluePale, padding: '1px 6px', borderRadius: 4,
+                              }}>AUTOMATED</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: colors.gray400, marginTop: 2 }}>
+                              {isDone
+                                ? `Update confirmed ${t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}`
+                                : isActive
+                                  ? `Monitoring ${monitorLabel} for updates — you'll be notified when confirmed`
+                                  : t.description}
+                            </div>
+                            {isActive && (
+                              <div style={{
+                                marginTop: 8, padding: '8px 12px', borderRadius: 6,
+                                background: colors.bluePale, border: `1px solid ${colors.blue}20`,
+                                fontSize: 11, color: colors.blue, fontWeight: 500,
+                              }}>
+                                ⏳ Pending {monitorLabel} verification
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div key={t.id} style={{ marginBottom: 6 }}>
@@ -684,13 +763,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                             fontSize: 12, fontWeight: 600, color: isDone ? colors.gray400 : colors.navy,
                             textDecoration: isDone ? 'line-through' : 'none',
                           }}>
-                            {t.title}
-                            {t.task_type === 'monitor_auto_confirm' && (
-                              <span style={{
-                                marginLeft: 6, fontSize: 9, fontWeight: 700, color: colors.blue,
-                                background: colors.bluePale, padding: '1px 6px', borderRadius: 4,
-                              }}>AUTO</span>
-                            )}
+                            {contextTitle}
                             {t.task_type === 'submit_nppes' && (
                               <span style={{
                                 marginLeft: 6, fontSize: 9, fontWeight: 700, color: colors.gray400,
@@ -945,8 +1018,65 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                       )}
 
+                      {/* ── Submit renewal to TMB ── */}
+                      {isActive && t.task_type === 'submit_renewal' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          <a
+                            href="https://profile.tmb.state.tx.us/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                              border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                              textDecoration: 'none', marginBottom: 10,
+                            }}
+                          >
+                            Open TMB Portal →
+                          </a>
+                          <button
+                            onClick={async () => {
+                              await supabase.from('workflow_tasks').update({
+                                status: 'completed', completed_at: new Date().toISOString(),
+                              }).eq('id', t.id);
+                              await logEvent('task_completed', `Submitted renewal to TMB`, {});
+                              // Activate monitor_board step
+                              const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending');
+                              if (nextTask) {
+                                await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                              }
+                              fetchData();
+                            }}
+                            style={{
+                              width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
+                              border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                            }}
+                          >
+                            I've submitted the renewal
+                          </button>
+                          <div style={{ fontSize: 10, color: colors.gray400, marginTop: 6, textAlign: 'center' }}>
+                            After submission, we'll monitor TMB for your updated license status.
+                          </div>
+                        </div>
+                      )}
+                      {isDone && t.task_type === 'submit_renewal' && (
+                        <div style={{
+                          marginTop: 8, padding: '8px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          fontSize: 11, color: colors.green, fontWeight: 600,
+                        }}>
+                          ✓ Submitted to TMB {t.completed_at
+                            ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : ''}
+                        </div>
+                      )}
+
                       {/* ── Generic active task: Mark complete button ── */}
-                      {isActive && !['review_approve', 'download_form', 'download_submit', 'submit_nppes', 'monitor_auto_confirm'].includes(t.task_type) && (
+                      {isActive && !['review_approve', 'download_form', 'download_submit', 'submit_nppes', 'submit_renewal', 'monitor_auto_confirm', 'monitor_board'].includes(t.task_type) && (
                         <div style={{
                           marginTop: 8, padding: 14, background: colors.gray50,
                           border: `1px solid ${colors.gray200}`, borderRadius: 8,

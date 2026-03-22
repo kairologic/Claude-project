@@ -41,6 +41,10 @@ interface ProviderHealth {
   has_taxonomy_mismatch: boolean;
   has_name_mismatch: boolean;
   has_license_issue: boolean;
+  has_active_license_renewal: boolean;
+  has_active_payer_directory: boolean;
+  has_active_onboarding: boolean;
+  has_active_compliance: boolean;
 }
 
 interface PayerData {
@@ -219,20 +223,24 @@ export default function DashboardHome({
                     background: colors.redPale, color: colors.red,
                   }}>{p.open_issues} issue{p.open_issues !== 1 ? 's' : ''}</span>
                 </div>
-                <div style={{ fontSize: 11, color: colors.gray600, marginBottom: p.has_address_mismatch || p.has_phone_mismatch || p.has_taxonomy_mismatch || p.has_name_mismatch || p.has_license_issue ? 6 : 0 }}>
+                <div style={{ fontSize: 11, color: colors.gray600, marginBottom: 6 }}>
                   {titleCase(p.specialty) || 'Specialty not listed'}
-                  {p.open_issues > 0 && ' · '}
-                  {p.open_issues > 0 && (
-                    <span style={{ color: colors.red, fontWeight: 500 }}>
-                      {p.open_issues} correction{p.open_issues !== 1 ? 's' : ''} needed
-                    </span>
-                  )}
                 </div>
                 {/* Issue type tags */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {p.has_license_issue && (
+                  {(p.has_license_issue || p.has_active_license_renewal) && (
                     <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.redPale, color: colors.red }}>
-                      License
+                      License renewal
+                    </span>
+                  )}
+                  {p.has_active_payer_directory && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.redPale, color: colors.red }}>
+                      Payer directory
+                    </span>
+                  )}
+                  {p.has_active_compliance && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.redPale, color: colors.red }}>
+                      Compliance
                     </span>
                   )}
                   {p.has_address_mismatch && (
@@ -253,6 +261,11 @@ export default function DashboardHome({
                   {p.has_taxonomy_mismatch && (
                     <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#FFF3E0', color: '#E65100' }}>
                       Specialty
+                    </span>
+                  )}
+                  {p.has_active_onboarding && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.bluePale, color: colors.blue }}>
+                      Onboarding
                     </span>
                   )}
                 </div>
