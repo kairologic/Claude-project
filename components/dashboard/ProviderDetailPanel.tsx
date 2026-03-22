@@ -159,6 +159,7 @@ export default function ProviderDetailPanel({
   const [loading, setLoading] = useState(true);
   const [expandedAction, setExpandedAction] = useState<string | null>(null);
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'credentialing' | 'history'>('overview');
 
   const supabase = createBrowserSupabaseClient();
 
@@ -240,6 +241,7 @@ export default function ProviderDetailPanel({
 
   useEffect(() => {
     fetchData();
+    setActiveTab('overview'); // Reset tab when provider changes
   }, [fetchData]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -265,6 +267,13 @@ export default function ProviderDetailPanel({
     ['credentialing_onboarding', 'credentialing_departure'].includes(w.workflow_type)
     && !['resolved', 'cancelled'].includes(w.status)
   );
+  // Auto-switch to credentialing tab when provider has an active credentialing workflow
+  useEffect(() => {
+    if (credentialingWorkflows.length > 0 && !loading) {
+      setActiveTab('credentialing');
+    }
+  }, [credentialingWorkflows.length, loading]);
+
   const nonCredentialingActive = activeWorkflows.filter(w =>
     !['credentialing_onboarding', 'credentialing_departure'].includes(w.workflow_type)
   );
@@ -396,196 +405,322 @@ export default function ProviderDetailPanel({
           )}
         </div>
 
+        {/* ── Tab bar ──────────────────────────────────────── */}
+        {!loading && provider && (
+          <div style={{
+            display: 'flex', borderBottom: `1px solid ${colors.gray200}`,
+            padding: '0 20px', background: '#fff',
+          }}>
+            {([
+              { key: 'overview', label: 'Overview' },
+              ...(credentialingWorkflows.length > 0
+                ? [{ key: 'credentialing', label: credentialingWorkflows[0]?.workflow_type === 'credentialing_departure' ? 'Departure' : 'Credentialing' }]
+                : []),
+              { key: 'history', label: 'History' },
+            ] as { key: typeof activeTab; label: string }[]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: '10px 16px', fontSize: 12, fontWeight: 700,
+                  color: activeTab === tab.key ? colors.navy : colors.gray400,
+                  background: 'none', border: 'none', borderBottom: activeTab === tab.key ? `2px solid ${colors.navy}` : '2px solid transparent',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {tab.label}
+                {tab.key === 'history' && activeWorkflows.length > 0 && (
+                  <span style={{
+                    marginLeft: 4, fontSize: 9, fontWeight: 700, padding: '1px 5px',
+                    borderRadius: 100, background: colors.redPale, color: colors.red,
+                  }}>{activeWorkflows.length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── Body ───────────────────────────────────────────── */}
         {!loading && provider && (
           <div style={{ padding: 20 }}>
 
-            {/* ── Section 1: Data Accuracy Across Sources ──── */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={sectionTitle}>Data accuracy across sources</div>
-              <table style={{
-                width: '100%', borderCollapse: 'collapse', fontSize: 11,
-                border: `1px solid ${colors.gray200}`, borderRadius: 8, overflow: 'hidden',
-              }}>
-                <thead>
-                  <tr>
-                    {['Field', 'NPPES', 'Website'].map(h => (
-                      <th key={h} style={{
-                        padding: '6px 8px', background: colors.gray100,
-                        fontWeight: 700, color: colors.gray400, textTransform: 'uppercase',
-                        fontSize: 10, letterSpacing: '0.03em', textAlign: 'left',
-                      }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonFields.map((row, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`, fontWeight: 600 }}>
-                        {row.field}
-                      </td>
-                      <td style={{
-                        padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`,
-                        color: row.match === false ? colors.red : row.match === true ? colors.green : colors.gray400,
-                        fontWeight: row.match === false ? 600 : 400,
-                        fontStyle: !row.nppes ? 'italic' : 'normal',
-                      }}>
-                        {row.nppes || 'Not available'}
-                      </td>
-                      <td style={{
-                        padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`,
-                        color: row.match === false ? colors.red : row.match === true ? colors.green : colors.gray400,
-                        fontWeight: row.match === false ? 600 : 400,
-                        fontStyle: !row.website ? 'italic' : 'normal',
-                      }}>
-                        {row.website || 'Not available'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {nppes?.credential && (
-                <div style={{ fontSize: 11, color: colors.gray400, marginTop: 6 }}>
-                  Credential: {nppes.credential} · Specialty: {titleCase(nppes.taxonomy_desc) || 'N/A'}
-                </div>
-              )}
-            </div>
-
-            {/* ── Section 2: License & Credentialing ───────── */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={sectionTitle}>License & credentialing</div>
-              <div style={{
-                background: colors.gray50, border: `1px solid ${colors.gray200}`,
-                borderRadius: 8, padding: '12px 14px',
-              }}>
-                {[
-                  {
-                    label: `${nppes?.state || 'State'} medical license`,
-                    value: practiceProvider?.has_license_issue
-                      ? (practiceProvider.license_issue_type || 'Issue detected')
-                      : 'Active',
-                    color: practiceProvider?.has_license_issue ? colors.red : colors.green,
-                    bg: practiceProvider?.has_license_issue ? colors.redPale : colors.greenPale,
-                  },
-                  {
-                    label: 'Disciplinary',
-                    value: practiceProvider?.has_license_issue && practiceProvider?.license_issue_type?.includes('disciplin')
-                      ? 'Active' : 'None',
-                    color: colors.green,
-                    bg: colors.greenPale,
-                  },
-                  {
-                    label: 'PECOS enrollment',
-                    value: 'Enrolled',
-                    color: colors.green,
-                    bg: colors.greenPale,
-                  },
-                ].map((row, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 0', fontSize: 12,
+            {/* ═══════ OVERVIEW TAB ═══════ */}
+            {activeTab === 'overview' && (
+              <>
+                {/* Data Accuracy Across Sources */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={sectionTitle}>Data accuracy across sources</div>
+                  <table style={{
+                    width: '100%', borderCollapse: 'collapse', fontSize: 11,
+                    border: `1px solid ${colors.gray200}`, borderRadius: 8, overflow: 'hidden',
                   }}>
-                    <span style={{ color: colors.gray400, fontWeight: 600 }}>{row.label}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
-                      background: row.bg, color: row.color,
-                    }}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Section 2b: Credentialing Progress ────── */}
-            {credentialingWorkflows.length > 0 && credentialingWorkflows.map(cw => {
-              const assessment = cw.finding_details?.assessment || {};
-              const estWeeks = cw.finding_details?.estimated_completion_weeks || 12;
-              const bottleneck = cw.finding_details?.bottleneck;
-              const isOnboarding = cw.workflow_type === 'credentialing_onboarding';
-              const totalTasks = Object.keys(assessment).length || 9;
-              const completedSources = Object.values(assessment).filter(
-                (v: any) => v === 'listed_correct' || v === 'active' || v === 'enrolled'
-              ).length;
-              // Use open_issues count as proxy for incomplete tasks
-              const tasksLabel = isOnboarding ? 'onboarding' : 'departure';
-
-              return (
-                <div key={cw.id} style={{ marginBottom: 20 }}>
-                  <div style={sectionTitle}>
-                    {isOnboarding ? '📋 Credentialing progress' : '📤 Departure progress'}
-                  </div>
-                  <div style={{
-                    background: '#fff', border: `1px solid ${colors.blue}30`,
-                    borderRadius: 10, padding: 16, borderLeft: `3px solid ${colors.blue}`,
-                  }}>
-                    {/* Progress header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>
-                        {cw.finding_summary}
-                      </div>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
-                        background: colors.bluePale, color: colors.blue,
-                      }}>
-                        {cw.status === 'in_progress' ? 'In progress' : cw.status === 'action_needed' ? 'Needs attention' : 'Monitoring'}
-                      </span>
+                    <thead>
+                      <tr>
+                        {['Field', 'NPPES', 'Website'].map(h => (
+                          <th key={h} style={{
+                            padding: '6px 8px', background: colors.gray100,
+                            fontWeight: 700, color: colors.gray400, textTransform: 'uppercase',
+                            fontSize: 10, letterSpacing: '0.03em', textAlign: 'left',
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonFields.map((row, i) => (
+                        <tr key={i}>
+                          <td style={{ padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`, fontWeight: 600 }}>
+                            {row.field}
+                          </td>
+                          <td style={{
+                            padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`,
+                            color: row.match === false ? colors.red : row.match === true ? colors.green : colors.gray400,
+                            fontWeight: row.match === false ? 600 : 400,
+                            fontStyle: !row.nppes ? 'italic' : 'normal',
+                          }}>
+                            {row.nppes || 'Not available'}
+                          </td>
+                          <td style={{
+                            padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`,
+                            color: row.match === false ? colors.red : row.match === true ? colors.green : colors.gray400,
+                            fontWeight: row.match === false ? 600 : 400,
+                            fontStyle: !row.website ? 'italic' : 'normal',
+                          }}>
+                            {row.website || 'Not available'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {nppes?.credential && (
+                    <div style={{ fontSize: 11, color: colors.gray400, marginTop: 6 }}>
+                      Credential: {nppes.credential} · Specialty: {titleCase(nppes.taxonomy_desc) || 'N/A'}
                     </div>
+                  )}
+                </div>
 
-                    {/* Timeline visualization */}
-                    {credentialingTasks[cw.id] && (
-                      <div style={{ marginBottom: 10 }}>
+                {/* License & Credentialing */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={sectionTitle}>License & credentialing</div>
+                  <div style={{
+                    background: colors.gray50, border: `1px solid ${colors.gray200}`,
+                    borderRadius: 8, padding: '12px 14px',
+                  }}>
+                    {[
+                      {
+                        label: `${nppes?.state || 'State'} medical license`,
+                        value: practiceProvider?.has_license_issue
+                          ? (practiceProvider.license_issue_type || 'Issue detected')
+                          : 'Active',
+                        color: practiceProvider?.has_license_issue ? colors.red : colors.green,
+                        bg: practiceProvider?.has_license_issue ? colors.redPale : colors.greenPale,
+                      },
+                      {
+                        label: 'Disciplinary',
+                        value: practiceProvider?.has_license_issue && practiceProvider?.license_issue_type?.includes('disciplin')
+                          ? 'Active' : 'None',
+                        color: colors.green,
+                        bg: colors.greenPale,
+                      },
+                      {
+                        label: 'PECOS enrollment',
+                        value: 'Enrolled',
+                        color: colors.green,
+                        bg: colors.greenPale,
+                      },
+                    ].map((row, i) => (
+                      <div key={i} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '6px 0', fontSize: 12,
+                      }}>
+                        <span style={{ color: colors.gray400, fontWeight: 600 }}>{row.label}</span>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                          background: row.bg, color: row.color,
+                        }}>{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Provider Reference */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={sectionTitle}>Provider reference</div>
+                  <div style={{
+                    padding: '10px 14px', background: colors.gray50, borderRadius: 8,
+                    border: `1px solid ${colors.gray200}`, fontSize: 12,
+                  }}>
+                    {[
+                      { label: 'NPI', value: provider.npi, mono: true },
+                      { label: 'Specialty', value: titleCase(provider.specialty) || 'N/A' },
+                      { label: 'Credential', value: provider.credential || 'N/A' },
+                      { label: 'Status', value: rosterInfo.badge },
+                    ].map((row, i) => (
+                      <div key={i} style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        marginBottom: i < 3 ? 4 : 0,
+                      }}>
+                        <span style={{ color: colors.gray400, fontWeight: 600 }}>{row.label}</span>
+                        <span style={{
+                          color: colors.navy, fontWeight: 600,
+                          fontFamily: row.mono ? 'monospace' : 'inherit',
+                          fontSize: row.mono ? 11 : 12,
+                        }}>{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ═══════ CREDENTIALING TAB ═══════ */}
+            {activeTab === 'credentialing' && credentialingWorkflows.length > 0 && (
+              <>
+                {credentialingWorkflows.map(cw => {
+                  const estWeeks = cw.finding_details?.estimated_completion_weeks || 12;
+                  const bottleneck = cw.finding_details?.bottleneck;
+                  const isOnboarding = cw.workflow_type === 'credentialing_onboarding';
+                  const tasksLabel = isOnboarding ? 'onboarding' : 'departure';
+                  const cwTasks = credentialingTasks[cw.id] || [];
+
+                  // Compute task group counts
+                  const immediateTasks = cwTasks.filter(t => t.metadata?.group === 'immediate');
+                  const submitTasks = cwTasks.filter(t => t.metadata?.group === 'submit_wait');
+                  const monitorTasks = cwTasks.filter(t => t.metadata?.group === 'monitoring');
+                  const completedCount = cwTasks.filter(t => t.status === 'completed').length;
+
+                  return (
+                    <div key={cw.id}>
+                      {/* Status header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
+                            {isOnboarding ? 'Provider Onboarding' : 'Provider Departure'}
+                          </div>
+                          <div style={{ fontSize: 11, color: colors.gray400, marginTop: 2 }}>
+                            {completedCount}/{cwTasks.length} tasks complete · Est. {estWeeks} weeks
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 100,
+                          background: cw.status === 'action_needed' ? colors.redPale : colors.bluePale,
+                          color: cw.status === 'action_needed' ? colors.red : colors.blue,
+                        }}>
+                          {cw.status === 'in_progress' ? 'In progress' : cw.status === 'action_needed' ? 'Needs attention' : 'Monitoring'}
+                        </span>
+                      </div>
+
+                      {/* Timeline visualization — full width, breathing room */}
+                      <div style={{
+                        background: colors.gray50, border: `1px solid ${colors.gray200}`,
+                        borderRadius: 10, padding: '16px 20px', marginBottom: 20,
+                      }}>
                         <CredentialingTimeline
                           workflowType={cw.workflow_type as 'credentialing_onboarding' | 'credentialing_departure'}
-                          tasks={credentialingTasks[cw.id]}
+                          tasks={cwTasks}
                           estimatedWeeks={estWeeks}
                           createdAt={cw.created_at}
                         />
+                        {bottleneck && (
+                          <div style={{ fontSize: 11, color: colors.gold, fontWeight: 600, marginTop: 8, textAlign: 'center' }}>
+                            Bottleneck: {bottleneck.charAt(0).toUpperCase() + bottleneck.slice(1)}
+                          </div>
+                        )}
                       </div>
-                    )}
 
-                    {/* Estimated timeline */}
-                    <div style={{ fontSize: 11, color: colors.gray600, marginBottom: 10 }}>
-                      Est. {estWeeks} weeks to full credentialing
-                      {bottleneck && (
-                        <span style={{ color: colors.gold, fontWeight: 600 }}>
-                          {' · '}{bottleneck.charAt(0).toUpperCase() + bottleneck.slice(1)} is the bottleneck
-                        </span>
-                      )}
+                      {/* Task group summary cards */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+                        {[
+                          { label: 'Immediate', tasks: immediateTasks, icon: '⚡', accent: colors.red },
+                          { label: 'Submit & Wait', tasks: submitTasks, icon: '📤', accent: colors.gold },
+                          { label: 'Monitoring', tasks: monitorTasks, icon: '📡', accent: colors.blue },
+                        ].map(group => {
+                          const done = group.tasks.filter(t => t.status === 'completed').length;
+                          return (
+                            <div key={group.label} style={{
+                              padding: '12px 10px', background: '#fff',
+                              border: `1px solid ${colors.gray200}`, borderRadius: 8, textAlign: 'center',
+                            }}>
+                              <div style={{ fontSize: 16, marginBottom: 4 }}>{group.icon}</div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: colors.gray400, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                {group.label}
+                              </div>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: done === group.tasks.length && group.tasks.length > 0 ? colors.green : colors.navy, marginTop: 2 }}>
+                                {done}/{group.tasks.length}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Task list — compact */}
+                      <div style={{ marginBottom: 20 }}>
+                        <div style={sectionTitle}>All tasks</div>
+                        {cwTasks.sort((a, b) => (a.task_order || 0) - (b.task_order || 0)).map((t, i) => {
+                          const isDone = t.status === 'completed';
+                          const isActive = t.status === 'active';
+                          return (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '8px 10px', borderBottom: `1px solid ${colors.gray100}`,
+                              opacity: isDone ? 0.5 : 1,
+                            }}>
+                              <div style={{
+                                width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 9, fontWeight: 800,
+                                background: isDone ? colors.green : isActive ? colors.blue : colors.gray200,
+                                color: isDone || isActive ? '#fff' : colors.gray400,
+                              }}>
+                                {isDone ? '✓' : isActive ? '→' : i + 1}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  fontSize: 12, fontWeight: isActive ? 700 : 500, color: colors.navy,
+                                  textDecoration: isDone ? 'line-through' : 'none',
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                }}>
+                                  {t.title}
+                                </div>
+                              </div>
+                              <span style={{
+                                fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 4, flexShrink: 0,
+                                textTransform: 'uppercase',
+                                background: t.metadata?.group === 'immediate' ? colors.redPale
+                                  : t.metadata?.group === 'submit_wait' ? '#FFF8E1'
+                                  : t.metadata?.group === 'monitoring' ? colors.bluePale : colors.gray100,
+                                color: t.metadata?.group === 'immediate' ? colors.red
+                                  : t.metadata?.group === 'submit_wait' ? '#F57F17'
+                                  : t.metadata?.group === 'monitoring' ? colors.blue : colors.gray400,
+                              }}>
+                                {t.metadata?.group === 'immediate' ? 'Now' : t.metadata?.group === 'submit_wait' ? 'Submit' : t.metadata?.group === 'monitoring' ? 'Auto' : ''}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Open full checklist button */}
+                      <button
+                        onClick={() => setActiveWorkflowId(cw.id)}
+                        style={{
+                          width: '100%', padding: '11px 14px', background: colors.navy, color: '#fff',
+                          border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        Open full {tasksLabel} checklist →
+                      </button>
                     </div>
+                  );
+                })}
+              </>
+            )}
 
-                    {/* Assessment snapshot */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
-                      {Object.entries(assessment).map(([source, status]: [string, any]) => {
-                        const isGood = status === 'listed_correct' || status === 'active' || status === 'enrolled';
-                        const needsWork = status === 'needs_update' || status === 'wrong_address' || status === 'not_listed' || status === 'needs_reassignment' || status === 'possibly_stale';
-                        return (
-                          <span key={source} style={{
-                            fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                            background: isGood ? colors.greenPale : needsWork ? colors.redPale : colors.gray100,
-                            color: isGood ? colors.green : needsWork ? colors.red : colors.gray400,
-                          }}>
-                            {source.toUpperCase().replace('_', ' ')}: {isGood ? '✓' : needsWork ? '✗' : '—'}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    {/* Open workflow button */}
-                    <button
-                      onClick={() => setActiveWorkflowId(cw.id)}
-                      style={{
-                        width: '100%', padding: '9px 14px', background: colors.navy, color: '#fff',
-                        border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                        cursor: 'pointer', fontFamily: 'inherit',
-                      }}
-                    >
-                      View {tasksLabel} checklist →
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* ── Section 3: Action Items ─────────────────── */}
+            {/* ═══════ HISTORY TAB ═══════ */}
+            {activeTab === 'history' && (
+              <>
+                {/* Action Items */}
             <div style={{ marginBottom: 20 }}>
               <div style={sectionTitle}>
                 Action items
@@ -827,33 +962,8 @@ export default function ProviderDetailPanel({
               </div>
             )}
 
-            {/* ── Provider Reference ─────────────────────── */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={sectionTitle}>Provider reference</div>
-              <div style={{
-                padding: '10px 14px', background: colors.gray50, borderRadius: 8,
-                border: `1px solid ${colors.gray200}`, fontSize: 12,
-              }}>
-                {[
-                  { label: 'NPI', value: provider.npi, mono: true },
-                  { label: 'Specialty', value: titleCase(provider.specialty) || 'N/A' },
-                  { label: 'Credential', value: provider.credential || 'N/A' },
-                  { label: 'Status', value: rosterInfo.badge },
-                ].map((row, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between',
-                    marginBottom: i < 3 ? 4 : 0,
-                  }}>
-                    <span style={{ color: colors.gray400, fontWeight: 600 }}>{row.label}</span>
-                    <span style={{
-                      color: colors.navy, fontWeight: 600,
-                      fontFamily: row.mono ? 'monospace' : 'inherit',
-                      fontSize: row.mono ? 11 : 12,
-                    }}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>
