@@ -1048,7 +1048,13 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                               if (nextTask) {
                                 await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
                               }
-                              fetchData();
+                              // Refetch tasks
+                              const { data: freshTasks } = await supabase
+                                .from('workflow_tasks')
+                                .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                                .eq('workflow_id', workflow!.id)
+                                .order('task_order', { ascending: true });
+                              if (freshTasks) setTasks(freshTasks);
                             }}
                             style={{
                               width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
