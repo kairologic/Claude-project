@@ -802,57 +802,49 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                       )}
 
-                      {/* ── Step 2: Download & Submit (merged step) ── */}
+                      {/* ── Step 2: Submit to NPPES ── */}
                       {isActive && t.task_type === 'download_submit' && (
                         <div style={{
                           marginTop: 8, padding: 14, background: colors.gray50,
                           border: `1px solid ${colors.gray200}`, borderRadius: 8,
                         }}>
-                          {/* PDF download card */}
+                          {/* Primary action: Go to NPPES Portal */}
+                          <a
+                            href="https://nppes.cms.hhs.gov/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                              border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                              textDecoration: 'none', marginBottom: 10,
+                            }}
+                          >
+                            Open NPPES Portal →
+                          </a>
+
+                          {/* Secondary: Download pre-filled form (optional) */}
                           <div style={{
-                            display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12,
-                            padding: 12, background: '#fff', border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 12px', background: '#fff', border: `1px solid ${colors.gray200}`,
+                            borderRadius: 6, marginBottom: 12,
                           }}>
-                            <div style={{
-                              width: 36, height: 36, borderRadius: 8, background: colors.navy,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#fff', fontSize: 16, flexShrink: 0,
-                            }}>📄</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
-                                NPPES Update Form — {workflow?.provider_name}
-                              </div>
-                              <div style={{ fontSize: 10, color: colors.gray400, marginTop: 2 }}>
-                                Pre-filled with your approved correction
-                              </div>
+                            <div style={{ fontSize: 11, color: colors.gray400 }}>
+                              Need a pre-filled form?
                             </div>
                             <button onClick={handleDownload} disabled={downloadGenerating} style={{
-                              padding: '7px 14px', background: colors.navy, color: '#fff', border: 'none',
-                              borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: downloadGenerating ? 'wait' : 'pointer',
+                              padding: '4px 12px', background: 'transparent', color: colors.navy,
+                              border: `1px solid ${colors.gray200}`, borderRadius: 4,
+                              fontSize: 11, fontWeight: 600, cursor: downloadGenerating ? 'wait' : 'pointer',
                               fontFamily: 'inherit', opacity: downloadGenerating ? 0.6 : 1,
                             }}>
                               {downloadGenerating ? 'Generating...' : 'Download PDF'}
                             </button>
                           </div>
 
-                          {/* Portal link */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                            <a
-                              href="https://nppes.cms.hhs.gov/"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ fontSize: 11, fontWeight: 600, color: colors.blue, textDecoration: 'underline' }}
-                            >
-                              Open NPPES Portal →
-                            </a>
-                            <span style={{ fontSize: 10, color: colors.gray400 }}>
-                              Upload your form here
-                            </span>
-                          </div>
-
-                          {/* Single action: I've submitted */}
+                          {/* Confirm submission */}
                           <button onClick={handleDownloadSubmitComplete} disabled={submitMarking} style={{
-                            width: '100%', padding: '9px 14px', background: colors.navy, color: '#fff',
+                            width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
                             border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
                             cursor: submitMarking ? 'wait' : 'pointer', fontFamily: 'inherit',
                             opacity: submitMarking ? 0.6 : 1,
@@ -888,30 +880,42 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                       )}
 
-                      {/* Legacy support: old download_form tasks still work */}
+                      {/* Legacy support: old download_form tasks — show portal link + optional PDF */}
                       {isActive && t.task_type === 'download_form' && (
                         <div style={{
                           marginTop: 8, padding: 14, background: colors.gray50,
                           border: `1px solid ${colors.gray200}`, borderRadius: 8,
-                          display: 'flex', alignItems: 'center', gap: 12,
                         }}>
+                          <a
+                            href="https://nppes.cms.hhs.gov/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                              border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                              textDecoration: 'none', marginBottom: 10,
+                            }}
+                          >
+                            Open NPPES Portal →
+                          </a>
                           <div style={{
-                            width: 36, height: 36, borderRadius: 8, background: colors.navy,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#fff', fontSize: 16, flexShrink: 0,
-                          }}>📄</div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
-                              NPPES Update Form — {workflow?.provider_name}
-                            </div>
-                          </div>
-                          <button onClick={handleDownload} disabled={downloadGenerating} style={{
-                            padding: '7px 14px', background: colors.navy, color: '#fff', border: 'none',
-                            borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: downloadGenerating ? 'wait' : 'pointer',
-                            fontFamily: 'inherit', opacity: downloadGenerating ? 0.6 : 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 12px', background: '#fff', border: `1px solid ${colors.gray200}`,
+                            borderRadius: 6,
                           }}>
-                            {downloadGenerating ? 'Generating...' : 'Download PDF'}
-                          </button>
+                            <div style={{ fontSize: 11, color: colors.gray400 }}>
+                              Need a pre-filled form?
+                            </div>
+                            <button onClick={handleDownload} disabled={downloadGenerating} style={{
+                              padding: '4px 12px', background: 'transparent', color: colors.navy,
+                              border: `1px solid ${colors.gray200}`, borderRadius: 4,
+                              fontSize: 11, fontWeight: 600, cursor: downloadGenerating ? 'wait' : 'pointer',
+                              fontFamily: 'inherit', opacity: downloadGenerating ? 0.6 : 1,
+                            }}>
+                              {downloadGenerating ? 'Generating...' : 'Download PDF'}
+                            </button>
+                          </div>
                         </div>
                       )}
                       {isDone && t.task_type === 'download_form' && (

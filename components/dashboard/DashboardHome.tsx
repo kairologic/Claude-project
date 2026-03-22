@@ -36,6 +36,11 @@ interface ProviderHealth {
   total_workflows: number;
   health_score: number;
   roster_status: string;
+  has_address_mismatch: boolean;
+  has_phone_mismatch: boolean;
+  has_taxonomy_mismatch: boolean;
+  has_name_mismatch: boolean;
+  has_license_issue: boolean;
 }
 
 interface PayerData {
@@ -214,12 +219,40 @@ export default function DashboardHome({
                     background: colors.redPale, color: colors.red,
                   }}>{p.open_issues} issue{p.open_issues !== 1 ? 's' : ''}</span>
                 </div>
-                <div style={{ fontSize: 11, color: colors.gray600 }}>
+                <div style={{ fontSize: 11, color: colors.gray600, marginBottom: p.has_address_mismatch || p.has_phone_mismatch || p.has_taxonomy_mismatch || p.has_name_mismatch || p.has_license_issue ? 6 : 0 }}>
                   {titleCase(p.specialty) || 'Specialty not listed'}
                   {p.open_issues > 0 && ' · '}
                   {p.open_issues > 0 && (
                     <span style={{ color: colors.red, fontWeight: 500 }}>
                       {p.open_issues} correction{p.open_issues !== 1 ? 's' : ''} needed
+                    </span>
+                  )}
+                </div>
+                {/* Issue type tags */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {p.has_license_issue && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.redPale, color: colors.red }}>
+                      License
+                    </span>
+                  )}
+                  {p.has_address_mismatch && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#FFF3E0', color: '#E65100' }}>
+                      Address
+                    </span>
+                  )}
+                  {p.has_phone_mismatch && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#FFF3E0', color: '#E65100' }}>
+                      Phone
+                    </span>
+                  )}
+                  {p.has_name_mismatch && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#FFF3E0', color: '#E65100' }}>
+                      Name
+                    </span>
+                  )}
+                  {p.has_taxonomy_mismatch && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#FFF3E0', color: '#E65100' }}>
+                      Specialty
                     </span>
                   )}
                 </div>
