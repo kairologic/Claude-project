@@ -94,19 +94,42 @@ export class FhirDirectoryClient {
       }
 
       // ── Step 2: Find PractitionerRole (links to Location, Org, Network) ──
+      // Two query strategies:
+      // A) Reference-based: PractitionerRole?practitioner=Practitioner/{id} (works on UHC/Optum)
+      // B) Chained identifier: PractitionerRole?practitioner.identifier=NPI (works on Aetna, Cigna)
+      // Try reference-based first (more reliable), fall back to chained if no results.
       await limiter.wait();
-      const roleBundle = await this.fhirGet<FhirBundle>(
+
+      const practitionerRef = `Practitioner/${practitioner.id}`;
+      let roleBundle = await this.fhirGet<FhirBundle>(
         endpoint,
-        `/PractitionerRole?practitioner.identifier=${identifierParam}` +
+        `/PractitionerRole?practitioner=${encodeURIComponent(practitionerRef)}` +
           `&_include=PractitionerRole:location` +
           `&_include=PractitionerRole:organization` +
           `&_include=PractitionerRole:network`
       );
 
-      const role = this.findResourceInBundle<FhirPractitionerRole>(
+      let role = this.findResourceInBundle<FhirPractitionerRole>(
         roleBundle,
         'PractitionerRole'
       );
+
+      // Fallback: try chained identifier search if reference-based returned nothing
+      if (!role && roleBundle.total === 0) {
+        console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles, trying chained identifier...`);
+        await limiter.wait();
+        roleBundle = await this.fhirGet<FhirBundle>(
+          endpoint,
+          `/PractitionerRole?practitioner.identifier=${identifierParam}` +
+            `&_include=PractitionerRole:location` +
+            `&_include=PractitionerRole:organization` +
+            `&_include=PractitionerRole:network`
+        );
+        role = this.findResourceInBundle<FhirPractitionerRole>(
+          roleBundle,
+          'PractitionerRole'
+        );
+      }
 
       // Extract included resources from the role bundle
       let location = this.findResourceInBundle<FhirLocation>(
