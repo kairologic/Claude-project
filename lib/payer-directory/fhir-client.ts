@@ -109,7 +109,7 @@ export class FhirDirectoryClient {
       );
 
       // Extract included resources from the role bundle
-      const location = this.findResourceInBundle<FhirLocation>(
+      let location = this.findResourceInBundle<FhirLocation>(
         roleBundle,
         'Location'
       );
@@ -117,6 +117,41 @@ export class FhirDirectoryClient {
         roleBundle,
         'Organization'
       );
+
+      // ── Fix #42b: Fallback for Location when _include fails ──
+      // Some payers (Humana, HCSC) don't support _include, so Location
+      // comes back null. Extract the reference from PractitionerRole
+      // and fetch Location directly.
+      if (!location && role) {
+        const locationRef = this.extractLocationReference(role);
+        if (locationRef) {
+          try {
+            await limiter.wait();
+            const locationBundle = await this.fhirGet<FhirBundle>(
+              endpoint,
+              `/Location?_id=${locationRef}`
+            );
+            location = this.findResourceInBundle<FhirLocation>(
+              locationBundle,
+              'Location'
+            );
+            if (!location) {
+              // Try direct read by ID (some servers prefer /Location/{id} over search)
+              try {
+                await limiter.wait();
+                location = await this.fhirGet<FhirLocation>(
+                  endpoint,
+                  `/Location/${locationRef}`
+                );
+              } catch {
+                // Location not available via direct read either
+              }
+            }
+          } catch (err) {
+            console.log(`    [${endpoint.payer_code}] Location fallback failed: ${err instanceof Error ? err.message : err}`);
+          }
+        }
+      }
 
       // Also check contained resources inside PractitionerRole
       const containedPractitioner = this.findContained<FhirPractitioner>(
@@ -210,9 +245,12 @@ export class FhirDirectoryClient {
       if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // Timeout: 60s for Humana (slow responses), 30s for others
+    const timeoutMs = endpoint.payer_code === 'humana' ? 60_000 : 30_000;
+
     const res = await fetch(url, {
       headers,
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     // 404 and 400 are expected when a provider isn't in a payer's directory
@@ -371,6 +409,55 @@ export class FhirDirectoryClient {
   }
 
   /**
+   * Fix #42: Also extract specialty from PractitionerRole.code
+   * Some payers (Cigna, Humana) put specialty in role.code instead of role.specialty
+   */
+  private extractSpecialtyFromRoleCode(
+    role: FhirPractitionerRole | null
+  ): { code: string | null; display: string | null } | null {
+    if (!role) return null;
+    const codes = (role as unknown as Record<string, unknown>)['code'] as FhirCodeableConcept[] | undefined;
+    if (!codes || codes.length === 0) return null;
+
+    for (const codeableConcept of codes) {
+      const coding = codeableConcept.coding;
+      if (!coding) continue;
+      for (const c of coding) {
+        if (c.system && NUCC_SYSTEM_PATTERNS.some((p) => c.system!.toLowerCase().includes(p))) {
+          return { code: c.code || null, display: c.display || codeableConcept.text || null };
+        }
+      }
+    }
+    // If no NUCC match, return the first code's display (some payers use plain text specialty)
+    const firstCoding = codes[0]?.coding?.[0];
+    if (firstCoding?.display) {
+      return { code: firstCoding.code || null, display: firstCoding.display };
+    }
+    return null;
+  }
+
+  /**
+   * Fix #42b: Extract Location reference ID from PractitionerRole.location
+   * Used as fallback when _include doesn't return Location resources
+   */
+  private extractLocationReference(role: FhirPractitionerRole): string | null {
+    const locations = (role as unknown as Record<string, unknown>)['location'] as
+      Array<{ reference?: string; display?: string }> | undefined;
+    if (!locations || locations.length === 0) return null;
+
+    const ref = locations[0].reference;
+    if (!ref) return null;
+
+    // Extract ID from "Location/12345" format
+    if (ref.startsWith('Location/')) {
+      return ref.replace('Location/', '');
+    }
+    // Some payers use full URL: "https://fhir.example.com/Location/12345"
+    const match = ref.match(/Location\/([^/]+)$/);
+    return match ? match[1] : ref;
+  }
+
+  /**
    * Fallback: Extract specialty from Practitioner.qualification.
    * UHC/Optum puts the NUCC taxonomy code in qualification[].code.coding
    * instead of PractitionerRole.specialty.
@@ -475,8 +562,11 @@ export class FhirDirectoryClient {
       this.extractFax(location?.telecom) ||
       this.extractFax(practitioner?.telecom);
     const specialty = this.extractSpecialty(role?.specialty);
-    // Fallback: UHC puts taxonomy in Practitioner.qualification, not PractitionerRole.specialty
-    // Check ALL Practitioner entries (UHC returns multiple, NUCC code may be on 2nd entry)
+    // Specialty fallback chain:
+    // 1. PractitionerRole.specialty (standard FHIR)
+    // 2. PractitionerRole.code (Cigna, Humana put NUCC here)
+    // 3. Practitioner.qualification (UHC/Optum puts taxonomy here)
+    let roleCodeSpecialty: { code: string | null; display: string | null } | null = null;
     let qualSpecialty: { code: string | null; display: string | null } | null = null;
     let qualCredentials: string | null = null;
     const practitionersToCheck = allPractitioners?.length
@@ -484,6 +574,11 @@ export class FhirDirectoryClient {
       : (practitioner ? [practitioner] : []);
 
     if (!specialty.code) {
+      // Fallback 2: PractitionerRole.code
+      roleCodeSpecialty = this.extractSpecialtyFromRoleCode(role);
+    }
+    if (!specialty.code && !roleCodeSpecialty) {
+      // Fallback 3: Practitioner.qualification
       for (const p of practitionersToCheck) {
         qualSpecialty = this.extractSpecialtyFromQualification(p);
         if (qualSpecialty) break;
@@ -494,7 +589,7 @@ export class FhirDirectoryClient {
       if (qualCredentials) break;
     }
 
-    const finalSpecialty = specialty.code ? specialty : (qualSpecialty || specialty);
+    const finalSpecialty = specialty.code ? specialty : (roleCodeSpecialty || qualSpecialty || specialty);
 
     const accepting = this.extractAcceptingPatients(role?.extension);
     const languages = this.extractLanguages(practitioner?.communication);
