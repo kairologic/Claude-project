@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { colors, statusColors, statusBgColors, rosterStatusMap } from '@/lib/design-tokens';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 import WorkflowDetailPanel from './WorkflowDetailPanel';
+import CredentialingTimeline from './CredentialingTimeline';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ export default function ProviderDetailPanel({
   const [practiceProvider, setPracticeProvider] = useState<PracticeProvider | null>(null);
   const [workflows, setWorkflows] = useState<WorkflowInstance[]>([]);
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
+  const [credentialingTasks, setCredentialingTasks] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedAction, setExpandedAction] = useState<string | null>(null);
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
@@ -209,8 +211,28 @@ export default function ProviderDetailPanel({
         .order('created_at', { ascending: false })
         .limit(30);
       if (ev) setEvents(ev);
+      // Also fetch tasks for credentialing workflows (for timeline)
+      const credWfs = wf.filter(w =>
+        ['credentialing_onboarding', 'credentialing_departure'].includes(w.workflow_type)
+        && !['resolved', 'cancelled'].includes(w.status)
+      );
+      if (credWfs.length > 0) {
+        const { data: tasks } = await supabase
+          .from('workflow_tasks')
+          .select('workflow_id, task_type, status, metadata')
+          .in('workflow_id', credWfs.map(c => c.id));
+        const grouped: Record<string, any[]> = {};
+        for (const t of (tasks || [])) {
+          if (!grouped[t.workflow_id]) grouped[t.workflow_id] = [];
+          grouped[t.workflow_id].push(t);
+        }
+        setCredentialingTasks(grouped);
+      } else {
+        setCredentialingTasks({});
+      }
     } else {
       setEvents([]);
+      setCredentialingTasks({});
     }
 
     setLoading(false);
@@ -507,6 +529,18 @@ export default function ProviderDetailPanel({
                         {cw.status === 'in_progress' ? 'In progress' : cw.status === 'action_needed' ? 'Needs attention' : 'Monitoring'}
                       </span>
                     </div>
+
+                    {/* Timeline visualization */}
+                    {credentialingTasks[cw.id] && (
+                      <div style={{ marginBottom: 10 }}>
+                        <CredentialingTimeline
+                          workflowType={cw.workflow_type as 'credentialing_onboarding' | 'credentialing_departure'}
+                          tasks={credentialingTasks[cw.id]}
+                          estimatedWeeks={estWeeks}
+                          createdAt={cw.created_at}
+                        />
+                      </div>
+                    )}
 
                     {/* Estimated timeline */}
                     <div style={{ fontSize: 11, color: colors.gray600, marginBottom: 10 }}>

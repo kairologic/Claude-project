@@ -256,6 +256,25 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
             bottleneck: assessmentOutput?.bottleneck,
           },
         });
+
+        // 6. Send onboarding notification email (non-blocking)
+        fetch('/api/email/credentialing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'onboarding_started',
+            provider_name: `${result.first_name} ${result.last_name}`.trim(),
+            provider_npi: result.npi,
+            practice_name: '',
+            practice_id: practiceId,
+            recipient_email: 'compliance@kairologic.net',
+            details: {
+              task_count: assessmentTasks.length,
+              estimated_weeks: assessmentOutput?.estimated_completion_weeks,
+              bottleneck: assessmentOutput?.bottleneck,
+            },
+          }),
+        }).catch(() => {});
       }
 
       setCreatedWorkflowId(wf?.id || null);

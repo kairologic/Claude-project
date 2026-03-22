@@ -176,7 +176,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
   const isOverdue = workflow?.overdue_at && new Date(workflow.overdue_at) < new Date() && workflow.status === 'action_needed';
 
   // Monitor task types (both legacy and credentialing)
-  const MONITOR_TASK_TYPES = ['monitor_auto_confirm', 'monitor_board', 'monitor_nppes', 'monitor_payer_directory', 'monitor_pecos'];
+  const MONITOR_TASK_TYPES = ['monitor_auto_confirm', 'monitor_board', 'monitor_nppes', 'monitor_payer_directory', 'monitor_pecos', 'monitor_phantom'];
 
   // Check if all human tasks done and a monitor task is active (pending verification state)
   const activeMonitorTask = tasks.find(t => MONITOR_TASK_TYPES.includes(t.task_type) && t.status === 'active');
@@ -1533,6 +1533,15 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                                 .update({ roster_status: 'active' }).eq('id', existing.id);
                             }
                             await logEvent('roster_added', `${workflow.provider_name} added to roster`, { npi: workflow.provider_npi });
+                          }
+
+                          // For credentialing_departure: update provider roster to departed
+                          if (workflow.workflow_type === 'credentialing_departure' && workflow.provider_npi) {
+                            await supabase.from('practice_providers')
+                              .update({ roster_status: 'departed', departed_date: new Date().toISOString().split('T')[0] })
+                              .eq('practice_website_id', practiceId)
+                              .eq('npi', workflow.provider_npi);
+                            await logEvent('roster_departed', `${workflow.provider_name} marked as departed`, { npi: workflow.provider_npi });
                           }
 
                           // Refresh

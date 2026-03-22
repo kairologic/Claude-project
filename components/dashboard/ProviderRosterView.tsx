@@ -9,12 +9,14 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { colors, rosterStatusMap, avatarColors } from '@/lib/design-tokens';
 import { Tooltip } from './ui';
 import ProviderDetailPanel from './ProviderDetailPanel';
 import { titleCase } from '@/lib/format-helpers';
+import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
+import { runDepartureAssessment } from '@/lib/credentialing/departure-engine';
 
 interface ProviderData {
   id: string;
@@ -42,6 +44,108 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
   const router = useRouter();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [selectedNpi, setSelectedNpi] = useState<string | null>(null);
+  const [departingNpi, setDepartingNpi] = useState<string | null>(null);
+
+  const handleMarkDeparting = useCallback(async (npi: string, providerName: string) => {
+    if (!confirm(`Mark ${providerName} as departing? This will generate a departure checklist.`)) return;
+    setDepartingNpi(npi);
+    try {
+      const supabase = createBrowserSupabaseClient();
+
+      // Run departure assessment
+      const output = await runDepartureAssessment(supabase, npi, practiceId);
+
+      // Create credentialing_departure workflow
+      const { data: wf } = await supabase.from('workflow_instances').insert({
+        practice_id: practiceId,
+        workflow_type: 'credentialing_departure',
+        status: 'action_needed',
+        provider_npi: npi,
+        provider_name: providerName,
+        finding_summary: output.summary,
+        finding_details: {
+          field: 'departure',
+          assessment: output.assessment,
+          directories_to_clear: output.directories_to_clear,
+        },
+        priority: 2,
+      }).select('id').single();
+
+      if (wf) {
+        // Insert departure tasks
+        if (output.tasks.length > 0) {
+          await supabase.from('workflow_tasks').insert(
+            output.tasks.map(t => ({
+              workflow_id: wf.id,
+              task_order: t.task_order,
+              task_type: t.task_type,
+              title: t.title,
+              description: t.description,
+              status: t.status,
+              metadata: t.metadata,
+            }))
+          );
+        }
+
+        // Update roster status to departing
+        await supabase.from('practice_providers')
+          .update({ roster_status: 'departing', departure_workflow_id: wf.id })
+          .eq('practice_website_id', practiceId)
+          .eq('npi', npi);
+
+        // Create alert
+        await supabase.from('alerts').insert({
+          practice_id: practiceId,
+          severity: 'warning',
+          title: `Departure started: ${providerName}`,
+          description: `${output.directories_to_clear} directories to clear. ${output.tasks.length} tasks generated.`,
+          workflow_id: wf.id,
+          provider_npi: npi,
+          provider_name: providerName,
+          source: 'departure_engine',
+          is_active: true,
+        });
+
+        // Log event
+        await supabase.from('workflow_events').insert({
+          workflow_id: wf.id,
+          event_type: 'created',
+          actor_type: 'user',
+          title: `Departure started for ${providerName}`,
+          details: {
+            npi,
+            directories_to_clear: output.directories_to_clear,
+            tasks_generated: output.tasks.length,
+          },
+        });
+
+        // Send departure notification email (non-blocking)
+        fetch('/api/email/credentialing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'departure_started',
+            provider_name: providerName,
+            provider_npi: npi,
+            practice_name: '',
+            practice_id: practiceId,
+            recipient_email: 'compliance@kairologic.net',
+            details: {
+              directories_to_clear: output.directories_to_clear,
+              task_count: output.tasks.length,
+            },
+          }),
+        }).catch(() => {});
+      }
+
+      // Reload to show updated status
+      window.location.reload();
+    } catch (err) {
+      alert('Failed to start departure workflow. Please try again.');
+    } finally {
+      setDepartingNpi(null);
+    }
+  }, [practiceId]);
 
   function getInitials(name: string | null): string {
     if (!name) return '??';
@@ -202,16 +306,18 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
                   {status !== 'departing' && status !== 'departed' && (
                     <button onClick={() => {
                       setOpenMenu(null);
-                      router.push(`/practice/${practiceId}/release?npi=${p.npi}&name=${encodeURIComponent(p.provider_name || '')}`);
+                      handleMarkDeparting(p.npi, titleCase(p.provider_name || ''));
                     }}
-                      style={{ ...menuItemStyle, color: colors.red }}>
-                      <span style={menuIconStyle}>🚪</span> Mark as departing
+                      disabled={departingNpi === p.npi}
+                      style={{ ...menuItemStyle, color: departingNpi === p.npi ? colors.gray400 : colors.red }}>
+                      <span style={menuIconStyle}>{departingNpi === p.npi ? '⏳' : '🚪'}</span>
+                      {departingNpi === p.npi ? 'Starting departure...' : 'Mark as departing'}
                     </button>
                   )}
                   {status === 'departing' && (
                     <button onClick={() => {
                       setOpenMenu(null);
-                      router.push(`/practice/${practiceId}/workflows?type=release`);
+                      setSelectedNpi(p.npi);
                     }}
                       style={menuItemStyle}>
                       <span style={menuIconStyle}>📋</span> View departure workflow
