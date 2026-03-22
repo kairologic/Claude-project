@@ -80,10 +80,15 @@ export default function HomePage() {
                       Audit trail
                     </div>
                   </nav>
-                  <div className="m-app-sidebar-soon">
-                    <div className="m-app-soon-label">PREMIUM</div>
-                    <div className="m-app-nav-item m-disabled">Reports</div>
-                    <div className="m-app-nav-item m-disabled">Settings</div>
+                  <div className="m-app-sidebar-extra">
+                    <div className="m-app-nav-item">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
+                      Reports
+                    </div>
+                    <div className="m-app-nav-item">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
+                      Settings
+                    </div>
                   </div>
                 </div>
 
