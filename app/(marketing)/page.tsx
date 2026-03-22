@@ -173,6 +173,54 @@ export default function HomePage() {
                         <span className="m-app-comp-status m-pending">Pending</span>
                       </div>
                     </div>
+
+                    {/* Credentialing Workflow Card */}
+                    <div className="m-app-workflow-panel">
+                      <div className="m-app-wf-header">
+                        <div className="m-app-panel-title">ACTIVE WORKFLOW</div>
+                        <span className="m-app-wf-badge m-onboarding">Onboarding</span>
+                      </div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--m-navy)', marginBottom: '2px' }}>David Willingham</div>
+                      <div style={{ fontSize: '9px', color: 'var(--m-gray-400)' }}>Optometry &middot; NPI 1750312120</div>
+
+                      {/* Timeline visualization */}
+                      <div className="m-app-wf-timeline">
+                        <div className="m-app-wf-step m-done"></div>
+                        <div className="m-app-wf-connector m-done"></div>
+                        <div className="m-app-wf-step m-done"></div>
+                        <div className="m-app-wf-connector m-done"></div>
+                        <div className="m-app-wf-step m-active"></div>
+                        <div className="m-app-wf-connector"></div>
+                        <div className="m-app-wf-step"></div>
+                        <div className="m-app-wf-connector"></div>
+                        <div className="m-app-wf-step"></div>
+                      </div>
+                      <div className="m-app-wf-labels">
+                        <span>Assess</span>
+                        <span>CAQH</span>
+                        <span>NPPES</span>
+                        <span>Payers</span>
+                        <span>Monitor</span>
+                      </div>
+
+                      {/* Task list */}
+                      <div className="m-app-wf-task">
+                        <div className="m-app-wf-task-dot m-done"></div>
+                        <span>Assessment complete</span>
+                      </div>
+                      <div className="m-app-wf-task">
+                        <div className="m-app-wf-task-dot m-done"></div>
+                        <span>CAQH profile updated</span>
+                      </div>
+                      <div className="m-app-wf-task">
+                        <div className="m-app-wf-task-dot m-active"></div>
+                        <span>Submit NPPES correction</span>
+                      </div>
+                      <div className="m-app-wf-task">
+                        <div className="m-app-wf-task-dot m-pending-dot"></div>
+                        <span>Payer enrollment (3)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

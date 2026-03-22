@@ -140,9 +140,10 @@
   background: linear-gradient(180deg, #FFFFFF 0%, var(--m-gray-50) 100%);
   overflow: hidden;
 }
+.m-hero .m-container { max-width: 1320px; }
 .m-hero-inner {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 64px; align-items: center;
+  display: grid; grid-template-columns: 1fr 1.4fr;
+  gap: 48px; align-items: center;
 }
 .m-hero-label { margin-bottom: 20px; }
 .m-hero h1 {
@@ -175,7 +176,7 @@
   overflow: hidden;
 }
 .m-app-frame {
-  display: flex; min-height: 380px;
+  display: flex; min-height: 420px;
 }
 
 /* Sidebar */
@@ -294,9 +295,9 @@
 .m-app-kpi-green .m-app-kpi-num   { color: var(--m-green); }
 .m-app-kpi-green .m-app-kpi-label { color: var(--m-green); }
 
-/* Bottom Row: Providers + Compliance */
+/* Bottom Row: Providers + Compliance + Workflow */
 .m-app-bottom-row {
-  display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; flex: 1;
+  display: grid; grid-template-columns: 1.2fr 0.9fr 0.9fr; gap: 10px; flex: 1;
 }
 .m-app-providers-panel, .m-app-compliance-panel {
   background: var(--m-white); border-radius: 10px;
@@ -358,6 +359,50 @@
   font-size: 10px; font-weight: 600;
 }
 .m-app-comp-status.m-pending { color: var(--m-gold); }
+
+/* Workflow card */
+.m-app-workflow-panel {
+  background: var(--m-white); border-radius: 10px;
+  border: 1px solid var(--m-gray-200); padding: 12px 14px;
+}
+.m-app-wf-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.m-app-wf-badge {
+  font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 100px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.m-app-wf-badge.m-onboarding { background: #E0F2FE; color: #0369A1; }
+.m-app-wf-timeline {
+  display: flex; align-items: center; gap: 0; margin: 10px 0;
+}
+.m-app-wf-step {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid var(--m-gray-200); background: var(--m-white);
+  position: relative; z-index: 1;
+}
+.m-app-wf-step.m-done { background: var(--m-green); border-color: var(--m-green); }
+.m-app-wf-step.m-active { background: #3B82F6; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+.m-app-wf-connector {
+  flex: 1; height: 2px; background: var(--m-gray-200);
+}
+.m-app-wf-connector.m-done { background: var(--m-green); }
+.m-app-wf-labels {
+  display: flex; justify-content: space-between;
+  font-size: 8px; color: var(--m-gray-400); margin-bottom: 10px;
+}
+.m-app-wf-task {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 0; border-top: 1px solid var(--m-gray-100);
+  font-size: 10px; color: var(--m-navy);
+}
+.m-app-wf-task-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.m-app-wf-task-dot.m-done { background: var(--m-green); }
+.m-app-wf-task-dot.m-active { background: #3B82F6; }
+.m-app-wf-task-dot.m-pending-dot { background: var(--m-gray-300); }
 
 /* Floating badges on hero */
 .m-float-badge {
