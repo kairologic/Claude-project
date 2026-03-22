@@ -1,7 +1,7 @@
 /**
  * POST /api/email/credentialing
  *
- * Sends credentialing-related notification emails via Amazon SES.
+ * Sends credentialing-related notification emails via Resend.
  * Covers onboarding, departure, phantom listing, and completion events.
  *
  * Body: {
@@ -20,12 +20,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
-const SES_SMTP_PORT = parseInt(process.env.SES_SMTP_PORT || '587');
-const SES_SMTP_USER = process.env.SES_SMTP_USER || '';
-const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
-const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.net';
-const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'ravi@kairologic.net';
+const FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -242,28 +239,41 @@ function ctaButton(url: string, text: string): string {
   </div>`;
 }
 
-// ─── Send via SES ────────────────────────────────────────────────────────────
+// ─── Send via Resend ─────────────────────────────────────────────────────────
 
-async function sendViaSES(to: string, toName: string, subject: string, html: string): Promise<boolean> {
-  if (!SES_SMTP_USER || !SES_SMTP_PASS) {
-    console.error('[Credentialing Email] SES SMTP credentials not configured');
+async function sendViaResend(to: string, subject: string, html: string, event: string, npi?: string): Promise<boolean> {
+  if (!RESEND_API_KEY) {
+    console.error('[Credentialing Email] RESEND_API_KEY not configured');
     return false;
   }
   try {
-    const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.default.createTransport({
-      host: SES_SMTP_HOST,
-      port: SES_SMTP_PORT,
-      secure: false,
-      auth: { user: SES_SMTP_USER, pass: SES_SMTP_PASS },
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [to],
+        subject,
+        html,
+        tags: [
+          { name: 'type', value: 'credentialing' },
+          { name: 'event', value: event },
+          ...(npi ? [{ name: 'npi', value: npi }] : []),
+        ],
+      }),
     });
-    const info = await transporter.sendMail({
-      from: `"${SES_FROM_NAME}" <${SES_FROM_EMAIL}>`,
-      to: toName ? `"${toName}" <${to}>` : to,
-      subject,
-      html,
-    });
-    console.log(`[Credentialing Email] Sent OK — ${info.messageId} to ${to}`);
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`[Credentialing Email] Resend ${res.status}: ${errBody}`);
+      return false;
+    }
+
+    const data = await res.json();
+    console.log(`[Credentialing Email] Sent OK — id: ${data.id}, to: ${to}`);
     return true;
   } catch (err) {
     console.error('[Credentialing Email] Send failed:', err);
@@ -340,11 +350,12 @@ export async function POST(request: NextRequest) {
     const subject = template.subject(vars);
     const html = template.body(vars);
 
-    const sent = await sendViaSES(
+    const sent = await sendViaResend(
       recipient_email,
-      recipient_name || practice_name || 'Practice Manager',
       subject,
       html,
+      event,
+      provider_npi,
     );
 
     // Log to notification_log table
