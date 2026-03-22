@@ -175,13 +175,24 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
   const typeInfo = workflow ? (workflowTypeLabels[workflow.workflow_type] || { label: workflow.workflow_type, tooltip: '' }) : { label: '', tooltip: '' };
   const isOverdue = workflow?.overdue_at && new Date(workflow.overdue_at) < new Date() && workflow.status === 'action_needed';
 
+  // Monitor task types (both legacy and credentialing)
+  const MONITOR_TASK_TYPES = ['monitor_auto_confirm', 'monitor_board', 'monitor_nppes', 'monitor_payer_directory', 'monitor_pecos'];
+
   // Check if all human tasks done and a monitor task is active (pending verification state)
-  const activeMonitorTask = tasks.find(t => ['monitor_auto_confirm', 'monitor_board'].includes(t.task_type) && t.status === 'active');
-  const humanTasksDone = tasks.filter(t => !['monitor_auto_confirm', 'monitor_board'].includes(t.task_type)).every(t => t.status === 'completed' || t.status === 'skipped');
+  const activeMonitorTask = tasks.find(t => MONITOR_TASK_TYPES.includes(t.task_type) && t.status === 'active');
+  const humanTasksDone = tasks.filter(t => !MONITOR_TASK_TYPES.includes(t.task_type)).every(t => t.status === 'completed' || t.status === 'skipped');
   const isPendingVerification = activeMonitorTask && humanTasksDone;
   const pendingVerificationLabel = workflow?.workflow_type === 'license_renewal' ? 'Pending TMB verification'
     : workflow?.workflow_type === 'payer_directory' ? 'Pending payer verification'
+    : workflow?.workflow_type === 'credentialing_onboarding' ? 'Pending directory verification'
+    : workflow?.workflow_type === 'credentialing_departure' ? 'Pending removal verification'
     : 'Pending NPPES verification';
+
+  // Is this a credentialing workflow?
+  const isCredentialingWorkflow = workflow?.workflow_type === 'credentialing_onboarding' || workflow?.workflow_type === 'credentialing_departure';
+  const assessment = workflow?.finding_details?.assessment || {};
+  const estWeeks = workflow?.finding_details?.estimated_completion_weeks;
+  const bottleneck = workflow?.finding_details?.bottleneck;
 
   // Due text
   let dueText = '';
@@ -554,7 +565,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
       .eq('workflow_id', workflow.id);
 
     // If this was an onboarding workflow, remove any practice_providers entry with onboarding status
-    if (workflow.workflow_type === 'onboarding' && workflow.provider_npi) {
+    if (['onboarding', 'credentialing_onboarding'].includes(workflow.workflow_type) && workflow.provider_npi) {
       await supabase.from('practice_providers')
         .delete()
         .eq('practice_website_id', practiceId)
@@ -671,12 +682,52 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
               {/* ── Task Checklist ──────────────────────────────────── */}
               <div style={{ marginBottom: 24 }}>
                 <div style={sectionTitle}>Task checklist</div>
+                {/* Credentialing assessment snapshot */}
+                {isCredentialingWorkflow && Object.keys(assessment).length > 0 && (
+                  <div style={{
+                    marginBottom: 12, padding: 12, background: colors.bluePale + '40',
+                    border: `1px solid ${colors.blue}20`, borderRadius: 8,
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: colors.blue, textTransform: 'uppercase', marginBottom: 6 }}>
+                      Assessment Snapshot
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {Object.entries(assessment).map(([source, status]: [string, any]) => {
+                        const isGood = status === 'listed_correct' || status === 'active' || status === 'enrolled';
+                        const needsWork = status === 'needs_update' || status === 'wrong_address' || status === 'not_listed' || status === 'needs_reassignment' || status === 'possibly_stale';
+                        return (
+                          <span key={source} style={{
+                            fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                            background: isGood ? colors.greenPale : needsWork ? colors.redPale : colors.gray100,
+                            color: isGood ? colors.green : needsWork ? colors.red : colors.gray400,
+                          }}>
+                            {source.toUpperCase().replace('_', ' ')}: {isGood ? '✓' : needsWork ? '✗' : '—'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {estWeeks && (
+                      <div style={{ fontSize: 10, color: colors.gray600, marginTop: 6 }}>
+                        Est. {estWeeks} weeks to full credentialing
+                        {bottleneck && <span style={{ color: colors.gold, fontWeight: 600 }}> · {bottleneck.charAt(0).toUpperCase() + bottleneck.slice(1)} is the bottleneck</span>}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {tasks.filter(t => t.status !== 'skipped').map(t => {
                   const isDone = t.status === 'completed';
                   const isActive = t.status === 'active';
-                  const isMonitorTask = ['monitor_auto_confirm', 'monitor_board'].includes(t.task_type);
+                  const isMonitorTask = MONITOR_TASK_TYPES.includes(t.task_type);
                   const checkColor = isDone ? colors.green : isActive ? colors.gold : colors.gray200;
                   const checkMark = isDone ? '✓' : isActive && !isMonitorTask ? '●' : '';
+
+                  // Group label for credentialing tasks
+                  const taskGroup = t.metadata?.group;
+                  const groupLabel = taskGroup === 'immediate' ? '⚡ Immediate'
+                    : taskGroup === 'submit_wait' ? '📤 Submit & Wait'
+                    : taskGroup === 'monitoring' ? '📡 Automated'
+                    : null;
 
                   // Contextual title overrides based on workflow type
                   const contextTitle = (() => {
@@ -688,7 +739,11 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
                   // Monitor tasks render differently — no checkbox, status indicator
                   if (isMonitorTask) {
-                    const monitorLabel = workflow?.workflow_type === 'license_renewal' ? 'TMB'
+                    const monitorLabel = t.task_type === 'monitor_board' ? 'TMB'
+                      : t.task_type === 'monitor_nppes' ? 'NPPES'
+                      : t.task_type === 'monitor_pecos' ? 'PECOS'
+                      : t.task_type === 'monitor_payer_directory' ? (t.metadata?.payer?.toUpperCase() || 'payer directory')
+                      : workflow?.workflow_type === 'license_renewal' ? 'TMB'
                       : workflow?.workflow_type === 'payer_directory' ? 'payer directory'
                       : 'NPPES';
                     return (
@@ -1081,8 +1136,213 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                       )}
 
+                      {/* ── CAQH update task ── */}
+                      {isActive && t.task_type === 'correction_caqh' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          {t.metadata?.fixes_payers && t.metadata.fixes_payers.length > 0 && (
+                            <div style={{
+                              padding: '8px 12px', background: colors.bluePale, borderRadius: 6,
+                              border: `1px solid ${colors.blue}20`, marginBottom: 10,
+                              fontSize: 11, color: colors.blue, fontWeight: 500,
+                            }}>
+                              💡 Updating CAQH will automatically fix your listing in {t.metadata.fixes_payers.map((p: string) => p.toUpperCase()).join(' and ')}
+                            </div>
+                          )}
+                          <a href={t.metadata?.portal_url || 'https://proview.caqh.org/'} target="_blank" rel="noopener noreferrer" style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 10,
+                          }}>Open CAQH ProView →</a>
+                          <button onClick={async () => {
+                            await supabase.from('workflow_tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', t.id);
+                            await logEvent('task_completed', 'CAQH ProView updated', { fixes_payers: t.metadata?.fixes_payers });
+                            // Activate monitoring tasks for payers that pull from CAQH
+                            const monitorTasks = tasks.filter(mt => mt.task_type === 'monitor_payer_directory' && ['uhc', 'aetna'].includes(mt.metadata?.payer) && mt.status === 'pending');
+                            for (const mt of monitorTasks) {
+                              await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', mt.id);
+                            }
+                            // Activate next pending task
+                            const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending' && !MONITOR_TASK_TYPES.includes(nt.task_type));
+                            if (nextTask) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                            const { data: freshTasks } = await supabase.from('workflow_tasks')
+                              .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                              .eq('workflow_id', workflow!.id).order('task_order', { ascending: true });
+                            if (freshTasks) setTasks(freshTasks);
+                          }} style={{
+                            width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>I&apos;ve updated CAQH</button>
+                        </div>
+                      )}
+                      {isDone && t.task_type === 'correction_caqh' && (
+                        <div style={{
+                          marginTop: 8, padding: '8px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          fontSize: 11, color: colors.green, fontWeight: 600,
+                        }}>✓ CAQH updated {t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                      )}
+
+                      {/* ── NPPES correction task (credentialing) ── */}
+                      {isActive && t.task_type === 'correction_nppes' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          <a href="https://nppes.cms.hhs.gov/" target="_blank" rel="noopener noreferrer" style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 10,
+                          }}>Open NPPES Portal →</a>
+                          <button onClick={async () => {
+                            await supabase.from('workflow_tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', t.id);
+                            await logEvent('task_completed', 'NPPES address correction submitted', {});
+                            // Activate NPPES monitor if present
+                            const nppesMonitor = tasks.find(mt => mt.task_type === 'monitor_nppes' && mt.status === 'pending');
+                            if (nppesMonitor) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nppesMonitor.id);
+                            const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending' && !MONITOR_TASK_TYPES.includes(nt.task_type));
+                            if (nextTask) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                            const { data: freshTasks } = await supabase.from('workflow_tasks')
+                              .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                              .eq('workflow_id', workflow!.id).order('task_order', { ascending: true });
+                            if (freshTasks) setTasks(freshTasks);
+                          }} style={{
+                            width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>I&apos;ve submitted to NPPES</button>
+                        </div>
+                      )}
+                      {isDone && t.task_type === 'correction_nppes' && (
+                        <div style={{
+                          marginTop: 8, padding: '8px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          fontSize: 11, color: colors.green, fontWeight: 600,
+                        }}>✓ Submitted to NPPES {t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                      )}
+
+                      {/* ── PECOS submission task ── */}
+                      {isActive && t.task_type === 'submit_pecos' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          <a href="https://pecos.cms.hhs.gov/" target="_blank" rel="noopener noreferrer" style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 10,
+                          }}>Open PECOS Portal →</a>
+                          {t.metadata?.expected_days && (
+                            <div style={{ fontSize: 10, color: colors.gray400, marginBottom: 10, textAlign: 'center' }}>
+                              Expected processing time: {t.metadata.expected_days} days
+                            </div>
+                          )}
+                          <button onClick={async () => {
+                            await supabase.from('workflow_tasks').update({ status: 'completed', completed_at: new Date().toISOString(), metadata: { ...t.metadata, submitted_at: new Date().toISOString() } }).eq('id', t.id);
+                            await logEvent('task_completed', 'PECOS reassignment submitted', {});
+                            const pecosMonitor = tasks.find(mt => mt.task_type === 'monitor_pecos' && mt.status === 'pending');
+                            if (pecosMonitor) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', pecosMonitor.id);
+                            const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending' && !MONITOR_TASK_TYPES.includes(nt.task_type));
+                            if (nextTask) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                            const { data: freshTasks } = await supabase.from('workflow_tasks')
+                              .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                              .eq('workflow_id', workflow!.id).order('task_order', { ascending: true });
+                            if (freshTasks) setTasks(freshTasks);
+                          }} style={{
+                            width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>Mark as submitted</button>
+                        </div>
+                      )}
+                      {isDone && t.task_type === 'submit_pecos' && (
+                        <div style={{
+                          marginTop: 8, padding: '8px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          fontSize: 11, color: colors.green, fontWeight: 600,
+                        }}>✓ PECOS submitted {t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                      )}
+
+                      {/* ── Payer enrollment task ── */}
+                      {isActive && t.task_type === 'submit_payer_enrollment' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          <a href={t.metadata?.portal_url || '#'} target="_blank" rel="noopener noreferrer" style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 10,
+                          }}>Open {t.metadata?.payer ? t.metadata.payer.charAt(0).toUpperCase() + t.metadata.payer.slice(1) : 'Payer'} Portal →</a>
+                          {t.metadata?.expected_days && (
+                            <div style={{ fontSize: 10, color: colors.gray400, marginBottom: 10, textAlign: 'center' }}>
+                              Expected processing time: {t.metadata.expected_days} days
+                            </div>
+                          )}
+                          <button onClick={async () => {
+                            await supabase.from('workflow_tasks').update({ status: 'completed', completed_at: new Date().toISOString(), metadata: { ...t.metadata, submitted_at: new Date().toISOString() } }).eq('id', t.id);
+                            await logEvent('task_completed', `${t.metadata?.payer || 'Payer'} credentialing application submitted`, { payer: t.metadata?.payer });
+                            // Activate payer directory monitor for this payer
+                            const payerMonitor = tasks.find(mt => mt.task_type === 'monitor_payer_directory' && mt.metadata?.payer === t.metadata?.payer && mt.status === 'pending');
+                            if (payerMonitor) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', payerMonitor.id);
+                            const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending' && !MONITOR_TASK_TYPES.includes(nt.task_type));
+                            if (nextTask) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                            const { data: freshTasks } = await supabase.from('workflow_tasks')
+                              .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                              .eq('workflow_id', workflow!.id).order('task_order', { ascending: true });
+                            if (freshTasks) setTasks(freshTasks);
+                          }} style={{
+                            width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>Mark as submitted</button>
+                        </div>
+                      )}
+                      {isDone && t.task_type === 'submit_payer_enrollment' && (
+                        <div style={{
+                          marginTop: 8, padding: '8px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          fontSize: 11, color: colors.green, fontWeight: 600,
+                        }}>✓ {t.metadata?.payer ? t.metadata.payer.charAt(0).toUpperCase() + t.metadata.payer.slice(1) : 'Payer'} application submitted {t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                      )}
+
+                      {/* ── Website update task ── */}
+                      {isActive && t.task_type === 'update_website' && (
+                        <div style={{
+                          marginTop: 8, padding: 14, background: colors.gray50,
+                          border: `1px solid ${colors.gray200}`, borderRadius: 8,
+                        }}>
+                          {t.metadata?.website_url && (
+                            <a href={t.metadata.website_url} target="_blank" rel="noopener noreferrer" style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              width: '100%', padding: '10px 14px', background: colors.navy, color: '#fff',
+                              border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 10,
+                            }}>Open Practice Website →</a>
+                          )}
+                          <button onClick={async () => {
+                            await supabase.from('workflow_tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', t.id);
+                            await logEvent('task_completed', 'Provider added to practice website', {});
+                            const nextTask = tasks.find(nt => nt.task_order > t.task_order && nt.status === 'pending' && !MONITOR_TASK_TYPES.includes(nt.task_type));
+                            if (nextTask) await supabase.from('workflow_tasks').update({ status: 'active' }).eq('id', nextTask.id);
+                            const { data: freshTasks } = await supabase.from('workflow_tasks')
+                              .select('id, task_order, task_type, title, description, status, metadata, completed_at, confirmed_at')
+                              .eq('workflow_id', workflow!.id).order('task_order', { ascending: true });
+                            if (freshTasks) setTasks(freshTasks);
+                          }} style={{
+                            width: '100%', padding: '9px 14px', background: colors.green, color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>Mark as done</button>
+                        </div>
+                      )}
+                      {isDone && t.task_type === 'update_website' && (
+                        <div style={{
+                          marginTop: 8, padding: '8px 14px', borderRadius: 8,
+                          background: colors.greenPale, border: `1px solid ${colors.green}`,
+                          fontSize: 11, color: colors.green, fontWeight: 600,
+                        }}>✓ Website updated {t.completed_at ? new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</div>
+                      )}
+
                       {/* ── Generic active task: Mark complete button ── */}
-                      {isActive && !['review_approve', 'download_form', 'download_submit', 'submit_nppes', 'submit_renewal', 'monitor_auto_confirm', 'monitor_board'].includes(t.task_type) && (
+                      {isActive && !['review_approve', 'download_form', 'download_submit', 'submit_nppes', 'submit_renewal', 'correction_nppes', 'correction_caqh', 'submit_pecos', 'submit_payer_enrollment', 'update_website', ...MONITOR_TASK_TYPES].includes(t.task_type) && (
                         <div style={{
                           marginTop: 8, padding: 14, background: colors.gray50,
                           border: `1px solid ${colors.gray200}`, borderRadius: 8,
@@ -1137,7 +1397,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                                 });
 
                                 // For onboarding: add provider to roster now
-                                if (workflow.workflow_type === 'onboarding' && workflow.provider_npi) {
+                                if (['onboarding', 'credentialing_onboarding'].includes(workflow.workflow_type) && workflow.provider_npi) {
                                   // Check if already on roster
                                   const { data: existing } = await supabase
                                     .from('practice_providers')
@@ -1232,7 +1492,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 {(() => {
                   const visibleTasks = tasks.filter(t => t.status !== 'skipped');
                   const humanTasksDone = visibleTasks
-                    .filter(t => t.task_type !== 'monitor_auto_confirm')
+                    .filter(t => !MONITOR_TASK_TYPES.includes(t.task_type))
                     .every(t => t.status === 'completed');
                   const isStillInProgress = workflow?.status === 'in_progress' || workflow?.status === 'action_needed';
 
@@ -1242,7 +1502,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         onClick={async () => {
                           if (!workflow) return;
                           // Complete any remaining auto tasks
-                          const pendingAuto = tasks.filter(t => t.task_type === 'monitor_auto_confirm' && t.status !== 'completed' && t.status !== 'skipped');
+                          const pendingAuto = tasks.filter(t => MONITOR_TASK_TYPES.includes(t.task_type) && t.status !== 'completed' && t.status !== 'skipped');
                           for (const at of pendingAuto) {
                             await supabase.from('workflow_tasks').update({
                               status: 'completed', completed_at: new Date().toISOString(),
@@ -1255,8 +1515,8 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                             .eq('id', workflow.id);
                           await logEvent('completed', 'Workflow manually completed', { manually_completed: true });
 
-                          // For onboarding: add provider to roster
-                          if (workflow.workflow_type === 'onboarding' && workflow.provider_npi) {
+                          // For onboarding/credentialing_onboarding: update provider roster to active
+                          if (['onboarding', 'credentialing_onboarding'].includes(workflow.workflow_type) && workflow.provider_npi) {
                             const { data: existing } = await supabase
                               .from('practice_providers')
                               .select('id')

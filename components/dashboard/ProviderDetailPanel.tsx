@@ -116,6 +116,8 @@ const WORKFLOW_TYPE_LABELS: Record<string, string> = {
   release: 'Provider departure',
   license_renewal: 'License renewal',
   compliance: 'Compliance check',
+  credentialing_onboarding: 'Credentialing',
+  credentialing_departure: 'Departure checklist',
 };
 
 const WORKFLOW_TYPE_ICONS: Record<string, string> = {
@@ -125,6 +127,15 @@ const WORKFLOW_TYPE_ICONS: Record<string, string> = {
   release: '🚪',
   license_renewal: '📜',
   compliance: '◈',
+  credentialing_onboarding: '📋',
+  credentialing_departure: '📤',
+};
+
+const CREDENTIALING_GROUP_LABELS: Record<string, { label: string; icon: string }> = {
+  immediate: { label: 'Immediate', icon: '⚡' },
+  submit_wait: { label: 'Submit & Wait', icon: '📤' },
+  monitoring: { label: 'Automated Monitoring', icon: '📡' },
+  complete: { label: 'Already Complete', icon: '✅' },
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -226,6 +237,18 @@ export default function ProviderDetailPanel({
   const activeWorkflows = workflows.filter(w => ['action_needed', 'in_progress'].includes(w.status));
   const monitoringWorkflows = workflows.filter(w => w.status === 'awaiting');
   const resolvedWorkflows = workflows.filter(w => ['resolved', 'cancelled'].includes(w.status));
+
+  // Credentialing workflows get special treatment
+  const credentialingWorkflows = workflows.filter(w =>
+    ['credentialing_onboarding', 'credentialing_departure'].includes(w.workflow_type)
+    && !['resolved', 'cancelled'].includes(w.status)
+  );
+  const nonCredentialingActive = activeWorkflows.filter(w =>
+    !['credentialing_onboarding', 'credentialing_departure'].includes(w.workflow_type)
+  );
+  const nonCredentialingMonitoring = monitoringWorkflows.filter(w =>
+    !['credentialing_onboarding', 'credentialing_departure'].includes(w.workflow_type)
+  );
 
   // ── Build comparison data ─────────────────────────────────────────────────
 
@@ -449,6 +472,84 @@ export default function ProviderDetailPanel({
                 ))}
               </div>
             </div>
+
+            {/* ── Section 2b: Credentialing Progress ────── */}
+            {credentialingWorkflows.length > 0 && credentialingWorkflows.map(cw => {
+              const assessment = cw.finding_details?.assessment || {};
+              const estWeeks = cw.finding_details?.estimated_completion_weeks || 12;
+              const bottleneck = cw.finding_details?.bottleneck;
+              const isOnboarding = cw.workflow_type === 'credentialing_onboarding';
+              const totalTasks = Object.keys(assessment).length || 9;
+              const completedSources = Object.values(assessment).filter(
+                (v: any) => v === 'listed_correct' || v === 'active' || v === 'enrolled'
+              ).length;
+              // Use open_issues count as proxy for incomplete tasks
+              const tasksLabel = isOnboarding ? 'onboarding' : 'departure';
+
+              return (
+                <div key={cw.id} style={{ marginBottom: 20 }}>
+                  <div style={sectionTitle}>
+                    {isOnboarding ? '📋 Credentialing progress' : '📤 Departure progress'}
+                  </div>
+                  <div style={{
+                    background: '#fff', border: `1px solid ${colors.blue}30`,
+                    borderRadius: 10, padding: 16, borderLeft: `3px solid ${colors.blue}`,
+                  }}>
+                    {/* Progress header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>
+                        {cw.finding_summary}
+                      </div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                        background: colors.bluePale, color: colors.blue,
+                      }}>
+                        {cw.status === 'in_progress' ? 'In progress' : cw.status === 'action_needed' ? 'Needs attention' : 'Monitoring'}
+                      </span>
+                    </div>
+
+                    {/* Estimated timeline */}
+                    <div style={{ fontSize: 11, color: colors.gray600, marginBottom: 10 }}>
+                      Est. {estWeeks} weeks to full credentialing
+                      {bottleneck && (
+                        <span style={{ color: colors.gold, fontWeight: 600 }}>
+                          {' · '}{bottleneck.charAt(0).toUpperCase() + bottleneck.slice(1)} is the bottleneck
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Assessment snapshot */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                      {Object.entries(assessment).map(([source, status]: [string, any]) => {
+                        const isGood = status === 'listed_correct' || status === 'active' || status === 'enrolled';
+                        const needsWork = status === 'needs_update' || status === 'wrong_address' || status === 'not_listed' || status === 'needs_reassignment' || status === 'possibly_stale';
+                        return (
+                          <span key={source} style={{
+                            fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                            background: isGood ? colors.greenPale : needsWork ? colors.redPale : colors.gray100,
+                            color: isGood ? colors.green : needsWork ? colors.red : colors.gray400,
+                          }}>
+                            {source.toUpperCase().replace('_', ' ')}: {isGood ? '✓' : needsWork ? '✗' : '—'}
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    {/* Open workflow button */}
+                    <button
+                      onClick={() => setActiveWorkflowId(cw.id)}
+                      style={{
+                        width: '100%', padding: '9px 14px', background: colors.navy, color: '#fff',
+                        border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      View {tasksLabel} checklist →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
 
             {/* ── Section 3: Action Items ─────────────────── */}
             <div style={{ marginBottom: 20 }}>

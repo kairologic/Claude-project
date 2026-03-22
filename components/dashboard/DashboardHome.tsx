@@ -45,6 +45,8 @@ interface ProviderHealth {
   has_active_payer_directory: boolean;
   has_active_onboarding: boolean;
   has_active_compliance: boolean;
+  has_active_credentialing: boolean;
+  has_active_departure: boolean;
 }
 
 interface PayerData {
@@ -266,6 +268,16 @@ export default function DashboardHome({
                   {p.has_active_onboarding && (
                     <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.bluePale, color: colors.blue }}>
                       Onboarding
+                    </span>
+                  )}
+                  {p.has_active_credentialing && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: colors.bluePale, color: colors.blue }}>
+                      Credentialing
+                    </span>
+                  )}
+                  {p.has_active_departure && (
+                    <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#FFF3E0', color: '#E65100' }}>
+                      Departing
                     </span>
                   )}
                 </div>

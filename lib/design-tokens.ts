@@ -57,6 +57,29 @@ export const workflowTypeLabels: Record<string, { label: string; tooltip: string
   release: { label: 'RELEASE', tooltip: 'Provider departure workflow' },
   license_renewal: { label: 'LICENSE RENEWAL', tooltip: 'State medical board license status monitoring' },
   compliance: { label: 'COMPLIANCE', tooltip: 'State regulatory compliance: SB 1188, HB 149, AB 3030' },
+  credentialing_onboarding: { label: 'CREDENTIALING', tooltip: 'New provider onboarding — multi-source assessment, CAQH enrollment, payer credentialing, PECOS, and automated monitoring' },
+  credentialing_departure: { label: 'DEPARTURE', tooltip: 'Provider departure — remove from directories, CAQH, PECOS, and 90-day phantom listing monitoring' },
+};
+
+/** Task group labels for credentialing workflows */
+export const credentialingGroupLabels: Record<string, { label: string; icon: string; description: string }> = {
+  immediate: { label: 'Immediate', icon: '⚡', description: 'Tasks the practice manager can do right now' },
+  submit_wait: { label: 'Submit & Wait', icon: '📤', description: 'Submit forms and wait for processing' },
+  monitoring: { label: 'Automated Monitoring', icon: '📡', description: 'System watches — no action needed' },
+  complete: { label: 'Already Complete', icon: '✅', description: 'No action needed' },
+};
+
+/** Payer portal URLs for credentialing task routing */
+export const payerPortals: Record<string, { name: string; url: string; pullsFromCaqh: boolean; method: string }> = {
+  nppes: { name: 'NPPES', url: 'https://nppes.cms.hhs.gov/', pullsFromCaqh: false, method: 'Direct portal submission' },
+  caqh: { name: 'CAQH ProView', url: 'https://proview.caqh.org/', pullsFromCaqh: false, method: 'CAQH profile update' },
+  uhc: { name: 'UnitedHealthcare', url: 'https://proview.caqh.org/', pullsFromCaqh: true, method: 'CAQH auto-propagation' },
+  aetna: { name: 'Aetna', url: 'https://proview.caqh.org/', pullsFromCaqh: true, method: 'CAQH auto-propagation' },
+  cigna: { name: 'Cigna', url: 'https://cignaforhcp.cigna.com/', pullsFromCaqh: false, method: 'Direct credentialing application' },
+  humana: { name: 'Humana', url: 'https://www.humana.com/provider/', pullsFromCaqh: false, method: 'Direct credentialing application' },
+  bcbstx: { name: 'BCBS TX', url: 'https://essentials.availity.com/', pullsFromCaqh: false, method: 'Availity PDM' },
+  pecos: { name: 'PECOS (Medicare)', url: 'https://pecos.cms.hhs.gov/', pullsFromCaqh: false, method: 'CMS portal' },
+  tmb: { name: 'TX Medical Board', url: 'https://profile.tmb.state.tx.us/', pullsFromCaqh: false, method: 'TMB portal' },
 };
 
 export const rosterStatusMap: Record<string, { badge: string; color: string; bg: string }> = {
