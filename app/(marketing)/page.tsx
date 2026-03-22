@@ -24,15 +24,15 @@ export default function HomePage() {
               organizations real-time confidence in their provider data.
             </p>
             <div className="m-hero-actions">
-              <Link href="/scan" className="m-btn-primary m-gold">
-                Run a Free Scan
+              <Link href="/contact" className="m-btn-primary m-gold">
+                Start Free Trial
                 <ArrowIcon />
               </Link>
-              <Link href="/contact" className="m-btn-outline">Request a Demo</Link>
+              <Link href="/demo" className="m-btn-outline">Watch a Demo</Link>
             </div>
             <div className="m-hero-note">
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L8 5h4.5L9 7.5l1.5 4L6.5 9 3 11.5l1.5-4L1 5H5.5L6.5 1z" fill="currentColor"/></svg>
-              No credit card required &middot; HIPAA-aligned infrastructure &middot; Results in &lt;30 seconds
+              21-day free trial &middot; No credit card required &middot; HIPAA-aligned infrastructure
             </div>
           </div>
         </div>
@@ -596,19 +596,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ CTA BAND — Free Scan ═══ */}
+      {/* ═══ CTA BAND ═══ */}
       <div className="m-cta-band">
         <div className="m-container">
           <div className="m-cta-inner">
             <span className="m-tag" style={{ background: 'rgba(212,160,23,0.15)', color: 'var(--m-gold)', borderColor: 'rgba(212,160,23,0.3)' }}>Get Started Today</span>
             <h2>Your provider data is <em>drifting right now.</em></h2>
-            <p>Run a free scan on any Texas or California provider — see results in under 30 seconds, no signup required.</p>
+            <p>Start monitoring your provider roster in minutes — full platform access for 21 days, no credit card required.</p>
             <div className="m-cta-actions">
-              <Link href="/scan" className="m-btn-primary m-gold">
-                Run a Free Scan
+              <Link href="/contact" className="m-btn-primary m-gold">
+                Start Free Trial
                 <ArrowIcon />
               </Link>
-              <Link href="/contact" className="m-btn-ghost">Schedule a Demo</Link>
+              <Link href="/demo" className="m-btn-ghost">Watch a Demo</Link>
             </div>
           </div>
         </div>

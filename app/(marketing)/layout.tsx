@@ -26,7 +26,7 @@ export default function MarketingLayout({
       <div className="m-announce-bar">
         <span className="m-announce-dot"></span>
         Now live in Texas &amp; California — 1.8M+ provider records indexed.
-        <Link href="/registry">See what&apos;s in your state &rarr;</Link>
+        <Link href="/contact">Try free for 21 days &rarr;</Link>
       </div>
 
       {/* Nav */}
@@ -42,17 +42,16 @@ export default function MarketingLayout({
             </Link>
 
             <ul className="m-nav-links">
-              <li><Link href="/platform">Platform</Link></li>
-              <li><Link href="/solutions">Solutions</Link></li>
+              <li><Link href="/product">Product</Link></li>
+              <li><Link href="/compliance">Compliance</Link></li>
               <li><Link href="/pricing">Pricing</Link></li>
-              <li><Link href="/registry">Registry</Link></li>
-              <li><Link href="/insights">Insights</Link></li>
+              <li><Link href="/demo">Demo</Link></li>
             </ul>
 
             <div className="m-nav-actions">
               <Link href="/dashboard/login" className="m-btn-ghost">Sign In</Link>
               <Link href="/contact" className="m-btn-primary">
-                Get Started
+                Start Free Trial
                 <ArrowIcon />
               </Link>
             </div>
@@ -78,32 +77,29 @@ export default function MarketingLayout({
               <p>Provider data intelligence for the modern healthcare organization. Monitoring integrity, compliance, and drift across 1.8M+ U.S. providers.</p>
             </div>
             <div className="m-footer-col">
-              <h4>Platform</h4>
+              <h4>Product</h4>
               <ul>
-                <li><Link href="/platform">Provider Intelligence</Link></li>
-                <li><Link href="/platform">Compliance Dashboard</Link></li>
-                <li><Link href="/platform">Roster Monitoring</Link></li>
-                <li><Link href="/registry">NPI Registry</Link></li>
+                <li><Link href="/product">Provider Intelligence</Link></li>
+                <li><Link href="/product">Compliance Monitoring</Link></li>
+                <li><Link href="/product">Credentialing Automation</Link></li>
+                <li><Link href="/demo">Product Demo</Link></li>
                 <li><Link href="/contact">API Access</Link></li>
               </ul>
             </div>
             <div className="m-footer-col">
-              <h4>Solutions</h4>
+              <h4>Resources</h4>
               <ul>
-                <li><Link href="/solutions">Medical Practices</Link></li>
-                <li><Link href="/solutions">Health Systems</Link></li>
-                <li><Link href="/solutions">CVO Organizations</Link></li>
-                <li><Link href="/solutions">Health Plans</Link></li>
-                <li><Link href="/solutions">Dental &amp; Specialty</Link></li>
+                <li><Link href="/compliance">State Compliance</Link></li>
+                <li><Link href="/pricing">Pricing</Link></li>
+                <li><Link href="/insights">Insights &amp; Blog</Link></li>
+                <li><Link href="/contact">Contact</Link></li>
               </ul>
             </div>
             <div className="m-footer-col">
               <h4>Company</h4>
               <ul>
-                <li><Link href="/insights">Insights &amp; Blog</Link></li>
-                <li><Link href="/registry">Registry</Link></li>
-                <li><Link href="/pricing">Pricing</Link></li>
-                <li><Link href="/contact">Contact</Link></li>
+                <li><Link href="/contact">Start Free Trial</Link></li>
+                <li><Link href="/demo">Watch a Demo</Link></li>
                 <li><Link href="/privacy">Privacy Policy</Link></li>
                 <li><Link href="/terms">Terms of Service</Link></li>
               </ul>
