@@ -55,8 +55,8 @@ export default function HomePage() {
                 <div className="m-app-sidebar">
                   <div className="m-app-sidebar-logo">KairoLogic</div>
                   <div className="m-app-sidebar-practice">
-                    <div className="m-app-practice-name">North Texas Medical Surgical Clinic PA</div>
-                    <div className="m-app-practice-meta">Denton, TX &middot; 18 providers</div>
+                    <div className="m-app-practice-name">Austin Regional Medical Group</div>
+                    <div className="m-app-practice-meta">Austin, TX &middot; 24 providers</div>
                   </div>
                   <nav className="m-app-sidebar-nav">
                     <div className="m-app-nav-item m-active">
@@ -81,7 +81,7 @@ export default function HomePage() {
                     </div>
                   </nav>
                   <div className="m-app-sidebar-soon">
-                    <div className="m-app-soon-label">COMING SOON</div>
+                    <div className="m-app-soon-label">PREMIUM</div>
                     <div className="m-app-nav-item m-disabled">Reports</div>
                     <div className="m-app-nav-item m-disabled">Settings</div>
                   </div>
@@ -93,7 +93,7 @@ export default function HomePage() {
                   <div className="m-app-topbar">
                     <div>
                       <div className="m-app-page-title">Dashboard</div>
-                      <div className="m-app-page-meta">NORTH TEXAS MEDICAL SURGICAL CLINIC PA &middot; 18 providers &middot; Last sync: 2 hours ago</div>
+                      <div className="m-app-page-meta">AUSTIN REGIONAL MEDICAL GROUP &middot; 24 providers &middot; Last sync: 2 hours ago</div>
                     </div>
                     <div className="m-app-topbar-actions">
                       <span className="m-app-btn-add">+ Add provider</span>
@@ -105,28 +105,28 @@ export default function HomePage() {
                   {/* Welcome Banner */}
                   <div className="m-app-welcome-banner">
                     <div className="m-app-welcome-text">
-                      <strong>Welcome, support</strong>
+                      <strong>Welcome, Dr. Martinez</strong>
                       <span className="m-app-trial-badge">FREE TRIAL</span>
                     </div>
-                    <div className="m-app-welcome-desc">17 of your 19 providers need attention. Click any provider below to review issues, approve corrections, and track resolution.</div>
+                    <div className="m-app-welcome-desc">5 of your 24 providers need attention. Click any provider below to review issues, approve corrections, and track resolution.</div>
                   </div>
 
                   {/* Status KPI Cards */}
                   <div className="m-app-kpi-row">
                     <div className="m-app-kpi m-app-kpi-red">
-                      <div className="m-app-kpi-num">17</div>
+                      <div className="m-app-kpi-num">5</div>
                       <div className="m-app-kpi-label">Needs attention</div>
                     </div>
                     <div className="m-app-kpi m-app-kpi-yellow">
-                      <div className="m-app-kpi-num">0</div>
+                      <div className="m-app-kpi-num">3</div>
                       <div className="m-app-kpi-label">In progress</div>
                     </div>
                     <div className="m-app-kpi m-app-kpi-blue">
-                      <div className="m-app-kpi-num">0</div>
+                      <div className="m-app-kpi-num">2</div>
                       <div className="m-app-kpi-label">Monitoring</div>
                     </div>
                     <div className="m-app-kpi m-app-kpi-green">
-                      <div className="m-app-kpi-num">2</div>
+                      <div className="m-app-kpi-num">14</div>
                       <div className="m-app-kpi-label">All clear</div>
                     </div>
                   </div>
@@ -136,25 +136,26 @@ export default function HomePage() {
                     <div className="m-app-providers-panel">
                       <div className="m-app-panel-header">
                         <span className="m-app-panel-title">PRIORITY PROVIDERS</span>
-                        <span className="m-app-panel-link">View all 19 providers &rarr;</span>
+                        <span className="m-app-panel-link">View all 24 providers &rarr;</span>
                       </div>
                       <div className="m-app-provider-row">
-                        <div className="m-app-prov-avatar" style={{ background: '#E8A0A0' }}>DW</div>
+                        <div className="m-app-prov-avatar" style={{ background: '#7C9CBF' }}>MW</div>
                         <div className="m-app-prov-info">
-                          <div className="m-app-prov-name">David Willingham</div>
-                          <div className="m-app-prov-npi">1750312120</div>
-                          <div className="m-app-prov-specialty">Optometry</div>
+                          <div className="m-app-prov-name">Dr. Marcus Webb, DO</div>
+                          <div className="m-app-prov-npi">1234567890</div>
+                          <div className="m-app-prov-specialty">Family Medicine</div>
                           <span className="m-app-prov-tag">Credentialing</span>
                         </div>
-                        <div className="m-app-prov-issues m-app-issues-red">1 issue</div>
+                        <div className="m-app-prov-issues m-app-issues-red">2 issues</div>
                       </div>
                       <div className="m-app-provider-row">
-                        <div className="m-app-prov-avatar" style={{ background: '#E8A0A0' }}>RC</div>
+                        <div className="m-app-prov-avatar" style={{ background: '#B8A0D4' }}>PN</div>
                         <div className="m-app-prov-info">
-                          <div className="m-app-prov-name">Robert Connaughton</div>
-                          <div className="m-app-prov-npi">1326061003</div>
+                          <div className="m-app-prov-name">Dr. Priya Nair, MD</div>
+                          <div className="m-app-prov-npi">9876543210</div>
+                          <div className="m-app-prov-specialty">Pediatrics</div>
                         </div>
-                        <div className="m-app-prov-issues m-app-issues-red">2 issues</div>
+                        <div className="m-app-prov-issues m-app-issues-red">1 issue</div>
                       </div>
                     </div>
 
@@ -172,6 +173,16 @@ export default function HomePage() {
                         <span>HB 149 (AI transp.)</span>
                         <span className="m-app-comp-status m-pending">Pending</span>
                       </div>
+                      <div className="m-app-payers-section">
+                        <div className="m-app-payers-label">Connected Directories</div>
+                        <div className="m-app-payer-logos">
+                          <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#002677"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">UHC</text></svg>
+                          <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#00A74E"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">H</text></svg>
+                          <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#0072C6"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="8" fontWeight="700">CIG</text></svg>
+                          <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#003DA5"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="8" fontWeight="700">AET</text></svg>
+                          <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#0055A4"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="7" fontWeight="700">BCBS</text></svg>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Credentialing Workflow Card */}
@@ -180,8 +191,8 @@ export default function HomePage() {
                         <div className="m-app-panel-title">ACTIVE WORKFLOW</div>
                         <span className="m-app-wf-badge m-onboarding">Onboarding</span>
                       </div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--m-navy)', marginBottom: '2px' }}>David Willingham</div>
-                      <div style={{ fontSize: '9px', color: 'var(--m-gray-400)' }}>Optometry &middot; NPI 1750312120</div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--m-navy)', marginBottom: '2px' }}>Dr. Marcus Webb, DO</div>
+                      <div style={{ fontSize: '9px', color: 'var(--m-gray-400)' }}>Family Medicine &middot; NPI 1234567890</div>
 
                       {/* Timeline visualization */}
                       <div className="m-app-wf-timeline">

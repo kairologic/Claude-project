@@ -360,10 +360,35 @@
 }
 .m-app-comp-status.m-pending { color: var(--m-gold); }
 
-/* Workflow card */
+/* Payer logos inside compliance */
+.m-app-payers-section {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--m-gray-100);
+}
+.m-app-payers-label {
+  font-size: 9px; font-weight: 600; color: var(--m-gray-400);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+}
+.m-app-payer-logos {
+  display: flex; gap: 5px; align-items: center;
+}
+.m-app-payer-logos svg {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Workflow card — enhanced visual weight */
 .m-app-workflow-panel {
-  background: var(--m-white); border-radius: 10px;
-  border: 1px solid var(--m-gray-200); padding: 12px 14px;
+  background: linear-gradient(135deg, #FAFCFF 0%, #F0F7FF 100%);
+  border-radius: 10px;
+  border: 1px solid #BFDBFE; padding: 12px 14px;
+  position: relative;
+}
+.m-app-workflow-panel::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; background: linear-gradient(90deg, var(--m-green), #3B82F6, var(--m-gray-300));
+  border-radius: 10px 10px 0 0;
 }
 .m-app-wf-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -373,32 +398,40 @@
   font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 100px;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
-.m-app-wf-badge.m-onboarding { background: #E0F2FE; color: #0369A1; }
+.m-app-wf-badge.m-onboarding { background: #DBEAFE; color: #1D4ED8; }
 .m-app-wf-timeline {
-  display: flex; align-items: center; gap: 0; margin: 10px 0;
+  display: flex; align-items: center; gap: 0; margin: 12px 0 4px;
 }
 .m-app-wf-step {
-  width: 10px; height: 10px; border-radius: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
   border: 2px solid var(--m-gray-200); background: var(--m-white);
   position: relative; z-index: 1;
 }
 .m-app-wf-step.m-done { background: var(--m-green); border-color: var(--m-green); }
-.m-app-wf-step.m-active { background: #3B82F6; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+.m-app-wf-step.m-active {
+  background: #3B82F6; border-color: #3B82F6;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.2);
+  animation: m-pulse-step 2s ease-in-out infinite;
+}
+@keyframes m-pulse-step {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+  50%      { box-shadow: 0 0 0 6px rgba(59,130,246,0.08); }
+}
 .m-app-wf-connector {
-  flex: 1; height: 2px; background: var(--m-gray-200);
+  flex: 1; height: 3px; background: var(--m-gray-200);
 }
 .m-app-wf-connector.m-done { background: var(--m-green); }
 .m-app-wf-labels {
   display: flex; justify-content: space-between;
-  font-size: 8px; color: var(--m-gray-400); margin-bottom: 10px;
+  font-size: 8px; font-weight: 600; color: var(--m-gray-400); margin-bottom: 10px;
 }
 .m-app-wf-task {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 0; border-top: 1px solid var(--m-gray-100);
-  font-size: 10px; color: var(--m-navy);
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-top: 1px solid rgba(191,219,254,0.4);
+  font-size: 10px; color: var(--m-navy); font-weight: 500;
 }
 .m-app-wf-task-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
 .m-app-wf-task-dot.m-done { background: var(--m-green); }
 .m-app-wf-task-dot.m-active { background: #3B82F6; }
