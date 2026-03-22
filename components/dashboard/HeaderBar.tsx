@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/design-tokens';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 import GlobalSearch from './GlobalSearch';
+import { runCredentialingAssessment, type AssessmentOutput, type AssessmentResult, type SourceStatus } from '@/lib/credentialing/assessment-engine';
 
 interface HeaderBarProps {
   title: string;
@@ -46,6 +47,8 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
   const [adding, setAdding] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
   const [createdWorkflowId, setCreatedWorkflowId] = useState<string | null>(null);
+  const [assessmentOutput, setAssessmentOutput] = useState<AssessmentOutput | null>(null);
+  const [assessing, setAssessing] = useState(false);
 
   useEffect(() => {
     const now = new Date();
@@ -62,6 +65,8 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
     setAddSuccess(false);
     setSearching(false);
     setCreatedWorkflowId(null);
+    setAssessmentOutput(null);
+    setAssessing(false);
   }
 
   function closeModal() {
@@ -97,13 +102,13 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
         return;
       }
 
-      // Check if there's already an active onboarding workflow for this NPI
+      // Check if there's already an active onboarding/credentialing workflow for this NPI
       const { data: existingOnboarding } = await supabase
         .from('workflow_instances')
         .select('id')
         .eq('practice_id', practiceId)
         .eq('provider_npi', npiInput)
-        .eq('workflow_type', 'onboarding')
+        .in('workflow_type', ['onboarding', 'credentialing_onboarding'])
         .in('status', ['action_needed', 'in_progress', 'awaiting'])
         .maybeSingle();
 
@@ -127,6 +132,18 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
       }
 
       setResult(provider as NPPESResult);
+
+      // Run credentialing assessment using existing DB data
+      setAssessing(true);
+      try {
+        const assessment = await runCredentialingAssessment(supabase, npiInput, practiceId!);
+        setAssessmentOutput(assessment);
+      } catch {
+        // Assessment is non-blocking — provider can still be added
+        setAssessmentOutput(null);
+      } finally {
+        setAssessing(false);
+      }
     } catch (err) {
       setError('Search failed. Please try again.');
     } finally {
@@ -141,79 +158,119 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
     try {
       const supabase = createBrowserSupabaseClient();
 
-      // Create onboarding workflow (provider is NOT added to roster until onboarding completes)
+      // Use assessment-generated tasks, or fallback to minimal tasks if assessment failed
+      const assessmentTasks = assessmentOutput?.tasks || [];
+      const taskCount = assessmentTasks.length || 1;
+
+      // 1. Create credentialing_onboarding workflow with assessment metadata
       const { data: wf } = await supabase.from('workflow_instances').insert({
         practice_id: practiceId,
-        workflow_type: 'onboarding',
+        workflow_type: 'credentialing_onboarding',
         status: 'action_needed',
         provider_npi: result.npi,
         provider_name: `${result.first_name} ${result.last_name}`.trim(),
-        finding_summary: 'New provider onboarding',
+        finding_summary: assessmentOutput?.summary || `New provider onboarding — ${taskCount} tasks generated`,
         finding_details: {
-          field: 'onboarding',
+          field: 'credentialing',
           taxonomy: result.taxonomy_desc,
           address: result.address_line_1,
           city: result.city,
           state: result.state,
+          assessment: assessmentOutput?.assessment || null,
+          estimated_completion_weeks: assessmentOutput?.estimated_completion_weeks || null,
+          bottleneck: assessmentOutput?.bottleneck || null,
         },
         priority: 3,
       }).select('id').single();
 
-      // 2. Create onboarding tasks
       if (wf) {
-        const tasks = [
-          { task_order: 1, task_type: 'data_snapshot', title: 'Day-one data snapshot', description: 'Review NPPES, PECOS, and license data for this provider.', status: 'active' },
-          { task_order: 2, task_type: 'credentialing_checklist', title: 'Credentialing checklist', description: 'CAQH ProView, payer enrollment, NPPES update, website addition.', status: 'pending' },
-          { task_order: 3, task_type: 'verify_payer', title: 'Verify payer directory listings', description: 'Check that provider appears in payer directories with correct data.', status: 'pending' },
-          { task_order: 4, task_type: 'monitor_sync', title: 'Monitor & auto-confirm', description: 'Weekly check of external sources for onboarding completion.', status: 'pending' },
-        ];
-        await supabase.from('workflow_tasks').insert(
-          tasks.map(t => ({ ...t, workflow_id: wf.id }))
-        );
+        // 2. Insert assessment-generated tasks (or fallback)
+        if (assessmentTasks.length > 0) {
+          await supabase.from('workflow_tasks').insert(
+            assessmentTasks.map(t => ({
+              workflow_id: wf.id,
+              task_order: t.task_order,
+              task_type: t.task_type,
+              title: t.title,
+              description: t.description,
+              status: t.status,
+              metadata: t.metadata,
+            }))
+          );
+        } else {
+          // Fallback: minimal tasks if assessment didn't run
+          await supabase.from('workflow_tasks').insert([
+            { workflow_id: wf.id, task_order: 1, task_type: 'data_snapshot', title: 'Day-one data snapshot', description: 'Review NPPES, PECOS, and license data for this provider.', status: 'active' },
+            { workflow_id: wf.id, task_order: 2, task_type: 'correction_caqh', title: 'Update CAQH ProView', description: 'Add/update provider profile in CAQH with new practice info.', status: 'pending', metadata: { group: 'immediate', portal_url: 'https://proview.caqh.org/' } },
+            { workflow_id: wf.id, task_order: 3, task_type: 'update_website', title: 'Add provider to practice website', description: 'List provider with bio, photo, and specialty info.', status: 'pending', metadata: { group: 'immediate' } },
+          ]);
+        }
 
-        // 3. Create alert
+        // 3. Create/update practice_providers entry with onboarding status
+        const { data: existingPP } = await supabase
+          .from('practice_providers')
+          .select('id')
+          .eq('practice_website_id', practiceId)
+          .eq('npi', result.npi)
+          .maybeSingle();
+
+        if (existingPP) {
+          await supabase.from('practice_providers')
+            .update({ roster_status: 'onboarding' })
+            .eq('id', existingPP.id);
+        } else {
+          await supabase.from('practice_providers').insert({
+            practice_website_id: practiceId,
+            npi: result.npi,
+            provider_name: `${result.first_name} ${result.last_name}`.trim(),
+            specialty: result.taxonomy_desc || null,
+            roster_status: 'onboarding',
+          });
+        }
+
+        // 4. Create alert
         await supabase.from('alerts').insert({
           practice_id: practiceId,
           severity: 'info',
-          title: `New provider onboarding: ${result.first_name} ${result.last_name}`,
-          description: `${result.taxonomy_desc || 'Provider'} onboarding started. Provider will be added to roster on completion.`,
+          title: `Credentialing started: ${result.first_name} ${result.last_name}`,
+          description: `${result.taxonomy_desc || 'Provider'} credentialing started — ${assessmentTasks.length} tasks auto-generated.${assessmentOutput?.bottleneck ? ` Bottleneck: ${assessmentOutput.bottleneck}.` : ''}`,
           workflow_id: wf.id,
           provider_npi: result.npi,
           provider_name: `${result.first_name} ${result.last_name}`.trim(),
-          source: 'manual_add',
+          source: 'assessment_engine',
           is_active: true,
         });
 
-        // 4. Log event
+        // 5. Log event
         await supabase.from('workflow_events').insert({
           workflow_id: wf.id,
           event_type: 'created',
           actor_type: 'user',
-          title: `Onboarding started for ${result.first_name} ${result.last_name}`,
-          details: { npi: result.npi, taxonomy: result.taxonomy_desc },
+          title: `Credentialing started for ${result.first_name} ${result.last_name}`,
+          details: {
+            npi: result.npi,
+            taxonomy: result.taxonomy_desc,
+            tasks_generated: assessmentTasks.length,
+            estimated_weeks: assessmentOutput?.estimated_completion_weeks,
+            bottleneck: assessmentOutput?.bottleneck,
+          },
         });
       }
 
       setCreatedWorkflowId(wf?.id || null);
       setAddSuccess(true);
 
-      // Auto-navigate to the new workflow after a brief success flash
+      // Auto-navigate to dashboard after a brief success flash (server re-fetches data)
       setTimeout(() => {
         setShowAddModal(false);
-        if (wf?.id) {
-          // Use window.location for a full page reload so server re-fetches data
-          window.location.href = `/practice/${practiceId}/workflows?type=onboarding&detail=${wf.id}`;
-        } else {
-          router.push(`/practice/${practiceId}/workflows?type=onboarding`);
-          router.refresh();
-        }
+        window.location.href = `/practice/${practiceId}`;
       }, 1200);
     } catch (err) {
       setError('Failed to add provider. Please try again.');
     } finally {
       setAdding(false);
     }
-  }, [result, practiceId, router]);
+  }, [result, practiceId, router, assessmentOutput]);
 
   return (
     <>
@@ -310,11 +367,12 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                     </div>
                   )}
 
-                  {/* Result card */}
+                  {/* Result card with assessment snapshot */}
                   {result && (
                     <div style={{
                       border: `1.5px solid ${colors.green}`, borderRadius: 10, overflow: 'hidden',
                     }}>
+                      {/* Provider info */}
                       <div style={{
                         padding: '12px 16px', background: colors.greenPale,
                         display: 'flex', alignItems: 'center', gap: 10,
@@ -348,18 +406,68 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                           </div>
                         )}
                       </div>
+
+                      {/* Assessment snapshot */}
+                      {assessing && (
+                        <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}`, textAlign: 'center' }}>
+                          <div style={{ fontSize: 11, color: colors.gray400, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <div style={{
+                              width: 12, height: 12, border: `2px solid ${colors.blue}`,
+                              borderTopColor: 'transparent', borderRadius: '50%',
+                              animation: 'spin 0.8s linear infinite',
+                            }} />
+                            Running credentialing assessment...
+                          </div>
+                        </div>
+                      )}
+
+                      {assessmentOutput && !assessing && (
+                        <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}` }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.gray400, marginBottom: 8 }}>
+                            Readiness assessment
+                          </div>
+                          {/* Source status badges */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                            {assessmentOutput.assessment && Object.entries(assessmentOutput.assessment).map(([key, status]) => {
+                              const label = key === 'caqh_inferred' ? 'CAQH' : key.toUpperCase();
+                              const { bg, fg } = getStatusBadgeColors(status as SourceStatus);
+                              return (
+                                <span key={key} style={{
+                                  fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                  background: bg, color: fg,
+                                }}>
+                                  {label}: {formatSourceStatus(status as SourceStatus)}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          {/* Summary line */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: colors.gray600 }}>
+                              {assessmentOutput.tasks.length} tasks · ~{assessmentOutput.estimated_completion_weeks} weeks
+                            </span>
+                            {assessmentOutput.bottleneck && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: colors.gold }}>
+                                Bottleneck: {assessmentOutput.bottleneck}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action button */}
                       <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}` }}>
                         <button
                           onClick={handleAddProvider}
-                          disabled={adding}
+                          disabled={adding || assessing}
                           style={{
                             width: '100%', padding: '10px', background: colors.navy, color: '#fff',
                             border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                            cursor: adding ? 'wait' : 'pointer', fontFamily: 'inherit',
-                            opacity: adding ? 0.6 : 1,
+                            cursor: adding || assessing ? 'wait' : 'pointer', fontFamily: 'inherit',
+                            opacity: adding || assessing ? 0.6 : 1,
                           }}
                         >
-                          {adding ? 'Adding to roster...' : 'Add to roster & start onboarding'}
+                          {adding ? 'Starting credentialing...' : assessing ? 'Running assessment...' : `Start credentialing (${assessmentOutput?.tasks.length || 0} tasks)`}
                         </button>
                       </div>
                     </div>
@@ -368,7 +476,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                   {/* Hint */}
                   {!result && !error && (
                     <div style={{ fontSize: 11, color: colors.gray400, textAlign: 'center', padding: '8px 0' }}>
-                      We'll pull their data from NPPES, check license status, and create an onboarding workflow.
+                      We'll pull their NPPES data, run a multi-source assessment, and auto-generate a credentialing checklist.
                     </div>
                   )}
                 </>
@@ -381,10 +489,10 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                     margin: '0 auto 12px', fontSize: 22, color: colors.green,
                   }}>✓</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: colors.navy, marginBottom: 4 }}>
-                    {result?.first_name} {result?.last_name} added
+                    {result?.first_name} {result?.last_name} — credentialing started
                   </div>
                   <div style={{ fontSize: 12, color: colors.gray400, marginBottom: 16 }}>
-                    Onboarding workflow created. Taking you to the workflow...
+                    {assessmentOutput?.tasks.length || 0} tasks generated. Taking you to the dashboard...
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <div style={{
@@ -403,6 +511,46 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
       )}
     </>
   );
+}
+
+// ─── Assessment badge helpers ─────────────────────────────────────────────────
+
+function getStatusBadgeColors(status: SourceStatus): { bg: string; fg: string } {
+  switch (status) {
+    case 'listed_correct':
+    case 'active':
+    case 'enrolled':
+      return { bg: colors.greenPale, fg: colors.green };
+    case 'wrong_address':
+    case 'wrong_phone':
+    case 'needs_update':
+    case 'needs_reassignment':
+    case 'possibly_stale':
+      return { bg: colors.redPale, fg: colors.red };
+    case 'not_listed':
+    case 'expired':
+      return { bg: '#FFF3E0', fg: '#E65100' };
+    case 'not_checked':
+    default:
+      return { bg: colors.gray100, fg: colors.gray400 };
+  }
+}
+
+function formatSourceStatus(status: SourceStatus): string {
+  switch (status) {
+    case 'listed_correct': return 'OK';
+    case 'wrong_address': return 'Wrong addr';
+    case 'wrong_phone': return 'Wrong phone';
+    case 'needs_update': return 'Needs update';
+    case 'not_listed': return 'Not listed';
+    case 'not_checked': return 'N/A';
+    case 'active': return 'Active';
+    case 'expired': return 'Expired';
+    case 'needs_reassignment': return 'Needs reassign';
+    case 'enrolled': return 'Enrolled';
+    case 'possibly_stale': return 'May be stale';
+    default: return status;
+  }
 }
 
 const styles: Record<string, React.CSSProperties> = {
