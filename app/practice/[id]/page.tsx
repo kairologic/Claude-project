@@ -40,14 +40,31 @@ export default async function DashboardHomePage({
     .eq('practice_website_id', practiceId)
     .maybeSingle();
 
-  // 2. Priority providers (top 5 by open issues)
-  const { data: priorityProviders } = await admin
+  // 2. Priority providers: top 5 by open issues + any credentialing/onboarding providers
+  const { data: topIssues } = await admin
     .from('v_provider_health')
     .select('*')
     .eq('practice_website_id', practiceId)
     .gt('open_issues', 0)
     .order('open_issues', { ascending: false })
     .limit(5);
+
+  // Also fetch providers being credentialed/onboarded (may not be in top 5 by issues)
+  const { data: credentialingProviders } = await admin
+    .from('v_provider_health')
+    .select('*')
+    .eq('practice_website_id', practiceId)
+    .in('roster_status', ['onboarding', 'departing']);
+
+  // Merge: credentialing providers first, then top issues (deduplicated)
+  const seen = new Set<string>();
+  const priorityProviders: any[] = [];
+  for (const p of (credentialingProviders || [])) {
+    if (!seen.has(p.npi)) { priorityProviders.push(p); seen.add(p.npi); }
+  }
+  for (const p of (topIssues || [])) {
+    if (!seen.has(p.npi)) { priorityProviders.push(p); seen.add(p.npi); }
+  }
 
   // 3. Unseen alert count for this user
   let unseenAlertCount = 0;
