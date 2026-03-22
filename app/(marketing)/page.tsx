@@ -39,7 +39,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Dashboard Preview */}
+            {/* Dashboard Preview — matches real product */}
             <div className="m-hero-visual">
               {/* Floating badge left */}
               <div className="m-float-badge m-left">
@@ -50,100 +50,127 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="m-dashboard-frame">
-                <div className="m-dash-topbar">
-                  <div className="m-dash-dots"><span></span><span></span><span></span></div>
-                  <span className="m-dash-title">KairoLogic Dashboard — Austin Regional Medical Group</span>
+              <div className="m-dashboard-frame m-app-frame">
+                {/* Dark Navy Sidebar */}
+                <div className="m-app-sidebar">
+                  <div className="m-app-sidebar-logo">KairoLogic</div>
+                  <div className="m-app-sidebar-practice">
+                    <div className="m-app-practice-name">North Texas Medical Surgical Clinic PA</div>
+                    <div className="m-app-practice-meta">Denton, TX &middot; 18 providers</div>
+                  </div>
+                  <nav className="m-app-sidebar-nav">
+                    <div className="m-app-nav-item m-active">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-green)' }}></span>
+                      Dashboard
+                    </div>
+                    <div className="m-app-nav-item">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-gold)' }}></span>
+                      Provider roster
+                    </div>
+                    <div className="m-app-nav-item">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
+                      Compliance
+                    </div>
+                    <div className="m-app-nav-item">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
+                      Documents
+                    </div>
+                    <div className="m-app-nav-item">
+                      <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
+                      Audit trail
+                    </div>
+                  </nav>
+                  <div className="m-app-sidebar-soon">
+                    <div className="m-app-soon-label">COMING SOON</div>
+                    <div className="m-app-nav-item m-disabled">Reports</div>
+                    <div className="m-app-nav-item m-disabled">Settings</div>
+                  </div>
                 </div>
-                <div className="m-dash-body">
-                  <div className="m-dash-header-row">
-                    <div className="m-dash-welcome">Provider Intelligence <span>/ Dashboard</span></div>
-                    <div className="m-dash-state-pills">
-                      <span className="m-dash-pill">TX</span>
-                      <span className="m-dash-pill">CA</span>
-                      <span className="m-dash-pill m-inactive">+48</span>
+
+                {/* Main Content Area */}
+                <div className="m-app-main">
+                  {/* Top Header */}
+                  <div className="m-app-topbar">
+                    <div>
+                      <div className="m-app-page-title">Dashboard</div>
+                      <div className="m-app-page-meta">NORTH TEXAS MEDICAL SURGICAL CLINIC PA &middot; 18 providers &middot; Last sync: 2 hours ago</div>
+                    </div>
+                    <div className="m-app-topbar-actions">
+                      <span className="m-app-btn-add">+ Add provider</span>
+                      <span className="m-app-status-dot"></span>
+                      <span className="m-app-status-text">Operational</span>
                     </div>
                   </div>
 
-                  <div className="m-kpi-grid">
-                    <div className="m-kpi-card">
-                      <div className="m-kpi-label">Monitored Providers</div>
-                      <div className="m-kpi-value">247</div>
-                      <div className="m-kpi-delta m-up">&uarr; 12 this month</div>
+                  {/* Welcome Banner */}
+                  <div className="m-app-welcome-banner">
+                    <div className="m-app-welcome-text">
+                      <strong>Welcome, support</strong>
+                      <span className="m-app-trial-badge">FREE TRIAL</span>
                     </div>
-                    <div className="m-kpi-card">
-                      <div className="m-kpi-value" style={{ color: 'var(--m-red)' }}>
-                        <div className="m-kpi-label" style={{ color: 'var(--m-gray-400)' }}>Data Issues</div>
-                        14
-                      </div>
-                      <div className="m-kpi-delta m-down">&uarr; 3 new alerts</div>
+                    <div className="m-app-welcome-desc">17 of your 19 providers need attention. Click any provider below to review issues, approve corrections, and track resolution.</div>
+                  </div>
+
+                  {/* Status KPI Cards */}
+                  <div className="m-app-kpi-row">
+                    <div className="m-app-kpi m-app-kpi-red">
+                      <div className="m-app-kpi-num">17</div>
+                      <div className="m-app-kpi-label">Needs attention</div>
                     </div>
-                    <div className="m-kpi-card">
-                      <div className="m-kpi-label">Compliance Score</div>
-                      <div className="m-kpi-value" style={{ color: 'var(--m-gold)' }}>87%</div>
-                      <div className="m-kpi-delta m-up">&uarr; 4pts vs last scan</div>
+                    <div className="m-app-kpi m-app-kpi-yellow">
+                      <div className="m-app-kpi-num">0</div>
+                      <div className="m-app-kpi-label">In progress</div>
                     </div>
-                    <div className="m-kpi-card">
-                      <div className="m-kpi-label">Address Verified</div>
-                      <div className="m-kpi-value" style={{ color: 'var(--m-green)' }}>94%</div>
-                      <div className="m-kpi-delta m-up">&uarr; 2% this week</div>
+                    <div className="m-app-kpi m-app-kpi-blue">
+                      <div className="m-app-kpi-num">0</div>
+                      <div className="m-app-kpi-label">Monitoring</div>
+                    </div>
+                    <div className="m-app-kpi m-app-kpi-green">
+                      <div className="m-app-kpi-num">2</div>
+                      <div className="m-app-kpi-label">All clear</div>
                     </div>
                   </div>
 
-                  <div className="m-dash-two-col">
-                    <div className="m-dash-panel">
-                      <div className="m-panel-title">Recent Drift Alerts</div>
-                      <div className="m-alert-item">
-                        <div className="m-alert-dot m-red"></div>
-                        <div>
-                          <div className="m-alert-name">Dr. Marcus Webb &middot; NPI 1234567890</div>
-                          <div className="m-alert-desc">Address mismatch: NPPES &ne; practice website</div>
-                        </div>
+                  {/* Bottom Two-Col: Priority Providers + Compliance */}
+                  <div className="m-app-bottom-row">
+                    <div className="m-app-providers-panel">
+                      <div className="m-app-panel-header">
+                        <span className="m-app-panel-title">PRIORITY PROVIDERS</span>
+                        <span className="m-app-panel-link">View all 19 providers &rarr;</span>
                       </div>
-                      <div className="m-alert-item">
-                        <div className="m-alert-dot m-gold"></div>
-                        <div>
-                          <div className="m-alert-name">Sunrise Family Clinic</div>
-                          <div className="m-alert-desc">AI disclosure missing &middot; HB 149 (TX)</div>
+                      <div className="m-app-provider-row">
+                        <div className="m-app-prov-avatar" style={{ background: '#E8A0A0' }}>DW</div>
+                        <div className="m-app-prov-info">
+                          <div className="m-app-prov-name">David Willingham</div>
+                          <div className="m-app-prov-npi">1750312120</div>
+                          <div className="m-app-prov-specialty">Optometry</div>
+                          <span className="m-app-prov-tag">Credentialing</span>
                         </div>
+                        <div className="m-app-prov-issues m-app-issues-red">1 issue</div>
                       </div>
-                      <div className="m-alert-item">
-                        <div className="m-alert-dot m-gold"></div>
-                        <div>
-                          <div className="m-alert-name">Dr. Priya Nair &middot; NPI 9876543210</div>
-                          <div className="m-alert-desc">License expiry in 34 days &middot; CA MBC</div>
+                      <div className="m-app-provider-row">
+                        <div className="m-app-prov-avatar" style={{ background: '#E8A0A0' }}>RC</div>
+                        <div className="m-app-prov-info">
+                          <div className="m-app-prov-name">Robert Connaughton</div>
+                          <div className="m-app-prov-npi">1326061003</div>
                         </div>
-                      </div>
-                      <div className="m-alert-item">
-                        <div className="m-alert-dot m-green"></div>
-                        <div>
-                          <div className="m-alert-name">Valley Orthopaedics Group</div>
-                          <div className="m-alert-desc">SB 1188 data sovereignty &middot; Resolved</div>
-                        </div>
+                        <div className="m-app-prov-issues m-app-issues-red">2 issues</div>
                       </div>
                     </div>
 
-                    <div className="m-dash-panel">
-                      <div className="m-panel-title">Compliance Checks</div>
-                      <div className="m-comp-row">
-                        <span className="m-comp-check">NPI Integrity</span>
-                        <span className="m-comp-badge m-pass">PASS</span>
+                    <div className="m-app-compliance-panel">
+                      <div className="m-app-panel-title">PRACTICE COMPLIANCE</div>
+                      <div className="m-app-compliance-score">
+                        <div className="m-app-score-bar"></div>
+                        <span>Compliance score</span>
                       </div>
-                      <div className="m-comp-row">
-                        <span className="m-comp-check">Address Match</span>
-                        <span className="m-comp-badge m-warn">6 DRIFT</span>
+                      <div className="m-app-comp-item">
+                        <span>SB 1188 (Data sov.)</span>
+                        <span className="m-app-comp-status m-pending">Pending</span>
                       </div>
-                      <div className="m-comp-row">
-                        <span className="m-comp-check">AI Disclosure (TX HB149)</span>
-                        <span className="m-comp-badge m-fail">3 FAIL</span>
-                      </div>
-                      <div className="m-comp-row">
-                        <span className="m-comp-check">Data Sovereignty (SB1188)</span>
-                        <span className="m-comp-badge m-warn">2 WARN</span>
-                      </div>
-                      <div className="m-comp-row">
-                        <span className="m-comp-check">License Expiry</span>
-                        <span className="m-comp-badge m-warn">1 EXPIRING</span>
+                      <div className="m-app-comp-item">
+                        <span>HB 149 (AI transp.)</span>
+                        <span className="m-app-comp-status m-pending">Pending</span>
                       </div>
                     </div>
                   </div>
