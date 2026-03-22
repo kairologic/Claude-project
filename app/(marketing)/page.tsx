@@ -1,454 +1,536 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
-import { Shield, Search, FileText, Eye, AlertTriangle, CheckCircle, ArrowRight, Zap, Clock, DollarSign, Users, Lock, Activity, Play, X } from 'lucide-react';
+
+const ArrowIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 export default function HomePage() {
-  const [showVideo, setShowVideo] = useState(false);
-
   return (
-    <div className="min-h-screen bg-white">
-
+    <>
       {/* ═══ HERO ═══ */}
-      <section className="relative bg-gradient-to-br from-navy via-navy-light to-navy-dark text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-5"></div>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-orange/5 rounded-full blur-3xl"></div>
-
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-20 pb-16">
-          {/* Audience tag */}
-          <div className="text-center mb-6">
-            <span className="inline-flex items-center gap-2 bg-red-500/20 backdrop-blur-sm border border-red-400/30 text-red-300 text-xs font-bold uppercase tracking-widest px-5 py-2 rounded-full">
-              <AlertTriangle size={14} />
-              New Texas law — most healthcare websites are not compliant
-            </span>
-          </div>
-
-          {/* Primary message — immediately clear */}
-          <h1 className="text-center text-4xl sm:text-5xl md:text-6xl font-display font-extrabold leading-tight mb-6">
-            Your Healthcare Website May Be{' '}
-            <span className="text-gold">Breaking Texas Law</span>
-          </h1>
-
-          {/* Sub message — plain English, specific */}
-          <p className="text-center text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-3 leading-relaxed">
-            Texas SB 1188 requires healthcare providers to keep patient data inside the US. Most healthcare websites unknowingly send data to servers in Ireland, Singapore, and beyond — through Google Fonts, analytics, chatbots, and scheduling tools.
-          </p>
-          <p className="text-center text-base text-red-300 font-semibold mb-10">
-            Fines up to $50,000 per violation. Free scan takes 30 seconds.
-          </p>
-
-          {/* CTA */}
-          <div className="flex flex-col gap-4 justify-center items-center mb-16 max-w-md mx-auto">
-            <button
-              onClick={() => setShowVideo(true)}
-              className="w-full bg-white/10 border-2 border-white/20 hover:border-gold hover:bg-gold/10 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-all duration-200 flex items-center gap-2 justify-center">
-              <Play size={18} className="text-gold" />
-              Watch How It Works
-              <span className="text-xs text-gray-400 ml-1">(~2 min)</span>
-            </button>
-            <Link href="/scan" className="w-full">
-              <button className="w-full btn-primary text-lg px-10 py-4 flex items-center gap-2 justify-center shadow-xl shadow-orange/20">
-                <Search size={20} />
-                SCAN MY WEBSITE — FREE
-              </button>
-            </Link>
-          </div>
-
-          {/* 3-step visual — brief preview */}
-          <div className="grid md:grid-cols-3 gap-0 max-w-4xl mx-auto">
-            {[
-              {
-                step: '1',
-                title: 'Scan',
-                desc: 'Free 30-second scan of your website',
-                icon: <Search size={18} />,
-                color: 'bg-blue-500/20 text-blue-400',
-                connector: true,
-              },
-              {
-                step: '2',
-                title: 'Fix',
-                desc: 'Get your report + ready-made fixes',
-                icon: <FileText size={18} />,
-                color: 'bg-orange/20 text-orange',
-                connector: true,
-              },
-              {
-                step: '3',
-                title: 'Monitor',
-                desc: '24/7 protection — 3 months free',
-                icon: <Shield size={18} />,
-                color: 'bg-green-500/20 text-green-400',
-                connector: false,
-              },
-            ].map((item, i) => (
-              <div key={i} className="relative flex flex-col items-center text-center px-4 py-6">
-                {item.connector && (
-                  <div className="hidden md:block absolute top-1/2 right-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-y-4 z-0" />
-                )}
-                <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center mb-3 relative z-10`}>
-                  {item.icon}
-                </div>
-                <div className="text-xs font-bold text-gold uppercase tracking-widest mb-1">Step {item.step}</div>
-                <div className="font-display font-bold text-lg mb-1">{item.title}</div>
-                <div className="text-sm text-gray-400">{item.desc}</div>
+      <section className="m-hero">
+        <div className="m-container">
+          <div className="m-hero-inner">
+            <div className="m-hero-content">
+              <div className="m-hero-label">
+                <span className="m-tag">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.5"/><circle cx="5" cy="5" r="1.5" fill="currentColor"/></svg>
+                  Provider Data Intelligence Platform
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              <h1>Know your providers.<br/><em>Before problems arise.</em></h1>
+              <p className="m-hero-desc">
+                KairoLogic continuously monitors 1.8M+ provider records for data integrity, credential drift,
+                address mismatches, and state regulation compliance — giving healthcare organizations real-time
+                confidence in their provider data.
+              </p>
+              <div className="m-hero-actions">
+                <Link href="/contact" className="m-btn-primary m-gold">
+                  Request a Demo
+                  <ArrowIcon />
+                </Link>
+                <Link href="/registry" className="m-btn-outline">Explore the Registry</Link>
+              </div>
+              <div className="m-hero-note">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L8 5h4.5L9 7.5l1.5 4L6.5 9 3 11.5l1.5-4L1 5H5.5L6.5 1z" fill="currentColor"/></svg>
+                No credit card required &middot; HIPAA-aligned infrastructure &middot; TX &amp; CA live
+              </div>
+            </div>
 
-      {/* ═══ VIDEO MODAL ═══ */}
-      {showVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowVideo(false)}>
-          <div className="relative w-full max-w-4xl mx-4" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowVideo(false)}
-              className="absolute -top-10 right-0 text-white hover:text-gold transition-colors">
-              <X size={28} />
-            </button>
-            <div className="bg-navy rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-              <iframe
-                src="https://www.youtube.com/embed/GJNF7RRYL-s?autoplay=1&rel=0"
-                title="KairoLogic - How It Works"
-                className="w-full aspect-video"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                frameBorder="0"
-              />
+            {/* Dashboard Preview */}
+            <div className="m-hero-visual">
+              {/* Floating badge left */}
+              <div className="m-float-badge m-left">
+                <div className="m-float-icon" style={{ background: 'var(--m-green-pale)' }}>&#10003;</div>
+                <div className="m-float-badge-text">
+                  <div className="m-title">NPI Verified</div>
+                  <div className="m-sub">Dr. Sarah Chen &middot; TX</div>
+                </div>
+              </div>
+
+              <div className="m-dashboard-frame">
+                <div className="m-dash-topbar">
+                  <div className="m-dash-dots"><span></span><span></span><span></span></div>
+                  <span className="m-dash-title">KairoLogic Dashboard — Austin Regional Medical Group</span>
+                </div>
+                <div className="m-dash-body">
+                  <div className="m-dash-header-row">
+                    <div className="m-dash-welcome">Provider Intelligence <span>/ Dashboard</span></div>
+                    <div className="m-dash-state-pills">
+                      <span className="m-dash-pill">TX</span>
+                      <span className="m-dash-pill">CA</span>
+                      <span className="m-dash-pill m-inactive">+48</span>
+                    </div>
+                  </div>
+
+                  <div className="m-kpi-grid">
+                    <div className="m-kpi-card">
+                      <div className="m-kpi-label">Monitored Providers</div>
+                      <div className="m-kpi-value">247</div>
+                      <div className="m-kpi-delta m-up">&uarr; 12 this month</div>
+                    </div>
+                    <div className="m-kpi-card">
+                      <div className="m-kpi-value" style={{ color: 'var(--m-red)' }}>
+                        <div className="m-kpi-label" style={{ color: 'var(--m-gray-400)' }}>Data Issues</div>
+                        14
+                      </div>
+                      <div className="m-kpi-delta m-down">&uarr; 3 new alerts</div>
+                    </div>
+                    <div className="m-kpi-card">
+                      <div className="m-kpi-label">Compliance Score</div>
+                      <div className="m-kpi-value" style={{ color: 'var(--m-gold)' }}>87%</div>
+                      <div className="m-kpi-delta m-up">&uarr; 4pts vs last scan</div>
+                    </div>
+                    <div className="m-kpi-card">
+                      <div className="m-kpi-label">Address Verified</div>
+                      <div className="m-kpi-value" style={{ color: 'var(--m-green)' }}>94%</div>
+                      <div className="m-kpi-delta m-up">&uarr; 2% this week</div>
+                    </div>
+                  </div>
+
+                  <div className="m-dash-two-col">
+                    <div className="m-dash-panel">
+                      <div className="m-panel-title">Recent Drift Alerts</div>
+                      <div className="m-alert-item">
+                        <div className="m-alert-dot m-red"></div>
+                        <div>
+                          <div className="m-alert-name">Dr. Marcus Webb &middot; NPI 1234567890</div>
+                          <div className="m-alert-desc">Address mismatch: NPPES &ne; practice website</div>
+                        </div>
+                      </div>
+                      <div className="m-alert-item">
+                        <div className="m-alert-dot m-gold"></div>
+                        <div>
+                          <div className="m-alert-name">Sunrise Family Clinic</div>
+                          <div className="m-alert-desc">AI disclosure missing &middot; HB 149 (TX)</div>
+                        </div>
+                      </div>
+                      <div className="m-alert-item">
+                        <div className="m-alert-dot m-gold"></div>
+                        <div>
+                          <div className="m-alert-name">Dr. Priya Nair &middot; NPI 9876543210</div>
+                          <div className="m-alert-desc">License expiry in 34 days &middot; CA MBC</div>
+                        </div>
+                      </div>
+                      <div className="m-alert-item">
+                        <div className="m-alert-dot m-green"></div>
+                        <div>
+                          <div className="m-alert-name">Valley Orthopaedics Group</div>
+                          <div className="m-alert-desc">SB 1188 data sovereignty &middot; Resolved</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="m-dash-panel">
+                      <div className="m-panel-title">Compliance Checks</div>
+                      <div className="m-comp-row">
+                        <span className="m-comp-check">NPI Integrity</span>
+                        <span className="m-comp-badge m-pass">PASS</span>
+                      </div>
+                      <div className="m-comp-row">
+                        <span className="m-comp-check">Address Match</span>
+                        <span className="m-comp-badge m-warn">6 DRIFT</span>
+                      </div>
+                      <div className="m-comp-row">
+                        <span className="m-comp-check">AI Disclosure (TX HB149)</span>
+                        <span className="m-comp-badge m-fail">3 FAIL</span>
+                      </div>
+                      <div className="m-comp-row">
+                        <span className="m-comp-check">Data Sovereignty (SB1188)</span>
+                        <span className="m-comp-badge m-warn">2 WARN</span>
+                      </div>
+                      <div className="m-comp-row">
+                        <span className="m-comp-check">License Expiry</span>
+                        <span className="m-comp-badge m-warn">1 EXPIRING</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating badge right */}
+              <div className="m-float-badge m-right">
+                <div className="m-float-icon" style={{ background: 'var(--m-red-pale)' }}>&#9888;</div>
+                <div className="m-float-badge-text">
+                  <div className="m-title">Drift Detected</div>
+                  <div className="m-sub">Address mismatch &middot; 3 providers</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      )}
 
-      {/* ═══ THE PROBLEM — Why this matters ═══ */}
-      <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <h2 className="section-heading">
-              Why <span className="text-gold">Most Healthcare Websites</span> Fail
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              It&apos;s not about hacking — it&apos;s about where your website sends patient data without you knowing.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <AlertTriangle className="text-red-500" size={28} />,
-                title: 'Your Site Sends Data Overseas',
-                detail: 'Google Fonts, analytics, CDNs, and scheduling widgets route patient-identifying data through servers in Ireland, Singapore, and beyond — silently, on every page load.',
-                stat: '73%',
-                statLabel: 'of healthcare sites fail',
-              },
-              {
-                icon: <Eye className="text-amber-500" size={28} />,
-                title: 'Your AI Isn\'t Disclosing Itself',
-                detail: 'Chatbots, AI scheduling, automated forms — Texas HB 149 requires clear disclosure when AI interacts with patients. Almost no one does this.',
-                stat: '89%',
-                statLabel: 'lack AI disclosure',
-              },
-              {
-                icon: <DollarSign className="text-green-500" size={28} />,
-                title: 'Enforcement Has Started',
-                detail: 'SB 1188 carries penalties up to $50,000 per violation. A single data breach involving foreign-routed PHI can trigger six-figure liability.',
-                stat: '$50K',
-                statLabel: 'per violation',
-              },
-            ].map((card, i) => (
-              <div key={i} className="bg-gray-50 rounded-2xl p-8 hover:shadow-lg transition-shadow">
-                <div className="mb-4">{card.icon}</div>
-                <h3 className="text-lg font-display font-bold text-navy mb-2">{card.title}</h3>
-                <p className="text-sm text-gray-600 mb-4 leading-relaxed">{card.detail}</p>
-                <div className="border-t border-gray-200 pt-3">
-                  <span className="text-2xl font-display font-black text-navy">{card.stat}</span>
-                  <span className="text-xs text-gray-400 ml-2 uppercase tracking-wider">{card.statLabel}</span>
-                </div>
+        {/* ═══ TRUST BAR ═══ */}
+        <div className="m-trust-bar">
+          <div className="m-container">
+            <div className="m-trust-bar-inner">
+              <div className="m-trust-stat">
+                <div className="m-trust-num">1.8<em>M+</em></div>
+                <div className="m-trust-label">Provider records indexed</div>
               </div>
-            ))}
+              <div className="m-trust-stat">
+                <div className="m-trust-num">34<em>K+</em></div>
+                <div className="m-trust-label">Practice websites monitored</div>
+              </div>
+              <div className="m-trust-stat">
+                <div className="m-trust-num">14</div>
+                <div className="m-trust-label">Integrity checks per provider</div>
+              </div>
+              <div className="m-trust-stat">
+                <div className="m-trust-num">TX <em>+</em> CA</div>
+                <div className="m-trust-label">Live — 48 states coming</div>
+              </div>
+              <div className="m-trust-stat">
+                <div className="m-trust-num">&lt;<em>30s</em></div>
+                <div className="m-trust-label">Scan turnaround</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ═══ HOW IT WORKS — with video CTA ═══ */}
-      <section id="how-it-works" className="py-20 bg-navy text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
-              Three Steps to <span className="text-gold">Compliance</span>
-            </h2>
-            <p className="text-gray-400 max-w-xl mx-auto">
-              From vulnerability to verified — no IT team required.
-            </p>
+      {/* ═══ VALUE PROPS ═══ */}
+      <section className="m-section m-value-section">
+        <div className="m-container">
+          <div className="m-section-header">
+            <span className="m-tag">Why KairoLogic</span>
+            <h2>Provider data is <em>messier</em> than you think</h2>
+            <p>NPPES data goes stale. Websites drift. Regulations change. KairoLogic bridges the gap between what your data says and what&apos;s actually true on the ground.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            {[
-              {
-                step: '01',
-                title: 'Free Scan',
-                desc: 'Enter your NPI and website URL. In 30 seconds, our Sentry engine checks 12 compliance points and shows you exactly where patient data is going.',
-                icon: <Search size={24} />,
-                color: 'from-blue-500 to-indigo-500',
-              },
-              {
-                step: '02',
-                title: 'Get Your Report + Fixes',
-                desc: 'Download a forensic PDF with every issue mapped to the specific Texas statute, plus a remediation roadmap your developer can follow. Or get the Safe Harbor bundle with ready-made policies and templates.',
-                icon: <FileText size={24} />,
-                color: 'from-orange to-amber-500',
-              },
-              {
-                step: '03',
-                title: 'Stay Protected',
-                desc: 'Sentry Shield monitors your site 24/7, catching compliance drift before it becomes a violation. Every report purchase includes 3 months free.',
-                icon: <Shield size={24} />,
-                color: 'from-green-500 to-emerald-500',
-              },
-            ].map((item, i) => (
-              <div key={i} className="relative">
-                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} mb-4`}>
-                  {item.icon}
-                </div>
-                <div className="text-xs font-bold text-gold uppercase tracking-widest mb-2">Step {item.step}</div>
-                <h3 className="text-xl font-display font-bold mb-3">{item.title}</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Video CTA */}
-          <div className="text-center">
-            <button
-              onClick={() => setShowVideo(true)}
-              className="inline-flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl transition-all">
-              <div className="w-10 h-10 bg-gold/20 rounded-full flex items-center justify-center">
-                <Play size={18} className="text-gold ml-0.5" />
-              </div>
-              <div className="text-left">
-                <div className="text-sm font-bold">Watch the 1-Minute Demo</div>
-                <div className="text-xs text-gray-400">See a real scan → report → dashboard walkthrough</div>
-              </div>
-            </button>
+          <div className="m-value-grid">
+            <div className="m-value-card">
+              <div className="m-value-icon">&#128269;</div>
+              <h3>NPI &amp; Address Integrity</h3>
+              <p>Cross-reference NPPES, state boards, and practice websites to catch address mismatches, inactive NPIs, and data discrepancies before they cause credentialing failures.</p>
+            </div>
+            <div className="m-value-card">
+              <div className="m-value-icon">&#9878;&#65039;</div>
+              <h3>State Regulation Compliance</h3>
+              <p>Texas SB 1188, HB 149, California AB 3030 — our engine maps each regulation to provider-level checks and surfaces drift the moment it happens, filtered by your providers&apos; states.</p>
+            </div>
+            <div className="m-value-card">
+              <div className="m-value-icon">&#128225;</div>
+              <h3>Continuous Roster Monitoring</h3>
+              <p>Detect when providers join or leave a practice through website scan analysis. Get ahead of roster drift before it affects payer contracts, directories, or patient access.</p>
+            </div>
+            <div className="m-value-card">
+              <div className="m-value-icon">&#128451;&#65039;</div>
+              <h3>NPPES Differential Sync</h3>
+              <p>Weekly differential sync from NPPES keeps our registry current. You always see the latest provider data without waiting for quarterly credentialing cycles.</p>
+            </div>
+            <div className="m-value-card">
+              <div className="m-value-icon">&#127973;</div>
+              <h3>Practice-Level Intelligence</h3>
+              <p>Group providers by practice, network, or geographic region. Understand your entire book at a glance — not just individual provider snapshots.</p>
+            </div>
+            <div className="m-value-card">
+              <div className="m-value-icon">&#128640;</div>
+              <h3>Built for National Scale</h3>
+              <p>Architected for all 50 states from day one. State-specific regulation profiles activate automatically as providers are added — no manual configuration required.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ═══ SOCIAL PROOF ═══ */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { stat: '481K+', label: 'TX providers in registry', icon: <Users size={20} className="text-gold" /> },
-              { stat: '12', label: 'compliance checks', icon: <CheckCircle size={20} className="text-green-500" /> },
-              { stat: '<30s', label: 'scan time', icon: <Clock size={20} className="text-blue-500" /> },
-              { stat: '24/7', label: 'drift monitoring', icon: <Activity size={20} className="text-orange" /> },
-            ].map((item, i) => (
-              <div key={i} className="text-center py-4">
-                <div className="flex justify-center mb-2">{item.icon}</div>
-                <div className="text-2xl md:text-3xl font-display font-black text-navy">{item.stat}</div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{item.label}</div>
-              </div>
-            ))}
+      {/* ═══ HOW IT WORKS ═══ */}
+      <section className="m-section m-how-section">
+        <div className="m-container">
+          <div className="m-section-header">
+            <span className="m-tag m-tag-blue">How It Works</span>
+            <h2>From raw data to <em>actionable intelligence</em></h2>
+            <p>Three steps from provider upload to continuous monitoring — no IT team or complex integration required to get started.</p>
+          </div>
+          <div className="m-steps-grid">
+            <div className="m-step-card">
+              <div className="m-step-num">01</div>
+              <h3>Connect Your Roster</h3>
+              <p>Upload a CSV or connect via API. KairoLogic resolves each provider against NPPES, state license boards, and 34K+ practice websites in your first scan.</p>
+            </div>
+            <div className="m-step-card">
+              <div className="m-step-num">02</div>
+              <h3>Baseline &amp; Score</h3>
+              <p>Each provider receives an integrity score across 14 checks — NPI validity, address accuracy, credential status, and applicable state regulation compliance.</p>
+            </div>
+            <div className="m-step-card">
+              <div className="m-step-num">03</div>
+              <h3>Monitor &amp; Alert</h3>
+              <p>Ongoing scans surface drift the moment it appears. Your dashboard shows real-time alerts, trend data, and a full audit trail for every change detected.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ═══ PRICING ═══ */}
-      <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <h2 className="section-heading">
-              Simple, <span className="text-gold">Transparent</span> Pricing
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Every purchase includes 3 months of Sentry Shield monitoring — free.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-
-            {/* Audit Report — $149 */}
-            <div className="border-2 border-gray-200 rounded-2xl p-7 hover:border-gold transition-colors relative">
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">One-Time</div>
-              <h3 className="text-xl font-display font-bold text-navy mb-2">Audit Report</h3>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-display font-black text-navy">$149</span>
-                <span className="text-gray-400 text-sm">/report</span>
-              </div>
-              <div className="text-xs text-green-600 font-bold mb-4">+ 3 months Sentry Shield FREE</div>
-              <p className="text-gray-500 text-sm mb-6">
-                Know exactly where you stand and what to fix.
-              </p>
-              <ul className="space-y-2.5 mb-8">
-                {[
-                  'Full 12-point forensic scan',
-                  'Professional PDF report',
-                  'Data border map with IP geolocation',
-                  'Remediation roadmap with tech fixes',
-                  'SB 1188 & HB 149 statute mapping',
-                  '3 months Shield monitoring included',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                    <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
+      {/* ═══ FEATURE 1: Provider Intelligence ═══ */}
+      <section className="m-section">
+        <div className="m-container">
+          <div className="m-feature-split">
+            <div className="m-feature-text">
+              <span className="m-tag m-tag-green">Provider Verification</span>
+              <h2>Catch data integrity issues <em>before they escalate</em></h2>
+              <p>Most credentialing problems start with a simple data mismatch — an address that changed, a name that was entered differently, a license that expired quietly. KairoLogic finds these automatically across your entire roster.</p>
+              <ul className="m-feature-list">
+                <li>NPI cross-referenced against NPPES, TMB, and PECOS simultaneously</li>
+                <li>Address verification against USPS, Google Maps, and practice website data</li>
+                <li>Taxonomy and specialty mismatch detection</li>
+                <li>License board action monitoring (suspensions, probations, revocations)</li>
+                <li>DEA and CDS credential status checks</li>
               </ul>
-              <Link href="/scan">
-                <button className="w-full bg-navy hover:bg-navy-light text-white font-semibold py-3 rounded-lg transition-colors">
-                  Get My Report
-                </button>
+            </div>
+            <div className="m-feature-visual">
+              <div className="m-visual-header">
+                <div className="m-visual-dot" style={{ background: '#FF605C' }}></div>
+                <div className="m-visual-dot" style={{ background: '#FFBD44' }}></div>
+                <div className="m-visual-dot" style={{ background: '#00CA4E' }}></div>
+                <span className="m-visual-title">Provider Roster — Austin Regional Medical</span>
+              </div>
+              <div className="m-visual-body">
+                <div className="m-provider-card">
+                  <div className="m-prov-avatar">SC</div>
+                  <div className="m-prov-info">
+                    <div className="m-prov-name">Dr. Sarah Chen, MD</div>
+                    <div className="m-prov-meta">Internal Medicine &middot; Austin, TX</div>
+                  </div>
+                  <div className="m-prov-status">
+                    <span className="m-status-badge m-verified">Verified</span>
+                    <span className="m-prov-npi">NPI 1234567890</span>
+                  </div>
+                </div>
+                <div className="m-provider-card">
+                  <div className="m-prov-avatar" style={{ background: 'var(--m-gold)', color: 'var(--m-navy)' }}>MW</div>
+                  <div className="m-prov-info">
+                    <div className="m-prov-name">Dr. Marcus Webb, DO</div>
+                    <div className="m-prov-meta">Family Medicine &middot; Houston, TX</div>
+                  </div>
+                  <div className="m-prov-status">
+                    <span className="m-status-badge m-drift">Address Drift</span>
+                    <span className="m-prov-npi">NPI 9876543210</span>
+                  </div>
+                </div>
+                <div className="m-provider-card">
+                  <div className="m-prov-avatar" style={{ background: '#4A90D9' }}>PN</div>
+                  <div className="m-prov-info">
+                    <div className="m-prov-name">Dr. Priya Nair, MD</div>
+                    <div className="m-prov-meta">Pediatrics &middot; San Francisco, CA</div>
+                  </div>
+                  <div className="m-prov-status">
+                    <span className="m-status-badge m-verified">Verified</span>
+                    <span className="m-prov-npi">NPI 1122334455</span>
+                  </div>
+                </div>
+                <div className="m-provider-card">
+                  <div className="m-prov-avatar" style={{ background: 'var(--m-red)' }}>JR</div>
+                  <div className="m-prov-info">
+                    <div className="m-prov-name">Dr. James Rivera, DDS</div>
+                    <div className="m-prov-meta">Dentistry &middot; Dallas, TX</div>
+                  </div>
+                  <div className="m-prov-status">
+                    <span className="m-status-badge m-error">License Expiring</span>
+                    <span className="m-prov-npi">NPI 5544332211</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ═══ FEATURE 2: Multi-State ═══ */}
+          <div className="m-feature-split m-reverse">
+            <div className="m-feature-text">
+              <span className="m-tag">Multi-State Coverage</span>
+              <h2>One platform. <em>Every state&apos;s rules.</em></h2>
+              <p>Regulation varies dramatically by state. KairoLogic maintains state-specific compliance profiles so the right checks run automatically for each provider based on where they practice — not a one-size-fits-all scan.</p>
+              <ul className="m-feature-list">
+                <li>Texas SB 1188 (data sovereignty) and HB 149 (AI disclosure) live now</li>
+                <li>California AB 3030 (AI in healthcare) checks in active build</li>
+                <li>State license board API integrations for TX TMB, CA MBC, and more</li>
+                <li>New state profiles activate without re-configuring your account</li>
+                <li>National PECOS enrollment data for CMS-enrolled providers</li>
+              </ul>
+            </div>
+            <div className="m-feature-visual">
+              <div className="m-visual-header">
+                <div className="m-visual-dot" style={{ background: '#FF605C' }}></div>
+                <div className="m-visual-dot" style={{ background: '#FFBD44' }}></div>
+                <div className="m-visual-dot" style={{ background: '#00CA4E' }}></div>
+                <span className="m-visual-title">State Coverage Map</span>
+              </div>
+              <div className="m-visual-body">
+                <div className="m-map-visual">
+                  <div className="m-map-bg">
+                    <div className="m-map-dot m-large" style={{ left: '30%', top: '55%' }}></div>
+                    <div className="m-map-dot" style={{ left: '34%', top: '62%' }}></div>
+                    <div className="m-map-dot" style={{ left: '26%', top: '48%' }}></div>
+                    <div className="m-map-dot m-large" style={{ left: '12%', top: '50%' }}></div>
+                    <div className="m-map-dot" style={{ left: '10%', top: '42%' }}></div>
+                    <div className="m-map-label" style={{ left: '26%', top: '68%' }}>Texas</div>
+                    <div className="m-map-label" style={{ left: '6%', top: '56%' }}>California</div>
+                  </div>
+                  <div className="m-state-chips">
+                    <div className="m-state-chip"><span className="m-dot"></span> Texas — Live</div>
+                    <div className="m-state-chip"><span className="m-dot"></span> California — Live</div>
+                    <div className="m-state-chip m-coming"><span className="m-dot"></span> Florida — Q3 2026</div>
+                    <div className="m-state-chip m-coming"><span className="m-dot"></span> New York — Q3 2026</div>
+                    <div className="m-state-chip m-coming"><span className="m-dot"></span> +46 states coming</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ PRICING — Model D Bands ═══ */}
+      <section className="m-section m-pricing-section">
+        <div className="m-container">
+          <div className="m-section-header">
+            <span className="m-tag m-tag-blue">Pricing</span>
+            <h2>Simple plans for every <em>organization size</em></h2>
+            <p>From solo practices to enterprise health systems — KairoLogic scales with your roster. All plans include TX and CA compliance coverage.</p>
+          </div>
+          <div className="m-pricing-grid">
+            {/* Starter */}
+            <div className="m-pricing-card">
+              <div className="m-plan-name">Starter</div>
+              <div className="m-plan-price"><sup>$</sup>49<sub>/mo</sub></div>
+              <div className="m-plan-desc">For small practices with up to 5 providers. Full monitoring, all compliance checks included.</div>
+              <div className="m-pricing-divider"></div>
+              <ul className="m-pricing-features">
+                <li>Up to 5 providers monitored</li>
+                <li>Full 14-point integrity scan</li>
+                <li>NPI + address verification</li>
+                <li>State regulation compliance (TX &amp; CA)</li>
+                <li>Real-time drift alerts</li>
+                <li>Monthly compliance reports</li>
+              </ul>
+              <Link href="/contact" className="m-pricing-cta">Get Started</Link>
+            </div>
+
+            {/* Growth (featured) */}
+            <div className="m-pricing-card m-featured">
+              <div className="m-pricing-badge">Most Popular</div>
+              <div className="m-plan-name">Growth</div>
+              <div className="m-plan-price"><sup>$</sup>99<sub>/mo</sub></div>
+              <div className="m-plan-desc">For growing practices managing up to 15 providers with full dashboard access and priority support.</div>
+              <div className="m-pricing-divider"></div>
+              <ul className="m-pricing-features">
+                <li>Up to 15 providers monitored</li>
+                <li>Everything in Starter</li>
+                <li>Live compliance dashboard</li>
+                <li>Payer directory monitoring</li>
+                <li>Credentialing workflow tracking</li>
+                <li>Quarterly forensic reports</li>
+                <li>Priority email support</li>
+              </ul>
+              <Link href="/contact" className="m-pricing-cta">Start Monitoring</Link>
+            </div>
+
+            {/* Group */}
+            <div className="m-pricing-card">
+              <div className="m-plan-name">Group</div>
+              <div className="m-plan-price"><sup>$</sup>199<sub>/mo</sub></div>
+              <div className="m-plan-desc">For multi-site practices and groups managing up to 40 providers across locations.</div>
+              <div className="m-pricing-divider"></div>
+              <ul className="m-pricing-features">
+                <li>Up to 40 providers monitored</li>
+                <li>Everything in Growth</li>
+                <li>Multi-location roster management</li>
+                <li>NPPES differential sync</li>
+                <li>Roster change detection</li>
+                <li>Dedicated onboarding</li>
+                <li>Phone support</li>
+              </ul>
+              <Link href="/contact" className="m-pricing-cta">Contact Sales</Link>
+            </div>
+
+            {/* Enterprise */}
+            <div className="m-pricing-card">
+              <div className="m-plan-name">Enterprise</div>
+              <div className="m-plan-price" style={{ fontSize: '32px', marginTop: '8px' }}>Custom</div>
+              <div className="m-plan-desc">For health systems, payers, CVO organizations, and networks managing 40+ providers.</div>
+              <div className="m-pricing-divider"></div>
+              <ul className="m-pricing-features">
+                <li>Unlimited provider roster</li>
+                <li>API access + webhooks</li>
+                <li>Multi-state coverage</li>
+                <li>Bulk NPI resolution engine</li>
+                <li>Custom SLA &amp; compliance reporting</li>
+                <li>Dedicated account manager</li>
+                <li>SSO &amp; advanced security</li>
+              </ul>
+              <Link href="/contact" className="m-pricing-cta">Contact Sales</Link>
+            </div>
+          </div>
+
+          {/* Founders Rate Callout */}
+          <div className="m-founders-banner">
+            <strong>Founders Rate:</strong> Join our early access program at <em>$99/mo flat</em> — regardless of roster size. Limited to first 20 organizations. <Link href="/contact" style={{ color: 'var(--m-gold)', fontWeight: 700, textDecoration: 'underline' }}>Apply now &rarr;</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ TESTIMONIALS ═══ */}
+      <section className="m-section m-social-section">
+        <div className="m-container">
+          <div className="m-section-header">
+            <span className="m-tag m-tag-green">Trusted by Providers</span>
+            <h2>What healthcare organizations <em>are saying</em></h2>
+          </div>
+          <div className="m-testimonial-grid">
+            <div className="m-testimonial-card">
+              <div className="m-testi-quote">&ldquo;</div>
+              <div className="m-testi-text">KairoLogic caught an address mismatch for one of our providers that had been quietly failing PECOS verification for three months. Fixed in 24 hours instead of the next credentialing cycle.</div>
+              <div className="m-testi-author">
+                <div className="m-testi-avatar">MR</div>
+                <div>
+                  <div className="m-testi-name">Michael Rodriguez, CVO</div>
+                  <div className="m-testi-role">North Texas Regional Health Network</div>
+                </div>
+              </div>
+            </div>
+            <div className="m-testimonial-card">
+              <div className="m-testi-quote">&ldquo;</div>
+              <div className="m-testi-text">As a solo practice in Texas, keeping up with SB 1188 and HB 149 felt impossible. KairoLogic&apos;s dashboard tells me exactly what to fix and why — no lawyer required.</div>
+              <div className="m-testi-author">
+                <div className="m-testi-avatar" style={{ background: 'var(--m-navy-light)' }}>SC</div>
+                <div>
+                  <div className="m-testi-name">Dr. Sandra Cho, MD</div>
+                  <div className="m-testi-role">Austin Family Practice</div>
+                </div>
+              </div>
+            </div>
+            <div className="m-testimonial-card">
+              <div className="m-testi-quote">&ldquo;</div>
+              <div className="m-testi-text">We run credentialing for 200+ providers across TX and CA. KairoLogic&apos;s roster monitoring means we see departures and additions within days, not at the next audit.</div>
+              <div className="m-testi-author">
+                <div className="m-testi-avatar" style={{ background: '#4A6FA5' }}>JL</div>
+                <div>
+                  <div className="m-testi-name">Jennifer Lim, Director of Credentialing</div>
+                  <div className="m-testi-role">Southwest Medical Partners</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ CTA BAND ═══ */}
+      <div className="m-cta-band">
+        <div className="m-container">
+          <div className="m-cta-inner">
+            <span className="m-tag" style={{ background: 'rgba(212,160,23,0.15)', color: 'var(--m-gold)', borderColor: 'rgba(212,160,23,0.3)' }}>Get Started Today</span>
+            <h2>Your provider data is <em>drifting right now.</em></h2>
+            <p>Run a free scan on any Texas or California provider and see exactly what KairoLogic finds in under 30 seconds.</p>
+            <div className="m-cta-actions">
+              <Link href="/scan" className="m-btn-primary m-gold">
+                Run a Free Scan
+                <ArrowIcon />
               </Link>
-              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-sm font-semibold text-gold bg-gold/10 hover:bg-gold/20 border border-gold/30 mt-4 px-5 py-2 rounded-full transition-all">
-                <FileText size={15} />
-                Preview sample report
-              </a>
-            </div>
-
-            {/* Safe Harbor — $249 */}
-            <div className="border-2 border-orange rounded-2xl p-7 relative shadow-xl shadow-orange/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
-                Most Popular
-              </div>
-              <div className="text-xs font-bold uppercase tracking-widest text-orange mb-4">One-Time</div>
-              <h3 className="text-xl font-display font-bold text-navy mb-2">Safe Harbor&trade;</h3>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-display font-black text-navy">$249</span>
-                <span className="text-gray-400 text-sm">/bundle</span>
-              </div>
-              <div className="text-xs text-green-600 font-bold mb-4">+ 3 months Sentry Shield FREE</div>
-              <p className="text-gray-500 text-sm mb-6">
-                Everything to fix it — policies, disclosures, and training.
-              </p>
-              <ul className="space-y-2.5 mb-8">
-                {[
-                  'Everything in Audit Report',
-                  'SB 1188 Policy Pack',
-                  'AI Disclosure Kit (copy-paste code)',
-                  'Evidence Ledger Templates',
-                  'Staff Training Guide',
-                  'Implementation Blueprint',
-                  '3 months Shield monitoring included',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                    <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/scan">
-                <button className="w-full btn-primary py-3 text-base">
-                  Get Safe Harbor
-                </button>
-              </Link>
-              <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-sm font-semibold text-orange bg-orange/10 hover:bg-orange/20 border border-orange/30 mt-4 px-5 py-2 rounded-full transition-all">
-                <FileText size={15} />
-                Preview sample report
-              </a>
-            </div>
-
-            {/* Sentry Shield — $79/mo */}
-            <div className="border-2 border-green-500 rounded-2xl p-7 relative shadow-lg shadow-green-500/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
-                Ongoing Protection
-              </div>
-              <div className="text-xs font-bold uppercase tracking-widest text-green-600 mb-4">Monthly</div>
-              <h3 className="text-xl font-display font-bold text-navy mb-2">Sentry Shield</h3>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-display font-black text-navy">$79</span>
-                <span className="text-gray-400 text-sm">/month</span>
-              </div>
-              <div className="text-xs text-green-600 font-bold mb-4">Includes free Audit Report</div>
-              <p className="text-gray-500 text-sm mb-6">
-                24/7 monitoring. Never fall out of compliance.
-              </p>
-              <ul className="space-y-2.5 mb-8">
-                {[
-                  'Free Sovereignty Audit Report',
-                  '24/7 continuous monitoring',
-                  'Live compliance dashboard',
-                  'Website compliance widget',
-                  'Quarterly forensic reports',
-                  'Annual certification seal',
-                  'Priority support',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                    <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <a href="https://buy.stripe.com/aFa3cv3OW4Y54kJ3057Re06" target="_blank" rel="noopener noreferrer">
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors">
-                  Start Monitoring
-                </button>
-              </a>
-              <a href="/shield-demo.html" target="_blank" rel="noopener noreferrer"
-                className="block text-center text-sm text-green-600 underline hover:text-green-700 transition-colors mt-3">
-                View Sample Dashboard →
-              </a>
-              <p className="text-center text-xs text-gray-400 mt-2">Cancel anytime. No long-term contracts.</p>
+              <Link href="/contact" className="m-btn-ghost">Schedule a Demo</Link>
             </div>
           </div>
-
-          {/* Cost comparison callout */}
-          <div className="mt-12 max-w-3xl mx-auto bg-navy/5 border border-navy/10 rounded-xl p-6 text-center">
-            <p className="text-sm text-gray-600">
-              <strong className="text-navy">$79/month</strong> vs. <strong className="text-red-600">$50,000+</strong> per compliance violation.{' '}
-              <span className="text-gray-500">That&apos;s 0.16% of the cost of a single fine — to make sure it never happens.</span>
-            </p>
-          </div>
         </div>
-      </section>
-
-      {/* ═══ WHO IT'S FOR ═══ */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="section-heading">
-              Built for Texas <span className="text-gold">Healthcare</span>
-            </h2>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { icon: <Activity size={20} />, title: 'Medical Practices', desc: 'Solo and group practices, urgent care, and primary care clinics' },
-              { icon: <Users size={20} />, title: 'Dental & Orthodontics', desc: 'Dental offices, orthodontic clinics, and oral surgery centers' },
-              { icon: <Shield size={20} />, title: 'Mental Health & Wellness', desc: 'Therapy practices, counseling centers, and wellness clinics' },
-              { icon: <Eye size={20} />, title: 'Med Spas & Specialty', desc: 'Med spas, dermatology, chiropractic, optometry, and more' },
-            ].map((item, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gold transition-colors">
-                <div className="w-10 h-10 bg-navy/5 rounded-lg flex items-center justify-center mb-3 text-navy">
-                  {item.icon}
-                </div>
-                <h3 className="font-display font-bold text-navy text-sm mb-1">{item.title}</h3>
-                <p className="text-xs text-gray-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ FINAL CTA ═══ */}
-      <section className="py-20 bg-navy">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-display font-bold mb-4 text-white">
-            Don&apos;t Wait for a Regulator to Find Out First
-          </h2>
-          <p className="text-lg text-gray-300 mb-8 max-w-xl mx-auto">
-            Run a free compliance scan right now. 30 seconds, no signup, no credit card — and you&apos;ll know exactly where you stand.
-          </p>
-          <Link href="/scan">
-            <button className="btn-primary text-lg px-10 py-4 flex items-center gap-2 mx-auto shadow-xl shadow-orange/20">
-              <Shield size={22} />
-              SCAN MY WEBSITE — FREE
-            </button>
-          </Link>
-          <p className="text-xs text-gray-500 mt-4">
-            Full report with remediation starts at $149. Every purchase includes 3 months of monitoring free.
-          </p>
-        </div>
-      </section>
-    </div>
+      </div>
+    </>
   );
 }

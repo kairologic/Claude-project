@@ -1,10 +1,17 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
+import './marketing.css';
 
 export const metadata: Metadata = {
-  title: 'KairoLogic - Statutory Vanguard | Texas Healthcare Compliance',
-  description: 'The Sentry Compliance Standard - Navigate SB 1188 and HB 149 with confidence',
+  title: 'KairoLogic — Provider Data Intelligence Platform',
+  description: 'Continuously monitor 1.8M+ provider records for data integrity, credential drift, address mismatches, and state regulation compliance. TX & CA live.',
+  openGraph: {
+    title: 'KairoLogic — Provider Data Intelligence Platform',
+    description: 'Know your providers. Before problems arise. Real-time confidence in your provider data.',
+    siteName: 'KairoLogic',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
@@ -15,6 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
         <Script id="apollo-tracker" strategy="afterInteractive">
           {`function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"698e94452800cc0019cd2975"})},document.head.appendChild(o)}initApollo();`}
         </Script>
