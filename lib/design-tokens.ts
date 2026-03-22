@@ -78,6 +78,7 @@ export const payerPortals: Record<string, { name: string; url: string; pullsFrom
   cigna: { name: 'Cigna', url: 'https://cignaforhcp.cigna.com/', pullsFromCaqh: false, method: 'Direct credentialing application' },
   humana: { name: 'Humana', url: 'https://www.humana.com/provider/', pullsFromCaqh: false, method: 'Direct credentialing application' },
   bcbstx: { name: 'BCBS TX', url: 'https://essentials.availity.com/', pullsFromCaqh: false, method: 'Availity PDM' },
+  blueshieldca: { name: 'Blue Shield CA', url: 'https://www.blueshieldca.com/en/provider', pullsFromCaqh: false, method: 'Provider Connection portal' },
   pecos: { name: 'PECOS (Medicare)', url: 'https://pecos.cms.hhs.gov/', pullsFromCaqh: false, method: 'CMS portal' },
   tmb: { name: 'TX Medical Board', url: 'https://profile.tmb.state.tx.us/', pullsFromCaqh: false, method: 'TMB portal' },
 };

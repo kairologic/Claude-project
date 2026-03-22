@@ -33,6 +33,7 @@ export interface AssessmentResult {
   cigna: SourceStatus;
   humana: SourceStatus;
   bcbstx: SourceStatus;
+  blueshieldca: SourceStatus;
   pecos: SourceStatus;
   license: SourceStatus;
   website: SourceStatus;
@@ -63,7 +64,8 @@ const PAYER_CODES: Record<string, string> = {
   aetna: 'aetna',
   cigna: 'cigna',
   humana: 'humana',
-  bcbstx: 'bcbs_tx',  // DB uses bcbs_tx, we display as bcbstx
+  bcbstx: 'bcbs_tx',       // DB uses bcbs_tx, we display as bcbstx
+  blueshieldca: 'bcbs_ca',  // DB uses bcbs_ca, we display as blueshieldca
 };
 
 const CAQH_PAYERS = ['uhc', 'aetna']; // These pull from CAQH automatically
@@ -146,6 +148,7 @@ export async function runCredentialingAssessment(
     cigna: assessPayer('cigna'),
     humana: assessPayer('humana'),
     bcbstx: assessPayer('bcbstx'),
+    blueshieldca: assessPayer('blueshieldca'),
     pecos: 'not_checked', // TODO: wire PECOS check
     license: pp?.has_license_issue ? 'expired' : 'active',
     website: 'not_listed', // New provider won't be on website yet
@@ -271,6 +274,7 @@ function generateTasksFromAssessment(
     { key: 'cigna', name: 'Cigna', url: 'https://cignaforhcp.cigna.com/', expectedDays: 60 },
     { key: 'humana', name: 'Humana', url: 'https://www.humana.com/provider/', expectedDays: 60 },
     { key: 'bcbstx', name: 'BCBS TX', url: 'https://essentials.availity.com/', expectedDays: 30 },
+    { key: 'blueshieldca', name: 'Blue Shield CA', url: 'https://www.blueshieldca.com/en/provider', expectedDays: 45 },
   ];
 
   for (const payer of directPayers) {

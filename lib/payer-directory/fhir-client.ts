@@ -255,14 +255,21 @@ export class FhirDirectoryClient {
   // ── FHIR HTTP ─────────────────────────────────────────────
 
   private async fhirGet<T>(endpoint: PayerEndpoint, path: string): Promise<T> {
-    const url = `${endpoint.fhir_base_url}${path}`;
+    let url = `${endpoint.fhir_base_url}${path}`;
     const headers: Record<string, string> = {
       Accept: 'application/fhir+json',
     };
 
-    // Add auth headers if needed
+    // Add auth headers/params based on endpoint config
     if (endpoint.auth_type === 'api_key' && endpoint.auth_config?.api_key) {
-      headers['x-api-key'] = endpoint.auth_config.api_key;
+      // Standard API key in header (default: x-api-key, configurable via api_key_header)
+      const headerName = endpoint.auth_config.api_key_header || 'x-api-key';
+      headers[headerName] = endpoint.auth_config.api_key;
+    } else if (endpoint.auth_type === 'api_key_query' && endpoint.auth_config?.api_key) {
+      // API key passed as query parameter (e.g., Blue Shield CA clientId)
+      const paramName = endpoint.auth_config.param_name || 'clientId';
+      const separator = url.includes('?') ? '&' : '?';
+      url = `${url}${separator}${paramName}=${endpoint.auth_config.api_key}`;
     } else if (endpoint.auth_type === 'oauth2_client_credentials') {
       const token = await this.getOAuthToken(endpoint);
       if (token) headers['Authorization'] = `Bearer ${token}`;

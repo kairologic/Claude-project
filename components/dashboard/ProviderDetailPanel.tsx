@@ -156,6 +156,7 @@ export default function ProviderDetailPanel({
   const [workflows, setWorkflows] = useState<WorkflowInstance[]>([]);
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
   const [credentialingTasks, setCredentialingTasks] = useState<Record<string, any[]>>({});
+  const [payerSnapshots, setPayerSnapshots] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [expandedAction, setExpandedAction] = useState<string | null>(null);
   const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
@@ -192,6 +193,18 @@ export default function ProviderDetailPanel({
       .eq('practice_website_id', practiceId)
       .maybeSingle();
     if (pp) setPracticeProvider(pp);
+
+    // Fetch latest payer directory snapshots for this NPI
+    const { data: snaps } = await supabase
+      .from('payer_directory_snapshots')
+      .select('payer_code, listed_address_line1, listed_city, listed_state, listed_phone, listed_specialty_display, snapshot_date')
+      .eq('npi', npi)
+      .order('snapshot_date', { ascending: false });
+    const latestByPayer: Record<string, any> = {};
+    for (const s of (snaps || [])) {
+      if (!latestByPayer[s.payer_code]) latestByPayer[s.payer_code] = s;
+    }
+    setPayerSnapshots(latestByPayer);
 
     // Fetch workflows for this provider
     const { data: wf } = await supabase
@@ -286,27 +299,42 @@ export default function ProviderDetailPanel({
   const nppesAddress = nppes ? titleCase(`${nppes.address_line_1}, ${nppes.city}, ${nppes.state} ${nppes.zip_code}`) : null;
   const websiteAddress = practiceProvider?.web_address ? titleCase(practiceProvider.web_address) : null;
 
-  const comparisonFields = [
-    {
-      field: 'Address',
-      nppes: nppesAddress,
-      website: websiteAddress,
-      match: nppesAddress && websiteAddress ? nppesAddress.toLowerCase().includes(websiteAddress.toLowerCase().slice(0, 10)) : null,
-    },
-    {
-      field: 'Phone',
-      nppes: formatPhone(nppes?.phone),
-      website: formatPhone(practiceProvider?.web_phone),
-      match: nppes?.phone && practiceProvider?.web_phone
-        ? nppes.phone.replace(/\D/g, '') === practiceProvider.web_phone.replace(/\D/g, '') : null,
-    },
-    {
-      field: 'Specialty',
-      nppes: titleCase(nppes?.taxonomy_desc),
-      website: titleCase(practiceProvider?.web_specialty),
-      match: nppes?.taxonomy_desc && practiceProvider?.web_specialty
-        ? nppes.taxonomy_desc.toLowerCase() === practiceProvider.web_specialty.toLowerCase() : null,
-    },
+  // Payer columns for comparison grid (order: NPPES, 6 payers, Website)
+  const PAYER_COLS: { code: string; label: string; dbCode?: string }[] = [
+    { code: 'nppes', label: 'NPPES' },
+    { code: 'uhc', label: 'UHC' },
+    { code: 'aetna', label: 'Aetna' },
+    { code: 'cigna', label: 'Cigna' },
+    { code: 'humana', label: 'Humana' },
+    { code: 'bcbs_tx', label: 'BCBS TX' },
+    { code: 'bcbs_ca', label: 'BSC CA' },
+    { code: 'website', label: 'Website' },
+  ];
+
+  // Build per-source values for each field row
+  function getPayerValue(code: string, field: 'address' | 'phone' | 'specialty'): string | null {
+    if (code === 'nppes') {
+      if (field === 'address') return nppesAddress;
+      if (field === 'phone') return formatPhone(nppes?.phone);
+      if (field === 'specialty') return titleCase(nppes?.taxonomy_desc);
+    }
+    if (code === 'website') {
+      if (field === 'address') return websiteAddress;
+      if (field === 'phone') return formatPhone(practiceProvider?.web_phone);
+      if (field === 'specialty') return titleCase(practiceProvider?.web_specialty);
+    }
+    const snap = payerSnapshots[code];
+    if (!snap) return null;
+    if (field === 'address') return snap.listed_address_line1 ? titleCase(`${snap.listed_address_line1}, ${snap.listed_city || ''}, ${snap.listed_state || ''}`) : null;
+    if (field === 'phone') return formatPhone(snap.listed_phone);
+    if (field === 'specialty') return snap.listed_specialty_display ? titleCase(snap.listed_specialty_display) : null;
+    return null;
+  }
+
+  const comparisonRows: { field: string; key: 'address' | 'phone' | 'specialty' }[] = [
+    { field: 'Address', key: 'address' },
+    { field: 'Phone', key: 'phone' },
+    { field: 'Specialty', key: 'specialty' },
   ];
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -451,47 +479,57 @@ export default function ProviderDetailPanel({
                 {/* Data Accuracy Across Sources */}
                 <div style={{ marginBottom: 20 }}>
                   <div style={sectionTitle}>Data accuracy across sources</div>
+                  <div style={{ overflowX: 'auto' }}>
                   <table style={{
-                    width: '100%', borderCollapse: 'collapse', fontSize: 11,
+                    width: '100%', minWidth: 600, borderCollapse: 'collapse', fontSize: 10,
                     border: `1px solid ${colors.gray200}`, borderRadius: 8, overflow: 'hidden',
                   }}>
                     <thead>
                       <tr>
-                        {['Field', 'NPPES', 'Website'].map(h => (
-                          <th key={h} style={{
-                            padding: '6px 8px', background: colors.gray100,
+                        <th style={{
+                          padding: '5px 6px', background: colors.gray100,
+                          fontWeight: 700, color: colors.gray400, textTransform: 'uppercase',
+                          fontSize: 9, letterSpacing: '0.03em', textAlign: 'left', position: 'sticky', left: 0, zIndex: 1,
+                        }}>Field</th>
+                        {PAYER_COLS.map(col => (
+                          <th key={col.code} style={{
+                            padding: '5px 4px', background: colors.gray100,
                             fontWeight: 700, color: colors.gray400, textTransform: 'uppercase',
-                            fontSize: 10, letterSpacing: '0.03em', textAlign: 'left',
-                          }}>{h}</th>
+                            fontSize: 9, letterSpacing: '0.03em', textAlign: 'left', whiteSpace: 'nowrap',
+                          }}>{col.label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {comparisonFields.map((row, i) => (
+                      {comparisonRows.map((row, i) => {
+                        const nppesVal = getPayerValue('nppes', row.key);
+                        return (
                         <tr key={i}>
-                          <td style={{ padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`, fontWeight: 600 }}>
+                          <td style={{ padding: '5px 6px', borderTop: `1px solid ${colors.gray100}`, fontWeight: 600, position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
                             {row.field}
                           </td>
-                          <td style={{
-                            padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`,
-                            color: row.match === false ? colors.red : row.match === true ? colors.green : colors.gray400,
-                            fontWeight: row.match === false ? 600 : 400,
-                            fontStyle: !row.nppes ? 'italic' : 'normal',
-                          }}>
-                            {row.nppes || 'Not available'}
-                          </td>
-                          <td style={{
-                            padding: '6px 8px', borderTop: `1px solid ${colors.gray100}`,
-                            color: row.match === false ? colors.red : row.match === true ? colors.green : colors.gray400,
-                            fontWeight: row.match === false ? 600 : 400,
-                            fontStyle: !row.website ? 'italic' : 'normal',
-                          }}>
-                            {row.website || 'Not available'}
-                          </td>
+                          {PAYER_COLS.map(col => {
+                            const val = getPayerValue(col.code, row.key);
+                            const isMatch = val && nppesVal ? val.toLowerCase().slice(0, 12) === nppesVal.toLowerCase().slice(0, 12) : null;
+                            const isMissing = !val;
+                            return (
+                              <td key={col.code} style={{
+                                padding: '5px 4px', borderTop: `1px solid ${colors.gray100}`,
+                                color: isMissing ? colors.gray200 : isMatch === false ? colors.red : isMatch === true ? colors.green : colors.gray400,
+                                fontWeight: isMatch === false ? 600 : 400,
+                                fontStyle: isMissing ? 'italic' : 'normal',
+                                fontSize: 10, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }} title={val || undefined}>
+                                {val || (col.code === 'bcbs_ca' ? 'Pending' : '—')}
+                              </td>
+                            );
+                          })}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
+                  </div>
                   {nppes?.credential && (
                     <div style={{ fontSize: 11, color: colors.gray400, marginTop: 6 }}>
                       Credential: {nppes.credential} · Specialty: {titleCase(nppes.taxonomy_desc) || 'N/A'}

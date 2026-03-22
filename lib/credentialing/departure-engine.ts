@@ -45,6 +45,7 @@ const PAYER_CODES: Record<string, string> = {
   cigna: 'cigna',
   humana: 'humana',
   bcbstx: 'bcbs_tx',
+  blueshieldca: 'bcbs_ca',
 };
 
 const CAQH_PAYERS = ['uhc', 'aetna']; // These pull from CAQH automatically
@@ -53,6 +54,7 @@ const PAYER_PORTALS: Record<string, { name: string; url: string; expectedDays: n
   cigna:  { name: 'Cigna',   url: 'https://cignaforhcp.cigna.com/', expectedDays: 30 },
   humana: { name: 'Humana',  url: 'https://www.humana.com/provider/', expectedDays: 30 },
   bcbstx: { name: 'BCBS TX', url: 'https://essentials.availity.com/', expectedDays: 21 },
+  blueshieldca: { name: 'Blue Shield CA', url: 'https://www.blueshieldca.com/en/provider', expectedDays: 30 },
 };
 
 // ─── Departure assessment engine ─────────────────────────────────────────────

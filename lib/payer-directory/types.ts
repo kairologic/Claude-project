@@ -7,12 +7,14 @@ export interface PayerEndpoint {
   payer_code: string;
   payer_name: string;
   fhir_base_url: string;
-  auth_type: 'none' | 'api_key' | 'oauth2_client_credentials';
+  auth_type: 'none' | 'api_key' | 'api_key_query' | 'oauth2_client_credentials' | 'session_cookie';
   auth_config?: {
     client_id?: string;
     client_secret?: string;
     token_url?: string;
     api_key?: string;
+    api_key_header?: string;  // Header name or query param name for api_key
+    param_name?: string;      // Query parameter name (for api_key_query auth)
   };
   rate_limit_rpm: number;
   coverage_type: string;
