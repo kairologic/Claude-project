@@ -15,6 +15,8 @@ export interface PayerEndpoint {
     api_key?: string;
     api_key_header?: string;  // Header name or query param name for api_key
     param_name?: string;      // Query parameter name (for api_key_query auth)
+    auth_method?: string;     // 'basic_header' for Aetna-style OAuth
+    scope?: string;           // OAuth scope parameter
   };
   rate_limit_rpm: number;
   coverage_type: string;
