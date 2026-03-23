@@ -255,21 +255,14 @@ export class FhirDirectoryClient {
   // ── FHIR HTTP ─────────────────────────────────────────────
 
   private async fhirGet<T>(endpoint: PayerEndpoint, path: string): Promise<T> {
-    let url = `${endpoint.fhir_base_url}${path}`;
+    const url = `${endpoint.fhir_base_url}${path}`;
     const headers: Record<string, string> = {
       Accept: 'application/fhir+json',
     };
 
-    // Add auth headers/params based on endpoint config
+    // Add auth headers if needed
     if (endpoint.auth_type === 'api_key' && endpoint.auth_config?.api_key) {
-      // Standard API key in header (default: x-api-key, configurable via api_key_header)
-      const headerName = endpoint.auth_config.api_key_header || 'x-api-key';
-      headers[headerName] = endpoint.auth_config.api_key;
-    } else if (endpoint.auth_type === 'api_key_query' && endpoint.auth_config?.api_key) {
-      // API key passed as query parameter (e.g., Blue Shield CA clientId)
-      const paramName = endpoint.auth_config.param_name || 'clientId';
-      const separator = url.includes('?') ? '&' : '?';
-      url = `${url}${separator}${paramName}=${endpoint.auth_config.api_key}`;
+      headers['x-api-key'] = endpoint.auth_config.api_key;
     } else if (endpoint.auth_type === 'oauth2_client_credentials') {
       const token = await this.getOAuthToken(endpoint);
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -303,17 +296,39 @@ export class FhirDirectoryClient {
     const config = endpoint.auth_config;
     if (!config?.token_url || !config.client_id || !config.client_secret) return null;
 
+    // Some payers (Aetna) require Basic Auth header + scope param
+    // Others (Humana, BCBS) send credentials in the body
+    const useBasicAuth = config.auth_method === 'basic_header';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+    const bodyParams: Record<string, string> = {
+      grant_type: 'client_credentials',
+    };
+
+    if (useBasicAuth) {
+      const basicAuth = Buffer.from(`${config.client_id}:${config.client_secret}`).toString('base64');
+      headers['Authorization'] = `Basic ${basicAuth}`;
+    } else {
+      bodyParams.client_id = config.client_id;
+      bodyParams.client_secret = config.client_secret;
+    }
+
+    if (config.scope) {
+      bodyParams.scope = config.scope;
+    }
+
     const res = await fetch(config.token_url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: config.client_id,
-        client_secret: config.client_secret,
-      }),
+      headers,
+      body: new URLSearchParams(bodyParams),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`  [${endpoint.payer_code}] OAuth token failed: ${res.status} ${res.statusText}`);
+      return null;
+    }
     const data = (await res.json()) as { access_token: string; expires_in: number };
 
     this.authTokens.set(endpoint.payer_code, {

@@ -26,7 +26,7 @@ export default function MarketingLayout({
       <div className="m-announce-bar">
         <span className="m-announce-dot"></span>
         Now live in Texas &amp; California — 1.8M+ provider records indexed.
-        <Link href="/contact">Try free for 21 days &rarr;</Link>
+        <Link href="/contact">Try free for 14 days &rarr;</Link>
       </div>
 
       {/* Nav */}
@@ -51,7 +51,7 @@ export default function MarketingLayout({
             <div className="m-nav-actions">
               <Link href="/dashboard/login" className="m-btn-ghost">Sign In</Link>
               <Link href="/contact" className="m-btn-primary">
-                Start Free Trial
+                Get Started
                 <ArrowIcon />
               </Link>
             </div>
@@ -98,7 +98,7 @@ export default function MarketingLayout({
             <div className="m-footer-col">
               <h4>Company</h4>
               <ul>
-                <li><Link href="/contact">Start Free Trial</Link></li>
+                <li><Link href="/contact">Get Started</Link></li>
                 <li><Link href="/demo">Watch a Demo</Link></li>
                 <li><Link href="/privacy">Privacy Policy</Link></li>
                 <li><Link href="/terms">Terms of Service</Link></li>
