@@ -460,7 +460,7 @@ export default function HomePage() {
                 </div>
               </div>
               <Link href="/compliance" className="m-btn-outline" style={{ marginTop: '24px' }}>
-                View Compliance Details
+                See what we track by state
                 <ArrowIcon />
               </Link>
             </div>
