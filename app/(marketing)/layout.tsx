@@ -42,10 +42,10 @@ export default function MarketingLayout({
             </Link>
 
             <ul className="m-nav-links">
-              <li><Link href="/product">Product</Link></li>
-              <li><Link href="/compliance">Compliance</Link></li>
+              <li><Link href="/platform">Platform</Link></li>
+              <li><Link href="/solutions">Solutions</Link></li>
               <li><Link href="/pricing">Pricing</Link></li>
-              <li><Link href="/demo">Demo</Link></li>
+              <li><Link href="/resources">Resources</Link></li>
             </ul>
 
             <div className="m-nav-actions">
@@ -77,19 +77,26 @@ export default function MarketingLayout({
               <p>Provider data intelligence for the modern healthcare organization. Monitoring integrity, compliance, and drift across 1.8M+ U.S. providers.</p>
             </div>
             <div className="m-footer-col">
-              <h4>Product</h4>
+              <h4>Platform</h4>
               <ul>
-                <li><Link href="/product">Provider Intelligence</Link></li>
-                <li><Link href="/product">Compliance Monitoring</Link></li>
-                <li><Link href="/product">Credentialing Automation</Link></li>
-                <li><Link href="/demo">Product Demo</Link></li>
-                <li><Link href="/contact">API Access</Link></li>
+                <li><Link href="/platform">Provider Monitoring</Link></li>
+                <li><Link href="/platform">Compliance Tracking</Link></li>
+                <li><Link href="/platform">Credentialing Workflows</Link></li>
+                <li><Link href="/platform">Payer Directory Monitoring</Link></li>
+              </ul>
+            </div>
+            <div className="m-footer-col">
+              <h4>Solutions</h4>
+              <ul>
+                <li><Link href="/solutions#practices">Medical Groups &amp; Practices</Link></li>
+                <li><Link href="/solutions#cvos">CVOs &amp; Credentialing Orgs</Link></li>
+                <li><Link href="/solutions#health-systems">Health Systems &amp; Networks</Link></li>
               </ul>
             </div>
             <div className="m-footer-col">
               <h4>Resources</h4>
               <ul>
-                <li><Link href="/compliance">State Compliance</Link></li>
+                <li><Link href="/compliance">State Compliance Guide</Link></li>
                 <li><Link href="/pricing">Pricing</Link></li>
                 <li><Link href="/insights">Insights &amp; Blog</Link></li>
                 <li><Link href="/contact">Contact</Link></li>
@@ -98,8 +105,7 @@ export default function MarketingLayout({
             <div className="m-footer-col">
               <h4>Company</h4>
               <ul>
-                <li><Link href="/contact">Get Started</Link></li>
-                <li><Link href="/demo">Watch a Demo</Link></li>
+                <li><Link href="/contact">Get Free Trial</Link></li>
                 <li><Link href="/privacy">Privacy Policy</Link></li>
                 <li><Link href="/terms">Terms of Service</Link></li>
               </ul>
