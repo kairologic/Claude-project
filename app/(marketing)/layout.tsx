@@ -26,7 +26,7 @@ export default function MarketingLayout({
       <div className="m-announce-bar">
         <span className="m-announce-dot"></span>
         Now live in Texas &amp; California — 1.8M+ provider records indexed.
-        <Link href="/contact">Try free for 14 days &rarr;</Link>
+        <Link href="/compliance">See state coverage &rarr;</Link>
       </div>
 
       {/* Nav */}
@@ -51,7 +51,7 @@ export default function MarketingLayout({
             <div className="m-nav-actions">
               <Link href="/dashboard/login" className="m-btn-ghost">Sign In</Link>
               <Link href="/contact" className="m-btn-primary">
-                Get Started
+                Get Free Trial
                 <ArrowIcon />
               </Link>
             </div>
