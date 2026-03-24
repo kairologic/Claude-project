@@ -342,7 +342,7 @@ async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number = 5000
 ): Promise<T> {
-  let timeoutHandle: NodeJS.Timeout;
+  let timeoutHandle!: NodeJS.Timeout;
 
   const timeoutPromise = new Promise<T>((_, reject) => {
     timeoutHandle = setTimeout(
