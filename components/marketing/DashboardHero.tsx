@@ -1,6 +1,7 @@
 'use client';
+/* eslint-disable react-hooks/exhaustive-deps */
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 /* ══════════════════════════════════════════════════════════════
    KairoLogic — Animated Dashboard Hero
@@ -12,7 +13,7 @@ import { useState, useEffect } from "react";
    5. License & credentialing status badges
    ══════════════════════════════════════════════════════════════ */
 
-function useCounter(target, dur = 1400, delay = 500) {
+function useCounter(target: number, dur: number = 1400, delay: number = 500) {
   const [v, setV] = useState(0);
   useEffect(() => {
     const t = setTimeout(() => {
@@ -23,14 +24,13 @@ function useCounter(target, dur = 1400, delay = 500) {
         c += step;
         if (c >= target) { setV(target); clearInterval(id); } else setV(Math.floor(c));
       }, 16);
-      return () => clearInterval(id);
     }, delay);
     return () => clearTimeout(t);
   }, []);
   return v;
 }
 
-function Fade({ delay = 0, children, style = {} }) {
+function Fade({ delay = 0, children, style = {} }: { delay?: number; children: React.ReactNode; style?: React.CSSProperties }) {
   const [s, setS] = useState(false);
   useEffect(() => { const t = setTimeout(() => setS(true), delay); return () => clearTimeout(t); }, []);
   return (
@@ -43,7 +43,7 @@ function Fade({ delay = 0, children, style = {} }) {
   );
 }
 
-function SlideX({ delay = 0, children, from = -16, style = {} }) {
+function SlideX({ delay = 0, children, from = -16, style = {} }: { delay?: number; children: React.ReactNode; from?: number; style?: React.CSSProperties }) {
   const [s, setS] = useState(false);
   useEffect(() => { const t = setTimeout(() => setS(true), delay); return () => clearTimeout(t); }, []);
   return (
@@ -57,7 +57,7 @@ function SlideX({ delay = 0, children, from = -16, style = {} }) {
 }
 
 // ─── Stat Card ───
-function Stat({ value, label, color, bg, delay }) {
+function Stat({ value, label, color, bg, delay }: { value: number; label: string; color: string; bg: string; delay: number }) {
   const c = useCounter(value, 1200, delay);
   return (
     <Fade delay={delay} style={{ flex: 1, minWidth: 0 }}>
@@ -73,7 +73,7 @@ function Stat({ value, label, color, bg, delay }) {
 }
 
 // ─── Provider Row ───
-function PRow({ initials, name, npi, spec, issues, tags, delay, bg, highlight, onClick }) {
+function PRow({ initials, name, npi, spec, issues, tags, delay, bg, highlight, onClick }: { initials: string; name: string; npi: string; spec: string; issues: number; tags: string[]; delay: number; bg: string; highlight?: boolean; onClick?: () => void }) {
   return (
     <SlideX delay={delay}>
       <div onClick={onClick} style={{
@@ -117,7 +117,7 @@ function PRow({ initials, name, npi, spec, issues, tags, delay, bg, highlight, o
 }
 
 // ─── Sidebar Nav Item ───
-function NavI({ icon, label, active, delay }) {
+function NavI({ icon, label, active, delay }: { icon: string; label: string; active?: boolean; delay: number }) {
   return (
     <SlideX delay={delay}>
       <div style={{
@@ -135,12 +135,12 @@ function NavI({ icon, label, active, delay }) {
 }
 
 // ─── Data Accuracy Row ───
-function AccRow({ field, nppes, uhc, aetna, cigna, humana, delay, mismatch }) {
-  const cellStyle = (val, isMismatch) => ({
+function AccRow({ field, nppes, uhc, aetna, cigna, humana, delay, mismatch }: { field: string; nppes: string; uhc: string; aetna: string; cigna: string; humana: string; delay: number; mismatch?: boolean }) {
+  const cellStyle = (_val: string, isMismatch: boolean): React.CSSProperties => ({
     fontSize: 9.5, padding: "6px 4px", color: isMismatch ? "#dc2626" : "#475569",
     fontWeight: isMismatch ? 600 : 400,
     borderBottom: "1px solid #f1f5f9",
-    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110,
+    overflow: "hidden" as const, textOverflow: "ellipsis" as const, whiteSpace: "nowrap" as const, maxWidth: 110,
   });
   return (
     <Fade delay={delay}>
