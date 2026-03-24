@@ -169,12 +169,17 @@ export async function markTokenClaimed(tokenId: string, userId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getAuthenticatedUser() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return null;
-  const practices = await getUserPractices(user.id);
-  return { user, practices, primaryPractice: practices?.[0] || null };
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    const practices = await getUserPractices(user.id);
+    return { user, practices, primaryPractice: practices?.[0] || null };
+  } catch (err) {
+    console.error('[getAuthenticatedUser] Error:', err);
+    return null;
+  }
 }
