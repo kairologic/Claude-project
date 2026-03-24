@@ -170,26 +170,27 @@ export default function PostPreview({ post, onUpdate, onPublish, onCaptureGraphi
         </div>
       )}
 
-      {/* Publish controls */}
-      {post.status !== 'published' && (
-        <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 rounded-b-xl">
-          <div className="flex items-center justify-between">
-            <ChannelSelector selected={channels} onChange={setChannels} />
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing || channels.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isPublishing ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              Publish
-            </button>
-          </div>
+      {/* Publish controls — always visible so user can publish to additional channels */}
+      <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 rounded-b-xl">
+        {post.status === 'published' && (
+          <p className="text-[10px] text-emerald-600 font-medium mb-2">Published. Select channels to publish to additional platforms.</p>
+        )}
+        <div className="flex items-center justify-between">
+          <ChannelSelector selected={channels} onChange={setChannels} />
+          <button
+            onClick={handlePublish}
+            disabled={isPublishing || channels.length === 0}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isPublishing ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Send size={14} />
+            )}
+            {post.status === 'published' ? 'Publish to Selected' : 'Publish'}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
