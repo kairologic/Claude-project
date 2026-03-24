@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/design-tokens';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
-import GlobalSearch from './GlobalSearch';
+import NLSearchModal from './NLSearchModal';
 import { runCredentialingAssessment, type AssessmentOutput, type AssessmentResult, type SourceStatus } from '@/lib/credentialing/assessment-engine';
 
 interface HeaderBarProps {
@@ -303,10 +303,7 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
         </div>
         <div style={styles.right}>
           {practiceId && (
-            <GlobalSearch
-              practiceId={practiceId}
-              onSelectWorkflow={onSelectWorkflow || (() => {})}
-            />
+            <NLSearchModal practiceId={practiceId} />
           )}
           <span style={styles.date}>{dateStr}</span>
           <button onClick={() => setShowAddModal(true)} style={styles.addBtn}>

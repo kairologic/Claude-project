@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       // Continue - logging failure shouldn't fail the response
     }
 
-    // Step 6: Return results
+    // Step 6: Return results (field "data" matches SearchBar interface)
     return NextResponse.json({
       success: true,
       practice_id,
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       chartType: parsedResponse.chartType || 'table',
       sql: parsedResponse.sql,
       rowCount: rows.length,
-      rows,
+      data: rows,
       executed_at: new Date().toISOString(),
     });
   } catch (error) {
@@ -152,30 +152,53 @@ IMPORTANT RULES:
 
 DATABASE SCHEMA:
 
-Tables:
+Core Tables:
+- practice_providers: id, practice_website_id (FK→practice_websites.id), npi, provider_name, roster_status (active/onboarding/departing/departed), has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type, active_mismatch_count, web_address, web_phone, web_specialty, added_date, departed_date, created_at, updated_at
+- provider_licenses: id, npi, license_number, state, board_name, licensee_name, license_type, license_status, specialty, city, issue_date, expiration_date, last_renewal, has_disciplinary_action, source, first_name, last_name, created_at
+- providers: npi, first_name, last_name, credential, taxonomy_desc, address_line_1, city, state, zip_code, phone (NPPES data — 1.8M rows, always filter by npi)
 - workflow_instances: id, practice_id, workflow_type, status, provider_npi, provider_name, priority, trigger_source, finding_summary, approved_value, target_completion, overdue_at, completed_at, created_at, updated_at
 - workflow_tasks: id, workflow_id, task_order, task_type, title, description, status, assigned_to, completed_by, completed_at, due_date, metadata, created_at, updated_at
 - workflow_events: id, workflow_id, event_type, actor_id, actor_type, title, details, created_at
 - alerts: id, practice_id, severity, title, description, workflow_id, provider_npi, provider_name, source, is_active, resolved_at, created_at
-- payer_directory_endpoints: payer_code, payer_name, fhir_base_url, auth_type, rate_limit_rpm, coverage_type, state_scope, is_active, created_at, updated_at
-- payer_directory_snapshots: id, npi, payer_code, snapshot_date, listed_name_full, listed_city, listed_state, listed_phone, listed_specialty_display, listed_accepting_patients, created_at
+- nppes_delta_events: id, npi, practice_website_id, field_name, old_value, new_value, detection_source, resolved, resolved_at, detected_at, created_at (NPPES change log — address/phone/name changes detected)
+- payer_directory_endpoints: payer_code, payer_name, fhir_base_url, auth_type, rate_limit_rpm, coverage_type, state_scope, is_active
+- payer_directory_snapshots: id, npi, payer_code, snapshot_date, listed_name_full, listed_city, listed_state, listed_phone, listed_specialty_display, listed_accepting_patients
 - payer_directory_mismatches: id, npi, payer_code, snapshot_id, field_name, mismatch_type, nppes_value, website_value, payer_value, priority, resolved_at, created_at
-- practice_websites: id, practice_id, name, npi, address, city, state, zip, url, primary_phone, primary_fax, practice_specialties, created_at, updated_at
-- practice_team_members: id, practice_id, email, role, status, user_id, display_name, invited_at, accepted_at, created_at, updated_at
+- practice_websites: id, name, npi, address, city, state, zip, url, primary_phone, primary_fax, practice_specialties, created_at
+
+Views (pre-joined, use for provider-level questions):
+- v_provider_health: npi, practice_website_id, provider_name, specialty, credential, open_issues, monitoring, resolved, total_workflows, health_score (0-100), roster_status, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, has_active_license_renewal, has_active_payer_directory, has_active_onboarding, has_active_compliance, has_active_credentialing, has_active_departure
+- v_dashboard_kpis: practice_website_id, needs_attention, in_progress, monitoring_count, all_clear, total_providers
+
+IMPORTANT:
+- practice_providers uses "practice_website_id" (NOT "practice_id") as the practice FK
+- nppes_delta_events uses "practice_website_id" (NOT "practice_id")
+- v_provider_health uses "practice_website_id" (NOT "practice_id")
+- workflow_instances and alerts use "practice_id" which maps to practice_websites.id
+- The practice_id filter injected automatically matches practice_websites.id. For tables using practice_website_id, use that column name instead.
 
 Enums:
 - workflow_status: action_needed, in_progress, awaiting, resolved, cancelled
-- workflow_type: nppes_update, payer_directory, onboarding, release, license_renewal, compliance
+- workflow_type: nppes_update, payer_directory, onboarding, release, license_renewal, compliance, credentialing_onboarding
+- roster_status: active, onboarding, departing, departed
 - task_status: pending, active, completed, skipped
 - alert_severity: action, warning, info, resolved
-- practice_role: admin, viewer, editor
 
 Examples:
+- Q: "List all providers whose license is expiring"
+  A: {"sql": "SELECT pl.npi, pl.licensee_name, pl.state, pl.license_number, pl.license_status, pl.expiration_date FROM provider_licenses pl JOIN practice_providers pp ON pp.npi = pl.npi WHERE pl.expiration_date <= CURRENT_DATE + INTERVAL '90 days' AND pl.expiration_date >= CURRENT_DATE AND pp.roster_status = 'active' ORDER BY pl.expiration_date ASC LIMIT 500", "explanation": "Active providers with licenses expiring within 90 days, ordered soonest first", "columns": ["npi", "licensee_name", "state", "license_number", "license_status", "expiration_date"], "chartType": "table"}
+
+- Q: "How many providers need address change?"
+  A: {"sql": "SELECT provider_name, npi, web_address FROM practice_providers WHERE has_address_mismatch = true AND roster_status = 'active' LIMIT 500", "explanation": "Active providers flagged with an address mismatch between NPPES and the practice website", "columns": ["provider_name", "npi", "web_address"], "chartType": "table"}
+
+- Q: "How many NPPES fixes did we do last 30 days?"
+  A: {"sql": "SELECT COUNT(*) as fixes_count FROM nppes_delta_events WHERE resolved = true AND resolved_at >= CURRENT_DATE - INTERVAL '30 days' LIMIT 500", "explanation": "Count of NPPES changes that were resolved in the last 30 days", "columns": ["fixes_count"], "chartType": "table"}
+
 - Q: "Show me all pending workflows"
   A: {"sql": "SELECT id, workflow_type, status, provider_name, created_at FROM workflow_instances WHERE status = 'action_needed' ORDER BY created_at DESC LIMIT 500", "explanation": "Lists all workflows with action_needed status", "columns": ["id", "workflow_type", "status", "provider_name", "created_at"], "chartType": "table"}
 
-- Q: "How many workflows by status?"
-  A: {"sql": "SELECT status, COUNT(*) as count FROM workflow_instances GROUP BY status LIMIT 500", "explanation": "Count of workflows grouped by status", "columns": ["status", "count"], "chartType": "bar"}
+- Q: "Provider health summary"
+  A: {"sql": "SELECT provider_name, npi, health_score, open_issues, roster_status, has_license_issue, has_address_mismatch FROM v_provider_health ORDER BY health_score ASC LIMIT 500", "explanation": "All providers ranked by health score (lowest first = most issues)", "columns": ["provider_name", "npi", "health_score", "open_issues", "roster_status", "has_license_issue", "has_address_mismatch"], "chartType": "table"}
 
 Generate the response now.`;
 }
@@ -273,6 +296,12 @@ function validateSQL(sql: string): void {
     'workflow_tasks',
     'workflow_events',
     'alerts',
+    'practice_providers',
+    'providers',
+    'provider_licenses',
+    'nppes_delta_events',
+    'v_provider_health',
+    'v_dashboard_kpis',
     'payer_directory_endpoints',
     'payer_directory_snapshots',
     'payer_directory_mismatches',
@@ -296,30 +325,45 @@ function validateSQL(sql: string): void {
 }
 
 /**
- * Inject practice_id filter into SQL
+ * Inject practice filter into SQL.
+ * Tables use either practice_id or practice_website_id — detect which.
  */
 function injectPracticeFilter(sql: string, practice_id: string): string {
-  // Simple approach: add practice_id filter to WHERE clause
-  // This assumes the query uses a table with practice_id
+  // Determine the correct column based on tables used
+  const usesWebsiteId = [
+    'practice_providers',
+    'nppes_delta_events',
+    'v_provider_health',
+    'v_dashboard_kpis',
+  ];
+
+  // Check if any table using practice_website_id appears in the query
+  const colName = usesWebsiteId.some(t => sql.toLowerCase().includes(t))
+    ? 'practice_website_id'
+    : 'practice_id';
+
+  const filterClause = `${colName} = '${practice_id}'`;
   const hasWhere = /WHERE\s+/i.test(sql);
+  const hasGroupOrOrder = /\b(GROUP\s+BY|ORDER\s+BY)\b/i.test(sql);
   const hasLimit = /LIMIT\s+\d+/i.test(sql);
 
-  if (hasLimit) {
-    // Insert before LIMIT
-    return sql.replace(
-      /LIMIT\s+\d+/i,
-      `AND practice_id = '${practice_id}' LIMIT`
-    );
-  } else {
-    // Append before end or after GROUP BY/ORDER BY
-    if (hasWhere) {
-      return sql + ` AND practice_id = '${practice_id}'`;
+  if (hasWhere) {
+    // Insert filter right after the first WHERE
+    if (hasLimit) {
+      return sql.replace(/LIMIT\s+\d+/i, `AND ${filterClause} LIMIT`);
+    } else if (hasGroupOrOrder) {
+      return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `AND ${filterClause} $1`);
     } else {
-      // Find last FROM clause and add WHERE
-      return sql.replace(
-        /$/,
-        ` WHERE practice_id = '${practice_id}'`
-      );
+      return sql + ` AND ${filterClause}`;
+    }
+  } else {
+    // No WHERE yet — insert one
+    if (hasGroupOrOrder) {
+      return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `WHERE ${filterClause} $1`);
+    } else if (hasLimit) {
+      return sql.replace(/LIMIT\s+\d+/i, `WHERE ${filterClause} LIMIT`);
+    } else {
+      return sql + ` WHERE ${filterClause}`;
     }
   }
 }
