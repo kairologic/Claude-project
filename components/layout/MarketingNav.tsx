@@ -58,7 +58,6 @@ export default function MarketingNav() {
           </ul>
 
           <div className="m-nav-actions">
-            <Link href="/sign-in" className="m-btn-ghost">Sign In</Link>
             <Link href="/contact" className="m-btn-primary">
               Get Free Trial
               <ArrowIcon />
@@ -89,7 +88,6 @@ export default function MarketingNav() {
             <Link href="/blog" onClick={() => setMobileOpen(false)} className="m-mobile-link">Blog</Link>
             <Link href="/compliance" onClick={() => setMobileOpen(false)} className="m-mobile-link">State Coverage</Link>
             <div className="m-mobile-actions">
-              <Link href="/sign-in" onClick={() => setMobileOpen(false)} className="m-btn-ghost" style={{ width: '100%', textAlign: 'center' }}>Sign In</Link>
               <Link href="/contact" onClick={() => setMobileOpen(false)} className="m-btn-primary" style={{ width: '100%', textAlign: 'center', justifyContent: 'center' }}>
                 Get Free Trial
                 <ArrowIcon />

@@ -166,9 +166,9 @@ export default function DashboardHero() {
 
   useEffect(() => {
     setMounted(true);
-    // Simulate click on Robert Connaughton row after 3s
-    const t1 = setTimeout(() => setClickPulse(true), 2600);
-    const t2 = setTimeout(() => setShowPanel(true), 3200);
+    // Simulate click on Robert Connaughton row after 2s
+    const t1 = setTimeout(() => setClickPulse(true), 1800);
+    const t2 = setTimeout(() => setShowPanel(true), 2200);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
@@ -425,7 +425,7 @@ export default function DashboardHero() {
                 <div style={{ position: "absolute", top: 12, right: 14, fontSize: 16, color: "#94a3b8", cursor: "pointer" }}>✕</div>
 
                 {/* Provider header */}
-                <Fade delay={3300}>
+                <Fade delay={2300}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
                     <div style={{
                       width: 44, height: 44, borderRadius: "50%", background: "#fecaca",
@@ -450,7 +450,7 @@ export default function DashboardHero() {
                 </Fade>
 
                 {/* Health bar */}
-                <Fade delay={3450}>
+                <Fade delay={2380}>
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 3 }}>
                       <span style={{ fontSize: 9, color: "#94a3b8" }}>0% health</span>
@@ -462,7 +462,7 @@ export default function DashboardHero() {
                 </Fade>
 
                 {/* Tabs */}
-                <Fade delay={3550}>
+                <Fade delay={2460}>
                   <div style={{ display: "flex", gap: 16, borderBottom: "2px solid #e5e7eb", marginBottom: 14 }}>
                     <div style={{
                       fontSize: 11, fontWeight: 600, color: "#0f172a", paddingBottom: 8,
@@ -475,14 +475,14 @@ export default function DashboardHero() {
                 </Fade>
 
                 {/* DATA ACCURACY TABLE */}
-                <Fade delay={3650}>
+                <Fade delay={2540}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 0.4, marginBottom: 8 }}>
                     DATA ACCURACY ACROSS SOURCES
                   </div>
                 </Fade>
 
                 {/* Table header */}
-                <Fade delay={3700}>
+                <Fade delay={2600}>
                   <div style={{ display: "grid", gridTemplateColumns: "62px 1fr 1fr 50px 50px 60px", gap: 2, marginBottom: 2 }}>
                     {["FIELD","NPPES","UHC","AETNA","CIGNA","HUMANA"].map((h, i) => (
                       <div key={i} style={{
@@ -493,24 +493,24 @@ export default function DashboardHero() {
                   </div>
                 </Fade>
 
-                <AccRow field="Address" nppes="1105 Central Exp..." uhc="1105 Central Exp..." aetna="—" cigna="800 8th Ave #306" humana="85 Maui L..." delay={3800} mismatch />
-                <AccRow field="Phone" nppes="(692) 848-9904" uhc="(469) 284-8990" aetna="—" cigna="(682) 224-3748" humana="(808) 44..." delay={3900} mismatch />
-                <AccRow field="Specialty" nppes="Plastic Surgery" uhc="Surgery Physician" aetna="—" cigna="—" humana="Surgery P..." delay={4000} mismatch />
+                <AccRow field="Address" nppes="1105 Central Exp..." uhc="1105 Central Exp..." aetna="—" cigna="800 8th Ave #306" humana="85 Maui L..." delay={2680} mismatch />
+                <AccRow field="Phone" nppes="(692) 848-9904" uhc="(469) 284-8990" aetna="—" cigna="(682) 224-3748" humana="(808) 44..." delay={2760} mismatch />
+                <AccRow field="Specialty" nppes="Plastic Surgery" uhc="Surgery Physician" aetna="—" cigna="—" humana="Surgery P..." delay={2840} mismatch />
 
-                <Fade delay={4100}>
+                <Fade delay={2900}>
                   <div style={{ fontSize: 9, color: "#94a3b8", margin: "8px 0 16px", fontStyle: "italic" }}>
                     Credential: M.D. · Specialty: Plastic Surgery
                   </div>
                 </Fade>
 
                 {/* LICENSE & CREDENTIALING */}
-                <Fade delay={4200}>
+                <Fade delay={2960}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 0.4, marginBottom: 10 }}>
                     LICENSE & CREDENTIALING
                   </div>
                 </Fade>
 
-                <Fade delay={4300}>
+                <Fade delay={3040}>
                   <div style={{
                     background: "#f8fafc", borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden",
                   }}>
@@ -532,7 +532,7 @@ export default function DashboardHero() {
                 </Fade>
 
                 {/* PROVIDER REFERENCE */}
-                <Fade delay={4500}>
+                <Fade delay={3120}>
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 0.4, marginBottom: 10 }}>
                       PROVIDER REFERENCE

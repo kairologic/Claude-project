@@ -141,9 +141,10 @@
 }
 
 @media (max-width: 768px) {
+  .m-nav-links { display: none; }
+  .m-nav-actions { display: none; }
   .m-mobile-toggle { display: flex; }
   .m-mobile-menu { display: block; }
-  .m-nav-actions { display: none; }
 }
 
 /* ── Buttons ─────────────────────────────────────── */
