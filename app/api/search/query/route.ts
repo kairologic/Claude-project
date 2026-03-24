@@ -64,14 +64,23 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Send query to Claude with system prompt containing schema
     const systemPrompt = buildSystemPrompt();
-    const claudeResponse = await callClaudeAPI(query, systemPrompt);
+    let claudeResponse: string;
+    try {
+      claudeResponse = await callClaudeAPI(query, systemPrompt);
+    } catch (aiError: any) {
+      console.error('[Search Query POST] Claude API error:', aiError?.message || aiError);
+      return NextResponse.json(
+        { error: 'AI service error: ' + (aiError?.message || 'Failed to reach Claude API') },
+        { status: 500 }
+      );
+    }
 
     // Step 2: Parse Claude's response
     let parsedResponse: ClaudeResponse;
     try {
       parsedResponse = parseClaudeResponse(claudeResponse);
-    } catch (parseError) {
-      console.error('[Search Query POST] Error parsing Claude response:', parseError);
+    } catch (parseError: any) {
+      console.error('[Search Query POST] Parse error:', parseError?.message, 'Raw:', claudeResponse?.slice(0, 300));
       return NextResponse.json(
         { error: 'Failed to parse AI response' },
         { status: 500 }
@@ -79,17 +88,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3: Validate SQL
-    validateSQL(parsedResponse.sql);
+    try {
+      validateSQL(parsedResponse.sql);
+    } catch (valError: any) {
+      console.error('[Search Query POST] SQL validation:', valError?.message);
+      return NextResponse.json(
+        { error: 'Query validation failed: ' + valError?.message },
+        { status: 400 }
+      );
+    }
 
     // Step 4: Inject practice_id filter and execute query
     let rows: any[] = [];
     try {
       const filteredSQL = injectPracticeFilter(parsedResponse.sql, practice_id);
+      console.log('[Search Query POST] Executing:', filteredSQL);
       rows = await executeQuery(supabase, filteredSQL);
     } catch (execError: any) {
-      console.error('[Search Query POST] Error executing query:', execError);
+      console.error('[Search Query POST] SQL exec error:', execError?.message || execError);
       return NextResponse.json(
-        { error: 'Failed to execute search query: ' + execError.message },
+        { error: 'Failed to execute query: ' + (execError?.message || 'Unknown DB error') },
         { status: 500 }
       );
     }
@@ -121,10 +139,10 @@ export async function POST(request: NextRequest) {
       data: rows,
       executed_at: new Date().toISOString(),
     });
-  } catch (error) {
-    console.error('[Search Query POST] Error:', error);
+  } catch (error: any) {
+    console.error('[Search Query POST] Unhandled error:', error?.message || error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }
