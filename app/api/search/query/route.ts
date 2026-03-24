@@ -356,20 +356,39 @@ function injectPracticeFilter(sql: string, practice_id: string): string {
   ];
 
   // Check if any table using practice_website_id appears in the query
-  const colName = usesWebsiteId.some(t => sql.toLowerCase().includes(t))
+  const lowerSql = sql.toLowerCase();
+  const colName = usesWebsiteId.some(t => lowerSql.includes(t))
     ? 'practice_website_id'
     : 'practice_id';
 
-  const filterClause = `${colName} = '${practice_id}'`;
+  // Try to find the table alias for the practice-filtered table
+  // e.g. "practice_providers pp" → alias is "pp", so use "pp.practice_website_id"
+  let prefix = '';
+  if (colName === 'practice_website_id') {
+    for (const tbl of usesWebsiteId) {
+      const aliasMatch = sql.match(new RegExp(`${tbl}\\s+(\\w{1,4})\\b`, 'i'));
+      if (aliasMatch && aliasMatch[1].toLowerCase() !== 'on' && aliasMatch[1].toLowerCase() !== 'where' && aliasMatch[1].toLowerCase() !== 'set') {
+        prefix = aliasMatch[1] + '.';
+        break;
+      }
+    }
+  } else {
+    const aliasMatch = sql.match(/workflow_instances\s+(\w{1,4})\b/i) || sql.match(/alerts\s+(\w{1,4})\b/i);
+    if (aliasMatch && !['on', 'where', 'set', 'and', 'or'].includes(aliasMatch[1].toLowerCase())) {
+      prefix = aliasMatch[1] + '.';
+    }
+  }
+
+  const filterClause = `${prefix}${colName} = '${practice_id}'`;
   const hasWhere = /WHERE\s+/i.test(sql);
   const hasGroupOrOrder = /\b(GROUP\s+BY|ORDER\s+BY)\b/i.test(sql);
   const hasLimit = /LIMIT\s+\d+/i.test(sql);
 
   if (hasWhere) {
-    if (hasLimit) {
-      return sql.replace(/(LIMIT\s+\d+)/i, `AND ${filterClause} $1`);
-    } else if (hasGroupOrOrder) {
+    if (hasGroupOrOrder) {
       return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `AND ${filterClause} $1`);
+    } else if (hasLimit) {
+      return sql.replace(/(LIMIT\s+\d+)/i, `AND ${filterClause} $1`);
     } else {
       return sql + ` AND ${filterClause}`;
     }
