@@ -1,10 +1,5 @@
 import Link from 'next/link';
-
-const ArrowIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
+import MarketingNav from '@/components/layout/MarketingNav';
 
 const LogoMark = () => (
   <div className="m-logo-mark">
@@ -29,35 +24,8 @@ export default function MarketingLayout({
         <Link href="/compliance">See state coverage &rarr;</Link>
       </div>
 
-      {/* Nav */}
-      <nav className="m-nav">
-        <div className="m-container">
-          <div className="m-nav-inner">
-            <Link href="/" className="m-logo">
-              <LogoMark />
-              <span className="m-logo-text">
-                <span className="kairo">Kairo</span>
-                <span className="logic">Logic</span>
-              </span>
-            </Link>
-
-            <ul className="m-nav-links">
-              <li><Link href="/platform">Platform</Link></li>
-              <li><Link href="/solutions">Solutions</Link></li>
-              <li><Link href="/pricing">Pricing</Link></li>
-              <li><Link href="/resources">Resources</Link></li>
-            </ul>
-
-            <div className="m-nav-actions">
-              <Link href="/sign-in" className="m-btn-ghost">Sign In</Link>
-              <Link href="/contact" className="m-btn-primary">
-                Get Free Trial
-                <ArrowIcon />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      {/* Nav (client component with mobile menu) */}
+      <MarketingNav />
 
       {/* Page Content */}
       <main>{children}</main>
@@ -98,7 +66,7 @@ export default function MarketingLayout({
               <ul>
                 <li><Link href="/compliance">State Compliance Guide</Link></li>
                 <li><Link href="/pricing">Pricing</Link></li>
-                <li><Link href="/insights">Insights &amp; Blog</Link></li>
+                <li><Link href="/blog">Blog</Link></li>
                 <li><Link href="/contact">Contact</Link></li>
               </ul>
             </div>

@@ -16,12 +16,12 @@ export default function Footer() {
                   KAIRO<span className="text-gold">LOGIC</span>
                 </div>
                 <div className="text-xs text-gray-400 uppercase tracking-wider">
-                  Statutory Vanguard
+                  Provider Data Intelligence
                 </div>
               </div>
             </div>
             <p className="text-gray-400 text-sm">
-              A comprehensive technical and legal framework designed specifically for the Texas healthcare ecosystem.
+              Provider data intelligence for the modern healthcare organization. Monitoring integrity, compliance, and drift across 1.8M+ U.S. providers.
             </p>
           </div>
 
@@ -29,12 +29,12 @@ export default function Footer() {
           <div>
             <h3 className="font-display font-bold text-gold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/compliance" className="text-gray-400 hover:text-white transition-colors">Compliance</Link></li>
-              <li><Link href="/services" className="text-gray-400 hover:text-white transition-colors">Services</Link></li>
-              <li><Link href="/registry" className="text-gray-400 hover:text-white transition-colors">Registry</Link></li>
-              <li><Link href="/insights" className="text-gray-400 hover:text-white transition-colors">Insights</Link></li>
-              <li><Link href="/scan" className="text-gray-400 hover:text-white transition-colors">Run Scan</Link></li>
-              <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/platform" className="text-gray-400 hover:text-white transition-colors">Platform</Link></li>
+              <li><Link href="/solutions" className="text-gray-400 hover:text-white transition-colors">Solutions</Link></li>
+              <li><Link href="/compliance" className="text-gray-400 hover:text-white transition-colors">State Coverage</Link></li>
+              <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
+              <li><Link href="/resources" className="text-gray-400 hover:text-white transition-colors">Resources</Link></li>
+              <li><Link href="/contact" className="text-gray-400 hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>
 
@@ -54,8 +54,8 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-gray-400">
               <li className="flex items-center gap-2">
                 <span>📧</span>
-                <a href="mailto:compliance@kairologic.net" className="hover:text-white transition-colors">
-                  compliance@kairologic.net
+                <a href="mailto:info@kairologic.net" className="hover:text-white transition-colors">
+                  info@kairologic.net
                 </a>
               </li>
               <li className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <span>🌐</span>
-                <span>Austin, TX // ATX-01 Node</span>
+                <span>Austin, TX</span>
               </li>
             </ul>
           </div>
@@ -74,13 +74,16 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>BY ACCESSING THIS TERMINAL, YOU AGREE TO THE KAIROLOGIC DATA SOVEREIGNTY PROTOCOLS.</p>
-          <p className="mt-2">UNAUTHORIZED ACCESS IS A VIOLATION OF TEXAS SB 1188 COMPLIANCE STANDARDS.</p>
+          <p>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            {' · '}
+            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+            {' · '}
+            <a href="mailto:info@kairologic.net" className="hover:text-white transition-colors">info@kairologic.net</a>
+          </p>
           <p className="mt-4">© {new Date().getFullYear()} KairoLogic. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
 }
-
-

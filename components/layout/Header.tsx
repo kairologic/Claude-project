@@ -43,24 +43,24 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/compliance" className="text-navy hover:text-gold transition-colors font-medium">
-              COMPLIANCE
+            <Link href="/platform" className="text-navy hover:text-gold transition-colors font-medium">
+              PLATFORM
             </Link>
-            <Link href="/services" className="text-navy hover:text-gold transition-colors font-medium">
-              SERVICES
+            <Link href="/solutions" className="text-navy hover:text-gold transition-colors font-medium">
+              SOLUTIONS
             </Link>
-            <Link href="/registry" className="text-navy hover:text-gold transition-colors font-medium">
-              REGISTRY
+            <Link href="/pricing" className="text-navy hover:text-gold transition-colors font-medium">
+              PRICING
             </Link>
-            <Link href="/insights" className="text-navy hover:text-gold transition-colors font-medium">
-              INSIGHTS
+            <Link href="/blog" className="text-navy hover:text-gold transition-colors font-medium">
+              BLOG
             </Link>
             <Link href="/contact" className="text-navy hover:text-gold transition-colors font-medium">
               CONTACT
             </Link>
-            <Link href="/scan">
+            <Link href="/contact">
               <button className="btn-primary">
-                RUN SENTRY SCAN
+                GET FREE TRIAL
               </button>
             </Link>
           </div>
@@ -82,23 +82,23 @@ export default function Header() {
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 top-20 z-40 bg-white animate-in slide-in-from-top duration-200">
           <nav className="flex flex-col px-6 py-6 gap-1">
-            <Link href="/compliance" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
-              COMPLIANCE
+            <Link href="/platform" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
+              PLATFORM
             </Link>
-            <Link href="/services" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
-              SERVICES
+            <Link href="/solutions" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
+              SOLUTIONS
             </Link>
-            <Link href="/registry" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
-              REGISTRY
+            <Link href="/pricing" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
+              PRICING
             </Link>
-            <Link href="/insights" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
-              INSIGHTS
+            <Link href="/blog" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
+              BLOG
             </Link>
             <Link href="/contact" onClick={closeMenu} className="text-navy font-medium py-3 border-b border-gray-100 hover:text-gold transition-colors">
               CONTACT
             </Link>
-            <Link href="/scan" onClick={closeMenu} className="mt-4">
-              <button className="btn-primary w-full">RUN SENTRY SCAN</button>
+            <Link href="/contact" onClick={closeMenu} className="mt-4">
+              <button className="btn-primary w-full">GET FREE TRIAL</button>
             </Link>
           </nav>
         </div>
