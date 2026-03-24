@@ -69,6 +69,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     <div style={{ backgroundColor: colors.white }}>
       {/* Article Content */}
       <div
+        className="blog-article-grid"
         style={{
           maxWidth: '1120px',
           margin: '0 auto',

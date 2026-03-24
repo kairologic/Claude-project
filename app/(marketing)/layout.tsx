@@ -73,7 +73,7 @@ export default function MarketingLayout({
             <div className="m-footer-col">
               <h4>Company</h4>
               <ul>
-                <li><Link href="/contact">Get Free Trial</Link></li>
+                <li><Link href="/contact">About Us</Link></li>
                 <li><Link href="/privacy">Privacy Policy</Link></li>
                 <li><Link href="/terms">Terms of Service</Link></li>
               </ul>
