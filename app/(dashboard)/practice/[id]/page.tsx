@@ -22,9 +22,11 @@ export default async function DashboardHomePage({
 
   // Get authenticated user for personalization
   const auth = await getAuthenticatedUser();
-  const userName = auth?.user?.user_metadata?.name
+  // Derive display name: prefer metadata name, then capitalize email prefix
+  const rawName = auth?.user?.user_metadata?.name
     || auth?.user?.email?.split('@')[0]
     || 'there';
+  const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   // Get practice name
   const { data: practice } = await admin
