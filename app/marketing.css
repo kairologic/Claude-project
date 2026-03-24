@@ -91,23 +91,10 @@
   display: none;
   width: 40px; height: 40px;
   background: none; border: none; cursor: pointer;
-  position: relative; flex-shrink: 0;
+  flex-shrink: 0;
   align-items: center; justify-content: center;
+  color: var(--m-navy);
 }
-.m-hamburger-line {
-  display: block; position: absolute;
-  width: 22px; height: 2px;
-  background: var(--m-navy);
-  border-radius: 2px;
-  transition: all 0.3s ease;
-  left: 9px;
-}
-.m-hamburger-line:nth-child(1) { top: 12px; }
-.m-hamburger-line:nth-child(2) { top: 19px; }
-.m-hamburger-line:nth-child(3) { top: 26px; }
-.m-hamburger-line.m-open:nth-child(1) { top: 19px; transform: rotate(45deg); }
-.m-hamburger-line.m-open:nth-child(2) { opacity: 0; }
-.m-hamburger-line.m-open:nth-child(3) { top: 19px; transform: rotate(-45deg); }
 
 /* ── Mobile menu overlay ─────────────────────────── */
 .m-mobile-menu {
