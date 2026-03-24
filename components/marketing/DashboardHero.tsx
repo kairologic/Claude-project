@@ -135,7 +135,7 @@ function NavI({ icon, label, active, delay }: { icon: string; label: string; act
 }
 
 // ─── Data Accuracy Row ───
-function AccRow({ field, nppes, uhc, aetna, cigna, humana, delay, mismatch }: { field: string; nppes: string; uhc: string; aetna: string; cigna: string; humana: string; delay: number; mismatch?: boolean }) {
+function AccRow({ field, nppes, uhc, aetna, cigna, humana, delay, mismatch = false }: { field: string; nppes: string; uhc: string; aetna: string; cigna: string; humana: string; delay: number; mismatch?: boolean }) {
   const cellStyle = (_val: string, isMismatch: boolean): React.CSSProperties => ({
     fontSize: 9.5, padding: "6px 4px", color: isMismatch ? "#dc2626" : "#475569",
     fontWeight: isMismatch ? 600 : 400,
