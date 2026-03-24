@@ -39,54 +39,56 @@ export default function MarketingNav() {
   }, [mobileOpen]);
 
   return (
-    <nav className="m-nav">
-      <div className="m-container">
-        <div className="m-nav-inner">
-          <Link href="/" className="m-logo">
-            <LogoMark />
-            <span className="m-logo-text">
-              <span className="kairo">Kairo</span>
-              <span className="logic">Logic</span>
-            </span>
-          </Link>
-
-          <ul className="m-nav-links">
-            <li><Link href="/platform">Platform</Link></li>
-            <li><Link href="/solutions">Solutions</Link></li>
-            <li><Link href="/pricing">Pricing</Link></li>
-            <li><Link href="/resources">Resources</Link></li>
-          </ul>
-
-          <div className="m-nav-actions">
-            <Link href="/contact" className="m-btn-primary">
-              Get Free Trial
-              <ArrowIcon />
+    <>
+      <nav className="m-nav">
+        <div className="m-container">
+          <div className="m-nav-inner">
+            <Link href="/" className="m-logo">
+              <LogoMark />
+              <span className="m-logo-text">
+                <span className="kairo">Kairo</span>
+                <span className="logic">Logic</span>
+              </span>
             </Link>
+
+            <ul className="m-nav-links">
+              <li><Link href="/platform">Platform</Link></li>
+              <li><Link href="/solutions">Solutions</Link></li>
+              <li><Link href="/pricing">Pricing</Link></li>
+              <li><Link href="/resources">Resources</Link></li>
+            </ul>
+
+            <div className="m-nav-actions">
+              <Link href="/contact" className="m-btn-primary">
+                Get Free Trial
+                <ArrowIcon />
+              </Link>
+            </div>
+
+            {/* Mobile hamburger button */}
+            <button
+              className="m-mobile-toggle"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            >
+              {mobileOpen ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="6" y1="18" x2="18" y2="6" />
+                </svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              )}
+            </button>
           </div>
-
-          {/* Mobile hamburger button */}
-          <button
-            className="m-mobile-toggle"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          >
-            {mobileOpen ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="6" y1="6" x2="18" y2="18" />
-                <line x1="6" y1="18" x2="18" y2="6" />
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            )}
-          </button>
         </div>
-      </div>
+      </nav>
 
-      {/* Mobile menu overlay */}
+      {/* Mobile menu overlay — rendered OUTSIDE nav to avoid backdrop-filter breaking position:fixed on iOS */}
       {mobileOpen && (
         <div className="m-mobile-menu">
           <div className="m-mobile-menu-inner">
@@ -105,6 +107,6 @@ export default function MarketingNav() {
           </div>
         </div>
       )}
-    </nav>
+    </>
   );
 }
