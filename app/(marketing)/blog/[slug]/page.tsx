@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 import { notFound } from 'next/navigation';
 import { getPostBySlug, getRelatedPosts, getCategories, incrementViewCount } from '@/lib/blog-service';
 import ArticleHeader from '@/components/blog/ArticleHeader';

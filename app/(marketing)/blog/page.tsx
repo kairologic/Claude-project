@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 import { getPublishedPosts, getCategories, getPostsByCategory } from '@/lib/blog-service';
 import BlogHero from '@/components/blog/BlogHero';
 import CategoryFilter from '@/components/blog/CategoryFilter';
