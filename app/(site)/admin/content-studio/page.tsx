@@ -37,6 +37,8 @@ export default function ContentStudioPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<PipelineStats>({});
+  const [batchCount, setBatchCount] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
   const [error, setError] = useState<string>();
 
   // Auth check
@@ -100,6 +102,40 @@ export default function ContentStudioPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Batch generate content
+  const handleBatchGenerate = async (items: { topic: string; audience: string; intent: string; angle: string }[]) => {
+    setIsGenerating(true);
+    setError(undefined);
+    setBatchTotal(items.length);
+    setBatchCount(0);
+
+    let lastPostId: string | undefined;
+    for (let i = 0; i < items.length; i++) {
+      setBatchCount(i + 1);
+      try {
+        const res = await fetch('/api/content-studio/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(items[i]),
+        });
+        const data = await res.json();
+        if (data.error) {
+          setError(`Post ${i + 1} failed: ${data.error}`);
+        } else if (data.post?.id) {
+          lastPostId = data.post.id;
+        }
+      } catch (err) {
+        setError(`Post ${i + 1} failed: ${(err as Error).message}`);
+      }
+    }
+
+    await fetchPosts();
+    if (lastPostId) setSelectedPostId(lastPostId);
+    setIsGenerating(false);
+    setBatchCount(0);
+    setBatchTotal(0);
   };
 
   // Update post
@@ -216,7 +252,13 @@ export default function ContentStudioPage() {
         <div className="grid grid-cols-12 gap-6">
           {/* Left sidebar: Topic input + Queue */}
           <div className="col-span-12 lg:col-span-4 space-y-4">
-            <TopicInput onGenerate={handleGenerate} isGenerating={isGenerating} />
+            <TopicInput
+              onGenerate={handleGenerate}
+              onBatchGenerate={handleBatchGenerate}
+              isGenerating={isGenerating}
+              generatingCount={batchCount}
+              generatingTotal={batchTotal}
+            />
             <PostQueue
               posts={posts}
               selectedPostId={selectedPostId}
