@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable react-hooks/exhaustive-deps */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 /* ══════════════════════════════════════════════════════════════
    KairoLogic — Animated Dashboard Hero
@@ -157,9 +157,40 @@ function AccRow({ field, nppes, uhc, aetna, cigna, humana, delay, mismatch = fal
 }
 
 // ═══════════════════════════════════════
-// MAIN EXPORT
+// MAIN EXPORT — replays animation each time it scrolls into view
 // ═══════════════════════════════════════
 export default function DashboardHero() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [animKey, setAnimKey] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          // Increment key to force full remount → replay all animations
+          setAnimKey((k) => k + 1);
+        } else {
+          setIsVisible(false);
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ minHeight: 100 }}>
+      {isVisible && <DashboardHeroInner key={animKey} />}
+    </div>
+  );
+}
+
+function DashboardHeroInner() {
   const [mounted, setMounted] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [clickPulse, setClickPulse] = useState(false);
