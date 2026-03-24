@@ -9,6 +9,10 @@ export async function POST(
   try {
     const supabase = createAdminSupabaseClient();
 
+    // Read channels from the request body (UI sends them)
+    const body = await request.json().catch(() => ({}));
+    const requestedChannels: string[] = body.channels || [];
+
     // Fetch the post with graphics
     const { data: post, error: fetchError } = await supabase
       .from('content_posts')
@@ -20,7 +24,10 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    if (!post.channels || post.channels.length === 0) {
+    // Use channels from the request body, fall back to post.channels
+    const channels = requestedChannels.length > 0 ? requestedChannels : (post.channels || []);
+
+    if (channels.length === 0) {
       return NextResponse.json({ error: 'No channels selected for publishing' }, { status: 400 });
     }
 
@@ -28,7 +35,7 @@ export async function POST(
     const graphicUrl = post.content_graphics?.[0]?.image_url;
 
     // Publish to each selected channel
-    for (const channel of post.channels) {
+    for (const channel of channels) {
       try {
         if (channel === 'linkedin') {
           const liResult = await publishToLinkedIn(post.body_linkedin || '', graphicUrl);
@@ -45,6 +52,7 @@ export async function POST(
             external_id: liResult.postUrn,
             external_url: liResult.postUrl,
             error_message: liResult.error,
+            published_at: new Date().toISOString(),
           });
         }
 
@@ -83,6 +91,7 @@ export async function POST(
             external_id: slug,
             external_url: blogUrl,
             error_message: blogError?.message,
+            published_at: new Date().toISOString(),
           });
         }
 
@@ -94,6 +103,7 @@ export async function POST(
             post_id: post.id,
             channel: 'substack',
             status: 'pending',
+            published_at: new Date().toISOString(),
           });
         }
       } catch (err) {
