@@ -52,10 +52,10 @@ function SetPasswordForm() {
       if (practiceId) {
         const { data } = await supabase
           .from('practice_websites')
-          .select('practice_name')
+          .select('name')
           .eq('id', practiceId)
           .single();
-        if (data) setPracticeName(data.practice_name);
+        if (data) setPracticeName(data.name);
       }
     }
     init();

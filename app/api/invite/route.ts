@@ -53,11 +53,11 @@ export async function POST(request: NextRequest) {
     // Get practice name for the invite email
     const { data: practice } = await admin
       .from('practice_websites')
-      .select('practice_name')
+      .select('name')
       .eq('id', practice_id)
       .single();
 
-    const practiceName = practice?.practice_name || 'a practice';
+    const practiceName = practice?.name || 'a practice';
     const inviterName = user.user_metadata?.name || user.email || 'A team member';
 
     // Send invite
