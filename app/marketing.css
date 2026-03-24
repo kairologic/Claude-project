@@ -2067,3 +2067,198 @@ a.m-resource-card:hover {
   .m-resources-grid { grid-template-columns: 1fr; }
   .m-resource-featured { grid-column: span 1; }
 }
+
+/* ── Blog ── */
+.m-blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 24px;
+}
+
+.m-blog-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #E9ECEF;
+  background: #fff;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+}
+.m-blog-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 30, 46, 0.1);
+}
+
+.m-blog-card-image {
+  aspect-ratio: 16/9;
+  width: 100%;
+  object-fit: cover;
+  background: linear-gradient(135deg, #E9ECEF 0%, #F8F9FA 100%);
+}
+
+.m-blog-card-body {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.m-blog-hero-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 48px;
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid #E9ECEF;
+  background: #fff;
+}
+
+.m-blog-category-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.m-blog-filter-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  margin-bottom: 32px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.m-blog-filter-bar::-webkit-scrollbar { display: none; }
+
+.m-blog-filter-pill {
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #E9ECEF;
+  background: #fff;
+  color: #0F1E2E;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.m-blog-filter-pill:hover { background: #F8F9FA; }
+.m-blog-filter-pill.active {
+  background: #0F1E2E;
+  color: #fff;
+  border-color: #0F1E2E;
+}
+
+.m-blog-post-layout {
+  display: flex;
+  gap: 48px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.m-blog-article {
+  flex: 1;
+  max-width: 720px;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #0F1E2E;
+}
+.m-blog-article h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 28px;
+  margin-top: 32px;
+  margin-bottom: 12px;
+  color: #0F1E2E;
+}
+.m-blog-article h3 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 24px;
+  margin-bottom: 8px;
+  color: #0F1E2E;
+}
+.m-blog-article p { margin-bottom: 16px; }
+.m-blog-article a { color: #3B82F6; text-decoration: underline; }
+.m-blog-article a:hover { color: #2563EB; }
+.m-blog-article img {
+  width: 100%;
+  border-radius: 8px;
+  margin: 24px 0;
+}
+.m-blog-article blockquote {
+  border-left: 4px solid #F0C05A;
+  padding: 12px 20px;
+  margin: 20px 0;
+  font-style: italic;
+  color: #64748B;
+  background: #FEFCE8;
+  border-radius: 0 8px 8px 0;
+}
+.m-blog-article code {
+  background: #F8F9FA;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: monospace;
+}
+.m-blog-article pre {
+  background: #F8F9FA;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.m-blog-article pre code {
+  padding: 0;
+  background: none;
+}
+.m-blog-article ul, .m-blog-article ol {
+  margin: 12px 0 16px 24px;
+}
+.m-blog-article li { margin-bottom: 6px; }
+
+.m-blog-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 96px;
+  align-self: flex-start;
+}
+
+.m-blog-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #64748B;
+  margin-bottom: 24px;
+}
+
+.m-blog-author-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #E9ECEF;
+  border-radius: 12px;
+  margin-top: 48px;
+  background: #F8F9FA;
+}
+
+@media (max-width: 900px) {
+  .m-blog-hero-card { grid-template-columns: 1fr; }
+  .m-blog-post-layout { flex-direction: column; }
+  .m-blog-sidebar { width: 100%; position: static; }
+  .m-blog-grid { grid-template-columns: 1fr; }
+}

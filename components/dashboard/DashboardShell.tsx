@@ -43,6 +43,7 @@ const pageTitles: Record<string, string> = {
   '/payer-directory': 'Payer directories',
   '/search': 'Natural Language Search',
   '/reports': 'Reports',
+  '/blog': 'Blog Management',
   '/settings': 'Settings',
   '/onboarding': 'Provider onboarding',
   '/release': 'Provider release',

@@ -54,17 +54,17 @@ export default function ResourcesPage() {
             </Link>
 
             {/* Insights */}
-            <div className="m-resource-card m-resource-coming">
-              <div className="m-resource-tag">Coming Soon</div>
+            <Link href="/blog" className="m-resource-card">
+              <div className="m-resource-tag">Blog</div>
               <h2>Insights &amp; Blog</h2>
               <p>
                 Analysis of provider data trends, regulatory changes, and credentialing best practices.
                 Written for practice administrators and compliance teams.
               </p>
-              <span className="m-resource-link m-muted">
-                Coming soon
+              <span className="m-resource-link">
+                Read articles <ArrowIcon />
               </span>
-            </div>
+            </Link>
 
             {/* API Docs */}
             <div className="m-resource-card m-resource-coming">

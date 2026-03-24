@@ -72,6 +72,7 @@ export default function Sidebar({
     { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
     { id: 'search', path: '/search', icon: '🔍', label: 'NL Search' },
     { id: 'reports', path: '/reports', icon: '📊', label: 'Reports' },
+    { id: 'blog', path: '/blog', icon: '📝', label: 'Blog' },
     { id: 'settings', path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
@@ -90,6 +91,7 @@ export default function Sidebar({
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
     if (sub.startsWith('/search')) return 'search';
     if (sub.startsWith('/reports')) return 'reports';
+    if (sub.startsWith('/blog')) return 'blog';
     if (sub.startsWith('/settings')) return 'settings';
     return 'dashboard';
   }
