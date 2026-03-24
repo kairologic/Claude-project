@@ -348,10 +348,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
     outline: 'none',
     color: colors.navy,
-    ':placeholder': {
-      color: colors.gray400,
-    },
-  },
+  } as React.CSSProperties,
   clearBtn: {
     display: 'flex',
     alignItems: 'center',
