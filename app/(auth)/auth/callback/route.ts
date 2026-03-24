@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
   // If no code or exchange failed, redirect to login with error
   return NextResponse.redirect(
-    new URL('/login?error=auth_failed', requestUrl.origin)
+    new URL('/sign-in?error=auth_failed', requestUrl.origin)
   );
 }
 

@@ -232,7 +232,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       setLoading(true);
       await new Promise(r => setTimeout(r, 1000));
       setMessage({ type: 'success', text: 'Account deleted. Redirecting...' });
-      setTimeout(() => window.location.href = '/login', 2000);
+      setTimeout(() => window.location.href = '/sign-in', 2000);
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to delete account' });
     } finally {

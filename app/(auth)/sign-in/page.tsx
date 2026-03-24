@@ -39,9 +39,9 @@ export default function SignInPage() {
         return;
       }
 
-      // Look up practice_team_members to get practice_id
+      // Look up practice_users to get practice_id
       const { data: teamMembers, error: lookupError } = await supabase
-        .from('practice_team_members')
+        .from('practice_users')
         .select('practice_id')
         .eq('user_id', data.user.id)
         .single();
@@ -74,7 +74,7 @@ export default function SignInPage() {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         resetEmail,
         {
-          redirectTo: 'https://kairologic.net/auth/reset-password',
+          redirectTo: `${window.location.origin}/auth/reset-password`,
         }
       );
 

@@ -153,7 +153,7 @@ function ExpiredPage({ message, showLogin }: { message: string; showLogin?: bool
           {message}
         </div>
         {showLogin && (
-          <a href="/login" style={{
+          <a href="/sign-in" style={{
             display: 'inline-block', padding: '10px 24px', background: '#0F1E2E',
             color: '#fff', borderRadius: 8, fontSize: 14, fontWeight: 700,
             textDecoration: 'none',

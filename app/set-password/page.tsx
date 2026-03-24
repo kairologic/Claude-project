@@ -43,7 +43,7 @@ function SetPasswordForm() {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push('/login?error=session_expired');
+        router.push('/sign-in?error=session_expired');
         return;
       }
       setUserEmail(user.email || '');

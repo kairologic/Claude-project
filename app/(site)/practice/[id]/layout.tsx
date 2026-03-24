@@ -23,7 +23,7 @@ export default async function PracticeLayout({
   const auth = await getAuthenticatedUser();
 
   if (!auth) {
-    redirect('/login');
+    redirect('/sign-in');
   }
 
   // Verify user has access to this practice

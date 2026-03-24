@@ -14,10 +14,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 const PROTECTED_ROUTES = ['/practice', '/settings'];
 
 // Routes that authenticated users should be redirected away from
-const AUTH_ROUTES = ['/login', '/set-password'];
+const AUTH_ROUTES = ['/login', '/sign-in', '/set-password'];
 
 // Always public
-const PUBLIC_ROUTES = ['/preview', '/verify', '/reset-password', '/api/claim', '/api/invite'];
+const PUBLIC_ROUTES = ['/preview', '/verify', '/auth', '/reset-password', '/api/claim', '/api/invite'];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
   // Redirect unauthenticated users away from protected routes
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = '/sign-in';
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }

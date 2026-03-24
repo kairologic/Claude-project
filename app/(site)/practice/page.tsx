@@ -11,7 +11,7 @@ export default async function PracticeIndexPage() {
   const auth = await getAuthenticatedUser();
 
   if (!auth) {
-    redirect('/login');
+    redirect('/sign-in');
   }
 
   if (auth.primaryPractice) {
