@@ -366,20 +366,18 @@ function injectPracticeFilter(sql: string, practice_id: string): string {
   const hasLimit = /LIMIT\s+\d+/i.test(sql);
 
   if (hasWhere) {
-    // Insert filter right after the first WHERE
     if (hasLimit) {
-      return sql.replace(/LIMIT\s+\d+/i, `AND ${filterClause} LIMIT`);
+      return sql.replace(/(LIMIT\s+\d+)/i, `AND ${filterClause} $1`);
     } else if (hasGroupOrOrder) {
       return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `AND ${filterClause} $1`);
     } else {
       return sql + ` AND ${filterClause}`;
     }
   } else {
-    // No WHERE yet — insert one
     if (hasGroupOrOrder) {
       return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `WHERE ${filterClause} $1`);
     } else if (hasLimit) {
-      return sql.replace(/LIMIT\s+\d+/i, `WHERE ${filterClause} LIMIT`);
+      return sql.replace(/(LIMIT\s+\d+)/i, `WHERE ${filterClause} $1`);
     } else {
       return sql + ` WHERE ${filterClause}`;
     }
