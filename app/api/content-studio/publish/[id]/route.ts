@@ -58,26 +58,30 @@ export async function POST(
 
         if (channel === 'blog') {
           // Auto-publish to KairoLogic blog via blog_posts table
+          // Use upsert to handle re-publishing (updates existing post if slug exists)
           const slug = generateSlug(post.headline || post.topic);
           const { data: blogPost, error: blogError } = await supabase
             .from('blog_posts')
-            .insert({
-              title: post.headline || post.topic,
-              slug,
-              excerpt: (post.body_blog || '').substring(0, 200) + '...',
-              content: post.body_blog,
-              featured_image_url: graphicUrl,
-              author_name: 'KairoLogic',
-              status: 'published',
-              published_at: new Date().toISOString(),
-              reading_time_min: Math.ceil((post.body_blog || '').split(' ').length / 200),
-              meta_title: post.headline,
-              meta_description: (post.body_blog || '').substring(0, 160),
-            })
+            .upsert(
+              {
+                title: post.headline || post.topic,
+                slug,
+                excerpt: (post.body_blog || '').substring(0, 200) + '...',
+                content: post.body_blog,
+                featured_image_url: graphicUrl,
+                author_name: 'KairoLogic',
+                status: 'published',
+                published_at: new Date().toISOString(),
+                reading_time_min: Math.ceil((post.body_blog || '').split(' ').length / 200),
+                meta_title: post.headline,
+                meta_description: (post.body_blog || '').substring(0, 160),
+              },
+              { onConflict: 'slug' }
+            )
             .select()
             .single();
 
-          const blogUrl = blogPost ? `https://kairologic.net/blog/${slug}` : undefined;
+          const blogUrl = `https://kairologic.net/blog/${slug}`;
           results.blog = {
             success: !blogError,
             url: blogUrl,
@@ -111,11 +115,13 @@ export async function POST(
       }
     }
 
-    // Update post status
+    // Update post status — never downgrade from 'published' to 'failed'
     const allSuccess = Object.values(results).every((r) => r.success);
+    const anySuccess = Object.values(results).some((r) => r.success);
+    const newStatus = allSuccess || anySuccess || post.status === 'published' ? 'published' : 'failed';
     await supabase
       .from('content_posts')
-      .update({ status: allSuccess ? 'published' : 'failed' })
+      .update({ status: newStatus })
       .eq('id', post.id);
 
     return NextResponse.json({ success: true, results });
