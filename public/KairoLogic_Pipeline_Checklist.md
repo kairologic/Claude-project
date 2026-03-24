@@ -168,7 +168,26 @@ NPPES legal names ("BEVERLY HILLS DERMATOLOGY GROUP INC") don't match public-fac
 - Improves NPI resolver v2 (direct name+address match for 55K unresolved TX licenses)
 - Foundation for every new data source integration going forward
 
-## 10. Product Backlog (future)
+## 10. NL Search — Help Knowledge Base Migration (future)
+
+Current: Help content is embedded directly in the Claude system prompt (option A). This works well for the initial feature set but the system prompt grows with each new topic.
+
+### Phase 2: Supabase help_articles Table (option B)
+- [ ] #88 — Create `help_articles` table: id, title, category, content (markdown), keywords (text[]), embedding (vector), created_at, updated_at
+- [ ] #89 — Seed help_articles with current system prompt knowledge base content (dashboard, workflows, alerts, NPPES, payer directories, health score, settings, common terms)
+- [ ] #90 — Add pgvector extension + embeddings column for semantic search
+- [ ] #91 — Build retrieval step: before calling Claude, query help_articles by keyword/embedding similarity, pass top 3-5 matches as context
+- [ ] #92 — Admin UI for editing help articles (add/edit/preview markdown content without code deploys)
+- [ ] #93 — Analytics: track which help topics are queried most, surface gaps where users ask questions with no matching article
+- [ ] #94 — Auto-suggest: when a help query has no strong match, flag it for content creation
+
+### Benefits of Migration
+- System prompt stays lean (fewer tokens per API call = faster + cheaper)
+- Help content can be updated without code deploys
+- Semantic search catches paraphrased questions better than keyword matching
+- Analytics enable data-driven content improvements
+
+## 11. Product Backlog (future)
 
 - [ ] NPI resolver v2: uses Entity Resolution Engine (section 9) for direct name+address matching against 1.8M NPPES providers table
 - [ ] CAQH ProView auto-push: auto-submit corrections from KairoLogic findings into ProView (Command tier, requires CAQH API partnership)

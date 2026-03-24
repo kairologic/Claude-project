@@ -15,12 +15,21 @@ interface NLSearchModalProps {
   practiceId: string;
 }
 
-interface SearchResult {
+interface DataResult {
+  type: 'data';
   explanation: string;
   data: Array<Record<string, unknown>>;
   rowCount: number;
   columns: string[];
 }
+
+interface HelpResult {
+  type: 'help';
+  answer: string;
+  relatedQueries: string[];
+}
+
+type SearchResult = DataResult | HelpResult;
 
 export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,15 +39,20 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const suggestedQueries = [
+  const suggestedDataQueries = [
     'List providers with licenses expiring soon',
     'How many providers need address changes?',
     'NPPES fixes in the last 30 days',
-    'Show providers not listed in any payer directory',
     'Open correction workflows by type',
     'Provider health scores ranked lowest first',
-    'Providers added this month',
     'Payer directory mismatches by payer',
+  ];
+
+  const suggestedHelpQueries = [
+    'How do workflows work?',
+    'What does the health score mean?',
+    'What types of alerts are there?',
+    'How does NPPES monitoring work?',
   ];
 
   const placeholderQueries = [
@@ -98,12 +112,21 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
       }
 
       const data = await response.json();
-      setResults({
-        explanation: data.explanation,
-        data: data.data || [],
-        rowCount: data.rowCount,
-        columns: data.columns || [],
-      });
+      if (data.type === 'help') {
+        setResults({
+          type: 'help',
+          answer: data.answer,
+          relatedQueries: data.relatedQueries || [],
+        });
+      } else {
+        setResults({
+          type: 'data',
+          explanation: data.explanation,
+          data: data.data || [],
+          rowCount: data.rowCount,
+          columns: data.columns || [],
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -117,7 +140,7 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
   }
 
   function downloadCSV() {
-    if (!results) return;
+    if (!results || results.type !== 'data') return;
     const csv = [
       results.columns.join(','),
       ...results.data.map(row =>
@@ -136,6 +159,20 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
     a.download = `search-results-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // Simple markdown→HTML for help responses
+  function renderMarkdown(md: string): string {
+    return md
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 4px;font-size:13px;font-weight:700;">$1</h4>')
+      .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 6px;font-size:14px;font-weight:700;">$1</h3>')
+      .replace(/^- (.+)$/gm, '<li style="margin:2px 0;padding-left:4px;">$1</li>')
+      .replace(/(<li.*<\/li>\n?)+/g, (m) => `<ul style="margin:6px 0 6px 16px;padding:0;list-style:disc;">${m}</ul>`)
+      .replace(/\n\n/g, '<br/><br/>')
+      .replace(/\n/g, '<br/>');
   }
 
   return (
@@ -187,15 +224,27 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
               {/* Suggestions — show when no query */}
               {!query && !results && !loading && (
                 <div style={styles.suggestionsArea}>
-                  <div style={styles.sectionLabel}>Suggested queries</div>
+                  <div style={styles.sectionLabel}>Ask about your data</div>
                   <div style={styles.suggestionsGrid}>
-                    {suggestedQueries.map((q, i) => (
+                    {suggestedDataQueries.map((q, i) => (
                       <button
                         key={i}
                         onClick={() => handleSearch(q)}
                         style={styles.suggestionChip}
                       >
-                        {q}
+                        <span style={{ marginRight: 6, opacity: 0.5 }}>📊</span>{q}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ ...styles.sectionLabel, marginTop: 14 }}>Get help</div>
+                  <div style={styles.suggestionsGrid}>
+                    {suggestedHelpQueries.map((q, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSearch(q)}
+                        style={styles.suggestionChip}
+                      >
+                        <span style={{ marginRight: 6, opacity: 0.5 }}>💡</span>{q}
                       </button>
                     ))}
                   </div>
@@ -213,15 +262,47 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
               {loading && (
                 <div style={styles.loadingArea}>
                   <div style={styles.spinnerLarge} />
-                  <span style={{ fontSize: 13, color: colors.gray400 }}>Analyzing your question...</span>
+                  <span style={{ fontSize: 13, color: colors.gray400 }}>Thinking...</span>
                 </div>
               )}
 
-              {/* Results */}
-              {results && !loading && (
+              {/* Help Result */}
+              {results && results.type === 'help' && !loading && (
+                <div style={styles.helpArea}>
+                  <div style={styles.helpBadge}>
+                    <span style={{ fontSize: 12 }}>💡</span> Help
+                  </div>
+                  <div
+                    style={styles.helpAnswer}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(results.answer) }}
+                  />
+                  {results.relatedQueries && results.relatedQueries.length > 0 && (
+                    <div style={styles.relatedArea}>
+                      <div style={{ ...styles.sectionLabel, marginBottom: 6 }}>Related questions</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {results.relatedQueries.map((q, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSearch(q)}
+                            style={styles.relatedChip}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Data Result */}
+              {results && results.type === 'data' && !loading && (
                 <div>
                   {/* Explanation */}
-                  <div style={styles.explanation}>{results.explanation}</div>
+                  <div style={styles.explanation}>
+                    <span style={{ marginRight: 6, opacity: 0.5 }}>📊</span>
+                    {results.explanation}
+                  </div>
                   <div style={styles.rowCount}>
                     {results.rowCount} result{results.rowCount !== 1 ? 's' : ''}
                     <button onClick={downloadCSV} style={styles.exportBtn}>⬇ CSV</button>
@@ -270,7 +351,7 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
             {/* Footer hint */}
             <div style={styles.footer}>
               <span style={{ color: colors.gray400, fontSize: 11 }}>
-                Ask in plain English — e.g. "providers with expired licenses" or "mismatches by payer"
+                Ask anything — data queries or help questions in plain English
               </span>
               <kbd style={{ ...styles.kbd, fontSize: 10 }}>ESC</kbd>
             </div>
@@ -482,6 +563,44 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 250,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+  helpArea: {
+    padding: '14px 18px',
+  },
+  helpBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '3px 10px',
+    background: '#EEF2FF',
+    border: '1px solid #C7D2FE',
+    borderRadius: 12,
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#4F46E5',
+    marginBottom: 10,
+  },
+  helpAnswer: {
+    fontSize: 13,
+    lineHeight: 1.65,
+    color: colors.navy,
+  },
+  relatedArea: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTop: `1px solid ${colors.gray200}`,
+  },
+  relatedChip: {
+    padding: '5px 10px',
+    background: '#EEF2FF',
+    border: '1px solid #C7D2FE',
+    borderRadius: 6,
+    fontSize: 11,
+    cursor: 'pointer',
+    color: '#4F46E5',
+    fontWeight: 500,
+    fontFamily: 'inherit',
+    transition: 'background .15s',
   },
   footer: {
     padding: '10px 18px',

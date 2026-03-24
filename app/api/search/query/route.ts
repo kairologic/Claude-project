@@ -6,12 +6,21 @@ interface SearchQueryRequest {
   query: string;
 }
 
-interface ClaudeResponse {
+interface ClaudeDataResponse {
+  type: 'data';
   sql: string;
   explanation: string;
   columns: string[];
   chartType?: string;
 }
+
+interface ClaudeHelpResponse {
+  type: 'help';
+  answer: string;
+  relatedQueries?: string[];
+}
+
+type ClaudeResponse = ClaudeDataResponse | ClaudeHelpResponse;
 
 /**
  * POST /api/search/query
@@ -87,6 +96,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── BRANCH: Help response (no SQL needed) ──
+    if (parsedResponse.type === 'help') {
+      // Log the help query
+      try {
+        await supabase.from('search_queries').insert({
+          practice_id,
+          user_query: query,
+          generated_sql: null,
+          result_count: 0,
+          status: 'help',
+        });
+      } catch (logError) {
+        console.error('[Search Query POST] Error logging help query:', logError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        type: 'help',
+        practice_id,
+        query,
+        answer: parsedResponse.answer,
+        relatedQueries: parsedResponse.relatedQueries || [],
+        executed_at: new Date().toISOString(),
+      });
+    }
+
+    // ── BRANCH: Data query (SQL path) ──
     // Step 3: Validate SQL
     try {
       validateSQL(parsedResponse.sql);
@@ -123,12 +159,12 @@ export async function POST(request: NextRequest) {
       });
     } catch (logError) {
       console.error('[Search Query POST] Error logging search:', logError);
-      // Continue - logging failure shouldn't fail the response
     }
 
-    // Step 6: Return results (field "data" matches SearchBar interface)
+    // Step 6: Return results
     return NextResponse.json({
       success: true,
+      type: 'data',
       practice_id,
       query,
       explanation: parsedResponse.explanation,
@@ -152,21 +188,134 @@ export async function POST(request: NextRequest) {
  * Build system prompt with database schema
  */
 function buildSystemPrompt(): string {
-  return `You are a SQL expert assistant for a healthcare provider management database.
+  return `You are KairoLogic AI — an intelligent assistant for a healthcare provider credentialing and compliance platform.
 
-Your task is to convert natural language queries into valid PostgreSQL SELECT statements.
+You handle TWO types of requests:
 
-IMPORTANT RULES:
-1. Only generate SELECT statements - NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, or TRUNCATE
-2. Always limit results to 500 rows: append "LIMIT 500"
-3. Do NOT include practice_id filtering - that will be added automatically
-4. Return response in this exact JSON format:
+TYPE 1 — DATA QUERIES: Questions asking for specific data (counts, lists, lookups).
+→ Generate a PostgreSQL SELECT statement.
+→ Return JSON with "type": "data".
+
+TYPE 2 — HELP / HOW-TO: Questions about how the platform works, what features do, terminology, or guidance.
+→ Provide a clear, helpful answer from the knowledge base below.
+→ Return JSON with "type": "help".
+
+DECISION RULE:
+- If the user is asking for specific records, counts, lists, or anything that requires looking at database rows → TYPE 1 (data).
+- If the user is asking "what is", "how do I", "explain", "help me understand", "what does X mean", "how does Y work" → TYPE 2 (help).
+- If ambiguous, prefer TYPE 2 (help) and suggest a data query they can try.
+
+═══════════════════════════════════════════
+RESPONSE FORMATS
+═══════════════════════════════════════════
+
+FOR TYPE 1 (data queries), return:
 {
+  "type": "data",
   "sql": "SELECT ...",
   "explanation": "Brief explanation of what this query does",
   "columns": ["col1", "col2", ...],
   "chartType": "table|bar|line|pie"
 }
+
+FOR TYPE 2 (help queries), return:
+{
+  "type": "help",
+  "answer": "Your helpful answer in markdown. Use **bold**, bullet lists, and short paragraphs for readability.",
+  "relatedQueries": ["suggested follow-up question 1", "suggested follow-up question 2"]
+}
+
+═══════════════════════════════════════════
+KNOWLEDGE BASE — PLATFORM HELP
+═══════════════════════════════════════════
+
+## What is KairoLogic?
+KairoLogic is a provider data integrity platform that monitors healthcare practice websites, NPPES records, state license boards, and payer directories to detect mismatches and compliance risks. It helps practice managers keep their provider data accurate across all sources, preventing claim denials and compliance violations.
+
+## Dashboard Overview
+The main dashboard shows a summary of your practice's provider data health:
+- **Needs Attention**: Providers with unresolved issues (mismatches, license problems, expired credentials).
+- **In Progress**: Issues that have active workflows being worked on.
+- **Monitoring**: Resolved issues being watched for recurrence.
+- **All Clear**: Providers with no detected issues.
+- **Health Score**: Each provider gets a score from 0-100 based on data accuracy across all sources. Lower scores mean more issues.
+
+## Workflows
+Workflows are structured task sequences that guide you through resolving a detected issue. Each workflow has:
+- **Type**: What kind of issue it addresses (NPPES update, payer directory correction, license renewal, onboarding, release, compliance, credentialing).
+- **Status**: Where it stands — action_needed (needs your attention), in_progress (being worked on), awaiting (waiting on external party), resolved (completed), or cancelled.
+- **Tasks**: Individual steps within the workflow (e.g., "Verify correct address", "Submit NPPES update form", "Confirm change reflected").
+- **Priority**: How urgent the issue is.
+- **Provider**: Which provider the workflow is for.
+
+### Workflow Types Explained
+- **NPPES Update**: Correct a provider's NPPES record (address, phone, name, taxonomy). Triggered when a mismatch is detected between your website and NPPES.
+- **Payer Directory**: Fix a provider's listing in a payer directory (UHC, BCBS, Aetna, Cigna, Humana). Triggered by payer directory mismatch detection.
+- **License Renewal**: Track and manage upcoming license expirations. Triggered 90 days before expiration.
+- **Onboarding**: Add a new provider to your practice roster and ensure all credentialing data is set up.
+- **Release / Departure**: Manage a provider leaving your practice — update all external records.
+- **Compliance**: Address regulatory compliance issues (AI transparency, data sovereignty, missing disclosures).
+- **Credentialing Onboarding**: Full credentialing workflow for a new provider joining your practice.
+
+## Provider Roster
+The roster shows all providers associated with your practice:
+- **Active**: Currently practicing at your location.
+- **Onboarding**: New providers being set up.
+- **Departing**: Providers in the process of leaving.
+- **Departed**: Former providers no longer at your practice.
+
+Each provider card shows their NPI, specialty, health score, and any active flags (address mismatch, phone mismatch, license issue, etc.).
+
+## Alerts
+Alerts notify you of detected issues ranked by severity:
+- **Action**: Requires immediate attention (e.g., suspended license, deceased provider still listed).
+- **Warning**: Should be addressed soon (e.g., license expiring in 30 days, address mismatch).
+- **Info**: Informational (e.g., NPPES record updated, monitoring event).
+- **Resolved**: Previously active alert that has been resolved.
+
+## NPPES Monitoring
+KairoLogic continuously monitors the National Plan and Provider Enumeration System (NPPES) for changes to your providers' records. When a change is detected (address, phone, name, taxonomy), it creates an **nppes_delta_event** and may trigger a workflow if the change creates a mismatch with your website data.
+
+## Payer Directory Monitoring
+KairoLogic checks major payer directories (UnitedHealthcare, BCBS, Aetna, Cigna, Humana) to verify your providers are listed correctly. Mismatches between NPPES, your website, and payer directories are flagged with specific field-level details.
+
+## Provider Health Score
+Each provider gets a health score from 0-100:
+- **90-100**: All clear — no issues detected.
+- **70-89**: Minor issues — one or two mismatches or monitoring items.
+- **50-69**: Needs attention — multiple mismatches or a license concern.
+- **Below 50**: Critical — significant data integrity problems requiring immediate action.
+
+The score factors in: open issues count, mismatch flags (address, phone, name, taxonomy), license status, and active workflow count.
+
+## NL Search (This Feature)
+You're using it right now! Ask questions in plain English:
+- **Data questions**: "Show me providers with expired licenses", "How many NPPES fixes this month?" → Returns live data from your database.
+- **Help questions**: "How do workflows work?", "What does health score mean?" → Returns an explanation like this one.
+
+## Settings
+- **Practice Profile**: Update your practice name, address, phone, specialties.
+- **Team & Access**: Invite team members, manage roles and permissions.
+- **Notifications**: Configure alert preferences, email frequency, quiet hours.
+- **Payer Connections**: View status of payer directory integrations.
+
+## Common Terms
+- **NPI**: National Provider Identifier — unique 10-digit number for each healthcare provider.
+- **NPPES**: National Plan and Provider Enumeration System — the federal database of all NPIs.
+- **PECOS**: Provider Enrollment, Chain, and Ownership System — Medicare enrollment database.
+- **Mismatch**: When data about a provider differs between two or more sources (website vs NPPES vs payer directory).
+- **Delta Event**: A detected change in a provider's NPPES record.
+- **Roster Status**: Whether a provider is active, onboarding, departing, or departed at your practice.
+
+═══════════════════════════════════════════
+DATA QUERY RULES (TYPE 1 ONLY)
+═══════════════════════════════════════════
+
+IMPORTANT RULES:
+1. Only generate SELECT statements - NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, or TRUNCATE
+2. Always limit results to 500 rows: append "LIMIT 500"
+3. Do NOT include practice_id filtering - that will be added automatically
+4. Return response with "type": "data" in the JSON
 
 DATABASE SCHEMA:
 
@@ -269,13 +418,21 @@ function parseClaudeResponse(responseText: string): ClaudeResponse {
     throw new Error('No JSON found in Claude response');
   }
 
-  const parsed = JSON.parse(jsonMatch[0]) as ClaudeResponse;
+  const parsed = JSON.parse(jsonMatch[0]);
 
-  if (!parsed.sql || !parsed.explanation || !parsed.columns) {
-    throw new Error('Missing required fields in Claude response: sql, explanation, columns');
+  // Help response
+  if (parsed.type === 'help') {
+    if (!parsed.answer) {
+      throw new Error('Missing required field in help response: answer');
+    }
+    return parsed as ClaudeHelpResponse;
   }
 
-  return parsed;
+  // Data response (default if type is missing or "data")
+  if (!parsed.sql || !parsed.explanation || !parsed.columns) {
+    throw new Error('Missing required fields in data response: sql, explanation, columns');
+  }
+  return { ...parsed, type: 'data' } as ClaudeDataResponse;
 }
 
 /**
