@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@/lib/auth/auth-helpers';
+import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 import { Lock, CheckCircle } from 'lucide-react';
 
 export default function ResetPasswordPage() {

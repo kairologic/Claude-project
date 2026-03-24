@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@/lib/auth/auth-helpers';
+import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 import { Mail, Lock } from 'lucide-react';
 
 export default function SignInPage() {

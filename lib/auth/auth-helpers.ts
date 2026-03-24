@@ -1,7 +1,7 @@
 /**
  * lib/auth/auth-helpers.ts
  *
- * Server-side auth utilities + browser-side client factory.
+ * Server-side auth utilities.
  *
  * Server-side (import in Server Components, Route Handlers, Middleware):
  *   - createServerSupabaseClient(): cookie-based, respects RLS
@@ -10,10 +10,7 @@
  *   - getUserPractices(), checkPracticeAccess(), linkUserToPractice()
  *   - validatePreviewToken(), markTokenClaimed()
  *
- * Browser-side (safe in 'use client' components):
- *   - createBrowserSupabaseClient(): anon-key client for auth operations
- *
- * NOTE: For SSR-aware browser clients, prefer '@/lib/auth/auth-client'.
+ * Browser-side: For client components, use '@/lib/auth/auth-client' instead.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -70,24 +67,6 @@ export function createAdminSupabaseClient(): SupabaseClient {
   return adminInstance;
 }
 
-// ---------------------------------------------------------------------------
-// Browser-side Supabase client
-// ---------------------------------------------------------------------------
-
-/**
- * Browser-side client using anon key.
- * Respects RLS. Use in client components for auth operations.
- */
-export function createBrowserSupabaseClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-
-  return createClient(url, key);
-}
 
 // ---------------------------------------------------------------------------
 // User & practice helpers
