@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import DashboardHero from '@/components/marketing/DashboardHero';
 
 const ArrowIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -9,7 +10,7 @@ const ArrowIcon = () => (
 export default function HomePage() {
   return (
     <>
-      {/* ═══ HERO — Centered headline + full-width dashboard ═══ */}
+      {/* ═══ HERO — Centered headline + animated dashboard ═══ */}
       <section className="m-hero m-hero-v2">
         <div className="m-container">
           <div className="m-hero-centered">
@@ -37,190 +38,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Full-width product dashboard */}
+        {/* Animated product dashboard */}
         <div className="m-hero-dashboard-wrap">
           <div className="m-container m-container-wide">
-            <div className="m-dashboard-frame m-app-frame">
-              {/* Dark Navy Sidebar */}
-              <div className="m-app-sidebar">
-                <div className="m-app-sidebar-logo">KairoLogic</div>
-                <div className="m-app-sidebar-practice">
-                  <div className="m-app-practice-name">Austin Regional Medical Group</div>
-                  <div className="m-app-practice-meta">Austin, TX &middot; 24 providers</div>
-                </div>
-                <nav className="m-app-sidebar-nav">
-                  <div className="m-app-nav-item m-active">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-green)' }}></span>
-                    Dashboard
-                  </div>
-                  <div className="m-app-nav-item">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-gold)' }}></span>
-                    Provider roster
-                  </div>
-                  <div className="m-app-nav-item">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
-                    Compliance
-                  </div>
-                  <div className="m-app-nav-item">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
-                    Documents
-                  </div>
-                  <div className="m-app-nav-item">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
-                    Audit trail
-                  </div>
-                </nav>
-                <div className="m-app-sidebar-extra">
-                  <div className="m-app-nav-item">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
-                    Reports
-                  </div>
-                  <div className="m-app-nav-item">
-                    <span className="m-app-nav-dot" style={{ background: 'var(--m-gray-400)' }}></span>
-                    Settings
-                  </div>
-                </div>
-              </div>
-
-              {/* Main Content Area */}
-              <div className="m-app-main">
-                <div className="m-app-topbar">
-                  <div>
-                    <div className="m-app-page-title">Dashboard</div>
-                    <div className="m-app-page-meta">AUSTIN REGIONAL MEDICAL GROUP &middot; 24 providers &middot; Last sync: 2 hours ago</div>
-                  </div>
-                  <div className="m-app-topbar-actions">
-                    <span className="m-app-btn-add">+ Add provider</span>
-                    <span className="m-app-status-dot"></span>
-                    <span className="m-app-status-text">Operational</span>
-                  </div>
-                </div>
-
-                <div className="m-app-welcome-banner">
-                  <div className="m-app-welcome-text">
-                    <strong>Welcome, Dr. Martinez</strong>
-                    <span className="m-app-trial-badge">FREE TRIAL</span>
-                  </div>
-                  <div className="m-app-welcome-desc">5 of your 24 providers need attention. Click any provider below to review issues, approve corrections, and track resolution.</div>
-                </div>
-
-                <div className="m-app-kpi-row">
-                  <div className="m-app-kpi m-app-kpi-red">
-                    <div className="m-app-kpi-num">5</div>
-                    <div className="m-app-kpi-label">Needs attention</div>
-                  </div>
-                  <div className="m-app-kpi m-app-kpi-yellow">
-                    <div className="m-app-kpi-num">3</div>
-                    <div className="m-app-kpi-label">In progress</div>
-                  </div>
-                  <div className="m-app-kpi m-app-kpi-blue">
-                    <div className="m-app-kpi-num">2</div>
-                    <div className="m-app-kpi-label">Monitoring</div>
-                  </div>
-                  <div className="m-app-kpi m-app-kpi-green">
-                    <div className="m-app-kpi-num">14</div>
-                    <div className="m-app-kpi-label">All clear</div>
-                  </div>
-                </div>
-
-                <div className="m-app-bottom-row">
-                  <div className="m-app-providers-panel">
-                    <div className="m-app-panel-header">
-                      <span className="m-app-panel-title">PRIORITY PROVIDERS</span>
-                      <span className="m-app-panel-link">View all 24 providers &rarr;</span>
-                    </div>
-                    <div className="m-app-provider-row">
-                      <div className="m-app-prov-avatar" style={{ background: '#7C9CBF' }}>MW</div>
-                      <div className="m-app-prov-info">
-                        <div className="m-app-prov-name">Dr. Marcus Webb, DO</div>
-                        <div className="m-app-prov-npi">1234567890</div>
-                        <div className="m-app-prov-specialty">Family Medicine</div>
-                        <span className="m-app-prov-tag">Credentialing</span>
-                      </div>
-                      <div className="m-app-prov-issues m-app-issues-red">2 issues</div>
-                    </div>
-                    <div className="m-app-provider-row">
-                      <div className="m-app-prov-avatar" style={{ background: '#B8A0D4' }}>PN</div>
-                      <div className="m-app-prov-info">
-                        <div className="m-app-prov-name">Dr. Priya Nair, MD</div>
-                        <div className="m-app-prov-npi">9876543210</div>
-                        <div className="m-app-prov-specialty">Pediatrics</div>
-                      </div>
-                      <div className="m-app-prov-issues m-app-issues-red">1 issue</div>
-                    </div>
-                  </div>
-
-                  <div className="m-app-compliance-panel">
-                    <div className="m-app-panel-title">PRACTICE COMPLIANCE</div>
-                    <div className="m-app-compliance-score">
-                      <div className="m-app-score-bar"></div>
-                      <span>Compliance score</span>
-                    </div>
-                    <div className="m-app-comp-item">
-                      <span>SB 1188 (Data sov.)</span>
-                      <span className="m-app-comp-status m-pending">Pending</span>
-                    </div>
-                    <div className="m-app-comp-item">
-                      <span>HB 149 (AI transp.)</span>
-                      <span className="m-app-comp-status m-pending">Pending</span>
-                    </div>
-                    <div className="m-app-payers-section">
-                      <div className="m-app-payers-label">Connected Directories</div>
-                      <div className="m-app-payer-logos">
-                        <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#002677"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">UHC</text></svg>
-                        <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#00A74E"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">H</text></svg>
-                        <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#0072C6"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="8" fontWeight="700">CIG</text></svg>
-                        <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#003DA5"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="8" fontWeight="700">AET</text></svg>
-                        <svg viewBox="0 0 30 30" fill="none"><rect width="30" height="30" rx="6" fill="#0055A4"/><text x="15" y="19" textAnchor="middle" fill="white" fontSize="7" fontWeight="700">BCBS</text></svg>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="m-app-workflow-panel">
-                    <div className="m-app-wf-header">
-                      <div className="m-app-panel-title">ACTIVE WORKFLOW</div>
-                      <span className="m-app-wf-badge m-onboarding">Onboarding</span>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--m-navy)', marginBottom: '2px' }}>Dr. Marcus Webb, DO</div>
-                    <div style={{ fontSize: '9px', color: 'var(--m-gray-400)' }}>Family Medicine &middot; NPI 1234567890</div>
-                    <div className="m-app-wf-timeline">
-                      <div className="m-app-wf-step m-done"></div>
-                      <div className="m-app-wf-connector m-done"></div>
-                      <div className="m-app-wf-step m-done"></div>
-                      <div className="m-app-wf-connector m-done"></div>
-                      <div className="m-app-wf-step m-active"></div>
-                      <div className="m-app-wf-connector"></div>
-                      <div className="m-app-wf-step"></div>
-                      <div className="m-app-wf-connector"></div>
-                      <div className="m-app-wf-step"></div>
-                    </div>
-                    <div className="m-app-wf-labels">
-                      <span>Assess</span>
-                      <span>CAQH</span>
-                      <span>NPPES</span>
-                      <span>Payers</span>
-                      <span>Monitor</span>
-                    </div>
-                    <div className="m-app-wf-task">
-                      <div className="m-app-wf-task-dot m-done"></div>
-                      <span>Assessment complete</span>
-                    </div>
-                    <div className="m-app-wf-task">
-                      <div className="m-app-wf-task-dot m-done"></div>
-                      <span>CAQH profile updated</span>
-                    </div>
-                    <div className="m-app-wf-task">
-                      <div className="m-app-wf-task-dot m-active"></div>
-                      <span>Submit NPPES correction</span>
-                    </div>
-                    <div className="m-app-wf-task">
-                      <div className="m-app-wf-task-dot m-pending-dot"></div>
-                      <span>Payer enrollment (3)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <DashboardHero />
           </div>
         </div>
       </section>
