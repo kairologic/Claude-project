@@ -37,7 +37,7 @@ export default async function PracticeLayout({
     if (auth.primaryPractice) {
       redirect(`/practice/${auth.primaryPractice.practice_id}`);
     }
-    redirect('/login?error=no_practice');
+    redirect('/sign-in?error=no_practice');
   }
 
   // Build sidebar props

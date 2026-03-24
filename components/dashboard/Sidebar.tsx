@@ -70,6 +70,7 @@ export default function Sidebar({
     { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
     { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
+    { id: 'search', path: '/search', icon: '🔍', label: 'NL Search' },
     { id: 'reports', path: '/reports', icon: '📊', label: 'Reports' },
     { id: 'settings', path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
@@ -87,6 +88,7 @@ export default function Sidebar({
     if (sub.startsWith('/alerts')) return 'alerts';
     if (sub.startsWith('/documents')) return 'documents';
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
+    if (sub.startsWith('/search')) return 'search';
     if (sub.startsWith('/reports')) return 'reports';
     if (sub.startsWith('/settings')) return 'settings';
     return 'dashboard';
