@@ -65,15 +65,17 @@ export default function Sidebar({
 
   const navItems = [
     { id: 'dashboard', path: '', icon: '◉', label: 'Dashboard' },
-    { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster', badge: unseenAlertCount > 0 ? unseenAlertCount : undefined },
-    { id: 'compliance', path: '/compliance', icon: '◈', label: 'Compliance' },
+    { id: 'workflows', path: '/workflows', icon: '⚡', label: 'Workflows' },
+    { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster' },
+    { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
-    { id: 'audit', path: '/audit', icon: '📋', label: 'Audit trail' },
+    { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
+    { id: 'reports', path: '/reports', icon: '📊', label: 'Reports' },
+    { id: 'settings', path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
   const comingSoon = [
-    { icon: '📊', label: 'Reports' },
-    { icon: '⚙️', label: 'Settings' },
+    { icon: '🔐', label: 'Credentialing' },
   ];
 
   function getActiveId(): string {
@@ -85,7 +87,8 @@ export default function Sidebar({
     if (sub.startsWith('/alerts')) return 'alerts';
     if (sub.startsWith('/documents')) return 'documents';
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
-    if (sub.startsWith('/audit')) return 'audit';
+    if (sub.startsWith('/reports')) return 'reports';
+    if (sub.startsWith('/settings')) return 'settings';
     return 'dashboard';
   }
 
@@ -114,47 +117,35 @@ export default function Sidebar({
       {/* Site selector */}
       <div className="sidebar-dropdown-area" style={styles.siteSelector}>
         <button
-          onClick={(e) => {
-            if (practices.length > 1) {
-              e.stopPropagation(); setSiteOpen(!siteOpen); setHelpOpen(false); setUserOpen(false);
-            }
-          }}
-          style={{
-            ...styles.siteBtn,
-            cursor: practices.length > 1 ? 'pointer' : 'default',
-          }}
+          onClick={(e) => { e.stopPropagation(); setSiteOpen(!siteOpen); setHelpOpen(false); setUserOpen(false); }}
+          style={styles.siteBtn}
         >
           <div style={styles.siteName}>{currentPractice?.practice_name || 'Select practice'}</div>
           <div style={styles.siteMeta}>
             {currentPractice?.city}, {currentPractice?.state} · {currentPractice?.provider_count || 0} providers
           </div>
-          {practices.length > 1 && <span style={styles.siteArrow}>▼</span>}
+          <span style={styles.siteArrow}>▼</span>
         </button>
-        {siteOpen && practices.length > 1 && (
+        {siteOpen && (
           <div style={styles.dropdown}>
-            <div style={styles.ddHeader}>Switch practice site</div>
-            {practices.filter(p => p.practice_id !== currentPracticeId).map(p => (
+            <div style={styles.ddHeader}>Your practice sites</div>
+            {practices.map(p => (
               <button
                 key={p.practice_id}
                 onClick={() => switchPractice(p.practice_id)}
-                style={styles.ddItem}
+                style={{
+                  ...styles.ddItem,
+                  background: p.practice_id === currentPracticeId ? `${colors.navy}80` : 'transparent',
+                  fontWeight: p.practice_id === currentPracticeId ? 600 : 400,
+                }}
               >
-                {p.practice_name}
+                {p.practice_id === currentPracticeId && '✓ '}{p.practice_name}
               </button>
             ))}
+            <button style={styles.ddAdd}>+ Add practice site</button>
           </div>
         )}
       </div>
-
-      {/* Add practice — always visible */}
-      <button
-        onClick={() => window.alert('Practice site creation is coming soon. Contact support@kairologic.net to add a new practice.')}
-        style={styles.addSiteBtn}
-        onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = colors.gold; (e.currentTarget as HTMLElement).style.color = colors.gold; }}
-        onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = `${colors.navyLight}40`; (e.currentTarget as HTMLElement).style.color = colors.navyLight; }}
-      >
-        <span style={{ color: colors.gold, fontWeight: 700 }}>+</span> Add practice site
-      </button>
 
       {/* Navigation */}
       <nav style={styles.nav}>
@@ -199,18 +190,11 @@ export default function Sidebar({
         </button>
         {helpOpen && (
           <div style={styles.popupUp}>
-            <button onClick={() => { navigate('/help'); setHelpOpen(false); }} style={styles.popupItem}>
-              Help center
-            </button>
-            <button onClick={() => { navigate('/help'); setHelpOpen(false); }} style={styles.popupItem}>
-              Common questions
-            </button>
-            <button onClick={() => setHelpOpen(false)} style={styles.popupItem}>
-              Report an issue
-            </button>
-            <button onClick={() => setHelpOpen(false)} style={styles.popupItem}>
-              Request a feature
-            </button>
+            {['Help center', 'Common questions', 'Report an issue', 'Request a feature'].map((item, i) => (
+              <button key={i} onClick={() => setHelpOpen(false)} style={styles.popupItem}>
+                {item}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -230,9 +214,13 @@ export default function Sidebar({
         </button>
         {userOpen && (
           <div style={styles.popupUp}>
-            {['Account settings', 'Reset password', 'Manage team', 'Billing'].map((item, i) => (
-              <button key={i} onClick={() => setUserOpen(false)} style={styles.popupItem}>
-                {item}
+            {[
+              { label: 'Account settings', path: '/settings' },
+              { label: 'Manage team', path: '/settings' },
+              { label: 'Reports', path: '/reports' },
+            ].map((item, i) => (
+              <button key={i} onClick={() => { navigate(item.path); setUserOpen(false); }} style={styles.popupItem}>
+                {item.label}
               </button>
             ))}
             <button
@@ -240,7 +228,7 @@ export default function Sidebar({
                 const { createBrowserSupabaseClient } = await import('@/lib/auth/auth-client');
                 const supabase = createBrowserSupabaseClient();
                 await supabase.auth.signOut();
-                router.push('/login');
+                router.push('/sign-in');
               }}
               style={{ ...styles.popupItem, color: colors.red, fontWeight: 600, borderBottom: 'none' }}
             >
@@ -262,15 +250,7 @@ const styles: Record<string, React.CSSProperties> = {
   logo: {
     padding: '18px 18px 14px', fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em',
   },
-  siteSelector: { padding: '0 12px 4px', position: 'relative' },
-  addSiteBtn: {
-    width: 'calc(100% - 24px)', margin: '0 12px 12px', padding: '6px 12px',
-    background: 'none', border: `1px dashed ${colors.navyLight}40`,
-    borderRadius: 6, color: colors.navyLight, fontSize: 11, fontWeight: 500,
-    cursor: 'pointer', textAlign: 'left' as const, fontFamily: 'inherit',
-    display: 'flex', alignItems: 'center', gap: 6,
-    transition: 'border-color .15s, color .15s',
-  },
+  siteSelector: { padding: '0 12px 12px', position: 'relative' },
   siteBtn: {
     width: '100%', background: colors.navyMid, border: 'none', borderRadius: 8,
     padding: '10px 12px', cursor: 'pointer', textAlign: 'left' as const, color: '#fff',
