@@ -14,15 +14,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const validAudiences = ['practice_manager', 'credentialing', 'compliance', 'executive'];
-    const validIntents = ['awareness', 'conversion', 'thought_leadership'];
-
-    if (!validAudiences.includes(audience)) {
-      return NextResponse.json({ error: `Invalid audience. Must be one of: ${validAudiences.join(', ')}` }, { status: 400 });
-    }
-    if (!validIntents.includes(intent)) {
-      return NextResponse.json({ error: `Invalid intent. Must be one of: ${validIntents.join(', ')}` }, { status: 400 });
-    }
+    // Audience and intent are free-text — passed directly to the AI writer
 
     // Step 1: Create draft record
     const supabase = createAdminSupabaseClient();
@@ -74,7 +66,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      post_id: post.id,
+      post: { id: post.id },
       headline: content.headline,
       graphic_type: content.graphic_brief.type,
     });
