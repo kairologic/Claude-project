@@ -72,29 +72,45 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Send query to Claude with system prompt containing schema
+    // Use Haiku (fast + cheap) first, fall back to Sonnet if it fails validation/parse
     const systemPrompt = buildSystemPrompt();
     let claudeResponse: string;
+    let parsedResponse: ClaudeResponse;
+    let usedModel: string = 'haiku';
+
     try {
-      claudeResponse = await callClaudeAPI(query, systemPrompt);
+      claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-haiku-4-5-20251001');
     } catch (aiError: any) {
-      console.error('[Search Query POST] Claude API error:', aiError?.message || aiError);
+      console.error('[Search Query POST] Haiku API error:', aiError?.message || aiError);
       return NextResponse.json(
         { error: 'AI service error: ' + (aiError?.message || 'Failed to reach Claude API') },
         { status: 500 }
       );
     }
 
-    // Step 2: Parse Claude's response
-    let parsedResponse: ClaudeResponse;
+    // Step 2: Parse Claude's response — if Haiku fails, retry with Sonnet
     try {
       parsedResponse = parseClaudeResponse(claudeResponse);
-    } catch (parseError: any) {
-      console.error('[Search Query POST] Parse error:', parseError?.message, 'Raw:', claudeResponse?.slice(0, 300));
-      return NextResponse.json(
-        { error: 'Failed to parse AI response' },
-        { status: 500 }
-      );
+      // For data queries, also validate SQL before accepting Haiku's result
+      if (parsedResponse.type === 'data') {
+        validateSQL(parsedResponse.sql);
+      }
+    } catch (haikuError: any) {
+      console.warn('[Search Query POST] Haiku response failed validation, retrying with Sonnet:', haikuError?.message);
+      usedModel = 'sonnet';
+      try {
+        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-4-20250514');
+        parsedResponse = parseClaudeResponse(claudeResponse);
+      } catch (sonnetError: any) {
+        console.error('[Search Query POST] Sonnet fallback also failed:', sonnetError?.message, 'Raw:', claudeResponse?.slice(0, 300));
+        return NextResponse.json(
+          { error: 'Failed to parse AI response' },
+          { status: 500 }
+        );
+      }
     }
+
+    console.log(`[Search Query POST] Used model: ${usedModel} for query: "${query.slice(0, 80)}"`);
 
     // ── BRANCH: Help response (no SQL needed) ──
     if (parsedResponse.type === 'help') {
@@ -123,7 +139,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── BRANCH: Data query (SQL path) ──
-    // Step 3: Validate SQL
+    // SQL was already validated during parse (and triggers Sonnet fallback if invalid)
+    // Re-validate here as a safety net
     try {
       validateSQL(parsedResponse.sql);
     } catch (valError: any) {
@@ -373,7 +390,7 @@ Generate the response now.`;
 /**
  * Call Claude API with fetch
  */
-async function callClaudeAPI(userQuery: string, systemPrompt: string): Promise<string> {
+async function callClaudeAPI(userQuery: string, systemPrompt: string, model: string = 'claude-haiku-4-5-20251001'): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -382,7 +399,7 @@ async function callClaudeAPI(userQuery: string, systemPrompt: string): Promise<s
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model,
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
