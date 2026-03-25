@@ -74,7 +74,7 @@ export default function MarketingLayout({
               <h4>Company</h4>
               <ul>
                 <li><Link href="/about">About Us</Link></li>
-                <li><Link href="/contact">Contact &amp; Support</Link></li>
+                <li><Link href="/support">Contact &amp; Support</Link></li>
                 <li><Link href="/privacy">Privacy Policy</Link></li>
                 <li><Link href="/terms">Terms of Service</Link></li>
               </ul>
