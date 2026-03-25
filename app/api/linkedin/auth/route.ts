@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const clientId = process.env.LINKEDIN_CLIENT_ID || '86mkxkw2wt1ped';
 
-  const redirectUri = encodeURIComponent('https://kairologic.net/api/linkedin/callback');
+  const redirectUri = encodeURIComponent('https://kairologic.net/api/auth/linkedin/callback');
   const scope = encodeURIComponent('openid profile email w_member_social');
   const state = crypto.randomUUID();
 
