@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BarChart3, Sparkles, RefreshCw } from 'lucide-react';
+import { ArrowLeft, BarChart3, Sparkles, RefreshCw, Linkedin, Unlink } from 'lucide-react';
 import Link from 'next/link';
 import TopicInput from '@/components/content-studio/TopicInput';
 import PostQueue from '@/components/content-studio/PostQueue';
@@ -40,6 +40,13 @@ export default function ContentStudioPage() {
   const [batchCount, setBatchCount] = useState(0);
   const [batchTotal, setBatchTotal] = useState(0);
   const [error, setError] = useState<string>();
+  const [linkedInStatus, setLinkedInStatus] = useState<{
+    connected: boolean;
+    expired?: boolean;
+    name?: string;
+    email?: string;
+  }>({ connected: false });
+  const [linkedInLoading, setLinkedInLoading] = useState(true);
 
   // Auth check
   useEffect(() => {
@@ -73,10 +80,39 @@ export default function ContentStudioPage() {
     }
   }, []);
 
+  // Fetch LinkedIn connection status
+  const fetchLinkedInStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/linkedin/status');
+      const data = await res.json();
+      setLinkedInStatus(data);
+    } catch {
+      // silent
+    } finally {
+      setLinkedInLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPosts();
     fetchStats();
-  }, [fetchPosts, fetchStats]);
+    fetchLinkedInStatus();
+  }, [fetchPosts, fetchStats, fetchLinkedInStatus]);
+
+  // Handle LinkedIn OAuth redirect params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkedinParam = params.get('linkedin');
+    const linkedinError = params.get('linkedin_error');
+    if (linkedinParam === 'connected') {
+      fetchLinkedInStatus();
+      window.history.replaceState({}, '', '/admin/content-studio');
+    }
+    if (linkedinError) {
+      setError(`LinkedIn connection failed: ${linkedinError}`);
+      window.history.replaceState({}, '', '/admin/content-studio');
+    }
+  }, [fetchLinkedInStatus]);
 
   const selectedPost = posts.find((p) => p.id === selectedPostId) || null;
 
@@ -181,6 +217,17 @@ export default function ContentStudioPage() {
     }
   };
 
+  // Disconnect LinkedIn
+  const handleDisconnectLinkedIn = async () => {
+    if (!confirm('Disconnect your LinkedIn account?')) return;
+    try {
+      await fetch('/api/linkedin/status', { method: 'DELETE' });
+      setLinkedInStatus({ connected: false });
+    } catch {
+      // silent
+    }
+  };
+
   // Capture graphic PNG
   const handleCaptureGraphic = async (graphicId: string, dataUrl: string) => {
     // For MVP, we store the data URL. In production, upload to storage.
@@ -225,8 +272,34 @@ export default function ContentStudioPage() {
                 )}
               </div>
             )}
+            {/* LinkedIn connection status */}
+            {!linkedInLoading && (
+              linkedInStatus.connected && !linkedInStatus.expired ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-medium text-blue-700">
+                    <Linkedin size={13} />
+                    <span className="hidden sm:inline">{linkedInStatus.name || 'Connected'}</span>
+                  </div>
+                  <button
+                    onClick={handleDisconnectLinkedIn}
+                    className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors"
+                    title="Disconnect LinkedIn"
+                  >
+                    <Unlink size={14} />
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/linkedin/auth"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  <Linkedin size={13} />
+                  Connect LinkedIn
+                </a>
+              )
+            )}
             <button
-              onClick={() => { fetchPosts(); fetchStats(); }}
+              onClick={() => { fetchPosts(); fetchStats(); fetchLinkedInStatus(); }}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
             >
               <RefreshCw size={16} />

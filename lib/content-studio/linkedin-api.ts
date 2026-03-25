@@ -1,9 +1,10 @@
 /**
- * LinkedIn Marketing API integration (stubbed).
- * Implements OAuth 2.0 flow and Posts API for organic posting.
- * Configure LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, LINKEDIN_ACCESS_TOKEN,
- * and LINKEDIN_PERSON_URN in environment variables.
+ * LinkedIn Marketing API integration using OAuth 2.0.
+ * Tokens are stored in the linkedin_connections table via OAuth flow.
+ * Uses UGC Posts API for organic posting with optional image uploads.
  */
+
+import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
 export interface LinkedInPostResult {
   success: boolean;
@@ -12,19 +13,93 @@ export interface LinkedInPostResult {
   error?: string;
 }
 
+interface LinkedInConnection {
+  id: string;
+  linkedin_person_id: string;
+  access_token: string;
+  expires_at: string;
+  refresh_token: string | null;
+}
+
+/**
+ * Get active LinkedIn connection, refreshing token if expired.
+ */
+async function getActiveConnection(): Promise<LinkedInConnection | null> {
+  const supabase = createAdminSupabaseClient();
+
+  const { data: connection, error } = await supabase
+    .from('linkedin_connections')
+    .select('id, linkedin_person_id, access_token, expires_at, refresh_token')
+    .eq('is_active', true)
+    .single();
+
+  if (error || !connection) return null;
+
+  // Check if token is expired
+  if (new Date(connection.expires_at) < new Date()) {
+    if (connection.refresh_token) {
+      const refreshed = await refreshToken(connection, supabase);
+      if (refreshed) {
+        return { ...connection, access_token: refreshed };
+      }
+    }
+    return null; // Token expired and can't refresh
+  }
+
+  return connection;
+}
+
+/**
+ * Refresh an expired LinkedIn access token.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function refreshToken(connection: LinkedInConnection, supabase: any): Promise<string | null> {
+  try {
+    const res = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: connection.refresh_token!,
+        client_id: process.env.LINKEDIN_CLIENT_ID!,
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.access_token) return null;
+
+    await supabase.from('linkedin_connections').update({
+      access_token: data.access_token,
+      expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
+      refresh_token: data.refresh_token || connection.refresh_token,
+      updated_at: new Date().toISOString(),
+    }).eq('id', connection.id);
+
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Publish a text post (with optional image) to LinkedIn.
+ */
 export async function publishToLinkedIn(
   text: string,
   imageUrl?: string
 ): Promise<LinkedInPostResult> {
-  const accessToken = process.env.LINKEDIN_ACCESS_TOKEN;
-  const personUrn = process.env.LINKEDIN_PERSON_URN;
+  const connection = await getActiveConnection();
 
-  if (!accessToken || !personUrn) {
+  if (!connection) {
     return {
       success: false,
-      error: 'LinkedIn credentials not configured. Set LINKEDIN_ACCESS_TOKEN and LINKEDIN_PERSON_URN.',
+      error: 'No active LinkedIn connection. Please connect your LinkedIn account in Content Studio.',
     };
   }
+
+  const { access_token: accessToken, linkedin_person_id: personId } = connection;
+  const personUrn = `urn:li:person:${personId}`;
 
   try {
     // Step 1: If there's an image, upload it first
@@ -33,7 +108,7 @@ export async function publishToLinkedIn(
       imageUrn = await uploadLinkedInImage(accessToken, personUrn, imageUrl);
     }
 
-    // Step 2: Create the post
+    // Step 2: Create the post via UGC Posts API
     const postBody: Record<string, unknown> = {
       author: personUrn,
       lifecycleState: 'PUBLISHED',
@@ -72,6 +147,19 @@ export async function publishToLinkedIn(
     }
 
     const postUrn = res.headers.get('x-restli-id') || '';
+
+    // Also track in linkedin_posts table
+    const supabase = createAdminSupabaseClient();
+    await supabase.from('linkedin_posts').insert({
+      connection_id: connection.id,
+      content_text: text,
+      linkedin_post_id: postUrn,
+      linkedin_post_url: postUrn ? `https://www.linkedin.com/feed/update/${postUrn}` : null,
+      status: 'posted',
+      posted_at: new Date().toISOString(),
+      metadata: { had_image: !!imageUrn },
+    });
+
     return {
       success: true,
       postUrn,
@@ -82,6 +170,9 @@ export async function publishToLinkedIn(
   }
 }
 
+/**
+ * Upload an image to LinkedIn for use in a post.
+ */
 async function uploadLinkedInImage(
   accessToken: string,
   personUrn: string,
@@ -137,8 +228,9 @@ async function uploadLinkedInImage(
 }
 
 /**
- * Check if LinkedIn credentials are configured
+ * Check if LinkedIn is connected (for use in server components/APIs).
  */
-export function isLinkedInConfigured(): boolean {
-  return !!(process.env.LINKEDIN_ACCESS_TOKEN && process.env.LINKEDIN_PERSON_URN);
+export async function isLinkedInConnected(): Promise<boolean> {
+  const connection = await getActiveConnection();
+  return !!connection;
 }
