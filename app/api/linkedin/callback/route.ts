@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         grant_type: 'authorization_code',
         code,
         redirect_uri: 'https://kairologic.net/api/linkedin/callback',
-        client_id: process.env.LINKEDIN_CLIENT_ID!,
+        client_id: process.env.LINKEDIN_CLIENT_ID || '86mkxkw2wt1ped',
         client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
       }),
     });

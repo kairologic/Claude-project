@@ -61,7 +61,7 @@ async function refreshToken(connection: LinkedInConnection, supabase: any): Prom
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: connection.refresh_token!,
-        client_id: process.env.LINKEDIN_CLIENT_ID!,
+        client_id: process.env.LINKEDIN_CLIENT_ID || '86mkxkw2wt1ped',
         client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
       }),
     });
