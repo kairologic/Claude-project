@@ -806,7 +806,7 @@
   padding: 64px 0 32px;
 }
 .m-footer-grid {
-  display: grid; grid-template-columns: 2fr 1fr 1fr 1.4fr; gap: 48px;
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 48px;
   margin-bottom: 48px;
 }
 .m-footer-brand .m-logo { margin-bottom: 14px; }
@@ -823,40 +823,76 @@
 }
 .m-footer-col a:hover { color: var(--m-white); }
 
-/* ── Need Support? section ─────────────────────── */
-.m-support-text {
-  font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.6;
-  margin-bottom: 14px;
+/* ── Contact / Support Form on /contact page ──── */
+.m-contact-support {
+  background: var(--m-gray-50);
+  padding: 80px 0;
 }
-.m-support-form {
-  display: flex; flex-direction: column; gap: 8px;
+.m-contact-support-inner {
+  max-width: 600px; margin: 0 auto;
 }
-.m-support-input {
-  width: 100%; padding: 10px 14px;
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 8px; color: var(--m-white);
-  font-size: 13px; font-family: 'Plus Jakarta Sans', sans-serif;
+.m-contact-support-inner h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 400; color: var(--m-navy);
+  letter-spacing: -0.02em; margin: 0 0 8px;
+}
+.m-contact-support-inner .m-subtitle {
+  font-size: 15px; color: var(--m-gray-600);
+  line-height: 1.7; margin-bottom: 32px;
+}
+.m-contact-form {
+  display: flex; flex-direction: column; gap: 20px;
+}
+.m-contact-form label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--m-navy); margin-bottom: 6px;
+}
+.m-contact-form input,
+.m-contact-form textarea {
+  width: 100%; padding: 12px 16px;
+  border: 1px solid var(--m-gray-200); border-radius: 10px;
+  font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--m-navy); background: var(--m-white);
   outline: none; transition: border-color 0.15s;
+  box-sizing: border-box;
 }
-.m-support-input::placeholder { color: rgba(255,255,255,0.35); }
-.m-support-input:focus { border-color: var(--m-gold); }
-.m-support-btn {
-  padding: 10px 18px; border: none; border-radius: 8px;
+.m-contact-form input:focus,
+.m-contact-form textarea:focus {
+  border-color: var(--m-gold);
+}
+.m-contact-form input::placeholder,
+.m-contact-form textarea::placeholder {
+  color: var(--m-gray-400);
+}
+.m-contact-form textarea {
+  resize: vertical; min-height: 120px;
+}
+.m-contact-form .m-form-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.m-contact-submit {
+  padding: 14px 28px; border: none; border-radius: 10px;
   background: var(--m-gold); color: var(--m-navy);
-  font-size: 13px; font-weight: 700; cursor: pointer;
+  font-size: 15px; font-weight: 700; cursor: pointer;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  transition: all 0.15s;
+  transition: all 0.15s; align-self: flex-start;
 }
-.m-support-btn:hover { background: #e0b020; transform: translateY(-1px); }
-.m-support-links {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 14px; font-size: 12px;
+.m-contact-submit:hover { background: #e0b020; transform: translateY(-1px); }
+.m-contact-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.m-contact-divider {
+  text-align: center; padding: 48px 0; font-size: 14px;
+  color: var(--m-gray-400);
 }
-.m-support-links a {
-  color: rgba(255,255,255,0.45); text-decoration: none; transition: color 0.15s;
+.m-contact-divider span {
+  display: inline-block; padding: 0 20px;
+  background: var(--m-white); position: relative;
 }
-.m-support-links a:hover { color: var(--m-white); }
-.m-support-links span { color: rgba(255,255,255,0.2); }
+.m-contact-divider::before {
+  content: ''; display: block; height: 1px;
+  background: var(--m-gray-200);
+  position: relative; top: 0.7em;
+}
 
 .m-footer-bottom {
   border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px;
@@ -903,6 +939,7 @@
   .m-dash-two-col { grid-template-columns: 1fr; }
   .m-kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .m-float-badge { display: none; }
+  .m-contact-form .m-form-row { grid-template-columns: 1fr; }
 }
 
 /* ── Marketing page base ─────────────────────────── */

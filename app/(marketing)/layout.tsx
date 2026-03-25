@@ -70,32 +70,14 @@ export default function MarketingLayout({
                 <li><Link href="/contact">Contact</Link></li>
               </ul>
             </div>
-            <div className="m-footer-col m-footer-support">
-              <h4>Need Support?</h4>
-              <p className="m-support-text">Our friendly team is here to help. Send us a message and we&apos;ll get back to you within 24 hours.</p>
-              <form
-                action="mailto:info@kairologic.net"
-                method="GET"
-                className="m-support-form"
-              >
-                <input
-                  type="email"
-                  name="subject"
-                  placeholder="Your email address"
-                  className="m-support-input"
-                  aria-label="Your email address"
-                />
-                <button type="submit" className="m-support-btn">
-                  Get in Touch
-                </button>
-              </form>
-              <div className="m-support-links">
-                <Link href="/about">About Us</Link>
-                <span>&middot;</span>
-                <Link href="/privacy">Privacy</Link>
-                <span>&middot;</span>
-                <Link href="/terms">Terms</Link>
-              </div>
+            <div className="m-footer-col">
+              <h4>Company</h4>
+              <ul>
+                <li><Link href="/about">About Us</Link></li>
+                <li><Link href="/contact">Contact &amp; Support</Link></li>
+                <li><Link href="/privacy">Privacy Policy</Link></li>
+                <li><Link href="/terms">Terms of Service</Link></li>
+              </ul>
             </div>
           </div>
           <div className="m-footer-bottom">
