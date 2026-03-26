@@ -1,14 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getOverviewStats } from '@/lib/content-studio/pipeline-queries';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const stats = await getOverviewStats();
+    const category = request.nextUrl.searchParams.get('category')?.trim();
+
+    const categoryInstruction = category
+      ? `Focus all suggestions specifically on the category/area: "${category}". Every topic must relate directly to this category within the healthcare credentialing and practice management space.`
+      : 'Cover a variety of relevant topics across credentialing, compliance, and practice management.';
 
     const prompt = `Based on these KairoLogic pipeline statistics, suggest 5 compelling content topics for LinkedIn thought leadership posts targeting healthcare practice managers and credentialing professionals.
+
+${categoryInstruction}
 
 Pipeline Stats:
 - Total providers monitored: ${stats.total_providers || 'N/A'}

@@ -24,12 +24,14 @@ export default function TopicInput({ onGenerate, onBatchGenerate, isGenerating, 
   const [suggestions, setSuggestions] = useState<TopicSuggestion[]>([]);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [category, setCategory] = useState('');
 
-  const fetchSuggestions = async () => {
+  const fetchSuggestions = async (cat?: string) => {
     setLoadingSuggestions(true);
     setSelectedSuggestions(new Set());
     try {
-      const res = await fetch('/api/content-studio/topic-suggestions');
+      const queryParam = (cat ?? category).trim() ? `?category=${encodeURIComponent((cat ?? category).trim())}` : '';
+      const res = await fetch(`/api/content-studio/topic-suggestions${queryParam}`);
       const data = await res.json();
       if (data.suggestions) setSuggestions(data.suggestions);
     } catch {
@@ -97,6 +99,30 @@ export default function TopicInput({ onGenerate, onBatchGenerate, isGenerating, 
         </h3>
       </div>
 
+      {/* Category input for AI suggestions */}
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Topic Category</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchSuggestions(); } }}
+            placeholder="e.g., Credentialing, Telehealth, Revenue Cycle, NPPES Updates..."
+            className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+          />
+          <button
+            onClick={() => fetchSuggestions()}
+            disabled={loadingSuggestions || isGenerating}
+            className="px-3 py-2 rounded-lg bg-amber-100 text-amber-700 text-sm font-medium hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+          >
+            <Sparkles size={14} />
+            Suggest
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-1">Enter a category to get targeted AI topic suggestions, or leave blank for general suggestions.</p>
+      </div>
+
       {/* AI Suggestions with multi-select */}
       {suggestions.length > 0 && (
         <div className="mb-5">
@@ -111,7 +137,7 @@ export default function TopicInput({ onGenerate, onBatchGenerate, isGenerating, 
               </button>
             </div>
             <button
-              onClick={fetchSuggestions}
+              onClick={() => fetchSuggestions()}
               disabled={loadingSuggestions || isGenerating}
               className="text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1"
             >
