@@ -17,6 +17,7 @@ interface Post {
   body_substack?: string;
   status: string;
   channels: string[];
+  scheduled_at?: string | null;
   created_at: string;
   content_graphics?: { id: string; graphic_type: string; config: Record<string, unknown>; image_url?: string }[];
   content_publish_log?: { id: string; channel: string; status: string; published_url?: string; error_message?: string; published_at: string }[];
@@ -200,6 +201,34 @@ export default function ContentStudioPage() {
     }
   };
 
+  // Schedule post
+  const handleSchedule = async (id: string, scheduledAt: string, channels: string[]) => {
+    try {
+      const res = await fetch(`/api/content-studio/schedule/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduled_at: scheduledAt, channels }),
+      });
+      if (res.ok) await fetchPosts();
+      else {
+        const data = await res.json();
+        setError(data.error || 'Failed to schedule post');
+      }
+    } catch {
+      setError('Failed to schedule post');
+    }
+  };
+
+  // Cancel schedule
+  const handleCancelSchedule = async (id: string) => {
+    try {
+      const res = await fetch(`/api/content-studio/schedule/${id}`, { method: 'DELETE' });
+      if (res.ok) await fetchPosts();
+    } catch {
+      // silent
+    }
+  };
+
   // Publish
   const handlePublish = async (id: string, channels: string[]) => {
     setIsPublishing(true);
@@ -347,6 +376,8 @@ export default function ContentStudioPage() {
               post={selectedPost || null}
               onUpdate={handleUpdate}
               onPublish={handlePublish}
+              onSchedule={handleSchedule}
+              onCancelSchedule={handleCancelSchedule}
               onCaptureGraphic={handleCaptureGraphic}
               isPublishing={isPublishing}
             />

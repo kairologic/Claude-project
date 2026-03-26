@@ -9,6 +9,7 @@ interface Post {
   status: string;
   channels: string[];
   created_at: string;
+  scheduled_at?: string | null;
   content_graphics?: { id: string; graphic_type: string }[];
 }
 
@@ -25,6 +26,7 @@ const statusConfig: Record<string, { icon: React.ReactNode; color: string; label
   review: { icon: <Eye size={12} />, color: 'text-amber-600 bg-amber-50', label: 'Review' },
   approved: { icon: <CheckCircle size={12} />, color: 'text-emerald-600 bg-emerald-50', label: 'Approved' },
   published: { icon: <Send size={12} />, color: 'text-blue-600 bg-blue-50', label: 'Published' },
+  scheduled: { icon: <Clock size={12} />, color: 'text-blue-600 bg-blue-50', label: 'Scheduled' },
   failed: { icon: <AlertCircle size={12} />, color: 'text-red-600 bg-red-50', label: 'Failed' },
 };
 
@@ -80,6 +82,11 @@ export default function PostQueue({ posts, selectedPostId, onSelect, onDelete, l
                       <span className="text-[10px] text-slate-400">
                         {new Date(post.created_at).toLocaleDateString()}
                       </span>
+                      {post.status === 'scheduled' && post.scheduled_at && (
+                        <span className="text-[10px] text-blue-500 font-medium">
+                          {new Date(post.scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      )}
                       {post.channels?.map((ch) => (
                         <span key={ch} className="text-[10px] text-slate-400 capitalize">{ch}</span>
                       ))}
