@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { canTransitionWorkflow, logStatusChange, logApproval } from '@/lib/workflow';
+import type { WorkflowStatus } from '@/lib/workflow';
 
 /**
  * GET /api/workflows/[id]
@@ -56,6 +58,29 @@ export async function PATCH(
   const body = await request.json();
   const supabase = createAdminSupabaseClient();
 
+  // Load current workflow for transition validation
+  const { data: current } = await supabase
+    .from('workflow_instances')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  const oldStatus = current?.status as WorkflowStatus | undefined;
+
+  // Validate status transition if status is changing
+  if (body.status && oldStatus && body.status !== oldStatus) {
+    const transition = canTransitionWorkflow(
+      oldStatus,
+      body.status as WorkflowStatus
+    );
+    if (!transition.allowed) {
+      return NextResponse.json(
+        { error: transition.reason },
+        { status: 422 }
+      );
+    }
+  }
+
   const allowedFields = [
     'status', 'approved_value', 'approved_by', 'approved_at',
     'completed_at', 'completed_reason',
@@ -74,6 +99,14 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Audit logging
+  if (body.status && oldStatus && body.status !== oldStatus) {
+    await logStatusChange(supabase, id, oldStatus, body.status, { type: 'user' });
+  }
+  if (body.approved_value) {
+    await logApproval(supabase, id, body.approved_value, { type: 'user' });
   }
 
   return NextResponse.json({ workflow: data });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { logTaskChange } from '@/lib/workflow';
 
 /**
  * PATCH /api/workflows/[id]/tasks/[taskId]
@@ -34,15 +35,14 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Also log an event
-  if (body.status === 'completed') {
-    await supabase.from('workflow_events').insert({
-      workflow_id: id,
-      event_type: 'task_completed',
-      actor_type: 'user',
-      title: `Task completed: ${data.title}`,
-      details: { task_id: taskId, task_type: data.task_type },
-    });
+  // Audit log: task status change (replaces inline insert)
+  if (body.status && data) {
+    const oldStatus = body._previous_status || 'active';
+    await logTaskChange(
+      supabase, id, taskId, data.title,
+      oldStatus, body.status,
+      { type: 'user' }
+    );
   }
 
   return NextResponse.json({ task: data });
