@@ -90,6 +90,38 @@ async function main() {
     console.log(`  Duration:            ${(deltaResult.duration_ms / 1000).toFixed(1)}s`);
   }
 
+  // ── Phase 3: Update practice counts (#5) ──────────────
+
+  if (!dryRun) {
+    console.log('\n─── Phase 3: Update Practice Counts ─────────────────\n');
+
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+    const rpcCall = async (fn: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    const pcOk = await rpcCall('update_provider_counts');
+    console.log(`  provider_count:  ${pcOk ? 'updated' : 'RPC not found (create update_provider_counts in SQL Editor)'}`);
+
+    const mcOk = await rpcCall('update_mismatch_counts');
+    console.log(`  mismatch_count:  ${mcOk ? 'updated' : 'RPC not found (create update_mismatch_counts in SQL Editor)'}`);
+  }
+
   // ── Summary ────────────────────────────────────────────
 
   const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
