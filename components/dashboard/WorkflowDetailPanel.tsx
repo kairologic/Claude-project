@@ -604,7 +604,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                   KairoLogic is automatically monitoring the NPPES registry for confirmation that the update has been applied. This typically takes 1-2 weeks.
                 </div>
               </div>
-              {activeTask?.metadata?.expected_value && (
+              {Boolean(activeTask?.metadata?.expected_value) && (
                 <div style={{
                   background: colors.bluePale, border: `1px solid ${colors.blue}`,
                   borderRadius: 6, padding: 12, fontSize: 12, color: colors.navy, maxWidth: 340,
