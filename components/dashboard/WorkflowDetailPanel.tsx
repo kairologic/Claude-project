@@ -306,7 +306,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                     <div style={{
                       fontSize: 9,
                       fontWeight: 700,
-                      background: statusBg,
+                      background: statusBg || undefined,
                       color: statusColor,
                       padding: '2px 8px',
                       borderRadius: 4,
