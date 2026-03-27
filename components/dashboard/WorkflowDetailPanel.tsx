@@ -5,6 +5,10 @@ import { colors, statusColors, statusBgColors, statusLabels, workflowTypeLabels 
 import FindingReview from './FindingReview';
 import ApproveCorrection from './ApproveCorrection';
 import SubmitNppes from './SubmitNppes';
+import PayerMismatchReview from './PayerMismatchReview';
+import CredentialingChecklist from './CredentialingChecklist';
+import DepartureChecklist from './DepartureChecklist';
+import ComplianceFinding from './ComplianceFinding';
 import type { FindingDetails, WorkflowTask, WorkflowEvent } from '@/lib/types/dashboard-schema';
 
 interface WorkflowDetailPanelProps {
@@ -27,15 +31,48 @@ interface WorkflowData {
 
 // Map DB task_type → view name
 // DB uses 'review_approve' (combined) instead of separate review/approve tasks
-type ActiveView = 'main' | 'review_finding' | 'approve_correction' | 'submit_nppes' | 'download_form' | 'monitor';
+type ActiveView =
+  | 'main'
+  | 'review_finding'
+  | 'approve_correction'
+  | 'submit_nppes'
+  | 'download_form'
+  | 'monitor'
+  | 'payer_mismatch_review'
+  | 'credentialing_checklist'
+  | 'departure_checklist'
+  | 'compliance_finding';
 
 const TASK_TYPE_TO_VIEW: Record<string, ActiveView> = {
+  // NPPES Update
   review_approve: 'review_finding',
   review_finding: 'review_finding',
   approve_correction: 'approve_correction',
   download_form: 'download_form',
   submit_nppes: 'submit_nppes',
   monitor_auto_confirm: 'monitor',
+  // Payer Directory
+  review_payer_finding: 'payer_mismatch_review',
+  update_caqh: 'payer_mismatch_review',
+  verify_payer: 'payer_mismatch_review',
+  confirm_payer: 'monitor',
+  // Onboarding
+  npi_lookup: 'credentialing_checklist',
+  update_website: 'credentialing_checklist',
+  enroll_caqh: 'credentialing_checklist',
+  credential_payers: 'credentialing_checklist',
+  enroll_pecos: 'credentialing_checklist',
+  monitor_credentialing: 'credentialing_checklist',
+  // Release
+  remove_website: 'departure_checklist',
+  update_nppes_release: 'departure_checklist',
+  notify_payers: 'departure_checklist',
+  update_pecos_release: 'departure_checklist',
+  monitor_removal: 'departure_checklist',
+  // Compliance
+  show_finding: 'compliance_finding',
+  provide_template: 'compliance_finding',
+  rescan_confirm: 'compliance_finding',
 };
 
 const TASK_STATUS_ICONS: Record<string, string> = {
@@ -598,10 +635,12 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
               <div style={{ fontSize: 40 }}>&#128225;</div>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: colors.navy, marginBottom: 6 }}>
-                  Monitoring NPPES
+                  {workflow.workflow_type === 'payer_directory' ? 'Monitoring Payer Directories' : 'Monitoring NPPES'}
                 </div>
                 <div style={{ fontSize: 12, color: colors.gray600, lineHeight: 1.5, maxWidth: 320 }}>
-                  KairoLogic is automatically monitoring the NPPES registry for confirmation that the update has been applied. This typically takes 1-2 weeks.
+                  {workflow.workflow_type === 'payer_directory'
+                    ? 'KairoLogic is automatically monitoring payer directories via FHIR to confirm the update has propagated. This typically takes 1-2 weeks.'
+                    : 'KairoLogic is automatically monitoring the NPPES registry for confirmation that the update has been applied. This typically takes 1-2 weeks.'}
                 </div>
               </div>
               {Boolean(activeTask?.metadata?.expected_value) && (
@@ -624,6 +663,89 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 &larr; Back to tasks
               </button>
             </div>
+          )}
+
+          {/* Payer Mismatch Review */}
+          {activeView === 'payer_mismatch_review' && workflow && (() => {
+            const { finding, comparisonData } = getFindingForReview();
+            return (
+              <PayerMismatchReview
+                workflowId={workflowId}
+                finding={finding}
+                comparisonData={comparisonData}
+                onBack={() => setActiveView('main')}
+              />
+            );
+          })()}
+
+          {/* Credentialing Checklist (Onboarding) */}
+          {activeView === 'credentialing_checklist' && workflow && (
+            <CredentialingChecklist
+              workflowId={workflowId}
+              providerName={workflow.provider_name}
+              tasks={tasks}
+              onTaskAction={async (taskId, action) => {
+                if (action === 'complete') {
+                  await fetch(`/api/workflows/${workflowId}/tasks/${taskId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      status: 'completed',
+                      completed_at: new Date().toISOString(),
+                    }),
+                  });
+                  await fetchWorkflowData();
+                }
+              }}
+              onBack={() => setActiveView('main')}
+            />
+          )}
+
+          {/* Departure Checklist (Release) */}
+          {activeView === 'departure_checklist' && workflow && (
+            <DepartureChecklist
+              workflowId={workflowId}
+              providerName={workflow.provider_name}
+              tasks={tasks}
+              onTaskAction={async (taskId, action) => {
+                if (action === 'complete') {
+                  await fetch(`/api/workflows/${workflowId}/tasks/${taskId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      status: 'completed',
+                      completed_at: new Date().toISOString(),
+                    }),
+                  });
+                  await fetchWorkflowData();
+                }
+              }}
+              onBack={() => setActiveView('main')}
+            />
+          )}
+
+          {/* Compliance Finding */}
+          {activeView === 'compliance_finding' && workflow && (
+            <ComplianceFinding
+              workflowId={workflowId}
+              finding={workflow.finding_details}
+              providerName={workflow.provider_name}
+              tasks={tasks}
+              onTaskAction={async (taskId, action) => {
+                if (action === 'complete') {
+                  await fetch(`/api/workflows/${workflowId}/tasks/${taskId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      status: 'completed',
+                      completed_at: new Date().toISOString(),
+                    }),
+                  });
+                  await fetchWorkflowData();
+                }
+              }}
+              onBack={() => setActiveView('main')}
+            />
           )}
         </div>
       </div>

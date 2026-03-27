@@ -42,3 +42,15 @@ export {
 } from './confirmation-engine';
 
 export type { ConfirmationResult } from './confirmation-engine';
+
+export {
+  WORKFLOW_TASK_TEMPLATES,
+  NPPES_UPDATE_TASKS,
+  PAYER_DIRECTORY_TASKS,
+  ONBOARDING_TASKS,
+  RELEASE_TASKS,
+  COMPLIANCE_TASKS,
+  getTaskTemplates,
+} from './workflow-templates';
+
+export type { TaskTemplate } from './workflow-templates';
