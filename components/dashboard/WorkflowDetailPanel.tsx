@@ -610,7 +610,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                   borderRadius: 6, padding: 12, fontSize: 12, color: colors.navy, maxWidth: 340,
                 }}>
                   <strong>Expected value:</strong><br />
-                  {activeTask.metadata.expected_value as string}
+                  {String(activeTask?.metadata?.expected_value ?? '')}
                 </div>
               )}
               <button
