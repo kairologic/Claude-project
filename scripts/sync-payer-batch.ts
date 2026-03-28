@@ -89,78 +89,19 @@ async function main() {
   console.log('');
 
   // ── 2. Load providers (unique NPIs, ordered for stable offset) ──
-  // Use SQL to get distinct NPIs with stable ordering for offset pagination
-  let providerSql = `
-    SELECT DISTINCT ON (pp.npi)
-      pp.npi,
-      pp.practice_website_id,
-      COALESCE(pp.provider_name, 'NPI ' || pp.npi) AS provider_name
-    FROM practice_providers pp
-    WHERE pp.roster_status IN ('active', 'onboarding', 'departing')
-  `;
+  // Uses DB function get_active_provider_npis() for correct DISTINCT ON pagination
+  const rpcParams: Record<string, unknown> = {
+    p_limit: LIMIT || 5000,
+    p_offset: OFFSET,
+  };
   if (PRACTICE_ID) {
-    providerSql += ` AND pp.practice_website_id = '${PRACTICE_ID}'`;
+    rpcParams.p_practice_id = PRACTICE_ID;
   }
-  providerSql += ' ORDER BY pp.npi';
-  if (OFFSET > 0) providerSql += ` OFFSET ${OFFSET}`;
-  if (LIMIT > 0) providerSql += ` LIMIT ${LIMIT}`;
 
-  const providerRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/execute_raw_sql`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: providerSql }),
-  });
-
-  // Fallback: if RPC doesn't exist, use REST API with range header
-  let providers: { npi: string; practice_website_id: string; provider_name: string }[];
-
-  if (!providerRes.ok) {
-    console.log('RPC not available, using REST API with pagination...');
-    // REST API approach: get all practice_providers, deduplicate client-side
-    const rangeStart = OFFSET;
-    const rangeEnd = LIMIT > 0 ? OFFSET + LIMIT - 1 : OFFSET + 4999;
-
-    const rawProviders = await fetch(
-      `${SUPABASE_URL}/rest/v1/practice_providers?select=npi,practice_website_id,provider_name&roster_status=in.(active,onboarding,departing)&order=npi${PRACTICE_ID ? `&practice_website_id=eq.${PRACTICE_ID}` : ''}`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          Range: `${rangeStart}-${rangeEnd}`,
-          Prefer: 'count=exact',
-        },
-      }
-    );
-
-    if (!rawProviders.ok) {
-      const errText = await rawProviders.text();
-      console.error('Failed to load providers:', errText);
-      process.exit(1);
-    }
-
-    const allProviders = await rawProviders.json() as { npi: string; practice_website_id: string; provider_name: string }[];
-    const totalHeader = rawProviders.headers.get('content-range');
-    console.log(`Content-Range: ${totalHeader}`);
-
-    // Deduplicate by NPI
-    const npiMap = new Map<string, { npi: string; practice_website_id: string; provider_name: string }>();
-    for (const p of allProviders) {
-      if (p.npi && !npiMap.has(p.npi)) {
-        npiMap.set(p.npi, {
-          npi: p.npi,
-          practice_website_id: p.practice_website_id,
-          provider_name: p.provider_name || `NPI ${p.npi}`,
-        });
-      }
-    }
-    providers = Array.from(npiMap.values());
-  } else {
-    providers = await providerRes.json();
-  }
+  const providers = await supabaseRequest<{ npi: string; practice_website_id: string; provider_name: string }[]>(
+    'rpc/get_active_provider_npis',
+    { method: 'POST', body: JSON.stringify(rpcParams) }
+  );
 
   if (!providers || providers.length === 0) {
     console.log('No providers to query at this offset. Batch complete.');
