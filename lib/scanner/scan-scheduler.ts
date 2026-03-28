@@ -27,6 +27,7 @@ import {
   saveExtractionToProviderSites,
   saveExtractionToPracticeProviders,
 } from '../address/scan-plugin';
+import { triggerWorkflowsForPractice } from './trigger-workflows';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -414,6 +415,33 @@ export async function scanSite(
       }
     }
 
+    // 5b. Backfill: ensure ALL providers at this practice have web_address.
+    // Some providers (e.g., matched by NPI-on-page) may not have gotten
+    // the address from saveExtractionToPracticeProviders if the extractor
+    // didn't produce a best_address. Use the practice-level address as fallback.
+    const practiceAddress = extraction.best_address?.address?.full_address
+      || (extraction.all_addresses?.length > 0 ? extraction.all_addresses[0]?.address?.full_address : null);
+
+    if (practiceAddress) {
+      const practicePhone = extraction.phone?.phone || null;
+      try {
+        // Update providers that still have no web_address
+        await db(
+          `practice_providers?practice_website_id=eq.${site.id}&web_address=is.null`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              web_address: practiceAddress,
+              ...(practicePhone ? { web_phone: practicePhone } : {}),
+              updated_at: new Date().toISOString(),
+            }),
+          },
+        );
+      } catch (err) {
+        console.warn(`[Scanner] Failed to backfill web_address for practice ${site.id}:`, err);
+      }
+    }
+
     result.success = true;
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Unknown scan error';
@@ -459,7 +487,38 @@ async function updateScanMetadata(
     });
   }
 
-  // Create scan_session record
+  // Compute practice-level scan scores from provider mismatch data
+  let compositeScore: number | null = null;
+  let riskLevel: string | null = null;
+  let checksTotal = 0;
+  let checksPassed = 0;
+  let checksFailed = 0;
+
+  if (result.success) {
+    try {
+      // Fetch current mismatch status for all providers at this practice
+      const providers: any[] = await db(
+        `practice_providers?practice_website_id=eq.${site.id}&select=npi,active_mismatch_count,has_address_mismatch,has_phone_mismatch,has_taxonomy_mismatch,has_name_mismatch,has_license_issue`,
+      );
+
+      checksTotal = providers.length;
+      checksPassed = providers.filter(p => p.active_mismatch_count === 0 && !p.has_license_issue).length;
+      checksFailed = providers.filter(p => p.active_mismatch_count > 0 || p.has_license_issue).length;
+
+      // Score: percentage of providers with clean data (0-100)
+      compositeScore = checksTotal > 0
+        ? Math.round((checksPassed / checksTotal) * 100)
+        : 100;
+
+      riskLevel = compositeScore >= 80 ? 'Low'
+        : compositeScore >= 50 ? 'Medium'
+        : 'High';
+    } catch (err) {
+      console.warn(`[Scanner] Failed to compute scan scores for practice ${site.id}:`, err);
+    }
+  }
+
+  // Create scan_session record with scores
   await db('scan_sessions', {
     method: 'POST',
     body: JSON.stringify({
@@ -472,9 +531,30 @@ async function updateScanMetadata(
       practice_website_id: site.id,
       practice_group_id: site.practice_group_id,
       delta_count: 0, // updated by delta engine in Task 1.11
+      composite_score: compositeScore,
+      risk_level: riskLevel,
+      checks_total: checksTotal,
+      checks_passed: checksPassed,
+      checks_failed: checksFailed,
     }),
     headers: { Prefer: 'return=minimal' },
   });
+
+  // 6. Trigger workflows and alerts for providers with mismatches
+  // This ensures every detected mismatch has an actionable workflow
+  // and alert in the dashboard.
+  if (result.success) {
+    try {
+      const wfResult = await triggerWorkflowsForPractice(site.id);
+      if (wfResult.workflows_created > 0) {
+        console.log(
+          `[Scanner] Created ${wfResult.workflows_created} workflows, ${wfResult.alerts_created} alerts for practice ${site.id}`,
+        );
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Failed to trigger workflows for practice ${site.id}:`, err);
+    }
+  }
 }
 
 // ── Main Scheduler Loop ──────────────────────────────────

@@ -97,19 +97,33 @@ export async function saveExtractionToProviderSites(
 /**
  * Write extracted web values to practice_providers for delta comparison.
  * The delta engine uses these web-detected values to compare against NPPES.
+ *
+ * Important: We always write phone/specialty even when address extraction
+ * fails. For address, we try best_address first, then fall back to any
+ * address found during extraction. This ensures ALL matched providers
+ * get web data for delta comparison, not just those with structured
+ * address extraction.
  */
 export async function saveExtractionToPracticeProviders(
   npi: string,
   practiceWebsiteId: string,
   extraction: ExtractionSummary,
 ): Promise<void> {
-  const best = extraction.best_address;
-  if (!best?.address) return;
-
   const updatePayload: Record<string, any> = {
-    web_address: best.address.full_address,
     updated_at: new Date().toISOString(),
   };
+
+  // Address: prefer best_address, fall back to any extracted address
+  const best = extraction.best_address;
+  if (best?.address) {
+    updatePayload.web_address = best.address.full_address;
+  } else if (extraction.all_addresses?.length > 0) {
+    // Fall back to the highest-confidence address from any method
+    const fallback = extraction.all_addresses[0];
+    if (fallback?.address?.full_address) {
+      updatePayload.web_address = fallback.address.full_address;
+    }
+  }
 
   if (extraction.phone) {
     updatePayload.web_phone = extraction.phone.phone;
@@ -118,6 +132,9 @@ export async function saveExtractionToPracticeProviders(
   if (extraction.specialty) {
     updatePayload.web_specialty = extraction.specialty;
   }
+
+  // Only write if we have something beyond just the timestamp
+  if (Object.keys(updatePayload).length <= 1) return;
 
   await supabaseRequest(
     `practice_providers?npi=eq.${npi}&practice_website_id=eq.${practiceWebsiteId}`,
