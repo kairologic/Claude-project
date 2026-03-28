@@ -1,10 +1,12 @@
 /**
  * LinkedIn Marketing API integration using OAuth 2.0.
+ * Supports both personal (w_member_social) and organization (w_organization_social) posting.
  * Tokens are stored in the linkedin_connections table via OAuth flow.
- * Uses UGC Posts API for organic posting with optional image uploads.
  */
 
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+
+export type LinkedInAccountType = 'personal' | 'organization';
 
 export interface LinkedInPostResult {
   success: boolean;
@@ -15,22 +17,25 @@ export interface LinkedInPostResult {
 
 interface LinkedInConnection {
   id: string;
+  account_type: LinkedInAccountType;
   linkedin_person_id: string;
+  organization_id: string | null;
   access_token: string;
   expires_at: string;
   refresh_token: string | null;
 }
 
 /**
- * Get active LinkedIn connection, refreshing token if expired.
+ * Get active LinkedIn connection by account type, refreshing token if expired.
  */
-async function getActiveConnection(): Promise<LinkedInConnection | null> {
+async function getActiveConnection(accountType: LinkedInAccountType = 'personal'): Promise<LinkedInConnection | null> {
   const supabase = createAdminSupabaseClient();
 
   const { data: connection, error } = await supabase
     .from('linkedin_connections')
-    .select('id, linkedin_person_id, access_token, expires_at, refresh_token')
+    .select('id, account_type, linkedin_person_id, organization_id, access_token, expires_at, refresh_token')
     .eq('is_active', true)
+    .eq('account_type', accountType)
     .single();
 
   if (error || !connection) return null;
@@ -43,7 +48,7 @@ async function getActiveConnection(): Promise<LinkedInConnection | null> {
         return { ...connection, access_token: refreshed };
       }
     }
-    return null; // Token expired and can't refresh
+    return null;
   }
 
   return connection;
@@ -54,6 +59,13 @@ async function getActiveConnection(): Promise<LinkedInConnection | null> {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function refreshToken(connection: LinkedInConnection, supabase: any): Promise<string | null> {
+  const clientId = connection.account_type === 'organization'
+    ? (process.env.LINKEDIN_ORG_CLIENT_ID || '86e4trpqib1zjv')
+    : (process.env.LINKEDIN_CLIENT_ID || '86mkxkw2wt1ped');
+  const clientSecret = connection.account_type === 'organization'
+    ? process.env.LINKEDIN_ORG_CLIENT_SECRET!
+    : process.env.LINKEDIN_CLIENT_SECRET!;
+
   try {
     const res = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
       method: 'POST',
@@ -61,8 +73,8 @@ async function refreshToken(connection: LinkedInConnection, supabase: any): Prom
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: connection.refresh_token!,
-        client_id: process.env.LINKEDIN_CLIENT_ID || '86mkxkw2wt1ped',
-        client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     });
 
@@ -84,33 +96,40 @@ async function refreshToken(connection: LinkedInConnection, supabase: any): Prom
 
 /**
  * Publish a text post (with optional image) to LinkedIn.
+ * Supports posting as personal profile or as an organization page.
  */
 export async function publishToLinkedIn(
   text: string,
-  imageUrl?: string
+  imageUrl?: string,
+  accountType: LinkedInAccountType = 'personal'
 ): Promise<LinkedInPostResult> {
-  const connection = await getActiveConnection();
+  const connection = await getActiveConnection(accountType);
 
   if (!connection) {
+    const label = accountType === 'organization' ? 'KairoLogic company page' : 'personal LinkedIn';
     return {
       success: false,
-      error: 'No active LinkedIn connection. Please connect your LinkedIn account in Content Studio.',
+      error: `No active ${label} connection. Please connect in Content Studio.`,
     };
   }
 
-  const { access_token: accessToken, linkedin_person_id: personId } = connection;
-  const personUrn = `urn:li:person:${personId}`;
+  const { access_token: accessToken, linkedin_person_id: personId, organization_id: orgId } = connection;
+
+  // Determine author URN based on account type
+  const authorUrn = accountType === 'organization' && orgId
+    ? `urn:li:organization:${orgId}`
+    : `urn:li:person:${personId}`;
 
   try {
     // Step 1: If there's an image, upload it first
     let imageUrn: string | undefined;
     if (imageUrl) {
-      imageUrn = await uploadLinkedInImage(accessToken, personUrn, imageUrl);
+      imageUrn = await uploadLinkedInImage(accessToken, authorUrn, imageUrl);
     }
 
     // Step 2: Create the post via UGC Posts API
     const postBody: Record<string, unknown> = {
-      author: personUrn,
+      author: authorUrn,
       lifecycleState: 'PUBLISHED',
       specificContent: {
         'com.linkedin.ugc.ShareContent': {
@@ -148,7 +167,7 @@ export async function publishToLinkedIn(
 
     const postUrn = res.headers.get('x-restli-id') || '';
 
-    // Also track in linkedin_posts table
+    // Track in linkedin_posts table
     const supabase = createAdminSupabaseClient();
     await supabase.from('linkedin_posts').insert({
       connection_id: connection.id,
@@ -157,7 +176,7 @@ export async function publishToLinkedIn(
       linkedin_post_url: postUrn ? `https://www.linkedin.com/feed/update/${postUrn}` : null,
       status: 'posted',
       posted_at: new Date().toISOString(),
-      metadata: { had_image: !!imageUrn },
+      metadata: { had_image: !!imageUrn, account_type: accountType },
     });
 
     return {
@@ -175,11 +194,10 @@ export async function publishToLinkedIn(
  */
 async function uploadLinkedInImage(
   accessToken: string,
-  personUrn: string,
+  ownerUrn: string,
   imageUrl: string
 ): Promise<string | undefined> {
   try {
-    // Register upload
     const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
       method: 'POST',
       headers: {
@@ -189,7 +207,7 @@ async function uploadLinkedInImage(
       body: JSON.stringify({
         registerUploadRequest: {
           recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
-          owner: personUrn,
+          owner: ownerUrn,
           serviceRelationships: [
             { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
           ],
@@ -208,7 +226,6 @@ async function uploadLinkedInImage(
 
     if (!uploadUrl || !asset) return undefined;
 
-    // Download the image and upload to LinkedIn
     const imageRes = await fetch(imageUrl);
     const imageBuffer = await imageRes.arrayBuffer();
 
@@ -228,9 +245,9 @@ async function uploadLinkedInImage(
 }
 
 /**
- * Check if LinkedIn is connected (for use in server components/APIs).
+ * Check if LinkedIn is connected for a given account type.
  */
-export async function isLinkedInConnected(): Promise<boolean> {
-  const connection = await getActiveConnection();
+export async function isLinkedInConnected(accountType: LinkedInAccountType = 'personal'): Promise<boolean> {
+  const connection = await getActiveConnection(accountType);
   return !!connection;
 }
