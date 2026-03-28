@@ -4,8 +4,11 @@
 # creates snapshots, and runs cross-source mismatch detection.
 #
 # Weekly on Thursdays (after Wed scan-and-delta settles).
-# Manual dispatch supports per-payer runs and offset pagination
-# for large backfill operations.
+# Manual dispatch supports per-payer runs and offset pagination.
+#
+# SELF-CHAINING: When a batch completes and more providers remain,
+# the workflow automatically triggers itself with offset += limit.
+# Trigger once with offset=0 and it runs through the entire roster.
 #
 # BCBS TX/CA: Set is_active=true in payer_directory_endpoints
 # and add client_id/client_secret to auth_config when ready.
@@ -34,13 +37,21 @@ on:
           - bcbs_tx
           - bcbs_ca
       limit:
-        description: 'Max providers per payer (default 5000)'
+        description: 'Max providers per batch (default 5000)'
         required: false
         default: '5000'
       offset:
         description: 'Offset for pagination (default 0)'
         required: false
         default: '0'
+      auto_chain:
+        description: 'Auto-trigger next batch when done'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
       dry_run:
         description: 'Dry run (no writes)'
         required: false
@@ -57,7 +68,7 @@ env:
 
 jobs:
   sync:
-    name: Payer Sync
+    name: "Payer Sync (offset ${{ github.event.inputs.offset || '0' }})"
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -77,6 +88,7 @@ jobs:
         run: npm install -g tsx
 
       - name: Run payer directory sync
+        id: sync
         run: |
           ARGS=""
 
@@ -98,7 +110,19 @@ jobs:
           fi
 
           echo "Running: npx tsx scripts/sync-payer-batch.ts $ARGS"
-          npx tsx scripts/sync-payer-batch.ts $ARGS
+          npx tsx scripts/sync-payer-batch.ts $ARGS 2>&1 | tee /tmp/sync-output.log
+
+          # Check if the batch exhausted all providers
+          if grep -q 'BATCH_STATUS=EXHAUSTED' /tmp/sync-output.log; then
+            echo "has_more=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_more=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "limit=$LIMIT" >> $GITHUB_OUTPUT
+          echo "offset=$OFFSET" >> $GITHUB_OUTPUT
+          NEXT_OFFSET=$((OFFSET + LIMIT))
+          echo "next_offset=$NEXT_OFFSET" >> $GITHUB_OUTPUT
 
       - name: Report
         if: always()
@@ -108,6 +132,32 @@ jobs:
           echo "- **Payer:** ${{ github.event.inputs.payer || 'all active' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Limit:** ${{ github.event.inputs.limit || '5000' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Offset:** ${{ github.event.inputs.offset || '0' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Next offset:** ${{ steps.sync.outputs.next_offset }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auto-chain:** ${{ github.event.inputs.auto_chain || 'true' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Dry run:** ${{ github.event.inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Chain next batch
+        if: >-
+          success() &&
+          steps.sync.outputs.has_more == 'true' &&
+          github.event.inputs.auto_chain != 'false' &&
+          github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEXT_OFFSET=${{ steps.sync.outputs.next_offset }}
+          LIMIT=${{ steps.sync.outputs.limit }}
+          PAYER="${{ github.event.inputs.payer || '' }}"
+
+          echo "More providers remaining. Triggering next batch: offset=$NEXT_OFFSET, limit=$LIMIT"
+
+          gh workflow run payer-directory-sync.yml \
+            -f offset="$NEXT_OFFSET" \
+            -f limit="$LIMIT" \
+            -f payer="$PAYER" \
+            -f auto_chain="true" \
+            -f dry_run="false"
+
+          echo "Next batch dispatched (offset=$NEXT_OFFSET)"
