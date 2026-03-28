@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BarChart3, Sparkles, RefreshCw, Linkedin, Unlink } from 'lucide-react';
+import { ArrowLeft, BarChart3, Sparkles, RefreshCw, Linkedin, Unlink, Building2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import TopicInput from '@/components/content-studio/TopicInput';
 import PostQueue from '@/components/content-studio/PostQueue';
@@ -46,8 +46,11 @@ export default function ContentStudioPage() {
     expired?: boolean;
     name?: string;
     email?: string;
+    accounts?: { account_type: string; name: string; email?: string; organization_id?: string; expired: boolean }[];
   }>({ connected: false });
   const [linkedInLoading, setLinkedInLoading] = useState(true);
+  const [linkedInAccount, setLinkedInAccount] = useState<'personal' | 'organization'>('personal');
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -105,8 +108,9 @@ export default function ContentStudioPage() {
     const params = new URLSearchParams(window.location.search);
     const linkedinParam = params.get('linkedin');
     const linkedinError = params.get('linkedin_error');
-    if (linkedinParam === 'connected') {
+    if (linkedinParam === 'connected' || linkedinParam === 'org_connected') {
       fetchLinkedInStatus();
+      if (linkedinParam === 'org_connected') setLinkedInAccount('organization');
       window.history.replaceState({}, '', '/admin/content-studio');
     }
     if (linkedinError) {
@@ -236,7 +240,7 @@ export default function ContentStudioPage() {
       const res = await fetch(`/api/content-studio/publish/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channels }),
+        body: JSON.stringify({ channels, linkedin_account: linkedInAccount }),
       });
       if (res.ok) await fetchPosts();
     } catch {
@@ -247,11 +251,13 @@ export default function ContentStudioPage() {
   };
 
   // Disconnect LinkedIn
-  const handleDisconnectLinkedIn = async () => {
-    if (!confirm('Disconnect your LinkedIn account?')) return;
+  const handleDisconnectLinkedIn = async (accountType?: string) => {
+    const label = accountType === 'organization' ? 'KairoLogic company page' : 'your personal LinkedIn';
+    if (!confirm(`Disconnect ${label}?`)) return;
     try {
-      await fetch('/api/linkedin/status', { method: 'DELETE' });
-      setLinkedInStatus({ connected: false });
+      const url = accountType ? `/api/linkedin/status?type=${accountType}` : '/api/linkedin/status';
+      await fetch(url, { method: 'DELETE' });
+      await fetchLinkedInStatus();
     } catch {
       // silent
     }
@@ -301,31 +307,105 @@ export default function ContentStudioPage() {
                 )}
               </div>
             )}
-            {/* LinkedIn connection status */}
+            {/* LinkedIn connection status + account picker */}
             {!linkedInLoading && (
-              linkedInStatus.connected && !linkedInStatus.expired ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-medium text-blue-700">
-                    <Linkedin size={13} />
-                    <span className="hidden sm:inline">{linkedInStatus.name || 'Connected'}</span>
+              <div className="relative flex items-center gap-2">
+                {/* Account picker dropdown */}
+                {linkedInStatus.accounts && linkedInStatus.accounts.length > 0 ? (
+                  <>
+                    <button
+                      onClick={() => setShowAccountPicker(!showAccountPicker)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                    >
+                      {linkedInAccount === 'organization' ? <Building2 size={13} /> : <Linkedin size={13} />}
+                      <span className="hidden sm:inline">
+                        {linkedInAccount === 'organization'
+                          ? (linkedInStatus.accounts.find(a => a.account_type === 'organization')?.name || 'KairoLogic')
+                          : (linkedInStatus.accounts.find(a => a.account_type === 'personal')?.name || 'Personal')}
+                      </span>
+                      <ChevronDown size={12} />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {showAccountPicker && (
+                      <div className="absolute top-full right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-slate-200 z-50 py-1">
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Post as</div>
+                        {linkedInStatus.accounts.map((account) => (
+                          <button
+                            key={account.account_type}
+                            onClick={() => {
+                              setLinkedInAccount(account.account_type as 'personal' | 'organization');
+                              setShowAccountPicker(false);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors ${
+                              linkedInAccount === account.account_type ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                            }`}
+                          >
+                            {account.account_type === 'organization' ? <Building2 size={14} /> : <Linkedin size={14} />}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{account.name}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {account.account_type === 'organization' ? 'Company page' : 'Personal profile'}
+                                {account.expired && ' · Expired'}
+                              </div>
+                            </div>
+                            {linkedInAccount === account.account_type && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            )}
+                          </button>
+                        ))}
+                        <div className="border-t border-slate-100 mt-1 pt-1">
+                          {!linkedInStatus.accounts.find(a => a.account_type === 'personal') && (
+                            <a
+                              href="/api/linkedin/auth"
+                              className="flex items-center gap-2.5 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <Linkedin size={14} />
+                              Connect personal profile
+                            </a>
+                          )}
+                          {!linkedInStatus.accounts.find(a => a.account_type === 'organization') && (
+                            <a
+                              href="/api/linkedin/auth/org"
+                              className="flex items-center gap-2.5 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              <Building2 size={14} />
+                              Connect KairoLogic page
+                            </a>
+                          )}
+                          {linkedInStatus.accounts.map((account) => (
+                            <button
+                              key={`disconnect-${account.account_type}`}
+                              onClick={() => { handleDisconnectLinkedIn(account.account_type); setShowAccountPicker(false); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              <Unlink size={14} />
+                              Disconnect {account.account_type === 'organization' ? 'KairoLogic' : account.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="/api/linkedin/auth"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      <Linkedin size={13} />
+                      Connect Personal
+                    </a>
+                    <a
+                      href="/api/linkedin/auth/org"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800 transition-colors"
+                    >
+                      <Building2 size={13} />
+                      Connect KairoLogic
+                    </a>
                   </div>
-                  <button
-                    onClick={handleDisconnectLinkedIn}
-                    className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors"
-                    title="Disconnect LinkedIn"
-                  >
-                    <Unlink size={14} />
-                  </button>
-                </div>
-              ) : (
-                <a
-                  href="/api/linkedin/auth"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  <Linkedin size={13} />
-                  Connect LinkedIn
-                </a>
-              )
+                )}
+              </div>
             )}
             <button
               onClick={() => { fetchPosts(); fetchStats(); fetchLinkedInStatus(); }}

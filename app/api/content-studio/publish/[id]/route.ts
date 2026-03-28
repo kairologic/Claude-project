@@ -9,9 +9,10 @@ export async function POST(
   try {
     const supabase = createAdminSupabaseClient();
 
-    // Read channels from the request body (UI sends them)
+    // Read channels and target LinkedIn account from the request body
     const body = await request.json().catch(() => ({}));
     const requestedChannels: string[] = body.channels || [];
+    const linkedinAccountType: 'personal' | 'organization' = body.linkedin_account || 'personal';
 
     // Fetch the post with graphics
     const { data: post, error: fetchError } = await supabase
@@ -38,7 +39,7 @@ export async function POST(
     for (const channel of channels) {
       try {
         if (channel === 'linkedin') {
-          const liResult = await publishToLinkedIn(post.body_linkedin || '', graphicUrl);
+          const liResult = await publishToLinkedIn(post.body_linkedin || '', graphicUrl, linkedinAccountType);
           results.linkedin = {
             success: liResult.success,
             url: liResult.postUrl,
