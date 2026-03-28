@@ -203,7 +203,7 @@ async function main() {
           // ── Run mismatch detection ──
           // Load NPPES data for this provider
           const nppesRows = await supabaseRequest<NppesProviderData[]>(
-            `providers?npi=eq.${provider.npi}&select=npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip,phone,taxonomy_code,taxonomy_desc,gender&limit=1`
+            `providers?npi=eq.${provider.npi}&select=npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip:zip_code,phone,taxonomy_code,taxonomy_desc,gender&limit=1`
           );
 
           if (nppesRows && nppesRows.length > 0) {
