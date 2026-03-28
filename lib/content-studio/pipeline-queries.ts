@@ -115,6 +115,81 @@ export async function runPipelineQuery(
   }
 }
 
+/**
+ * Get rich data findings from the provider intelligence pipeline for content ideation.
+ * Returns aggregate insights from mismatches, payer directories, scan results, etc.
+ * All data is aggregate — no PII or individual provider details.
+ */
+export async function getDataFindings(): Promise<Record<string, unknown>> {
+  const supabase = createAdminSupabaseClient();
+  try {
+    // Run all insight queries in parallel
+    const [stateBreakdown, scanHealth, payerMismatches, topSpecialties, mismatchRate] = await Promise.all([
+      // Top states by mismatch volume
+      supabase.rpc('execute_query', {
+        query_text: `
+          SELECT state, COUNT(*)::int as practices, SUM(mismatch_count)::int as total_mismatches,
+            ROUND(AVG(mismatch_count)::numeric, 1) as avg_mismatches_per_practice,
+            SUM(provider_count)::int as providers_affected
+          FROM practice_websites
+          WHERE mismatch_count > 0 AND state IS NOT NULL
+          GROUP BY state ORDER BY total_mismatches DESC LIMIT 10
+        `
+      }),
+      // Scan health overview
+      supabase.rpc('execute_query', {
+        query_text: `
+          SELECT scan_status, COUNT(*)::int as count,
+            ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER(), 0), 1) as pct
+          FROM practice_websites
+          WHERE scan_status IS NOT NULL
+          GROUP BY scan_status ORDER BY count DESC
+        `
+      }),
+      // Payer directory mismatch types
+      supabase.rpc('execute_query', {
+        query_text: `
+          SELECT field_name, mismatch_type, priority, COUNT(*)::int as count
+          FROM payer_directory_mismatches
+          GROUP BY field_name, mismatch_type, priority
+          ORDER BY count DESC LIMIT 10
+        `
+      }),
+      // Most common practice specialties with mismatches
+      supabase.rpc('execute_query', {
+        query_text: `
+          SELECT unnest(practice_specialties) as specialty, COUNT(*)::int as count
+          FROM practice_websites
+          WHERE mismatch_count > 0 AND practice_specialties IS NOT NULL
+          GROUP BY specialty ORDER BY count DESC LIMIT 10
+        `
+      }),
+      // Overall mismatch rate
+      supabase.rpc('execute_query', {
+        query_text: `
+          SELECT
+            COUNT(*)::int as total_practices,
+            COUNT(CASE WHEN mismatch_count > 0 THEN 1 END)::int as with_mismatches,
+            ROUND(100.0 * COUNT(CASE WHEN mismatch_count > 0 THEN 1 END) / NULLIF(COUNT(*), 0), 1) as mismatch_pct,
+            SUM(mismatch_count)::int as total_mismatches,
+            MAX(mismatch_count)::int as worst_mismatch_count
+          FROM practice_websites
+        `
+      }),
+    ]);
+
+    return {
+      state_breakdown: stateBreakdown.data || [],
+      scan_health: scanHealth.data || [],
+      payer_mismatches: payerMismatches.data || [],
+      top_specialties_with_issues: topSpecialties.data || [],
+      mismatch_rate: (mismatchRate.data as Record<string, unknown>[])?.[0] || {},
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function getOverviewStats(): Promise<Record<string, number>> {
   const supabase = createAdminSupabaseClient();
   try {

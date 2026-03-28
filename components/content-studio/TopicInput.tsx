@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Sparkles, Send, RefreshCw, CheckSquare, Square, Zap } from 'lucide-react';
+import { Loader2, Sparkles, Send, RefreshCw, CheckSquare, Square, Zap, Database } from 'lucide-react';
 
 interface TopicSuggestion {
   topic: string;
@@ -25,13 +25,19 @@ export default function TopicInput({ onGenerate, onBatchGenerate, isGenerating, 
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [category, setCategory] = useState('');
+  const [dataDriven, setDataDriven] = useState(false);
 
-  const fetchSuggestions = async (cat?: string) => {
+  const fetchSuggestions = async (cat?: string, useDataDriven?: boolean) => {
     setLoadingSuggestions(true);
     setSelectedSuggestions(new Set());
     try {
-      const queryParam = (cat ?? category).trim() ? `?category=${encodeURIComponent((cat ?? category).trim())}` : '';
-      const res = await fetch(`/api/content-studio/topic-suggestions${queryParam}`);
+      const params = new URLSearchParams();
+      const catVal = (cat ?? category).trim();
+      if (catVal) params.set('category', catVal);
+      const isDataDriven = useDataDriven ?? dataDriven;
+      if (isDataDriven) params.set('mode', 'data_driven');
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`/api/content-studio/topic-suggestions${queryString}`);
       const data = await res.json();
       if (data.suggestions) setSuggestions(data.suggestions);
     } catch {
@@ -123,12 +129,44 @@ export default function TopicInput({ onGenerate, onBatchGenerate, isGenerating, 
         <p className="text-[10px] text-slate-400 mt-1">Enter a category to get targeted AI topic suggestions, or leave blank for general suggestions.</p>
       </div>
 
+      {/* Data-driven toggle */}
+      <div className="mb-4">
+        <button
+          onClick={() => {
+            const next = !dataDriven;
+            setDataDriven(next);
+            fetchSuggestions(undefined, next);
+          }}
+          disabled={loadingSuggestions || isGenerating}
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left text-sm transition-all ${
+            dataDriven
+              ? 'bg-indigo-50 border-indigo-300 text-indigo-700 ring-1 ring-indigo-200'
+              : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          <Database size={15} className={dataDriven ? 'text-indigo-500' : 'text-slate-400'} />
+          <div className="flex-1">
+            <span className="font-medium">{dataDriven ? 'Data-Driven Mode' : 'Data-Driven Mode'}</span>
+            <span className="block text-[10px] mt-0.5 opacity-70">
+              {dataDriven
+                ? 'Topics grounded in real mismatch rates, state trends, and payer findings'
+                : 'Generate topics from KairoLogic\'s provider DB — mismatches, payer data, scan results'}
+            </span>
+          </div>
+          <div className={`w-8 h-4.5 rounded-full transition-colors relative ${dataDriven ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+            <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all ${dataDriven ? 'left-4' : 'left-0.5'}`} />
+          </div>
+        </button>
+      </div>
+
       {/* AI Suggestions with multi-select */}
       {suggestions.length > 0 && (
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">AI-Suggested Topics</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                {dataDriven ? '📊 Data-Driven Topics' : 'AI-Suggested Topics'}
+              </span>
               <button
                 onClick={selectAll}
                 className="text-[10px] text-slate-400 hover:text-amber-600 transition-colors"
