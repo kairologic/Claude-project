@@ -578,7 +578,7 @@ export async function runScheduler(options: {
     limit = 50,
     forceAll = false,
     dryRun = false,
-    concurrency = 3,
+    concurrency = 5,
     onProgress,
   } = options;
 
