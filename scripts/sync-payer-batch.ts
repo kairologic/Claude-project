@@ -104,7 +104,8 @@ async function main() {
   );
 
   if (!providers || providers.length === 0) {
-    console.log('No providers to query at this offset. Batch complete.');
+    console.log('No providers to query at this offset. All batches complete.');
+    console.log('BATCH_STATUS=EXHAUSTED');
     process.exit(0);
   }
 
