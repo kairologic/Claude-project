@@ -1,0 +1,113 @@
+# .github/workflows/payer-directory-sync.yml
+# ═══ KairoLogic Payer Directory Sync ═══
+# Queries active payer FHIR directories for provider listings,
+# creates snapshots, and runs cross-source mismatch detection.
+#
+# Weekly on Thursdays (after Wed scan-and-delta settles).
+# Manual dispatch supports per-payer runs and offset pagination
+# for large backfill operations.
+#
+# BCBS TX/CA: Set is_active=true in payer_directory_endpoints
+# and add client_id/client_secret to auth_config when ready.
+# No code changes needed — the workflow picks up all active endpoints.
+
+name: Payer Directory Sync
+
+on:
+  schedule:
+    # Every Thursday at 6am UTC (midnight Central Wednesday)
+    - cron: '0 6 * * 4'
+
+  workflow_dispatch:
+    inputs:
+      payer:
+        description: 'Payer code (blank = all active payers)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''           # all active payers
+          - aetna
+          - cigna
+          - humana
+          - uhc
+          - bcbs_tx
+          - bcbs_ca
+      limit:
+        description: 'Max providers per payer (default 5000)'
+        required: false
+        default: '5000'
+      offset:
+        description: 'Offset for pagination (default 0)'
+        required: false
+        default: '0'
+      dry_run:
+        description: 'Dry run (no writes)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  sync:
+    name: Payer Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Run payer directory sync
+        run: |
+          ARGS=""
+
+          LIMIT="${{ github.event.inputs.limit || '5000' }}"
+          ARGS="$ARGS --limit $LIMIT"
+
+          OFFSET="${{ github.event.inputs.offset || '0' }}"
+          if [ "$OFFSET" != "0" ]; then
+            ARGS="$ARGS --offset $OFFSET"
+          fi
+
+          PAYER="${{ github.event.inputs.payer || '' }}"
+          if [ -n "$PAYER" ]; then
+            ARGS="$ARGS --payer $PAYER"
+          fi
+
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: npx tsx scripts/sync-payer-batch.ts $ARGS"
+          npx tsx scripts/sync-payer-batch.ts $ARGS
+
+      - name: Report
+        if: always()
+        run: |
+          echo "### Payer Directory Sync Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Payer:** ${{ github.event.inputs.payer || 'all active' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Limit:** ${{ github.event.inputs.limit || '5000' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Offset:** ${{ github.event.inputs.offset || '0' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry run:** ${{ github.event.inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
