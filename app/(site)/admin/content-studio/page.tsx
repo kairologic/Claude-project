@@ -206,12 +206,12 @@ export default function ContentStudioPage() {
   };
 
   // Schedule post
-  const handleSchedule = async (id: string, scheduledAt: string, channels: string[]) => {
+  const handleSchedule = async (id: string, scheduledAt: string, channels: string[], channelSchedules?: Record<string, string>) => {
     try {
       const res = await fetch(`/api/content-studio/schedule/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduled_at: scheduledAt, channels }),
+        body: JSON.stringify({ scheduled_at: scheduledAt, channels, channel_schedules: channelSchedules }),
       });
       if (res.ok) await fetchPosts();
       else {

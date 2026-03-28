@@ -3,7 +3,9 @@ import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
 /**
  * Schedule a post for future publishing.
- * POST: Set schedule  { scheduled_at: "2026-03-26T14:00:00Z", channels: ["linkedin", "blog"] }
+ * POST: Set schedule  { scheduled_at, channels, channel_schedules? }
+ *   channel_schedules is an optional map of channel -> ISO date for staggered publishing
+ *   e.g. { "linkedin": "2026-03-28T14:00:00Z", "blog": "2026-03-29T14:00:00Z" }
  * DELETE: Cancel schedule
  */
 export async function POST(
@@ -12,7 +14,7 @@ export async function POST(
 ) {
   try {
     const supabase = createAdminSupabaseClient();
-    const { scheduled_at, channels } = await request.json();
+    const { scheduled_at, channels, channel_schedules } = await request.json();
 
     if (!scheduled_at) {
       return NextResponse.json({ error: 'scheduled_at is required' }, { status: 400 });
@@ -32,6 +34,11 @@ export async function POST(
     // Optionally update channels if provided
     if (channels && Array.isArray(channels)) {
       updateData.channels = channels;
+    }
+
+    // Store per-channel schedule times in metadata if staggered
+    if (channel_schedules && typeof channel_schedules === 'object') {
+      updateData.schedule_metadata = { channel_schedules };
     }
 
     const { data, error } = await supabase
@@ -63,6 +70,7 @@ export async function DELETE(
       .update({
         scheduled_at: null,
         status: 'draft',
+        schedule_metadata: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', params.id)

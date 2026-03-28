@@ -28,7 +28,7 @@ interface PostPreviewProps {
   post: PostData | null;
   onUpdate: (id: string, data: Partial<PostData>) => void;
   onPublish: (id: string, channels: string[]) => void;
-  onSchedule: (id: string, scheduledAt: string, channels: string[]) => void;
+  onSchedule: (id: string, scheduledAt: string, channels: string[], channelSchedules?: Record<string, string>) => void;
   onCancelSchedule: (id: string) => void;
   onCaptureGraphic: (graphicId: string, dataUrl: string) => void;
   isPublishing: boolean;
@@ -69,6 +69,7 @@ export default function PostPreview({ post, onUpdate, onPublish, onSchedule, onC
   const [editBody, setEditBody] = useState('');
   const [showScheduler, setShowScheduler] = useState(false);
   const [scheduleDate, setScheduleDate] = useState(getDefaultScheduleTime());
+  const [channelOffsets, setChannelOffsets] = useState<Record<string, number>>({});
 
   if (!post) {
     return (
@@ -112,7 +113,19 @@ export default function PostPreview({ post, onUpdate, onPublish, onSchedule, onC
 
   const handleSchedule = () => {
     const utcDate = new Date(scheduleDate).toISOString();
-    onSchedule(post.id, utcDate, channels);
+    // Pass channel offsets for staggered scheduling
+    const hasOffsets = Object.values(channelOffsets).some((v) => v > 0);
+    if (hasOffsets) {
+      // Build per-channel schedule times
+      const channelSchedules: Record<string, string> = {};
+      for (const ch of channels) {
+        const offsetMs = (channelOffsets[ch] || 0) * 60 * 60 * 1000;
+        channelSchedules[ch] = new Date(new Date(scheduleDate).getTime() + offsetMs).toISOString();
+      }
+      onSchedule(post.id, utcDate, channels, channelSchedules);
+    } else {
+      onSchedule(post.id, utcDate, channels);
+    }
     setShowScheduler(false);
   };
 
@@ -260,6 +273,34 @@ export default function PostPreview({ post, onUpdate, onPublish, onSchedule, onC
               Schedule
             </button>
           </div>
+          {/* Stagger offsets per channel */}
+          {channels.length > 1 && (
+            <div className="mt-3 pt-3 border-t border-slate-200/60">
+              <label className="block text-[11px] font-medium text-slate-500 mb-2">Channel Stagger (optional)</label>
+              <div className="space-y-1.5">
+                {channels.map((ch) => (
+                  <div key={ch} className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 w-20 capitalize">{ch}</span>
+                    <select
+                      value={channelOffsets[ch] || 0}
+                      onChange={(e) => setChannelOffsets((prev) => ({ ...prev, [ch]: Number(e.target.value) }))}
+                      className="flex-1 px-2 py-1 rounded border border-slate-300 text-xs bg-white focus:ring-1 focus:ring-blue-500 outline-none"
+                    >
+                      <option value={0}>Same time</option>
+                      <option value={1}>+1 hour</option>
+                      <option value={2}>+2 hours</option>
+                      <option value={4}>+4 hours</option>
+                      <option value={6}>+6 hours</option>
+                      <option value={12}>+12 hours</option>
+                      <option value={24}>+1 day</option>
+                      <option value={48}>+2 days</option>
+                      <option value={72}>+3 days</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <p className="text-[10px] text-slate-400 mt-2">
             Posts are checked every 15 minutes. Your post will publish at the next check after the scheduled time.
           </p>
