@@ -4,7 +4,7 @@ export async function GET() {
   const clientId = process.env.LINKEDIN_ORG_CLIENT_ID || '86e4trpqib1zjv';
 
   const redirectUri = encodeURIComponent('https://kairologic.net/api/auth/linkedin/org/callback');
-  const scope = encodeURIComponent('openid profile email w_member_social w_organization_social r_organization_social rw_organization_admin');
+  const scope = encodeURIComponent('w_organization_social r_organization_social');
   const state = crypto.randomUUID();
 
   const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=${state}`;

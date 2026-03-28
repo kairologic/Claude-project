@@ -41,11 +41,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/admin/content-studio?linkedin_error=token_failed', req.url));
     }
 
-    // Get the authorizing user's profile for reference
-    const profileRes = await fetch('https://api.linkedin.com/v2/userinfo', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const profile = await profileRes.json();
+    // No OpenID scope on this app, so skip userinfo.
+    // Use the /v2/me endpoint instead (available via Community Management API)
+    let personId = 'org_admin';
+    try {
+      const meRes = await fetch('https://api.linkedin.com/v2/me', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        personId = me.id || 'org_admin';
+      }
+    } catch {
+      // Non-critical — we just need the token for org posting
+    }
 
     // Store in database as organization connection
     const supabase = createAdminSupabaseClient();
@@ -63,9 +72,9 @@ export async function GET(req: NextRequest) {
         account_type: 'organization',
         organization_id: KAIROLOGIC_ORG_ID,
         organization_name: KAIROLOGIC_ORG_NAME,
-        linkedin_person_id: profile.sub || 'org_admin',
+        linkedin_person_id: personId,
         linkedin_name: KAIROLOGIC_ORG_NAME,
-        linkedin_email: profile.email || null,
+        linkedin_email: null,
         access_token: tokenData.access_token,
         expires_at: expiresAt.toISOString(),
         refresh_token: tokenData.refresh_token || null,
