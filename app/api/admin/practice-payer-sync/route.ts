@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     // Clear existing unresolved mismatches for this practice
     try {
-      await db(`payer_directory_mismatches?practice_website_id=eq.${practice_id}&resolved_at=is.null`, {
+      await db(`payer_directory_mismatches?practice_website_id=eq.${practice_id}&status=eq.open`, {
         method: 'DELETE',
       });
     } catch (delErr) {
@@ -229,6 +229,7 @@ export async function POST(request: NextRequest) {
                   priority: m.priority,
                   fix_via_caqh: m.fix_via_caqh,
                   fix_instructions: m.fix_instructions,
+                  status: 'open',
                 }),
               });
               mismatchesCreated++;
