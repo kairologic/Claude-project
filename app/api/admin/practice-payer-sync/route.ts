@@ -91,7 +91,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ═══ Phase 2 (optional): Refresh snapshots from FHIR endpoints ═══
-    let fhirRefreshStats = { attempted: 0, upserted: 0 };
+    let fhirRefreshStats = { attempted: 0, upserted: 0, errors: 0 };
+    // Track payers that had FHIR errors (auth failures, config issues).
+    // Phase 1 will exclude old snapshots from these payers since the data is unreliable.
+    const failedPayers = new Set<string>();
     if (refresh) {
       const endpoints: PayerEndpoint[] = await db(
         'payer_directory_endpoints?is_active=eq.true&select=*'
@@ -103,6 +106,7 @@ export async function POST(request: NextRequest) {
         for (const provider of providers) {
           if (!provider.npi) continue;
           for (const endpoint of endpoints) {
+            if (failedPayers.has(endpoint.payer_code)) continue; // Skip payer if already failed
             fhirRefreshStats.attempted++;
             try {
               const snapshot = await fhirClient.lookupByNpi(provider.npi, endpoint, batchId);
@@ -167,7 +171,15 @@ export async function POST(request: NextRequest) {
               fhirRefreshStats.upserted++;
 
             } catch (err) {
-              console.warn(`[practice-payer-sync] FHIR error for ${provider.npi}/${endpoint.payer_code}:`, err);
+              const msg = err instanceof Error ? err.message : String(err);
+              console.warn(`[practice-payer-sync] FHIR error for ${provider.npi}/${endpoint.payer_code}: ${msg}`);
+              fhirRefreshStats.errors++;
+              // If this looks like an auth/config error (not a single-provider issue),
+              // mark the entire payer as failed so we don't waste time on more requests
+              if (msg.includes('OAuth token') || msg.includes('auth error') || msg.includes('auth/config error')) {
+                console.warn(`[practice-payer-sync] Marking ${endpoint.payer_code} as failed — skipping remaining providers`);
+                failedPayers.add(endpoint.payer_code);
+              }
             }
           }
         }
@@ -186,11 +198,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Read all current snapshots for this practice's NPIs
-    const snapshots: DirectorySnapshot[] = npiList.length > 0
+    let snapshots: DirectorySnapshot[] = npiList.length > 0
       ? await db(
           `payer_directory_snapshots?npi=in.(${npiList.join(',')})&select=*`
         ) || []
       : [];
+
+    // If refresh was attempted, exclude snapshots from payers that had auth/config errors.
+    // Their old "not listed" data is unreliable and would create false acceptance gaps.
+    if (refresh && failedPayers.size > 0) {
+      const before = snapshots.length;
+      snapshots = snapshots.filter((s: DirectorySnapshot) => !failedPayers.has(s.payer_code));
+      console.log(
+        `[practice-payer-sync] Excluded ${before - snapshots.length} snapshots from failed payers: ${[...failedPayers].join(', ')}`
+      );
+    }
 
     let mismatchesCreated = 0;
     const allMismatches: DirectoryMismatch[] = [];
@@ -271,6 +293,7 @@ export async function POST(request: NextRequest) {
                 priority: gapMismatch.priority,
                 fix_via_caqh: gapMismatch.fix_via_caqh,
                 fix_instructions: gapMismatch.fix_instructions,
+                status: 'open',
               }),
             });
             acceptanceGapsCreated++;
@@ -296,7 +319,7 @@ export async function POST(request: NextRequest) {
       mismatches_detected: allMismatches.length,
       mismatches_upserted: mismatchesCreated,
       acceptance_gaps: acceptanceGapsCreated,
-      fhir_refresh: refresh ? fhirRefreshStats : null,
+      fhir_refresh: refresh ? { ...fhirRefreshStats, failed_payers: [...failedPayers] } : null,
       elapsed_seconds: parseFloat(elapsed),
       message: `Analyzed ${snapshots.length} snapshots for ${npiList.length} providers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}. Mismatches: ${allMismatches.length}`,
     });
