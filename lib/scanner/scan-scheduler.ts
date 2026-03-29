@@ -28,6 +28,7 @@ import {
   saveExtractionToPracticeProviders,
 } from '../address/scan-plugin';
 import { triggerWorkflowsForPractice } from './trigger-workflows';
+import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ export interface ScanResult {
   extraction: ExtractionSummary | null;
   providers_detected: string[];     // provider names found on site
   providers_matched: MatchedProvider[];
+  payer_extraction: PayerExtractionResult | null;  // #111: insurance accepted on website
   scan_duration_ms: number;
   error?: string;
 }
@@ -355,6 +357,7 @@ export async function scanSite(
     extraction: null,
     providers_detected: [],
     providers_matched: [],
+    payer_extraction: null,
     scan_duration_ms: 0,
   };
 
@@ -401,6 +404,30 @@ export async function scanSite(
       site.state,
     );
     result.providers_matched = matched;
+
+    // 3b. Extract accepted payers from website (#111)
+    try {
+      const payerResult = extractAcceptedPayers(crawl.html, crawl.text, site.state);
+      result.payer_extraction = payerResult;
+
+      if (payerResult.accepted_payers.length > 0) {
+        console.log(
+          `[Scanner] Payer acceptance: ${payerResult.accepted_payers.join(', ')} ` +
+          `(${payerResult.confidence} confidence, source: ${payerResult.extraction_source})`,
+        );
+
+        // Write accepted_payers to practice_websites
+        await db(`practice_websites?id=eq.${site.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            accepted_payers: payerResult.accepted_payers,
+            accepted_payers_extracted_at: new Date().toISOString(),
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Payer extraction failed for ${site.url}:`, err);
+    }
 
     // 4. Update practice_providers (Task 1.12)
     await updatePracticeProviders(site.id, matched);

@@ -16,6 +16,7 @@
 import { FhirDirectoryClient } from '../lib/payer-directory/fhir-client';
 import { detectMismatches } from '../lib/payer-directory/mismatch-engine';
 import type { PayerEndpoint, DirectorySnapshot, NppesProviderData } from '../lib/payer-directory/types';
+import { runAcceptanceGapCheck } from '../lib/payer-directory/acceptance-gap-detector';
 
 // ── Supabase via raw fetch (same pattern as scan-scheduler) ──
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -160,6 +161,19 @@ async function main() {
             payerNotListed++;
           }
 
+          // ── Layer 1: Fetch current consecutive_not_listed_count ──
+          let prevCount = 0;
+          try {
+            const existing = await supabaseRequest<{ consecutive_not_listed_count: number }[]>(
+              `payer_directory_snapshots?npi=eq.${provider.npi}&payer_code=eq.${endpoint.payer_code}&select=consecutive_not_listed_count&limit=1`
+            );
+            if (existing && existing.length > 0) {
+              prevCount = existing[0].consecutive_not_listed_count || 0;
+            }
+          } catch { /* first time — starts at 0 */ }
+
+          const newCount = isListed ? 0 : prevCount + 1;
+
           // ── Upsert snapshot (matches actual table schema) ──
           const snapshotRow: Record<string, unknown> = {
             npi: provider.npi,
@@ -194,7 +208,14 @@ async function main() {
             fhir_organization_id: snapshot.fhir_organization_id,
             fhir_raw_bundle: snapshot.fhir_raw_bundle,
             sync_batch_id: batchId,
+            consecutive_not_listed_count: newCount,
           };
+
+          // Reset re-verification flags when provider is found
+          if (isListed) {
+            snapshotRow.reverification_confirmed = null;
+            snapshotRow.last_reverification_at = null;
+          }
 
           await supabaseRequest(
             'payer_directory_snapshots',
@@ -285,6 +306,60 @@ async function main() {
   console.log(`  Not listed:     ${totalNotListed}`);
   console.log(`  Mismatches:     ${totalMismatches}`);
   console.log(`  Errors:         ${totalErrors}`);
+  console.log('══════════════════════════════════════════════════');
+
+  // ── 5. Payer Acceptance Gap Detection (#112) ──────────
+  console.log('\n─── Payer Acceptance Gap Check ───');
+  try {
+    // Build a db helper compatible with acceptance-gap-detector
+    // (reuses supabaseRequest but with the signature expected by the detector)
+    const dbFn = async (path: string, options: RequestInit = {}): Promise<any> => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: options.method === 'POST' ? 'return=representation' : 'return=minimal',
+          ...((options.headers as Record<string, string>) || {}),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`DB ${options.method || 'GET'} ${path}: ${res.status} ${err}`);
+      }
+      const ct = res.headers.get('content-type') || '';
+      return ct.includes('json') ? res.json() : null;
+    };
+
+    const gapReport = await runAcceptanceGapCheck(dbFn, {
+      practiceId: PRACTICE_ID || undefined,
+      payerCode: PAYER_FILTER || undefined,
+      // Pass FHIR client + endpoints for Layer 2 re-verification
+      fhirClient: client,
+      payerEndpoints: endpoints,
+    });
+
+    if (gapReport.total_gaps > 0) {
+      console.log(`  Practices checked:    ${gapReport.practices_checked}`);
+      console.log(`  Practices with gaps:  ${gapReport.practices_with_gaps}`);
+      console.log(`  Total gaps found:     ${gapReport.total_gaps}`);
+      console.log('');
+
+      for (const gap of gapReport.gaps) {
+        const icon = gap.severity === 'action' ? '🔴' : gap.severity === 'warning' ? '🟡' : 'ℹ️';
+        console.log(
+          `  ${icon} ${gap.practice_name || gap.practice_website_id}: ` +
+          `claims ${gap.payer_code.toUpperCase()}, ` +
+          `${gap.not_listed_count}/${gap.total_providers} providers not listed (${gap.gap_percentage}%)`
+        );
+      }
+    } else {
+      console.log(`  Checked ${gapReport.practices_checked} practices — no acceptance gaps found.`);
+    }
+  } catch (err) {
+    console.warn('  Acceptance gap check failed:', err instanceof Error ? err.message : err);
+  }
   console.log('══════════════════════════════════════════════════');
 }
 

@@ -744,4 +744,93 @@ export class FhirDirectoryClient {
     }
     return this.rateLimiters.get(endpoint.payer_code)!;
   }
+
+  // ── Layer 2: Re-Verification for False Positive Prevention ──
+
+  /**
+   * Re-verify a provider that was marked not_listed after 2+ consecutive
+   * sync cycles. Performs the standard NPI lookup PLUS a name-based search
+   * as a fallback strategy.
+   *
+   * Returns:
+   *   - { found: true, snapshot } if provider is actually listed
+   *   - { found: false } if confirmed not listed
+   */
+  async verifyNotListed(
+    npi: string,
+    providerName: string | null,
+    endpoint: PayerEndpoint,
+  ): Promise<{ found: boolean; snapshot?: DirectorySnapshot }> {
+    // Strategy 1: Standard NPI lookup (same as regular sync)
+    const standardResult = await this.lookupByNpi(npi, endpoint, `reverify_${Date.now()}`);
+
+    if (standardResult && standardResult.listed_name_full) {
+      // Found via standard lookup — was a transient failure before
+      return { found: true, snapshot: standardResult };
+    }
+
+    // Strategy 2: Name-based search (catches NPI format edge cases)
+    if (providerName) {
+      try {
+        const limiter = this.getRateLimiter(endpoint);
+        const nameParts = providerName.replace(/^Dr\.?\s*/i, '').split(/\s+/);
+
+        if (nameParts.length >= 2) {
+          const lastName = nameParts[nameParts.length - 1]
+            .replace(/,?\s*(MD|DO|NP|PA|DPM|DDS|DMD|OD|PhD|APRN|FNP|DNP)$/i, '')
+            .trim();
+          const firstName = nameParts[0];
+
+          if (lastName.length >= 2 && firstName.length >= 2) {
+            await limiter.wait();
+            const nameBundle = await this.fhirGet<FhirBundle>(
+              endpoint,
+              `/Practitioner?family=${encodeURIComponent(lastName)}&given=${encodeURIComponent(firstName)}`
+            );
+
+            // Check if any returned Practitioner has a matching NPI
+            const entries = nameBundle.entry || [];
+            for (const entry of entries) {
+              const resource = entry.resource as FhirPractitioner;
+              if (resource?.resourceType !== 'Practitioner') continue;
+
+              const identifiers = resource.identifier || [];
+              const hasMatchingNpi = identifiers.some(
+                (id) => id.system === NPI_SYSTEM && id.value === npi
+              );
+
+              if (hasMatchingNpi) {
+                // Found via name search — the NPI identifier query had an issue
+                console.log(
+                  `  [reverify] ${npi} found via name search in ${endpoint.payer_code} ` +
+                  `(NPI lookup missed it)`
+                );
+                // Do a full lookup now to get the complete snapshot
+                const fullSnapshot = await this.lookupByNpi(npi, endpoint, `reverify_name_${Date.now()}`);
+                return { found: true, snapshot: fullSnapshot || undefined };
+              }
+            }
+
+            // Strategy 3: Partial name match without NPI confirmation
+            // If we find practitioners with the same name, log it but don't
+            // auto-confirm — could be a different person with the same name
+            if (entries.length > 0) {
+              console.log(
+                `  [reverify] ${npi} name search returned ${entries.length} results in ` +
+                `${endpoint.payer_code}, but none matched NPI. Confirmed not listed.`
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `  [reverify] Name-based search failed for ${npi} in ${endpoint.payer_code}:`,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
+    // All strategies exhausted — confirmed not listed
+    return { found: false };
+  }
 }
