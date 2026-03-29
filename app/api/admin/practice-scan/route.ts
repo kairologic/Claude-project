@@ -62,32 +62,30 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'payer_sync' || action === 'both') {
-      // For payer sync, we mark it as needing sync.
-      // The actual sync runs via the GitHub Actions workflow or CLI.
-      // We record the request so it can be picked up.
-      await db('admin_action_queue', {
-        method: 'POST',
-        body: JSON.stringify({
-          action_type: 'payer_sync',
-          target_id: practice_id,
-          target_type: 'practice',
-          status: 'pending',
-          requested_at: new Date().toISOString(),
-          metadata: { practice_name: practices[0].name },
-        }),
-        headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' } as any,
-      }).catch(() => {
-        // If admin_action_queue table doesn't exist yet, that's OK
-        // The scan scheduling still works
-      });
-      results.payer_sync = 'queued';
+      // Run inline payer sync — calls FHIR APIs directly for this practice
+      try {
+        const origin = new URL(request.url).origin;
+        const syncRes = await fetch(`${origin}/api/admin/practice-payer-sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ practice_id }),
+        });
+        const syncData = await syncRes.json();
+        if (syncRes.ok) {
+          results.payer_sync = syncData.message || 'completed';
+        } else {
+          results.payer_sync = `error: ${syncData.error || 'unknown'}`;
+        }
+      } catch (syncErr) {
+        results.payer_sync = `error: ${syncErr instanceof Error ? syncErr.message : 'sync failed'}`;
+      }
     }
 
     return NextResponse.json({
       success: true,
       practice_id,
       actions: results,
-      message: `${action === 'both' ? 'Scan + payer sync' : action === 'scan' ? 'Scan' : 'Payer sync'} queued for ${practices[0].name || practice_id}`,
+      message: `${action === 'scan' ? 'Scan queued' : action === 'payer_sync' ? 'Payer sync completed' : 'Scan queued + payer sync completed'} for ${practices[0].name || practice_id}`,
     });
   } catch (err) {
     console.error('[practice-scan] Error:', err);
