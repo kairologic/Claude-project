@@ -2,15 +2,17 @@
  * POST /api/admin/practice-payer-sync
  *
  * On-demand payer directory sync for a single practice.
- * Looks up each provider NPI against active FHIR payer directories
- * and upserts snapshot rows. Runs inline (10-30s for typical practices).
+ * Looks up each provider NPI against active FHIR payer directories,
+ * upserts snapshot rows, and runs mismatch detection against NPPES data.
+ * Runs inline (10-30s for typical practices).
  *
  * Input: { practice_id: string }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { FhirDirectoryClient } from '@/lib/payer-directory/fhir-client';
-import type { PayerEndpoint, DirectorySnapshot } from '@/lib/payer-directory/types';
+import { detectMismatches, buildAcceptanceGapMismatch } from '@/lib/payer-directory/mismatch-engine';
+import type { PayerEndpoint, DirectorySnapshot, NppesProviderData, DirectoryMismatch } from '@/lib/payer-directory/types';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -45,12 +47,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'practice_id required' }, { status: 400 });
     }
 
-    // 1. Get practice providers
+    // 1. Get practice providers (include NPI for FHIR + mismatch lookups)
     const providers = await db(
       `practice_providers?practice_website_id=eq.${practice_id}&select=npi,provider_name&roster_status=eq.active`
     );
     if (!providers || providers.length === 0) {
       return NextResponse.json({ error: 'No active providers found for this practice' }, { status: 404 });
+    }
+
+    // 1b. Bulk-fetch NPPES data for all provider NPIs (needed for mismatch detection)
+    const npiList = providers.map((p: any) => p.npi).filter(Boolean);
+    const nppesMap = new Map<string, NppesProviderData>();
+    if (npiList.length > 0) {
+      try {
+        const nppesRows = await db(
+          `providers?npi=in.(${npiList.join(',')})&select=npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip:zip_code,phone,taxonomy_code,taxonomy_desc,gender`
+        );
+        if (nppesRows) {
+          for (const row of nppesRows) {
+            nppesMap.set(row.npi, {
+              npi: row.npi,
+              provider_name: row.organization_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+              first_name: row.first_name,
+              last_name: row.last_name,
+              organization_name: row.organization_name,
+              address_line_1: row.address_line_1,
+              address_line_2: row.address_line_2,
+              city: row.city,
+              state: row.state,
+              zip: row.zip,
+              phone: row.phone,
+              taxonomy_code: row.taxonomy_code,
+              taxonomy_desc: row.taxonomy_desc,
+              gender: row.gender,
+            });
+          }
+        }
+      } catch (nppesErr) {
+        console.warn('[practice-payer-sync] Failed to fetch NPPES data for mismatch detection:', nppesErr);
+        // Continue without mismatch detection — snapshots still get upserted
+      }
     }
 
     // 2. Get active payer endpoints
@@ -61,11 +97,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No active payer endpoints configured' }, { status: 500 });
     }
 
-    // 3. Run FHIR lookups
+    // 2b. Clear existing unresolved mismatches for this practice — we'll re-detect fresh
+    try {
+      await db(`payer_directory_mismatches?practice_website_id=eq.${practice_id}&resolved_at=is.null`, {
+        method: 'DELETE',
+      });
+    } catch (delErr) {
+      console.warn('[practice-payer-sync] Failed to clear old mismatches (continuing):', delErr);
+    }
+
+    // 3. Run FHIR lookups + mismatch detection
     const fhirClient = new FhirDirectoryClient();
     const batchId = `admin-sync-${practice_id.slice(0, 8)}-${Date.now()}`;
     const results: { npi: string; payer: string; found: boolean }[] = [];
     let snapshotsUpserted = 0;
+    let mismatchesCreated = 0;
+    const allMismatches: DirectoryMismatch[] = [];
+    // Track not-listed counts per payer for acceptance gap detection
+    const payerStats = new Map<string, { total: number; notListed: number }>();
 
     for (const provider of providers) {
       if (!provider.npi) continue;
@@ -140,9 +189,91 @@ export async function POST(request: NextRequest) {
           });
           snapshotsUpserted++;
 
+          // Track per-payer stats for acceptance gap detection
+          const stats = payerStats.get(endpoint.payer_code) || { total: 0, notListed: 0 };
+          stats.total++;
+          if (!isListed) stats.notListed++;
+          payerStats.set(endpoint.payer_code, stats);
+
+          // ── Mismatch detection ──
+          const nppesData = nppesMap.get(provider.npi);
+          if (nppesData) {
+            try {
+              const mismatches = detectMismatches(nppesData, snapshot, practice_id);
+              if (mismatches.length > 0) {
+                allMismatches.push(...mismatches);
+                // Upsert each mismatch row
+                for (const m of mismatches) {
+                  await db('payer_directory_mismatches', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      npi: m.npi,
+                      payer_code: m.payer_code,
+                      practice_website_id: m.practice_website_id,
+                      field_name: m.field_name,
+                      mismatch_type: m.mismatch_type,
+                      nppes_value: m.nppes_value,
+                      website_value: m.website_value,
+                      payer_value: m.payer_value,
+                      recommended_value: m.recommended_value,
+                      priority: m.priority,
+                      fix_via_caqh: m.fix_via_caqh,
+                      fix_instructions: m.fix_instructions,
+                      // Don't overwrite resolved_at if it's already set
+                    }),
+                  });
+                  mismatchesCreated++;
+                }
+              }
+            } catch (mismatchErr) {
+              console.warn(`[practice-payer-sync] Mismatch detection error for NPI ${provider.npi} / ${endpoint.payer_code}:`, mismatchErr);
+            }
+          }
+
         } catch (err) {
           console.warn(`[practice-payer-sync] FHIR error for NPI ${provider.npi} / ${endpoint.payer_code}:`, err);
           results.push({ npi: provider.npi, payer: endpoint.payer_code, found: false });
+        }
+      }
+    }
+
+    // 4. Acceptance gap detection — per-payer practice-level mismatches
+    let acceptanceGapsCreated = 0;
+    for (const [payerCode, stats] of payerStats) {
+      if (stats.total > 0 && stats.notListed > 0) {
+        const gapPct = Math.round((stats.notListed / stats.total) * 100);
+        if (gapPct >= 20) {
+          try {
+            const gapMismatch = buildAcceptanceGapMismatch({
+              practice_website_id: practice_id,
+              payer_code: payerCode,
+              total_providers: stats.total,
+              not_listed_count: stats.notListed,
+              gap_percentage: gapPct,
+            });
+            allMismatches.push(gapMismatch);
+            await db('payer_directory_mismatches', {
+              method: 'POST',
+              body: JSON.stringify({
+                npi: gapMismatch.npi,
+                payer_code: gapMismatch.payer_code,
+                practice_website_id: gapMismatch.practice_website_id,
+                field_name: gapMismatch.field_name,
+                mismatch_type: gapMismatch.mismatch_type,
+                nppes_value: gapMismatch.nppes_value,
+                website_value: gapMismatch.website_value,
+                payer_value: gapMismatch.payer_value,
+                recommended_value: gapMismatch.recommended_value,
+                priority: gapMismatch.priority,
+                fix_via_caqh: gapMismatch.fix_via_caqh,
+                fix_instructions: gapMismatch.fix_instructions,
+              }),
+            });
+            acceptanceGapsCreated++;
+            mismatchesCreated++;
+          } catch (gapErr) {
+            console.warn(`[practice-payer-sync] Acceptance gap error for ${payerCode}:`, gapErr);
+          }
         }
       }
     }
@@ -159,8 +290,11 @@ export async function POST(request: NextRequest) {
       snapshots_upserted: snapshotsUpserted,
       listed,
       not_listed: notListed,
+      mismatches_detected: allMismatches.length,
+      mismatches_upserted: mismatchesCreated,
+      acceptance_gaps: acceptanceGapsCreated,
       elapsed_seconds: parseFloat(elapsed),
-      message: `Synced ${providers.length} providers × ${endpoints.length} payers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}`,
+      message: `Synced ${providers.length} providers × ${endpoints.length} payers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}. Mismatches: ${allMismatches.length}`,
     });
 
   } catch (err) {
