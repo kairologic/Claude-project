@@ -265,7 +265,12 @@ export class FhirDirectoryClient {
       headers['x-api-key'] = endpoint.auth_config.api_key;
     } else if (endpoint.auth_type === 'oauth2_client_credentials') {
       const token = await this.getOAuthToken(endpoint);
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (!token) {
+        throw new Error(
+          `[${endpoint.payer_code}] OAuth token acquisition failed — cannot query without auth`
+        );
+      }
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     // Timeout: 60s for Humana (slow responses), 30s for others
@@ -276,10 +281,38 @@ export class FhirDirectoryClient {
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    // 404 and 400 are expected when a provider isn't in a payer's directory
-    if (res.status === 404 || res.status === 400) {
-      console.log(`    [${endpoint.payer_code}] ${res.status} — provider not in directory`);
+    // 404 is the standard "not found" response in FHIR
+    if (res.status === 404) {
+      console.log(`    [${endpoint.payer_code}] 404 — provider not in directory`);
       return { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] } as T;
+    }
+
+    // 400 can mean "not found" on some FHIR servers, but also auth/format errors.
+    // Read the body to distinguish.
+    if (res.status === 400) {
+      const bodyText = await res.text();
+      const lowerBody = bodyText.toLowerCase();
+      const isNotFound =
+        lowerBody.includes('no resources match') ||
+        lowerBody.includes('not found') ||
+        lowerBody.includes('no results') ||
+        lowerBody.includes('unknown resource');
+      if (isNotFound) {
+        console.log(`    [${endpoint.payer_code}] 400 (not found) — provider not in directory`);
+        return { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] } as T;
+      }
+      // 400 that isn't "not found" → likely auth or request format error
+      console.error(`    [${endpoint.payer_code}] FHIR 400 error body: ${bodyText.slice(0, 300)}`);
+      throw new Error(
+        `[${endpoint.payer_code}] FHIR 400 (possible auth/config error): ${bodyText.slice(0, 200)}`
+      );
+    }
+
+    // 401/403 are always auth errors
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(
+        `[${endpoint.payer_code}] FHIR ${res.status} auth error — check credentials: ${res.statusText}`
+      );
     }
 
     if (!res.ok) {
