@@ -182,85 +182,111 @@ export class FhirDirectoryClient {
       // A) Reference-based: PractitionerRole?practitioner=Practitioner/{id} (works on UHC/Optum)
       // B) Chained identifier: PractitionerRole?practitioner.identifier=NPI (works on Aetna, Cigna)
       // Try reference-based first (more reliable), fall back to chained if no results.
-      await limiter.wait();
+      //
+      // GRACEFUL DEGRADATION: If PractitionerRole query fails (e.g. UHC intermittent 500s),
+      // we still build a partial snapshot from the Practitioner data we already have.
+      // This recovers name, phone, specialty, and credentials even when role/location/org
+      // are unavailable — still useful for mismatch detection.
+      let role: FhirPractitionerRole | null = null;
+      let roleBundle: FhirBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
+      let location: FhirLocation | null = null;
+      let organization: FhirOrganization | null = null;
+      let partialSnapshot = false;
 
-      const practitionerRef = `Practitioner/${practitioner.id}`;
-      let roleBundle = await this.fhirGet<FhirBundle>(
-        endpoint,
-        `/PractitionerRole?practitioner=${encodeURIComponent(practitionerRef)}` +
-          `&_include=PractitionerRole:location` +
-          `&_include=PractitionerRole:organization` +
-          `&_include=PractitionerRole:network`
-      );
-
-      let role = this.findResourceInBundle<FhirPractitionerRole>(
-        roleBundle,
-        'PractitionerRole'
-      );
-
-      // Fallback: try chained identifier search if reference-based returned nothing.
-      // Skip for name-mode payers (e.g. Cigna) — they don't support practitioner.identifier
-      // and return OperationOutcome error CRD16-005.
-      if (!role && !roleBundle.entry?.length && searchMode !== 'name') {
-        console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles, trying chained identifier...`);
+      try {
         await limiter.wait();
+
+        const practitionerRef = `Practitioner/${practitioner.id}`;
         roleBundle = await this.fhirGet<FhirBundle>(
           endpoint,
-          `/PractitionerRole?practitioner.identifier=${identifierParam}` +
+          `/PractitionerRole?practitioner=${encodeURIComponent(practitionerRef)}` +
             `&_include=PractitionerRole:location` +
             `&_include=PractitionerRole:organization` +
             `&_include=PractitionerRole:network`
         );
+
         role = this.findResourceInBundle<FhirPractitionerRole>(
           roleBundle,
           'PractitionerRole'
         );
-      } else if (!role && !roleBundle.entry?.length && searchMode === 'name') {
-        console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles — skipping chained identifier (name-mode payer)`);
-      }
 
-      // Extract included resources from the role bundle
-      let location = this.findResourceInBundle<FhirLocation>(
-        roleBundle,
-        'Location'
-      );
-      const organization = this.findResourceInBundle<FhirOrganization>(
-        roleBundle,
-        'Organization'
-      );
+        // Fallback: try chained identifier search if reference-based returned nothing.
+        // Skip for name-mode payers (e.g. Cigna) — they don't support practitioner.identifier
+        // and return OperationOutcome error CRD16-005.
+        if (!role && !roleBundle.entry?.length && searchMode !== 'name') {
+          console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles, trying chained identifier...`);
+          await limiter.wait();
+          roleBundle = await this.fhirGet<FhirBundle>(
+            endpoint,
+            `/PractitionerRole?practitioner.identifier=${identifierParam}` +
+              `&_include=PractitionerRole:location` +
+              `&_include=PractitionerRole:organization` +
+              `&_include=PractitionerRole:network`
+          );
+          role = this.findResourceInBundle<FhirPractitionerRole>(
+            roleBundle,
+            'PractitionerRole'
+          );
+        } else if (!role && !roleBundle.entry?.length && searchMode === 'name') {
+          console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles — skipping chained identifier (name-mode payer)`);
+        }
 
-      // ── Fix #42b: Fallback for Location when _include fails ──
-      // Some payers (Humana, HCSC) don't support _include, so Location
-      // comes back null. Extract the reference from PractitionerRole
-      // and fetch Location directly.
-      if (!location && role) {
-        const locationRef = this.extractLocationReference(role);
-        if (locationRef) {
-          try {
-            await limiter.wait();
-            const locationBundle = await this.fhirGet<FhirBundle>(
-              endpoint,
-              `/Location?_id=${locationRef}`
-            );
-            location = this.findResourceInBundle<FhirLocation>(
-              locationBundle,
-              'Location'
-            );
-            if (!location) {
-              // Try direct read by ID (some servers prefer /Location/{id} over search)
-              try {
-                await limiter.wait();
-                location = await this.fhirGet<FhirLocation>(
-                  endpoint,
-                  `/Location/${locationRef}`
-                );
-              } catch {
-                // Location not available via direct read either
+        // Extract included resources from the role bundle
+        location = this.findResourceInBundle<FhirLocation>(
+          roleBundle,
+          'Location'
+        );
+        organization = this.findResourceInBundle<FhirOrganization>(
+          roleBundle,
+          'Organization'
+        );
+
+        // ── Fix #42b: Fallback for Location when _include fails ──
+        // Some payers (Humana, HCSC) don't support _include, so Location
+        // comes back null. Extract the reference from PractitionerRole
+        // and fetch Location directly.
+        if (!location && role) {
+          const locationRef = this.extractLocationReference(role);
+          if (locationRef) {
+            try {
+              await limiter.wait();
+              const locationBundle = await this.fhirGet<FhirBundle>(
+                endpoint,
+                `/Location?_id=${locationRef}`
+              );
+              location = this.findResourceInBundle<FhirLocation>(
+                locationBundle,
+                'Location'
+              );
+              if (!location) {
+                // Try direct read by ID (some servers prefer /Location/{id} over search)
+                try {
+                  await limiter.wait();
+                  location = await this.fhirGet<FhirLocation>(
+                    endpoint,
+                    `/Location/${locationRef}`
+                  );
+                } catch {
+                  // Location not available via direct read either
+                }
               }
+            } catch (err) {
+              console.log(`    [${endpoint.payer_code}] Location fallback failed: ${err instanceof Error ? err.message : err}`);
             }
-          } catch (err) {
-            console.log(`    [${endpoint.payer_code}] Location fallback failed: ${err instanceof Error ? err.message : err}`);
           }
+        }
+      } catch (roleErr: unknown) {
+        // GRACEFUL DEGRADATION: PractitionerRole query failed (e.g. UHC 500).
+        // Continue with just Practitioner data — we still get name, phone, specialty, credentials.
+        const roleMsg = roleErr instanceof Error ? roleErr.message : String(roleErr);
+        const is500 = roleMsg.includes('500') || roleMsg.includes('Internal Server Error');
+        if (is500) {
+          console.warn(`    [${endpoint.payer_code}] PractitionerRole query returned 500 for ${npi} — building partial snapshot from Practitioner data`);
+          partialSnapshot = true;
+          // role, location, organization remain null — snapshot will have Practitioner fields only
+        } else {
+          // Non-500 errors (auth, config, etc.) should still propagate
+          throw roleErr;
         }
       }
 
@@ -297,6 +323,10 @@ export class FhirDirectoryClient {
         batchId,
         allPractitioners
       );
+
+      if (partialSnapshot) {
+        console.log(`    [${endpoint.payer_code}] Partial snapshot for ${npi}: name=${snapshot.listed_name_full || 'N/A'}, phone=${snapshot.listed_phone || 'N/A'}, specialty=${snapshot.listed_specialty_display || 'N/A'}`);
+      }
 
       return snapshot;
     } catch (err: unknown) {
