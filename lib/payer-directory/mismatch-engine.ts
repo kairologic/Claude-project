@@ -318,3 +318,57 @@ function normalizeName(name: string | null | undefined): string | null {
   if (!name) return null;
   return name.toUpperCase().replace(/[^A-Z]/g, '').trim() || null;
 }
+
+// ═══ #114: Payer Acceptance Gap Sub-Signal ═══════════════════
+
+export interface AcceptanceGapInput {
+  practice_website_id: string;
+  payer_code: string;
+  total_providers: number;
+  not_listed_count: number;
+  gap_percentage: number;
+}
+
+/**
+ * Generate a mismatch entry for a payer acceptance gap.
+ * This fires when the practice website claims to accept a payer
+ * but most providers aren't found in that payer's directory.
+ *
+ * This mismatch gets injected into Workflow 2 alongside field-level
+ * mismatches (address, phone, etc.) so the practice manager sees
+ * the full picture in one place.
+ */
+export function buildAcceptanceGapMismatch(
+  gap: AcceptanceGapInput,
+): DirectoryMismatch {
+  const payerPullsFromCaqh = CAQH_CONNECTED_PAYERS.includes(gap.payer_code);
+
+  // Priority: 1 if action-level (>50% gap), 2 if warning (20-50%)
+  const priority = gap.gap_percentage > 50 ? 1 : 2;
+
+  return {
+    npi: 'PRACTICE', // practice-level, not provider-specific
+    payer_code: gap.payer_code,
+    practice_website_id: gap.practice_website_id,
+    snapshot_id: null,
+    field_name: 'payer_acceptance',
+    mismatch_type: 'acceptance_gap',
+    nppes_value: null,
+    website_value: `Accepts ${gap.payer_code.toUpperCase()}`,
+    payer_value: `${gap.not_listed_count}/${gap.total_providers} providers not listed`,
+    recommended_value: payerPullsFromCaqh
+      ? 'Update CAQH profiles for all providers, or remove payer from website'
+      : `Contact ${gap.payer_code.toUpperCase()} to verify network participation, or remove from website`,
+    fix_via_caqh: payerPullsFromCaqh,
+    fix_instructions: payerPullsFromCaqh
+      ? `${gap.not_listed_count} of ${gap.total_providers} providers are not found in ${gap.payer_code.toUpperCase()}'s directory. ` +
+        'Step 1: Log into CAQH ProView for each unlisted provider. ' +
+        'Step 2: Ensure this payer is authorized to access the provider\'s data. ' +
+        'Step 3: Verify practice location is current. ' +
+        `If providers are truly out-of-network, remove "${gap.payer_code.toUpperCase()}" from your website\'s accepted insurance list.`
+      : `${gap.not_listed_count} of ${gap.total_providers} providers not in directory. ` +
+        `Contact ${gap.payer_code.toUpperCase()} provider relations to confirm network status. ` +
+        'If out-of-network, remove this payer from your website to avoid No Surprises Act violations.',
+    priority,
+  };
+}

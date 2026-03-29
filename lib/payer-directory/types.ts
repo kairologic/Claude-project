@@ -112,7 +112,7 @@ export interface DirectoryMismatch {
   practice_website_id: string | null;
   snapshot_id: string | null;
   field_name: string;
-  mismatch_type: 'value_differs' | 'not_listed' | 'wrong_location' | 'specialty_mismatch';
+  mismatch_type: 'value_differs' | 'not_listed' | 'wrong_location' | 'specialty_mismatch' | 'acceptance_gap';
   nppes_value: string | null;
   website_value: string | null;
   payer_value: string | null;

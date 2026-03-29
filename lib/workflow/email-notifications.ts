@@ -29,6 +29,12 @@ type TemplateVars = {
   days_overdue?: number;
   confirmed_value?: string;
   finding_summary?: string;
+  // #113: Payer acceptance gap fields
+  payer_name?: string;
+  not_listed_count?: number;
+  total_providers?: number;
+  gap_percentage?: number;
+  gap_details?: string;
 };
 
 const TEMPLATES: Record<string, {
@@ -129,6 +135,62 @@ const TEMPLATES: Record<string, {
       <a href="${v.workflow_url}" style="display:inline-block;background:#0F1E2E;color:#FFFFFF;
         text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-top:8px">
         View Summary
+      </a>
+    `),
+  },
+
+  // #113: Payer acceptance gap alerts
+  payer_acceptance_gap_warning: {
+    subject: (v) =>
+      `Warning: ${v.not_listed_count || 'some'} providers not in ${v.payer_name || 'payer'} directory`,
+    html: (v) => emailWrapper(`
+      <h2 style="color:#D4A017;margin:0 0 16px">⚠ Payer Acceptance Gap Detected</h2>
+      <p>Your website says you accept <strong>${v.payer_name || 'this payer'}</strong>, but
+        <strong>${v.not_listed_count || 'some'} of ${v.total_providers || 'your'}</strong>
+        providers are <strong>not found</strong> in that payer's directory.</p>
+      <div style="background:#FDF6E3;border:1px solid #D4A017;border-radius:8px;padding:16px;margin:16px 0">
+        <strong style="color:#0F1E2E">${v.gap_percentage || 0}% of providers missing</strong>
+        <br><span style="color:#5A6472;font-size:13px">
+          Patients who see "${v.payer_name}" on your website may face surprise out-of-network charges
+          if they book with an unlisted provider.
+        </span>
+      </div>
+      ${v.gap_details ? `<p style="color:#5A6472;font-size:14px">${v.gap_details}</p>` : ''}
+      <p style="font-size:14px"><strong>Recommended action:</strong> Update CAQH profiles for unlisted
+        providers to ensure they appear in the ${v.payer_name || 'payer'} directory. This typically
+        takes 3-5 business days to propagate.</p>
+      <a href="${v.workflow_url}" style="display:inline-block;background:#D4A017;color:#0F1E2E;
+        text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-top:8px">
+        View Details
+      </a>
+    `),
+  },
+
+  payer_acceptance_gap_action: {
+    subject: (v) =>
+      `ACTION: ${v.practice_name || 'Practice'} — ${v.payer_name || 'payer'} directory mismatch (${v.gap_percentage || 0}% missing)`,
+    html: (v) => emailWrapper(`
+      <h2 style="color:#D64545;margin:0 0 16px">🚨 Payer Acceptance Gap — Action Required</h2>
+      <p>Your website advertises acceptance of <strong>${v.payer_name || 'this payer'}</strong>, but
+        <strong>${v.not_listed_count || 'most'} of ${v.total_providers || 'your'}</strong>
+        providers (<strong>${v.gap_percentage || 0}%</strong>) are <strong>not found</strong>
+        in that payer's provider directory.</p>
+      <div style="background:#FDE8E8;border:1px solid #D64545;border-radius:8px;padding:16px;margin:16px 0">
+        <strong style="color:#D64545">Compliance Risk: No Surprises Act</strong>
+        <br><span style="color:#5A6472;font-size:13px">
+          Under the No Surprises Act, patients relying on published directory information
+          may be entitled to in-network rates. This gap creates significant billing risk.
+        </span>
+      </div>
+      <p style="font-size:14px"><strong>Immediate steps:</strong></p>
+      <ol style="color:#0F1E2E;line-height:1.8;font-size:14px">
+        <li>Verify CAQH profiles are current for all providers</li>
+        <li>Ensure ${v.payer_name || 'the payer'} is authorized in each provider's CAQH attestation</li>
+        <li>If providers are truly out-of-network, <strong>remove ${v.payer_name || 'the payer'}</strong> from your website</li>
+      </ol>
+      <a href="${v.workflow_url}" style="display:inline-block;background:#D64545;color:#FFFFFF;
+        text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-top:8px">
+        Fix This Now
       </a>
     `),
   },
