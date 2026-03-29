@@ -44,9 +44,11 @@ export async function POST(request: NextRequest) {
       normalizedUrl = `https://${normalizedUrl}`;
     }
 
-    // Check for duplicate URL
+    // Check for duplicate URL — strip trailing slash for comparison
+    const baseUrl = normalizedUrl.replace(/\/+$/, '');
+    // Match exact URL or URL with trailing slash/query params only
     const existing = await db(
-      `practice_websites?url=ilike.${encodeURIComponent(normalizedUrl)}*&select=id,name,url&limit=1`
+      `practice_websites?or=(url.eq.${encodeURIComponent(baseUrl)},url.eq.${encodeURIComponent(baseUrl + '/')},url.like.${encodeURIComponent(baseUrl + '?')}*,url.like.${encodeURIComponent(baseUrl + '/?')}*)&select=id,name,url&limit=1`
     );
     if (existing && existing.length > 0) {
       // Practice exists from a prior scan — adopt it into admin tracking
