@@ -92,6 +92,9 @@ export async function POST(request: NextRequest) {
 
     // ═══ Phase 2 (optional): Refresh snapshots from FHIR endpoints ═══
     let fhirRefreshStats = { attempted: 0, upserted: 0, errors: 0 };
+    // Capture first N error messages for diagnostics (visible in API response)
+    const errorSamples: string[] = [];
+    const MAX_ERROR_SAMPLES = 10;
     // Track payers that had FHIR errors (auth failures, config issues).
     // Phase 1 will exclude old snapshots from these payers since the data is unreliable.
     const failedPayers = new Set<string>();
@@ -180,6 +183,9 @@ export async function POST(request: NextRequest) {
                 console.warn(`[practice-payer-sync] Upsert failed for NPI ${provider.npi}/${endpoint.payer_code} — full error: ${msg}`);
               }
               fhirRefreshStats.errors++;
+              if (errorSamples.length < MAX_ERROR_SAMPLES) {
+                errorSamples.push(`${provider.npi}/${endpoint.payer_code}: ${msg.slice(0, 200)}`);
+              }
               // If this looks like an auth/config error (not a single-provider issue),
               // mark the entire payer as failed so we don't waste time on more requests
               if (
@@ -333,7 +339,7 @@ export async function POST(request: NextRequest) {
       mismatches_detected: allMismatches.length,
       mismatches_upserted: mismatchesCreated,
       acceptance_gaps: acceptanceGapsCreated,
-      fhir_refresh: refresh ? { ...fhirRefreshStats, failed_payers: [...failedPayers] } : null,
+      fhir_refresh: refresh ? { ...fhirRefreshStats, failed_payers: [...failedPayers], error_samples: errorSamples } : null,
       elapsed_seconds: parseFloat(elapsed),
       message: `Analyzed ${snapshots.length} snapshots for ${npiList.length} providers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}. Mismatches: ${allMismatches.length}`,
     });
