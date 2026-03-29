@@ -125,9 +125,16 @@ async function main() {
   let totalNotListed = 0;
   let totalErrors = 0;
   let totalMismatches = 0;
+  const failedPayers = new Set<string>();
 
   for (let pIdx = 0; pIdx < endpoints.length; pIdx++) {
     const endpoint = endpoints[pIdx];
+
+    if (failedPayers.has(endpoint.payer_code)) {
+      console.log(`\n─── ${endpoint.payer_name} (${endpoint.payer_code}) ── SKIPPED (auth failure) ───`);
+      continue;
+    }
+
     console.log(`\n─── ${endpoint.payer_name} (${endpoint.payer_code}) ───`);
 
     let payerListed = 0;
@@ -143,7 +150,8 @@ async function main() {
           const snapshot = await client.lookupByNpi(
             provider.npi,
             endpoint,
-            batchId
+            batchId,
+            provider.provider_name
           );
 
           if (!snapshot) continue;
@@ -271,9 +279,21 @@ async function main() {
           }
         } catch (err) {
           payerErrors++;
-          console.error(`  Error for NPI ${provider.npi}: ${err instanceof Error ? err.message : err}`);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`  Error for NPI ${provider.npi}: ${msg}`);
+
+          // If this is an auth/config error, mark the entire payer as failed
+          // to avoid wasting requests on remaining providers
+          if (msg.includes('OAuth token') || msg.includes('auth error') || msg.includes('auth/config error')) {
+            console.warn(`  ⚠️ Marking ${endpoint.payer_code} as failed — skipping remaining providers for this payer`);
+            failedPayers.add(endpoint.payer_code);
+            break; // Exit the provider loop for this payer
+          }
         }
       }
+
+      // Break out of batch loop if payer was marked as failed
+      if (failedPayers.has(endpoint.payer_code)) break;
 
       const progress = Math.min(i + BATCH_SIZE, providers.length);
       process.stdout.write(`\r  Progress: ${progress}/${providers.length} | Listed: ${payerListed} | Not listed: ${payerNotListed} | Mismatches: ${payerMismatches} | Errors: ${payerErrors}`);

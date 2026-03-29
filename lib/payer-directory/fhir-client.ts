@@ -63,7 +63,8 @@ export class FhirDirectoryClient {
   async lookupByNpi(
     npi: string,
     endpoint: PayerEndpoint,
-    batchId?: string
+    batchId?: string,
+    providerName?: string | null
   ): Promise<DirectorySnapshot | null> {
     if (!endpoint.is_active || endpoint.fhir_base_url === 'TBD') {
       return null;
@@ -77,16 +78,88 @@ export class FhirDirectoryClient {
       const identifierParam = `${encodeURIComponent(NPI_SYSTEM + '|' + npi)}`;
 
       // ── Step 1: Find Practitioner by NPI ──
-      await limiter.wait();
-      const practitionerBundle = await this.fhirGet<FhirBundle>(
-        endpoint,
-        `/Practitioner?identifier=${identifierParam}`
-      );
+      // Strategy A: Search by NPI identifier (standard FHIR, works on most payers)
+      // Strategy B: Search by family+given name (fallback for payers like Cigna
+      //             that don't support `identifier` search param on Practitioner)
+      let practitionerBundle: FhirBundle;
+      let practitioner: FhirPractitioner | null = null;
+      let usedNameFallback = false;
 
-      const practitioner = this.findResourceInBundle<FhirPractitioner>(
-        practitionerBundle,
-        'Practitioner'
-      );
+      try {
+        await limiter.wait();
+        practitionerBundle = await this.fhirGet<FhirBundle>(
+          endpoint,
+          `/Practitioner?identifier=${identifierParam}`
+        );
+        practitioner = this.findResourceInBundle<FhirPractitioner>(
+          practitionerBundle,
+          'Practitioner'
+        );
+      } catch (identifierErr: unknown) {
+        const errMsg = identifierErr instanceof Error ? identifierErr.message : String(identifierErr);
+        // If identifier search fails (e.g. Cigna returns 400 "param not valid"),
+        // fall back to name-based search
+        if (errMsg.includes('400') && providerName) {
+          console.log(`    [${endpoint.payer_code}] Identifier search failed, trying name-based fallback for ${npi}...`);
+          practitionerBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
+        } else {
+          throw identifierErr; // Re-throw if not a 400 or no name available
+        }
+      }
+
+      // Strategy B: Name-based fallback when identifier search returned nothing
+      if (!practitioner && providerName) {
+        const nameParts = providerName
+          .replace(/^Dr\.?\s*/i, '')
+          .replace(/,?\s*(MD|DO|NP|PA|DPM|DDS|DMD|OD|PhD|APRN|FNP|DNP)$/i, '')
+          .trim()
+          .split(/\s+/);
+
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts[nameParts.length - 1];
+
+          if (firstName.length >= 2 && lastName.length >= 2) {
+            try {
+              await limiter.wait();
+              const nameBundle = await this.fhirGet<FhirBundle>(
+                endpoint,
+                `/Practitioner?family=${encodeURIComponent(lastName)}&given=${encodeURIComponent(firstName)}`
+              );
+
+              // Verify NPI match in returned results to avoid false positives
+              for (const entry of (nameBundle.entry || [])) {
+                const resource = entry.resource as FhirPractitioner;
+                if (resource?.resourceType !== 'Practitioner') continue;
+
+                const hasMatchingNpi = (resource.identifier || []).some(
+                  (id) => id.system === NPI_SYSTEM && id.value === npi
+                );
+
+                if (hasMatchingNpi) {
+                  practitioner = resource;
+                  practitionerBundle = nameBundle;
+                  usedNameFallback = true;
+                  console.log(`    [${endpoint.payer_code}] Found ${npi} via name search (${firstName} ${lastName})`);
+                  break;
+                }
+              }
+
+              if (!practitioner && (nameBundle.entry?.length || 0) > 0) {
+                console.log(
+                  `    [${endpoint.payer_code}] Name search for ${firstName} ${lastName} returned ` +
+                  `${nameBundle.entry?.length} results but none matched NPI ${npi}`
+                );
+              }
+            } catch (nameErr) {
+              console.warn(
+                `    [${endpoint.payer_code}] Name-based search failed for ${npi}:`,
+                nameErr instanceof Error ? nameErr.message : nameErr
+              );
+            }
+          }
+        }
+      }
 
       if (!practitioner) {
         // Provider not listed in this payer directory
@@ -224,7 +297,8 @@ export class FhirDirectoryClient {
   async lookupAllPayers(
     npi: string,
     endpoints: PayerEndpoint[],
-    batchId?: string
+    batchId?: string,
+    providerName?: string | null
   ): Promise<DirectorySnapshot[]> {
     const results: DirectorySnapshot[] = [];
 
@@ -235,7 +309,7 @@ export class FhirDirectoryClient {
       }
 
       console.log(`  [${endpoint.payer_code}] Querying ${endpoint.payer_name}...`);
-      const snapshot = await this.lookupByNpi(npi, endpoint, batchId);
+      const snapshot = await this.lookupByNpi(npi, endpoint, batchId, providerName);
 
       if (snapshot) {
         results.push(snapshot);

@@ -145,7 +145,7 @@ export async function runAcceptanceGapCheck(
   };
 
   // 1. Fetch practices that have accepted_payers populated
-  let practiceFilter = 'practice_websites?accepted_payers=not.is.null&select=id,name,url,accepted_payers';
+  let practiceFilter = 'practice_websites?accepted_payers=not.is.null&select=id,name,url,accepted_payers,accepted_payers_source';
   if (options.practiceId) {
     practiceFilter += `&id=eq.${options.practiceId}`;
   }
@@ -155,6 +155,7 @@ export async function runAcceptanceGapCheck(
     name: string | null;
     url: string;
     accepted_payers: string[];
+    accepted_payers_source: string | null;
   }[] = await dbFn(practiceFilter);
 
   if (!practices || practices.length === 0) {
@@ -176,7 +177,7 @@ export async function runAcceptanceGapCheck(
 
     // 3. Get payer directory snapshots for these providers (with consecutive counter)
     const npiList = providers.map(p => `"${p.npi}"`).join(',');
-    let snapshotFilter = `payer_directory_snapshots?npi=in.(${npiList})&select=npi,payer_code,listed_status,consecutive_not_listed_count,reverification_confirmed`;
+    let snapshotFilter = `payer_directory_snapshots?npi=in.(${npiList})&select=npi,payer_code,fhir_practitioner_id,consecutive_not_listed_count,reverification_confirmed`;
     if (options.payerCode) {
       snapshotFilter += `&payer_code=eq.${options.payerCode}`;
     }
@@ -184,7 +185,7 @@ export async function runAcceptanceGapCheck(
     const snapshots: {
       npi: string;
       payer_code: string;
-      listed_status: string;
+      fhir_practitioner_id: string | null;
       consecutive_not_listed_count: number;
       reverification_confirmed: boolean | null;
     }[] = await dbFn(snapshotFilter);
@@ -208,7 +209,12 @@ export async function runAcceptanceGapCheck(
       const ps = statusMap.get(snap.npi);
       if (!ps) continue;
 
-      if (snap.listed_status === 'not_listed') {
+      // Determine listed status from fhir_practitioner_id:
+      // Non-null = provider was found in the payer directory
+      // Null = provider was NOT found (not listed)
+      const isNotListed = !snap.fhir_practitioner_id;
+
+      if (isNotListed) {
         if (snap.consecutive_not_listed_count < NOT_LISTED_THRESHOLD) {
           // Layer 1: Below threshold — don't count as not_listed yet
           // (treat as unknown/pending, effectively skip)
@@ -264,8 +270,8 @@ export async function runAcceptanceGapCheck(
                 last_reverification_at: now,
                 reverification_confirmed: !result.found,
                 // If found, update the snapshot data and reset counter
-                ...(result.found ? {
-                  listed_status: 'listed',
+                ...(result.found && result.snapshot ? {
+                  fhir_practitioner_id: result.snapshot.fhir_practitioner_id,
                   consecutive_not_listed_count: 0,
                 } : {}),
               }),
@@ -309,6 +315,10 @@ export async function runAcceptanceGapCheck(
       report.gaps.push(...gaps);
 
       // Generate Workflow 2 compatible mismatches for warning+ severity
+      // Determine signal confidence from acceptance source
+      const acceptanceSource = practice.accepted_payers_source || 'assumed';
+      const signalType = acceptanceSource === 'admin_entered' ? 'confirmed' : 'indicative';
+
       for (const gap of gaps) {
         if (gap.severity === 'warning' || gap.severity === 'action') {
           const mismatch = buildAcceptanceGapMismatch({
@@ -318,6 +328,9 @@ export async function runAcceptanceGapCheck(
             not_listed_count: gap.not_listed_count,
             gap_percentage: gap.gap_percentage,
           });
+          // Attach signal metadata for the dashboard
+          (mismatch as any).signal_type = signalType;
+          (mismatch as any).acceptance_source = acceptanceSource;
           report.mismatches.push(mismatch);
         }
       }

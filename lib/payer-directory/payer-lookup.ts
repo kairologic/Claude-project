@@ -42,8 +42,9 @@ export class PayerDirectoryLookup {
       return null;
     }
 
-    // Standard FHIR lookup
-    return this.fhirClient.lookupByNpi(npi, endpoint, batchId);
+    // Standard FHIR lookup (pass name for fallback on payers that don't support identifier search)
+    const fullName = `${providerFirstName} ${providerLastName}`.trim();
+    return this.fhirClient.lookupByNpi(npi, endpoint, batchId, fullName || null);
   }
 
   /**
@@ -70,7 +71,8 @@ export class PayerDirectoryLookup {
     const fhirResults = await Promise.allSettled(
       fhirEndpoints.map(async (endpoint) => {
         console.log(`  [${endpoint.payer_code}] Querying ${endpoint.payer_name} (FHIR)...`);
-        return this.fhirClient.lookupByNpi(npi, endpoint, batchId);
+        const fullName = `${providerFirstName} ${providerLastName}`.trim();
+        return this.fhirClient.lookupByNpi(npi, endpoint, batchId, fullName || null);
       })
     );
 

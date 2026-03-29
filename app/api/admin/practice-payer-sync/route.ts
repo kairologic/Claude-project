@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
             if (failedPayers.has(endpoint.payer_code)) continue; // Skip payer if already failed
             fhirRefreshStats.attempted++;
             try {
-              const snapshot = await fhirClient.lookupByNpi(provider.npi, endpoint, batchId);
+              const snapshot = await fhirClient.lookupByNpi(provider.npi, endpoint, batchId, provider.provider_name);
               if (!snapshot) continue;
 
               const isListed = !!snapshot.fhir_practitioner_id;
@@ -294,6 +294,8 @@ export async function POST(request: NextRequest) {
                 fix_via_caqh: gapMismatch.fix_via_caqh,
                 fix_instructions: gapMismatch.fix_instructions,
                 status: 'open',
+                signal_type: 'indicative',
+                acceptance_source: 'assumed',
               }),
             });
             acceptanceGapsCreated++;
