@@ -1532,6 +1532,7 @@ export default function AdminDashboard() {
             <div><h1 className="text-base font-bold">Sentry Control Center</h1><p className="text-[9px] text-slate-400 uppercase">Registry & Compliance</p></div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/admin/practices"><button className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs font-bold flex items-center gap-1.5"><Globe size={14} /> Practices</button></Link>
             <Link href="/admin/content-studio"><button className="px-3 py-1.5 bg-[#C5A059]/20 hover:bg-[#C5A059]/40 rounded-lg text-[#C5A059] text-xs font-bold flex items-center gap-1.5"><Sparkles size={14} /> Content Studio</button></Link>
             <Link href="/"><button className="p-2 bg-white/10 hover:bg-white/20 rounded-lg"><Eye size={16} /></button></Link>
             <button onClick={handleLogout} className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg"><LogOut size={16} /></button>
