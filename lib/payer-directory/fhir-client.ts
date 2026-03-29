@@ -431,20 +431,48 @@ export class FhirDirectoryClient {
       );
     }
 
-    // 401/403 are always auth errors
+    // 401/403 are always auth errors — invalidate cached token and throw
     if (res.status === 401 || res.status === 403) {
+      this.authTokens.delete(endpoint.payer_code); // force token refresh on next call
       throw new Error(
         `[${endpoint.payer_code}] FHIR ${res.status} auth error — check credentials: ${res.statusText}`
       );
     }
 
+    // 429 = rate limited — retry once after Retry-After header or 5s default
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('Retry-After') || '', 10);
+      const delay = retryAfter > 0 ? retryAfter * 1000 : 5000;
+      console.warn(`    [${endpoint.payer_code}] FHIR 429 rate limited, waiting ${delay}ms before retry...`);
+      await new Promise((r) => setTimeout(r, delay));
+
+      // Single retry after rate limit wait
+      const retryRes = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!retryRes.ok) {
+        throw new Error(
+          `[${endpoint.payer_code}] FHIR ${retryRes.status} after 429 retry: ${retryRes.statusText} — ${url}`
+        );
+      }
+      return retryRes.json() as Promise<T>;
+    }
+
+    // 500+ = server error — throw with clear message
     if (!res.ok) {
-      throw new Error(`FHIR ${res.status}: ${res.statusText} — ${url}`);
+      throw new Error(`[${endpoint.payer_code}] FHIR ${res.status}: ${res.statusText} — ${url}`);
     }
 
     return res.json() as Promise<T>;
   }
 
+  /**
+   * OAuth token fetch with retry + exponential backoff.
+   * Retries up to 2 times on transient failures (network errors, 500/502/503).
+   * Returns null only when config is missing; throws on persistent auth failures
+   * so callers can distinguish "no config" from "auth broken."
+   */
   private async getOAuthToken(endpoint: PayerEndpoint): Promise<string | null> {
     const cached = this.authTokens.get(endpoint.payer_code);
     if (cached && cached.expires > Date.now()) return cached.token;
@@ -475,24 +503,92 @@ export class FhirDirectoryClient {
       bodyParams.scope = config.scope;
     }
 
-    const res = await fetch(config.token_url, {
-      method: 'POST',
-      headers,
-      body: new URLSearchParams(bodyParams),
-    });
+    const MAX_RETRIES = 2;
+    const OAUTH_TIMEOUT_MS = 15_000; // 15s timeout for token fetch
+    let lastError: Error | null = null;
 
-    if (!res.ok) {
-      console.error(`  [${endpoint.payer_code}] OAuth token failed: ${res.status} ${res.statusText}`);
-      return null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const res = await fetch(config.token_url, {
+          method: 'POST',
+          headers,
+          body: new URLSearchParams(bodyParams),
+          signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
+        });
+
+        // 401/403 = bad credentials, don't retry
+        if (res.status === 401 || res.status === 403) {
+          const errBody = await res.text().catch(() => '');
+          throw new Error(
+            `[${endpoint.payer_code}] OAuth ${res.status}: credentials rejected — ${errBody.slice(0, 200)}`
+          );
+        }
+
+        // 429 = rate limited, retry with longer backoff
+        if (res.status === 429) {
+          const retryAfter = parseInt(res.headers.get('Retry-After') || '', 10);
+          const delay = (retryAfter > 0 ? retryAfter * 1000 : 5000) * (attempt + 1);
+          console.warn(`  [${endpoint.payer_code}] OAuth 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+
+        // 500/502/503 = transient server error, retry with backoff
+        if (res.status >= 500) {
+          const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+          console.warn(`  [${endpoint.payer_code}] OAuth ${res.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          lastError = new Error(`[${endpoint.payer_code}] OAuth token server error: ${res.status} ${res.statusText}`);
+          if (attempt < MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          throw lastError;
+        }
+
+        if (!res.ok) {
+          const errBody = await res.text().catch(() => '');
+          throw new Error(
+            `[${endpoint.payer_code}] OAuth token failed: ${res.status} ${res.statusText} — ${errBody.slice(0, 200)}`
+          );
+        }
+
+        const data = (await res.json()) as { access_token: string; expires_in: number };
+
+        if (!data.access_token) {
+          throw new Error(`[${endpoint.payer_code}] OAuth response missing access_token`);
+        }
+
+        this.authTokens.set(endpoint.payer_code, {
+          token: data.access_token,
+          expires: Date.now() + (data.expires_in - 60) * 1000,
+        });
+
+        return data.access_token;
+
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+
+        // Timeout or network errors are retryable
+        const isRetryable = lastError.name === 'AbortError' ||
+          lastError.name === 'TimeoutError' ||
+          lastError.message.includes('fetch failed') ||
+          lastError.message.includes('ECONNREFUSED') ||
+          lastError.message.includes('ETIMEDOUT');
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          const delay = 1000 * Math.pow(2, attempt);
+          console.warn(`  [${endpoint.payer_code}] OAuth network error (${lastError.message}), retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+
+        // Non-retryable or exhausted retries — throw
+        throw lastError;
+      }
     }
-    const data = (await res.json()) as { access_token: string; expires_in: number };
 
-    this.authTokens.set(endpoint.payer_code, {
-      token: data.access_token,
-      expires: Date.now() + (data.expires_in - 60) * 1000,
-    });
-
-    return data.access_token;
+    // Should not reach here, but safety net
+    throw lastError || new Error(`[${endpoint.payer_code}] OAuth failed after ${MAX_RETRIES + 1} attempts`);
   }
 
   // ── Resource extraction ───────────────────────────────────

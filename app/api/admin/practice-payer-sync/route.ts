@@ -39,14 +39,33 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
   return ct.includes('json') ? res.json() : null;
 }
 
+// ── Practice-level sync lock ──────────────────────────────────
+// Prevents concurrent syncs for the same practice from creating race conditions.
+// In-memory lock is sufficient for single-instance Vercel deployments.
+const activeSyncs = new Map<string, number>(); // practice_id → start timestamp
+const SYNC_LOCK_TIMEOUT_MS = 300_000; // 5 minutes max lock duration
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  let lockedPracticeId: string | null = null;
 
   try {
     const { practice_id, refresh } = await request.json();
     if (!practice_id) {
       return NextResponse.json({ error: 'practice_id required' }, { status: 400 });
     }
+
+    // Check for concurrent sync — reject if another sync is running for this practice
+    const existingSync = activeSyncs.get(practice_id);
+    if (existingSync && (Date.now() - existingSync) < SYNC_LOCK_TIMEOUT_MS) {
+      const elapsedSec = Math.round((Date.now() - existingSync) / 1000);
+      return NextResponse.json({
+        error: `Sync already in progress for this practice (started ${elapsedSec}s ago). Please wait for it to complete.`,
+        retry_after_seconds: 30,
+      }, { status: 429 });
+    }
+    activeSyncs.set(practice_id, startTime);
+    lockedPracticeId = practice_id;
 
     // 1. Get practice providers
     const providers = await db(
@@ -59,7 +78,10 @@ export async function POST(request: NextRequest) {
     const npiList = providers.map((p: any) => p.npi).filter(Boolean);
 
     // 2. Bulk-fetch NPPES data for all provider NPIs
+    //    CRITICAL: If NPPES data is unavailable, mismatch detection is meaningless.
+    //    We fail explicitly rather than producing misleading "0 mismatches" results.
     const nppesMap = new Map<string, NppesProviderData>();
+    let nppesLoadError: string | null = null;
     if (npiList.length > 0) {
       try {
         const nppesRows = await db(
@@ -85,8 +107,13 @@ export async function POST(request: NextRequest) {
             });
           }
         }
+        if (nppesMap.size === 0) {
+          nppesLoadError = `NPPES returned 0 rows for ${npiList.length} NPIs — mismatch detection will be skipped`;
+          console.warn(`[practice-payer-sync] ${nppesLoadError}`);
+        }
       } catch (nppesErr) {
-        console.warn('[practice-payer-sync] Failed to fetch NPPES data:', nppesErr);
+        nppesLoadError = `Failed to fetch NPPES data: ${nppesErr instanceof Error ? nppesErr.message : String(nppesErr)}`;
+        console.error(`[practice-payer-sync] ${nppesLoadError}`);
       }
     }
 
@@ -98,6 +125,10 @@ export async function POST(request: NextRequest) {
     // Track payers that had FHIR errors (auth failures, config issues).
     // Phase 1 will exclude old snapshots from these payers since the data is unreliable.
     const failedPayers = new Set<string>();
+    // Circuit breaker: track consecutive failures per payer.
+    // If a payer fails 3+ providers in a row, mark it as failed (likely a systemic issue).
+    const consecutiveFailures = new Map<string, number>();
+    const CIRCUIT_BREAKER_THRESHOLD = 3;
     if (refresh) {
       const endpoints: PayerEndpoint[] = await db(
         'payer_directory_endpoints?is_active=eq.true&select=*'
@@ -172,6 +203,8 @@ export async function POST(request: NextRequest) {
                 body: JSON.stringify(snapshotRow),
               });
               fhirRefreshStats.upserted++;
+              // Reset circuit breaker on success
+              consecutiveFailures.set(endpoint.payer_code, 0);
 
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
@@ -186,16 +219,27 @@ export async function POST(request: NextRequest) {
               if (errorSamples.length < MAX_ERROR_SAMPLES) {
                 errorSamples.push(`${provider.npi}/${endpoint.payer_code}: ${msg.slice(0, 200)}`);
               }
-              // If this looks like an auth/config error (not a single-provider issue),
-              // mark the entire payer as failed so we don't waste time on more requests
-              if (
-                msg.includes('OAuth token') ||
+
+              // ── Circuit breaker: immediate trip on auth errors ──
+              const isAuthError =
+                msg.includes('OAuth') ||
                 msg.includes('auth error') ||
-                msg.includes('auth/config error') ||
+                msg.includes('credentials rejected') ||
                 msg.includes('FHIR 401') ||
-                msg.includes('FHIR 403')
-              ) {
-                console.warn(`[practice-payer-sync] Marking ${endpoint.payer_code} as failed — skipping remaining providers`);
+                msg.includes('FHIR 403');
+              if (isAuthError) {
+                console.warn(`[practice-payer-sync] Auth failure for ${endpoint.payer_code} — skipping remaining providers`);
+                failedPayers.add(endpoint.payer_code);
+                continue;
+              }
+
+              // ── Circuit breaker: consecutive failure tracking ──
+              const prevFailCount = consecutiveFailures.get(endpoint.payer_code) || 0;
+              consecutiveFailures.set(endpoint.payer_code, prevFailCount + 1);
+              if (prevFailCount + 1 >= CIRCUIT_BREAKER_THRESHOLD) {
+                console.warn(
+                  `[practice-payer-sync] Circuit breaker: ${endpoint.payer_code} failed ${prevFailCount + 1} times consecutively — skipping remaining providers`
+                );
                 failedPayers.add(endpoint.payer_code);
               }
             }
@@ -329,6 +373,15 @@ export async function POST(request: NextRequest) {
     const listed = snapshots.filter((s: DirectorySnapshot) => !!s.fhir_practitioner_id).length;
     const notListed = snapshots.filter((s: DirectorySnapshot) => !s.fhir_practitioner_id).length;
 
+    // Build warnings array for issues that didn't prevent sync but affect data quality
+    const warnings: string[] = [];
+    if (nppesLoadError) {
+      warnings.push(`NPPES: ${nppesLoadError}`);
+    }
+    if (failedPayers.size > 0) {
+      warnings.push(`Failed payers (circuit breaker): ${[...failedPayers].join(', ')}`);
+    }
+
     return NextResponse.json({
       success: true,
       practice_id,
@@ -340,6 +393,7 @@ export async function POST(request: NextRequest) {
       mismatches_upserted: mismatchesCreated,
       acceptance_gaps: acceptanceGapsCreated,
       fhir_refresh: refresh ? { ...fhirRefreshStats, failed_payers: [...failedPayers], error_samples: errorSamples } : null,
+      warnings: warnings.length > 0 ? warnings : undefined,
       elapsed_seconds: parseFloat(elapsed),
       message: `Analyzed ${snapshots.length} snapshots for ${npiList.length} providers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}. Mismatches: ${allMismatches.length}`,
     });
@@ -350,5 +404,10 @@ export async function POST(request: NextRequest) {
       { error: err instanceof Error ? err.message : 'Payer sync failed' },
       { status: 500 },
     );
+  } finally {
+    // Always release the practice-level sync lock
+    if (lockedPracticeId) {
+      activeSyncs.delete(lockedPracticeId);
+    }
   }
 }
