@@ -50,32 +50,34 @@ export async function POST(req: NextRequest) {
   if (raw) {
     const token = await getOAuthToken(endpoint);
     const npi = npis[0];
+    const name = (await req.json().catch(() => ({}))).name; // optional name param
     const npiSystem = 'http://hl7.org/fhir/sid/us-npi';
     const identifierParam = encodeURIComponent(`${npiSystem}|${npi}`);
+    const base = endpoint.fhir_base_url;
 
-    // Try multiple search approaches
-    // Try multiple base URL + path combinations to find the right one
-    const bases = [
-      endpoint.fhir_base_url,
-      'https://apif1.aetna.com/fhir/v1/providerdirectorydata',
-      'https://apif1.aetna.com/fhir/v1/providerdirectory',
-      'https://apif1.aetna.com/v1/providerdirectory',
+    // Try identifier-based, name-based, and bare NPI searches
+    const urls = [
+      { label: 'identifier (system|npi)', url: `${base}/Practitioner?identifier=${identifierParam}` },
+      { label: 'identifier (bare npi)', url: `${base}/Practitioner?identifier=${npi}` },
+      { label: 'name (family=Peckham)', url: `${base}/Practitioner?family=Peckham` },
+      { label: 'name (family=Solodky)', url: `${base}/Practitioner?family=Solodky` },
+      { label: 'name (family=Daniel)', url: `${base}/Practitioner?family=Daniel&given=Steven` },
+      { label: 'all practitioners (no filter)', url: `${base}/Practitioner?_count=5` },
     ];
-    const urls = bases.map(b => `${b}/Practitioner?identifier=${identifierParam}`);
 
-    const rawResults: Array<{ url: string; status: number; body: unknown }> = [];
-    for (const url of urls) {
+    const rawResults: Array<{ label: string; url: string; status: number; total?: number; entries?: number; body: unknown }> = [];
+    for (const { label, url } of urls) {
       try {
         const resp = await fetch(url, {
           headers: { Accept: 'application/fhir+json', Authorization: `Bearer ${token}` },
         });
         const body = await resp.json();
-        rawResults.push({ url, status: resp.status, body });
+        rawResults.push({ label, url, status: resp.status, total: body.total, entries: body.entry?.length || 0, body });
       } catch (err: unknown) {
-        rawResults.push({ url, status: 0, body: { error: err instanceof Error ? err.message : String(err) } });
+        rawResults.push({ label, url, status: 0, body: { error: err instanceof Error ? err.message : String(err) } });
       }
     }
-    return NextResponse.json({ npi, fhir_base_url: endpoint.fhir_base_url, rawResults });
+    return NextResponse.json({ npi, fhir_base_url: base, rawResults });
   }
 
   // NORMAL MODE: use FHIR client
