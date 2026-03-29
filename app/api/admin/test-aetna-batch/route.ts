@@ -54,11 +54,14 @@ export async function POST(req: NextRequest) {
     const identifierParam = encodeURIComponent(`${npiSystem}|${npi}`);
 
     // Try multiple search approaches
-    const urls = [
-      `${endpoint.fhir_base_url}/Practitioner?identifier=${identifierParam}`,
-      `${endpoint.fhir_base_url}/Practitioner?identifier=${npi}`,
-      `${endpoint.fhir_base_url}/Practitioner?_id=${npi}`,
+    // Try multiple base URL + path combinations to find the right one
+    const bases = [
+      endpoint.fhir_base_url,
+      'https://apif1.aetna.com/fhir/v1/providerdirectorydata',
+      'https://apif1.aetna.com/fhir/v1/providerdirectory',
+      'https://apif1.aetna.com/v1/providerdirectory',
     ];
+    const urls = bases.map(b => `${b}/Practitioner?identifier=${identifierParam}`);
 
     const rawResults: Array<{ url: string; status: number; body: unknown }> = [];
     for (const url of urls) {
