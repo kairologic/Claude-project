@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
                 snapshotRow.last_reverification_at = null;
               }
 
-              await db('payer_directory_snapshots', {
+              await db('payer_directory_snapshots?on_conflict=npi,payer_code,snapshot_date', {
                 method: 'POST',
                 body: JSON.stringify(snapshotRow),
               });
