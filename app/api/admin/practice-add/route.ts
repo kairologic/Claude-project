@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
         consecutive_errors: 0,
         provider_count: 0,
         mismatch_count: 0,
+        admin_tracked: true,
       }),
     });
 

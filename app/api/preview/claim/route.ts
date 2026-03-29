@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         organization_id: orgId,
         scan_tier: 'weekly',  // upgrade during trial
+        admin_tracked: true,
       }),
     });
 
