@@ -49,10 +49,17 @@ export async function POST(request: NextRequest) {
       `practice_websites?url=ilike.${encodeURIComponent(normalizedUrl)}*&select=id,name,url&limit=1`
     );
     if (existing && existing.length > 0) {
-      return NextResponse.json(
-        { error: `Practice already exists: ${existing[0].name || existing[0].url}`, existing: existing[0] },
-        { status: 409 },
-      );
+      // Practice exists from a prior scan — adopt it into admin tracking
+      await db(`practice_websites?id=eq.${existing[0].id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ admin_tracked: true }),
+      });
+      return NextResponse.json({
+        success: true,
+        adopted: true,
+        practice: existing[0],
+        message: `Practice "${existing[0].name || existing[0].url}" added to admin tracking.`,
+      });
     }
 
     // Look up NPI in NPPES data if provided
