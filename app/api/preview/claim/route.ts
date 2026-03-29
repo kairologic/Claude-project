@@ -118,6 +118,32 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ is_claimed: true, claimed_at: new Date().toISOString() }),
     });
 
+    // 10. Trigger on-demand scan + payer sync so data is fresh for first login
+    try {
+      await db(`practice_websites?id=eq.${practiceWebsiteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          scan_scheduled_at: new Date().toISOString(),
+          scan_status: 'pending',
+        }),
+      });
+      await db('admin_action_queue', {
+        method: 'POST',
+        body: JSON.stringify({
+          action_type: 'payer_sync',
+          target_id: practiceWebsiteId,
+          target_type: 'practice',
+          status: 'pending',
+          requested_at: new Date().toISOString(),
+          metadata: { practice_name: practice.name, trigger: 'claim' },
+        }),
+        headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' } as any,
+      });
+    } catch (scanErr) {
+      // Non-blocking: claim succeeds even if scan queue fails
+      console.warn('[Claim API] Failed to queue post-claim scan:', scanErr);
+    }
+
     return NextResponse.json({
       success: true,
       practice_website_id: practiceWebsiteId,
