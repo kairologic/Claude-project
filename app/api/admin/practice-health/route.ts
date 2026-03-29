@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
       // Delta events
       db(`nppes_delta_events?practice_website_id=in.(${idList})&select=practice_website_id,status`),
       // Payer snapshots (latest per NPI+payer)
-      db(`payer_directory_snapshots?select=npi,payer_code,listed_status,snapshot_date&order=snapshot_date.desc`),
+      db(`payer_directory_snapshots?select=npi,payer_code,fhir_practitioner_id,snapshot_date&order=snapshot_date.desc`),
       // Open payer mismatches
       db(`payer_directory_mismatches?practice_website_id=in.(${idList})&status=eq.open&select=practice_website_id`),
       // Workflows
@@ -198,8 +198,8 @@ export async function GET(request: NextRequest) {
         .filter((r: any) => r.practice_website_id === pid)
         .map((r: any) => r.npi);
       const pSnapshots = (payerSnapshots || []).filter((r: any) => practiceNpis.includes(r.npi));
-      const listed = pSnapshots.filter((r: any) => r.listed_status !== 'not_listed').length;
-      const notListed = pSnapshots.filter((r: any) => r.listed_status === 'not_listed').length;
+      const listed = pSnapshots.filter((r: any) => r.fhir_practitioner_id != null).length;
+      const notListed = pSnapshots.filter((r: any) => r.fhir_practitioner_id == null).length;
       const lastSync = pSnapshots.length > 0 ? pSnapshots[0]?.snapshot_date : null;
 
       // Payer mismatches
