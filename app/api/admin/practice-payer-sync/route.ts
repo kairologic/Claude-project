@@ -172,11 +172,23 @@ export async function POST(request: NextRequest) {
 
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
+              const stack = err instanceof Error ? err.stack : undefined;
               console.warn(`[practice-payer-sync] FHIR error for ${provider.npi}/${endpoint.payer_code}: ${msg}`);
+              if (stack) console.warn(`[practice-payer-sync] Stack: ${stack}`);
+              // Log full error for DB upsert failures to capture PostgREST error body
+              if (msg.includes('DB POST')) {
+                console.warn(`[practice-payer-sync] Upsert failed for NPI ${provider.npi}/${endpoint.payer_code} — full error: ${msg}`);
+              }
               fhirRefreshStats.errors++;
               // If this looks like an auth/config error (not a single-provider issue),
               // mark the entire payer as failed so we don't waste time on more requests
-              if (msg.includes('OAuth token') || msg.includes('auth error') || msg.includes('auth/config error')) {
+              if (
+                msg.includes('OAuth token') ||
+                msg.includes('auth error') ||
+                msg.includes('auth/config error') ||
+                msg.includes('FHIR 401') ||
+                msg.includes('FHIR 403')
+              ) {
                 console.warn(`[practice-payer-sync] Marking ${endpoint.payer_code} as failed — skipping remaining providers`);
                 failedPayers.add(endpoint.payer_code);
               }

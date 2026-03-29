@@ -76,38 +76,49 @@ export class FhirDirectoryClient {
     try {
       // URL-encode the pipe: some FHIR servers reject raw | in query strings
       const identifierParam = `${encodeURIComponent(NPI_SYSTEM + '|' + npi)}`;
+      const searchMode = (endpoint as any).search_mode || 'npi';
 
       // ── Step 1: Find Practitioner by NPI ──
       // Strategy A: Search by NPI identifier (standard FHIR, works on most payers)
-      // Strategy B: Search by family+given name (fallback for payers like Cigna
-      //             that don't support `identifier` search param on Practitioner)
+      // Strategy B: Search by family+given name (for payers like Cigna whose
+      //             CapabilityStatement only supports name/family/given params)
+      // The endpoint's search_mode drives which strategy to use first:
+      //   'npi'  → try identifier first, fall back to name
+      //   'name' → skip identifier entirely, go straight to name search
       let practitionerBundle: FhirBundle;
       let practitioner: FhirPractitioner | null = null;
       let usedNameFallback = false;
 
-      try {
-        await limiter.wait();
-        practitionerBundle = await this.fhirGet<FhirBundle>(
-          endpoint,
-          `/Practitioner?identifier=${identifierParam}`
-        );
-        practitioner = this.findResourceInBundle<FhirPractitioner>(
-          practitionerBundle,
-          'Practitioner'
-        );
-      } catch (identifierErr: unknown) {
-        const errMsg = identifierErr instanceof Error ? identifierErr.message : String(identifierErr);
-        // If identifier search fails (e.g. Cigna returns 400 "param not valid"),
-        // fall back to name-based search
-        if (errMsg.includes('400') && providerName) {
-          console.log(`    [${endpoint.payer_code}] Identifier search failed, trying name-based fallback for ${npi}...`);
-          practitionerBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
-        } else {
-          throw identifierErr; // Re-throw if not a 400 or no name available
+      if (searchMode !== 'name') {
+        // Strategy A: identifier-based search (default for most payers)
+        try {
+          await limiter.wait();
+          practitionerBundle = await this.fhirGet<FhirBundle>(
+            endpoint,
+            `/Practitioner?identifier=${identifierParam}`
+          );
+          practitioner = this.findResourceInBundle<FhirPractitioner>(
+            practitionerBundle,
+            'Practitioner'
+          );
+        } catch (identifierErr: unknown) {
+          const errMsg = identifierErr instanceof Error ? identifierErr.message : String(identifierErr);
+          // If identifier search fails (e.g. Cigna returns 400 "param not valid"),
+          // fall back to name-based search
+          if (errMsg.includes('400') && providerName) {
+            console.log(`    [${endpoint.payer_code}] Identifier search failed (400), trying name-based fallback for ${npi}...`);
+            practitionerBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
+          } else {
+            throw identifierErr; // Re-throw if not a 400 or no name available
+          }
         }
+      } else {
+        // Name-mode: skip identifier search entirely (saves a wasted API call)
+        console.log(`    [${endpoint.payer_code}] search_mode=name — skipping identifier search for ${npi}`);
+        practitionerBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
       }
 
-      // Strategy B: Name-based fallback when identifier search returned nothing
+      // Strategy B: Name-based search when identifier returned nothing or was skipped
       if (!practitioner && providerName) {
         const nameParts = providerName
           .replace(/^Dr\.?\s*/i, '')
@@ -187,8 +198,10 @@ export class FhirDirectoryClient {
         'PractitionerRole'
       );
 
-      // Fallback: try chained identifier search if reference-based returned nothing
-      if (!role && roleBundle.total === 0) {
+      // Fallback: try chained identifier search if reference-based returned nothing.
+      // Skip for name-mode payers (e.g. Cigna) — they don't support practitioner.identifier
+      // and return OperationOutcome error CRD16-005.
+      if (!role && !roleBundle.entry?.length && searchMode !== 'name') {
         console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles, trying chained identifier...`);
         await limiter.wait();
         roleBundle = await this.fhirGet<FhirBundle>(
@@ -202,6 +215,8 @@ export class FhirDirectoryClient {
           roleBundle,
           'PractitionerRole'
         );
+      } else if (!role && !roleBundle.entry?.length && searchMode === 'name') {
+        console.log(`    [${endpoint.payer_code}] Reference query returned 0 roles — skipping chained identifier (name-mode payer)`);
       }
 
       // Extract included resources from the role bundle
