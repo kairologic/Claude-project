@@ -302,7 +302,7 @@ export class FhirDirectoryClient {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`  [${endpoint.payer_code}] Error looking up NPI ${npi}: ${msg}`);
-      return null;
+      throw err; // Re-throw so callers can count/handle errors
     }
   }
 
@@ -324,17 +324,21 @@ export class FhirDirectoryClient {
       }
 
       console.log(`  [${endpoint.payer_code}] Querying ${endpoint.payer_name}...`);
-      const snapshot = await this.lookupByNpi(npi, endpoint, batchId, providerName);
+      try {
+        const snapshot = await this.lookupByNpi(npi, endpoint, batchId, providerName);
 
-      if (snapshot) {
-        results.push(snapshot);
-        const listed = snapshot.listed_name_full || snapshot.listed_name_last || '(no name)';
-        const addr = snapshot.listed_city
-          ? `${snapshot.listed_city}, ${snapshot.listed_state}`
-          : '(no address)';
-        console.log(`    → Found: ${listed} at ${addr}`);
-      } else {
-        console.log(`    → Not found or endpoint unavailable`);
+        if (snapshot) {
+          results.push(snapshot);
+          const listed = snapshot.listed_name_full || snapshot.listed_name_last || '(no name)';
+          const addr = snapshot.listed_city
+            ? `${snapshot.listed_city}, ${snapshot.listed_state}`
+            : '(no address)';
+          console.log(`    → Found: ${listed} at ${addr}`);
+        } else {
+          console.log(`    → Not found or endpoint unavailable`);
+        }
+      } catch (err) {
+        console.warn(`  [${endpoint.payer_code}] Error for NPI ${npi}: ${err instanceof Error ? err.message : err}`);
       }
     }
 
