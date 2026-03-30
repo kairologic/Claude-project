@@ -79,22 +79,70 @@ export default function AdminPracticesPage() {
     }
   }, [router]);
 
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
   const fetchPractices = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/admin/practice-health');
-      const data = await res.json();
-      if (data.practices) {
-        setPractices(data.practices);
-      } else if (data.error) {
-        setError(data.error);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.practices) {
+          setPractices(data.practices);
+          return;
+        }
       }
+      // Fallback: query practice_websites directly if API auth fails
+      const fallback = await fetch(
+        `${SUPABASE_URL}/rest/v1/practice_websites?select=id,name,url,npi,state,organization_id,scan_status,last_scan_at,scan_tier,consecutive_errors,provider_count,mismatch_count,accepted_payers,claimed_at&order=name.asc&limit=500`,
+        { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
+      );
+      if (!fallback.ok) {
+        throw new Error('Failed to load practices');
+      }
+      const rows = await fallback.json();
+      const mapped: PracticeHealth[] = rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        url: r.url,
+        npi: r.npi,
+        state: r.state,
+        organization_id: r.organization_id,
+        status: r.claimed_at ? 'active' : 'unclaimed',
+        claimed_at: r.claimed_at,
+        scan_status: r.scan_status || 'pending',
+        last_scan_at: r.last_scan_at,
+        scan_tier: r.scan_tier || 'standard',
+        consecutive_errors: r.consecutive_errors || 0,
+        provider_count: r.provider_count || 0,
+        mismatch_count: r.mismatch_count || 0,
+        accepted_payers: r.accepted_payers || null,
+        providers_total: r.provider_count || 0,
+        providers_active: r.provider_count || 0,
+        providers_unverified: 0,
+        providers_departed: 0,
+        delta_events_total: 0,
+        delta_events_unresolved: 0,
+        payer_snapshots_total: 0,
+        payer_snapshots_listed: 0,
+        payer_snapshots_not_listed: r.mismatch_count || 0,
+        payer_mismatches_open: r.mismatch_count || 0,
+        last_payer_sync_at: null,
+        workflows_total: 0,
+        workflows_action_needed: 0,
+        workflows_resolved: 0,
+        alerts_total: 0,
+        alerts_unread: 0,
+        dashboard_issues: [],
+      }));
+      setPractices(mapped);
     } catch (err) {
       setError('Failed to load practices');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [SUPABASE_URL, SUPABASE_ANON]);
 
   useEffect(() => { fetchPractices(); }, [fetchPractices]);
 

@@ -77,7 +77,7 @@ export default function AlertsPage() {
         setError(null);
 
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/alerts?select=*,practices(name)`,
+          `${SUPABASE_URL}/rest/v1/alerts?select=*,practice_websites(name)&order=created_at.desc`,
           {
             headers: {
               apikey: SUPABASE_ANON,
@@ -87,7 +87,21 @@ export default function AlertsPage() {
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch alerts: ${response.statusText}`);
+          const fallbackResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/alerts?select=*&order=created_at.desc`,
+            { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
+          );
+          if (!fallbackResponse.ok) {
+            throw new Error(`Failed to fetch alerts: ${fallbackResponse.statusText}`);
+          }
+          const fallbackData = await fallbackResponse.json();
+          setAlerts(fallbackData.map((alert: any) => ({
+            id: alert.id, practice_id: alert.practice_id, title: alert.title,
+            description: alert.description, severity: alert.severity,
+            created_at: alert.created_at, workflow_id: alert.workflow_id,
+            provider_name: alert.provider_name,
+          })));
+          return;
         }
 
         const data = await response.json();
@@ -101,7 +115,7 @@ export default function AlertsPage() {
           severity: alert.severity,
           created_at: alert.created_at,
           workflow_id: alert.workflow_id,
-          practice_name: alert.practices?.name,
+          practice_name: alert.practice_websites?.name,
           provider_name: alert.provider_name,
         }));
 

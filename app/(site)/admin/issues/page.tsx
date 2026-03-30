@@ -141,40 +141,28 @@ export default function IssuesPage() {
           'Content-Type': 'application/json',
         };
 
-        // Fetch all feedback
+        // Fetch all feedback with practice name join
         const feedbackResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/feedback?select=*`,
+          `${SUPABASE_URL}/rest/v1/feedback?select=*,practice_websites(name)&order=created_at.desc`,
           { headers }
         );
 
         if (!feedbackResponse.ok) {
+          // Table may not exist yet — show empty state gracefully
+          if (feedbackResponse.status === 404 || feedbackResponse.status === 400) {
+            setFeedback([]);
+            setStats({ all: 0, new: 0, reviewed: 0, in_progress: 0, resolved: 0, closed: 0 });
+            return;
+          }
           throw new Error(`Failed to fetch feedback: ${feedbackResponse.statusText}`);
         }
 
-        const feedbackData = (await feedbackResponse.json()) as Feedback[];
+        const feedbackData = (await feedbackResponse.json()) as any[];
 
-        // Fetch practice names for each feedback
-        const feedbackWithPracticeNames = await Promise.all(
-          feedbackData.map(async (item) => {
-            try {
-              const practiceResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/practices?id=eq.${item.practice_id}&select=name`,
-                { headers }
-              );
-
-              if (practiceResponse.ok) {
-                const practiceData = await practiceResponse.json();
-                return {
-                  ...item,
-                  practice_name: practiceData[0]?.name || 'Unknown Practice',
-                };
-              }
-              return { ...item, practice_name: 'Unknown Practice' };
-            } catch {
-              return { ...item, practice_name: 'Unknown Practice' };
-            }
-          })
-        );
+        const feedbackWithPracticeNames: Feedback[] = feedbackData.map((item) => ({
+          ...item,
+          practice_name: item.practice_websites?.name || 'Unknown Practice',
+        }));
 
         setFeedback(feedbackWithPracticeNames);
 
