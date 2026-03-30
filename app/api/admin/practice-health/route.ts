@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api/with-auth';
+import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
 // TODO: Add system-admin role check when role system is expanded
 
@@ -95,11 +95,14 @@ function detectIssues(p: PracticeHealth): DashboardIssue[] {
   return issues;
 }
 
-const GET_HANDLER = withAuth(async (request: NextRequest, ctx) => {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const practiceId = searchParams.get('id');
-    const supabase = ctx.supabase;
+
+    // Admin routes use the service-role client directly.
+    // Page-level auth is handled by sessionStorage in the admin layout.
+    const supabase = createAdminSupabaseClient();
 
     // Call the server-side RPC function that does all aggregation in SQL
     const { data: rows, error } = await supabase.rpc('get_practice_health_summary', {
@@ -142,6 +145,4 @@ const GET_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       { status: 500 },
     );
   }
-});
-
-export { GET_HANDLER as GET };
+}
