@@ -94,8 +94,9 @@ export default function AdminPracticesPage() {
         }
       }
       // Fallback: query practice_websites directly if API auth fails
+      // Use select=* to avoid requesting columns that may not exist
       const fallback = await fetch(
-        `${SUPABASE_URL}/rest/v1/practice_websites?select=id,name,url,npi,state,organization_id,scan_status,last_scan_at,scan_tier,consecutive_errors,provider_count,mismatch_count,accepted_payers,claimed_at&order=name.asc&limit=500`,
+        `${SUPABASE_URL}/rest/v1/practice_websites?select=*&order=name.asc&limit=500`,
         { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
       );
       if (!fallback.ok) {
@@ -104,20 +105,20 @@ export default function AdminPracticesPage() {
       const rows = await fallback.json();
       const mapped: PracticeHealth[] = rows.map((r: any) => ({
         id: r.id,
-        name: r.name,
+        name: r.name ?? null,
         url: r.url,
-        npi: r.npi,
-        state: r.state,
-        organization_id: r.organization_id,
-        status: r.claimed_at ? 'active' : 'unclaimed',
-        claimed_at: r.claimed_at,
+        npi: r.npi ?? null,
+        state: r.state ?? null,
+        organization_id: r.organization_id ?? null,
+        status: (r.organization_id || r.claimed_at) ? 'active' : 'unclaimed',
+        claimed_at: r.claimed_at ?? null,
         scan_status: r.scan_status || 'pending',
-        last_scan_at: r.last_scan_at,
+        last_scan_at: r.last_scan_at ?? null,
         scan_tier: r.scan_tier || 'standard',
         consecutive_errors: r.consecutive_errors || 0,
         provider_count: r.provider_count || 0,
         mismatch_count: r.mismatch_count || 0,
-        accepted_payers: r.accepted_payers || null,
+        accepted_payers: r.accepted_payers ?? null,
         providers_total: r.provider_count || 0,
         providers_active: r.provider_count || 0,
         providers_unverified: 0,
