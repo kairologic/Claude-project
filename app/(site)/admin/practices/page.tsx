@@ -11,6 +11,7 @@ interface PracticeHealth {
   url: string;
   npi: string | null;
   state: string | null;
+  city: string | null;
   organization_id: string | null;
   status: 'active' | 'pending' | 'error' | 'unclaimed';
   claimed_at: string | null;
@@ -110,8 +111,9 @@ export default function AdminPracticesPage() {
         url: r.url,
         npi: r.npi,
         state: r.state,
+        city: r.city ?? null,
         organization_id: r.organization_id ?? null,
-        status: r.claimed_at ? 'active' : 'unclaimed',
+        status: r.organization_id ? 'active' : 'unclaimed',
         claimed_at: r.claimed_at ?? null,
         scan_status: r.scan_status || 'pending',
         last_scan_at: r.last_scan_at ?? null,
@@ -150,9 +152,7 @@ export default function AdminPracticesPage() {
 
   // ── Filter + Search ──
   const filtered = practices.filter(p => {
-    if (filter === 'active') {
-      if (!p.claimed_at) return false;
-    } else if (filter !== 'all' && p.status !== filter) {
+    if (filter !== 'all' && p.status !== filter) {
       return false;
     }
     if (search) {
@@ -161,7 +161,8 @@ export default function AdminPracticesPage() {
         (p.name || '').toLowerCase().includes(q) ||
         (p.url || '').toLowerCase().includes(q) ||
         (p.npi || '').includes(q) ||
-        (p.state || '').toLowerCase().includes(q)
+        (p.state || '').toLowerCase().includes(q) ||
+        (p.city || '').toLowerCase().includes(q)
       );
     }
     return true;
@@ -176,7 +177,7 @@ export default function AdminPracticesPage() {
     let cmp = 0;
     if (sortCol === 'name') cmp = (a.name || '').localeCompare(b.name || '');
     else if (sortCol === 'providers') cmp = a.providers_active - b.providers_active;
-    else if (sortCol === 'status') cmp = (a.claimed_at ? 0 : 1) - (b.claimed_at ? 0 : 1);
+    else if (sortCol === 'status') cmp = (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1);
     else if (sortCol === 'last_scan') {
       const ta = a.last_scan_at ? new Date(a.last_scan_at).getTime() : 0;
       const tb = b.last_scan_at ? new Date(b.last_scan_at).getTime() : 0;
@@ -206,8 +207,8 @@ export default function AdminPracticesPage() {
   // ── Stats ──
   const stats = {
     total: practices.length,
-    active: practices.filter(p => p.claimed_at !== null).length,
-    unclaimed: practices.filter(p => !p.claimed_at).length,
+    active: practices.filter(p => p.status === 'active').length,
+    unclaimed: practices.filter(p => p.status === 'unclaimed').length,
     errors: practices.filter(p => p.status === 'error').length,
     withIssues: practices.filter(p => p.dashboard_issues.some(i => i.severity === 'error' || i.severity === 'warning')).length,
   };
@@ -257,7 +258,7 @@ export default function AdminPracticesPage() {
         <div style={{ flex: 1, minWidth: 200 }}>
           <input
             type="text"
-            placeholder="Search by name, URL, NPI, or state..."
+            placeholder="Search by name, URL, NPI, city, or state..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
@@ -383,7 +384,7 @@ function PracticeRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: sc.dot, flexShrink: 0 }} />
             <span style={{ fontWeight: 600, color: C.navy, fontSize: 15 }}>{p.name || 'Unnamed'}</span>
-            {p.state && <span style={{ fontSize: 11, color: C.gray400, fontWeight: 500 }}>{p.state}</span>}
+            {(p.city || p.state) && <span style={{ fontSize: 11, color: C.gray400, fontWeight: 500 }}>{[p.city, p.state].filter(Boolean).join(', ')}</span>}
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 4, marginLeft: 16 }}>
             <span style={{ fontSize: 12, color: C.gray400 }}>{p.url?.replace(/https?:\/\//, '').replace(/\/$/, '')}</span>
@@ -398,9 +399,13 @@ function PracticeRow({
 
         {/* Status (Live / Unclaimed) */}
         <div style={{ textAlign: 'center' }}>
-          {p.claimed_at ? (
+          {p.status === 'active' ? (
             <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700, background: C.greenPale, color: C.green }}>
               Live
+            </span>
+          ) : p.status === 'error' ? (
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700, background: '#FEE2E2', color: C.red }}>
+              Error
             </span>
           ) : (
             <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700, background: C.gray200, color: C.gray600 }}>

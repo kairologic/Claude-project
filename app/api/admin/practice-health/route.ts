@@ -20,6 +20,7 @@ export interface PracticeHealth {
   url: string;
   npi: string | null;
   state: string | null;
+  city: string | null;
   organization_id: string | null;
   status: 'active' | 'pending' | 'error' | 'unclaimed';
   claimed_at: string | null;
