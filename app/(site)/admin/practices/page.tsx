@@ -71,6 +71,8 @@ export default function AdminPracticesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sortCol, setSortCol] = useState<'name' | 'providers' | 'status' | 'last_scan'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Auth check
   useEffect(() => {
@@ -148,7 +150,11 @@ export default function AdminPracticesPage() {
 
   // ── Filter + Search ──
   const filtered = practices.filter(p => {
-    if (filter !== 'all' && p.status !== filter) return false;
+    if (filter === 'active') {
+      if (!p.claimed_at) return false;
+    } else if (filter !== 'all' && p.status !== filter) {
+      return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -159,6 +165,24 @@ export default function AdminPracticesPage() {
       );
     }
     return true;
+  });
+
+  // ── Sort ──
+  const toggleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0;
+    if (sortCol === 'name') cmp = (a.name || '').localeCompare(b.name || '');
+    else if (sortCol === 'providers') cmp = a.providers_active - b.providers_active;
+    else if (sortCol === 'status') cmp = (a.claimed_at ? 0 : 1) - (b.claimed_at ? 0 : 1);
+    else if (sortCol === 'last_scan') {
+      const ta = a.last_scan_at ? new Date(a.last_scan_at).getTime() : 0;
+      const tb = b.last_scan_at ? new Date(b.last_scan_at).getTime() : 0;
+      cmp = ta - tb;
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
   });
 
   // ── Actions ──
@@ -182,8 +206,8 @@ export default function AdminPracticesPage() {
   // ── Stats ──
   const stats = {
     total: practices.length,
-    active: practices.filter(p => p.status === 'active').length,
-    unclaimed: practices.filter(p => p.status === 'unclaimed').length,
+    active: practices.filter(p => p.claimed_at !== null).length,
+    unclaimed: practices.filter(p => !p.claimed_at).length,
     errors: practices.filter(p => p.status === 'error').length,
     withIssues: practices.filter(p => p.dashboard_issues.some(i => i.severity === 'error' || i.severity === 'warning')).length,
   };
@@ -251,22 +275,64 @@ export default function AdminPracticesPage() {
           <div style={{ textAlign: 'center', padding: 60, color: C.gray400 }}>Loading practices...</div>
         ) : error ? (
           <div style={{ textAlign: 'center', padding: 60, color: C.red }}>{error}</div>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, color: C.gray400 }}>
             {practices.length === 0 ? 'No practices found. Add one to get started.' : 'No practices match your filter.'}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filtered.map(p => (
-              <PracticeRow
-                key={p.id}
-                practice={p}
-                expanded={expandedId === p.id}
-                onToggle={() => setExpandedId(expandedId === p.id ? null : p.id)}
-                onAction={triggerAction}
-                actionLoading={actionLoading}
-              />
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {/* Column Headers */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '2fr 90px 90px 90px 90px 90px 110px 70px',
+              padding: '8px 20px', gap: 8,
+            }}>
+              {([
+                ['name', 'Name'],
+                ['providers', 'Providers'],
+                ['status', 'Status'],
+                ['last_scan', 'Last Scan'],
+                [null, 'Payer Listed'],
+                [null, 'Open'],
+                [null, 'Issues'],
+                [null, ''],
+              ] as [typeof sortCol | null, string][]).map(([col, label]) => (
+                <div key={label} style={{ textAlign: col === 'name' ? 'left' : 'center' }}>
+                  {col ? (
+                    <button
+                      onClick={() => toggleSort(col)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: 11, fontWeight: 700, color: sortCol === col ? C.navy : C.gray400,
+                        padding: 0, display: 'inline-flex', alignItems: 'center', gap: 3,
+                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                      }}
+                    >
+                      {label}
+                      <span style={{ fontSize: 10, color: sortCol === col ? C.navy : C.gray200 }}>
+                        {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      </span>
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: C.gray400, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {label}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {sorted.map(p => (
+                <PracticeRow
+                  key={p.id}
+                  practice={p}
+                  expanded={expandedId === p.id}
+                  onToggle={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                  onAction={triggerAction}
+                  actionLoading={actionLoading}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -308,7 +374,7 @@ function PracticeRow({
       <div
         onClick={onToggle}
         style={{
-          display: 'grid', gridTemplateColumns: '2fr 100px 100px 100px 100px 120px 80px',
+          display: 'grid', gridTemplateColumns: '2fr 90px 90px 90px 90px 90px 110px 70px',
           alignItems: 'center', padding: '16px 20px', cursor: 'pointer', gap: 8,
         }}
       >
@@ -328,7 +394,19 @@ function PracticeRow({
         {/* Providers */}
         <div style={{ textAlign: 'center' }}>
           <span style={{ fontWeight: 600, color: C.navy, fontSize: 16 }}>{p.providers_active}</span>
-          <div style={{ fontSize: 11, color: C.gray400 }}>Providers</div>
+        </div>
+
+        {/* Status (Live / Unclaimed) */}
+        <div style={{ textAlign: 'center' }}>
+          {p.claimed_at ? (
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700, background: C.greenPale, color: C.green }}>
+              Live
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700, background: C.gray200, color: C.gray600 }}>
+              Unclaimed
+            </span>
+          )}
         </div>
 
         {/* Scan */}
