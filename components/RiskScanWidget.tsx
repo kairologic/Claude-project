@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, XCircle, Loader2, Shield, Globe, Brain, Lock, MapPin, AlertTriangle } from 'lucide-react';
 
-// Supabase Configuration - Update these with your actual values
-const SUPABASE_URL = 'https://mxrtltezhkxhqizvxvsz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cnRsdGV6aGt4aHFpenZ4dnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzI1ODAsImV4cCI6MjA4NDM0ODU4MH0.pkPlFyHsMOKJKcxuw_eoV5EKkrXG09Vx_0MIDgHn7aw';
+// Supabase Configuration
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Technical Fixes Mapping
 const TECHNICAL_FIXES = {
@@ -851,7 +851,7 @@ const RiskScanWidget: React.FC<RiskScanWidgetProps> = ({
       // Try edge functions (non-blocking)
       try {
         await fetch(
-          'https://mxrtltezhkxhqizvxvsz.supabase.co/functions/v1/calculate-risk',
+          `${SUPABASE_URL}/functions/v1/calculate-risk`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

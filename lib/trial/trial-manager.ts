@@ -2,17 +2,17 @@
 // ═══ Reverse Trial Lifecycle Manager ═══
 //
 // Flow:
-//   1. Practice claims dashboard → 14-day Protect-tier trial starts (no CC)
-//   2. Day 7  → value summary email
-//   3. Day 12 → expiry warning email
-//   4. Day 14 → auto-downgrade to free tier, downgrade email
-//   5. Day 21 → "mismatches still open" nudge email
+//   1. Practice claims dashboard → 21-day Protect-tier trial starts (no CC)
+//   2. Day 10 → value summary email
+//   3. Day 18 → expiry warning email
+//   4. Day 21 → auto-downgrade to free tier, downgrade email
+//   5. Day 28 → "mismatches still open" nudge email
 //   6. Any time → user upgrades via Stripe → trial ends, paid tier activates
 //
 // Trial state: ACTIVE → EXPIRING (day 12+) → EXPIRED → CONVERTED | CHURNED
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -38,7 +38,7 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
 export type PlanTier = 'free' | 'trial_protect' | 'monitor' | 'protect' | 'command';
 export type TrialStatus = 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'CONVERTED' | 'CHURNED' | 'NONE';
 
-export const TRIAL_DURATION_DAYS = 14;
+export const TRIAL_DURATION_DAYS = 21;
 export const TRIAL_TIER: PlanTier = 'trial_protect'; // full Protect access during trial
 export const FREE_TIER: PlanTier = 'free';
 

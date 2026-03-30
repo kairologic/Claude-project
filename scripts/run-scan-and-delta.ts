@@ -95,8 +95,8 @@ async function main() {
   if (!dryRun) {
     console.log('\n─── Phase 3: Update Practice Counts ─────────────────\n');
 
-    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
     const rpcCall = async (fn: string): Promise<boolean> => {
       try {

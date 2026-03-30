@@ -11,8 +11,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { colors } from '@/lib/design-tokens';
+import { colors, shadows, transitions, radii, spacing, typography } from '@/lib/design-tokens';
 import { AlertCard } from './ui';
+import { EmptyState, StaggeredList } from './ui';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 
 interface AlertData {
@@ -58,26 +59,28 @@ export default function AlertsView({ alerts, practiceId, userId }: AlertsViewPro
   return (
     <div>
       {/* Summary */}
-      <div style={{ fontSize: 12, color: colors.gray400, marginBottom: 16 }}>
+      <div style={{ ...typography.bodySmall, color: colors.gray400, marginBottom: spacing.lg }}>
         {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
         {newAlerts.length > 0 && <span> · <span style={{ color: colors.red, fontWeight: 600 }}>{newAlerts.length} new</span></span>}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
         {/* New alerts */}
         {newAlerts.length > 0 && (
           <>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 6px',
-              fontSize: 10, fontWeight: 700, color: colors.gray400,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
+              display: 'flex', alignItems: 'center', gap: spacing.sm, margin: `${spacing.xs}px 0 ${spacing.xs}px`,
+              ...typography.label,
+              color: colors.gray400,
             }}>
               {newAlerts.length} new since your last visit
               <div style={{ flex: 1, height: 1, background: colors.gray200 }} />
             </div>
-            {newAlerts.map(a => (
-              <AlertCard key={a.id} alert={a} />
-            ))}
+            <StaggeredList>
+              {newAlerts.map(a => (
+                <AlertCard key={a.id} alert={a} />
+              ))}
+            </StaggeredList>
           </>
         )}
 
@@ -86,27 +89,24 @@ export default function AlertsView({ alerts, practiceId, userId }: AlertsViewPro
           <>
             {newAlerts.length > 0 && (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 6px',
-                fontSize: 10, fontWeight: 700, color: colors.gray400,
-                textTransform: 'uppercase', letterSpacing: '0.06em',
+                display: 'flex', alignItems: 'center', gap: spacing.sm, margin: `${spacing.md}px 0 ${spacing.xs}px`,
+                ...typography.label,
+                color: colors.gray400,
               }}>
                 Earlier
                 <div style={{ flex: 1, height: 1, background: colors.gray200 }} />
               </div>
             )}
-            {seenAlerts.map(a => (
-              <AlertCard key={a.id} alert={a} />
-            ))}
+            <StaggeredList key="seen-alerts">
+              {seenAlerts.map(a => (
+                <AlertCard key={a.id} alert={a} />
+              ))}
+            </StaggeredList>
           </>
         )}
 
         {alerts.length === 0 && (
-          <div style={{
-            padding: 40, textAlign: 'center', color: colors.gray400, fontSize: 13,
-            background: '#fff', borderRadius: 10, border: `1px solid ${colors.gray200}`,
-          }}>
-            No alerts yet. We'll notify you when we detect issues.
-          </div>
+          <EmptyState icon="🔔" title="No alerts yet" description="We'll notify you when we detect issues with your providers." />
         )}
       </div>
     </div>

@@ -11,33 +11,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
 import { FhirDirectoryClient } from '@/lib/payer-directory/fhir-client';
 import { detectMismatches, buildAcceptanceGapMismatch } from '@/lib/payer-directory/mismatch-engine';
+import { detectAcceptanceGaps, type ProviderDirectoryStatus } from '@/lib/payer-directory/acceptance-gap-detector';
 import type { PayerEndpoint, DirectorySnapshot, NppesProviderData, DirectoryMismatch } from '@/lib/payer-directory/types';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-async function db(path: string, options: RequestInit = {}): Promise<any> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: options.method === 'POST'
-        ? 'return=minimal,resolution=merge-duplicates'
-        : 'return=minimal',
-      ...((options.headers as Record<string, string>) || {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`DB ${options.method || 'GET'} ${path.slice(0, 80)}: ${res.status} ${err}`);
-  }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('json') ? res.json() : null;
-}
+// TODO: Add system-admin role check when role system is expanded
 
 // ── Practice-level sync lock ──────────────────────────────────
 // Prevents concurrent syncs for the same practice from creating race conditions.
@@ -45,7 +25,8 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
 const activeSyncs = new Map<string, number>(); // practice_id → start timestamp
 const SYNC_LOCK_TIMEOUT_MS = 300_000; // 5 minutes max lock duration
 
-export async function POST(request: NextRequest) {
+const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
+  const supabase = ctx.supabase;
   const startTime = Date.now();
   let lockedPracticeId: string | null = null;
 
@@ -68,14 +49,43 @@ export async function POST(request: NextRequest) {
     lockedPracticeId = practice_id;
 
     // 1. Get practice providers
-    const providers = await db(
-      `practice_providers?practice_website_id=eq.${practice_id}&select=npi,provider_name&roster_status=eq.active`
-    );
-    if (!providers || providers.length === 0) {
+    const { data: providers, error: providersError } = await supabase
+      .from('practice_providers')
+      .select('npi,provider_name')
+      .eq('practice_website_id', practice_id)
+      .eq('roster_status', 'active');
+
+    if (providersError || !providers || providers.length === 0) {
       return NextResponse.json({ error: 'No active providers found for this practice' }, { status: 404 });
     }
 
     const npiList = providers.map((p: any) => p.npi).filter(Boolean);
+
+    // 1b. Fetch practice website metadata (accepted payers + source)
+    let acceptedPayers: string[] = [];
+    let acceptedPayersSource: string = 'assumed';
+    let practiceName: string | null = null;
+    let practiceUrl: string = '';
+    try {
+      const { data: pwRows } = await supabase
+        .from('practice_websites')
+        .select('name,url,accepted_payers,accepted_payers_source')
+        .eq('id', practice_id);
+      if (pwRows?.[0]) {
+        acceptedPayers = pwRows[0].accepted_payers || [];
+        acceptedPayersSource = pwRows[0].accepted_payers_source || 'assumed';
+        practiceName = pwRows[0].name || null;
+        practiceUrl = pwRows[0].url || '';
+      }
+    } catch (pwErr) {
+      console.warn('[practice-payer-sync] Failed to fetch practice website metadata:', pwErr);
+    }
+
+    // Derive signal confidence from acceptance source:
+    //   admin_entered → confirmed (practice explicitly told us)
+    //   scanner       → indicative (extracted from website text)
+    //   assumed       → indicative (default/unknown)
+    const signalType = acceptedPayersSource === 'admin_entered' ? 'confirmed' : 'indicative';
 
     // 2. Bulk-fetch NPPES data for all provider NPIs
     //    CRITICAL: If NPPES data is unavailable, mismatch detection is meaningless.
@@ -84,29 +94,34 @@ export async function POST(request: NextRequest) {
     let nppesLoadError: string | null = null;
     if (npiList.length > 0) {
       try {
-        const nppesRows = await db(
-          `providers?npi=in.(${npiList.join(',')})&select=npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip:zip_code,phone,taxonomy_code,taxonomy_desc,gender`
-        );
-        if (nppesRows) {
-          for (const row of nppesRows) {
-            nppesMap.set(row.npi, {
-              npi: row.npi,
-              provider_name: row.organization_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-              first_name: row.first_name,
-              last_name: row.last_name,
-              organization_name: row.organization_name,
-              address_line_1: row.address_line_1,
-              address_line_2: row.address_line_2,
-              city: row.city,
-              state: row.state,
-              zip: row.zip,
-              phone: row.phone,
-              taxonomy_code: row.taxonomy_code,
-              taxonomy_desc: row.taxonomy_desc,
-              gender: row.gender,
-            });
-          }
+        const { data: nppesRows, error: nppesQueryError } = await supabase
+          .from('providers')
+          .select('npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip_code,phone,taxonomy_code,taxonomy_desc,gender')
+          .in('npi', npiList);
+
+        if (nppesQueryError || !nppesRows) {
+          throw new Error(nppesQueryError?.message || 'Failed to fetch NPPES data');
         }
+
+        for (const row of nppesRows) {
+          nppesMap.set(row.npi, {
+            npi: row.npi,
+            provider_name: row.organization_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+            first_name: row.first_name,
+            last_name: row.last_name,
+            organization_name: row.organization_name,
+            address_line_1: row.address_line_1,
+            address_line_2: row.address_line_2,
+            city: row.city,
+            state: row.state,
+            zip: row.zip_code,
+            phone: row.phone,
+            taxonomy_code: row.taxonomy_code,
+            taxonomy_desc: row.taxonomy_desc,
+            gender: row.gender,
+          });
+        }
+
         if (nppesMap.size === 0) {
           nppesLoadError = `NPPES returned 0 rows for ${npiList.length} NPIs — mismatch detection will be skipped`;
           console.warn(`[practice-payer-sync] ${nppesLoadError}`);
@@ -130,10 +145,12 @@ export async function POST(request: NextRequest) {
     const consecutiveFailures = new Map<string, number>();
     const CIRCUIT_BREAKER_THRESHOLD = 3;
     if (refresh) {
-      const endpoints: PayerEndpoint[] = await db(
-        'payer_directory_endpoints?is_active=eq.true&select=*'
-      );
-      if (endpoints && endpoints.length > 0) {
+      const { data: endpoints, error: endpointsError } = await supabase
+        .from('payer_directory_endpoints')
+        .select('*')
+        .eq('is_active', true);
+
+      if (!endpointsError && endpoints && endpoints.length > 0) {
         const fhirClient = new FhirDirectoryClient();
         const batchId = `admin-sync-${practice_id.slice(0, 8)}-${Date.now()}`;
 
@@ -151,9 +168,12 @@ export async function POST(request: NextRequest) {
               // Read existing consecutive count
               let prevCount = 0;
               try {
-                const existing = await db(
-                  `payer_directory_snapshots?npi=eq.${provider.npi}&payer_code=eq.${endpoint.payer_code}&select=consecutive_not_listed_count&limit=1`
-                );
+                const { data: existing } = await supabase
+                  .from('payer_directory_snapshots')
+                  .select('consecutive_not_listed_count')
+                  .eq('npi', provider.npi)
+                  .eq('payer_code', endpoint.payer_code)
+                  .limit(1);
                 if (existing?.[0]) prevCount = existing[0].consecutive_not_listed_count || 0;
               } catch { /* first snapshot */ }
 
@@ -198,10 +218,9 @@ export async function POST(request: NextRequest) {
                 snapshotRow.last_reverification_at = null;
               }
 
-              await db('payer_directory_snapshots?on_conflict=npi,payer_code,snapshot_date', {
-                method: 'POST',
-                body: JSON.stringify(snapshotRow),
-              });
+              await supabase
+                .from('payer_directory_snapshots')
+                .upsert(snapshotRow, { onConflict: 'npi,payer_code,snapshot_date' });
               fhirRefreshStats.upserted++;
               // Reset circuit breaker on success
               consecutiveFailures.set(endpoint.payer_code, 0);
@@ -252,19 +271,24 @@ export async function POST(request: NextRequest) {
 
     // Clear existing unresolved mismatches for this practice
     try {
-      await db(`payer_directory_mismatches?practice_website_id=eq.${practice_id}&status=eq.open`, {
-        method: 'DELETE',
-      });
+      await supabase
+        .from('payer_directory_mismatches')
+        .delete()
+        .eq('practice_website_id', practice_id)
+        .eq('status', 'open');
     } catch (delErr) {
       console.warn('[practice-payer-sync] Failed to clear old mismatches:', delErr);
     }
 
     // Read all current snapshots for this practice's NPIs
-    let snapshots: DirectorySnapshot[] = npiList.length > 0
-      ? await db(
-          `payer_directory_snapshots?npi=in.(${npiList.join(',')})&select=*`
-        ) || []
-      : [];
+    let snapshots: DirectorySnapshot[] = [];
+    if (npiList.length > 0) {
+      const { data: snapshotData } = await supabase
+        .from('payer_directory_snapshots')
+        .select('*')
+        .in('npi', npiList);
+      snapshots = snapshotData || [];
+    }
 
     // If refresh was attempted, exclude snapshots from payers that had auth/config errors.
     // Their old "not listed" data is unreliable and would create false acceptance gaps.
@@ -298,9 +322,9 @@ export async function POST(request: NextRequest) {
           if (mismatches.length > 0) {
             allMismatches.push(...mismatches);
             for (const m of mismatches) {
-              await db('payer_directory_mismatches', {
-                method: 'POST',
-                body: JSON.stringify({
+              await supabase
+                .from('payer_directory_mismatches')
+                .insert({
                   npi: m.npi,
                   payer_code: m.payer_code,
                   practice_website_id: m.practice_website_id,
@@ -314,8 +338,7 @@ export async function POST(request: NextRequest) {
                   fix_via_caqh: m.fix_via_caqh,
                   fix_instructions: m.fix_instructions,
                   status: 'open',
-                }),
-              });
+                });
               mismatchesCreated++;
             }
           }
@@ -325,24 +348,62 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Acceptance gap detection per payer
+    // ═══ Acceptance Gap Detection (website claims vs directory reality) ═══
+    // Only flag gaps for payers the website CLAIMS to accept.
+    // Uses Layer 1 (consecutive not-listed threshold) via snapshot data.
     let acceptanceGapsCreated = 0;
-    for (const [payerCode, stats] of payerStats) {
-      if (stats.total > 0 && stats.notListed > 0) {
-        const gapPct = Math.round((stats.notListed / stats.total) * 100);
-        if (gapPct >= 20) {
+
+    if (acceptedPayers.length > 0) {
+      // Build per-provider directory status from snapshots (for claimed payers)
+      const providerStatuses: ProviderDirectoryStatus[] = npiList.map((npi: string) => ({
+        npi,
+        payer_statuses: {} as Record<string, 'listed' | 'not_listed'>,
+      }));
+      const statusMap = new Map(providerStatuses.map(ps => [ps.npi, ps]));
+
+      for (const snapshot of snapshots) {
+        const ps = statusMap.get(snapshot.npi);
+        if (!ps) continue;
+        // Only track status for claimed payers
+        if (!acceptedPayers.includes(snapshot.payer_code)) continue;
+
+        const isListed = !!snapshot.fhir_practitioner_id;
+
+        if (isListed) {
+          ps.payer_statuses[snapshot.payer_code] = 'listed';
+        } else {
+          // Layer 1: Only count as not_listed if consecutive_not_listed_count >= 2
+          // This prevents single-cycle false positives (transient FHIR errors, etc.)
+          const consecutiveCount = (snapshot as any).consecutive_not_listed_count || 0;
+          if (consecutiveCount >= 2) {
+            ps.payer_statuses[snapshot.payer_code] = 'not_listed';
+          }
+          // Below threshold: leave as undefined (not yet conclusive)
+        }
+      }
+
+      // Detect gaps using the full acceptance-gap-detector module
+      const gaps = detectAcceptanceGaps(
+        practice_id,
+        acceptedPayers,
+        providerStatuses,
+        { name: practiceName, url: practiceUrl },
+      );
+
+      for (const gap of gaps) {
+        if (gap.severity === 'warning' || gap.severity === 'action') {
           try {
             const gapMismatch = buildAcceptanceGapMismatch({
-              practice_website_id: practice_id,
-              payer_code: payerCode,
-              total_providers: stats.total,
-              not_listed_count: stats.notListed,
-              gap_percentage: gapPct,
+              practice_website_id: gap.practice_website_id,
+              payer_code: gap.payer_code,
+              total_providers: gap.total_providers,
+              not_listed_count: gap.not_listed_count,
+              gap_percentage: gap.gap_percentage,
             });
             allMismatches.push(gapMismatch);
-            await db('payer_directory_mismatches', {
-              method: 'POST',
-              body: JSON.stringify({
+            await supabase
+              .from('payer_directory_mismatches')
+              .insert({
                 npi: gapMismatch.npi,
                 payer_code: gapMismatch.payer_code,
                 practice_website_id: gapMismatch.practice_website_id,
@@ -356,17 +417,81 @@ export async function POST(request: NextRequest) {
                 fix_via_caqh: gapMismatch.fix_via_caqh,
                 fix_instructions: gapMismatch.fix_instructions,
                 status: 'open',
-                signal_type: 'indicative',
-                acceptance_source: 'assumed',
-              }),
-            });
+                signal_type: signalType,
+                acceptance_source: acceptedPayersSource,
+              });
             acceptanceGapsCreated++;
             mismatchesCreated++;
           } catch (gapErr) {
-            console.warn(`[practice-payer-sync] Acceptance gap error for ${payerCode}:`, gapErr);
+            console.warn(`[practice-payer-sync] Acceptance gap error for ${gap.payer_code}:`, gapErr);
           }
         }
       }
+    } else {
+      console.log(`[practice-payer-sync] No accepted_payers on website — skipping acceptance gap detection`);
+    }
+
+    // ═══ Correction Packet Completion Tracking ═══
+    // If mismatches dropped to zero for this practice, mark any active correction
+    // packets as completed. If new mismatches exist, ensure a current packet exists.
+    let correctionPacketStatus: string | null = null;
+    try {
+      if (allMismatches.length === 0) {
+        // All clean — mark any active packets as completed
+        const { data: activePackets } = await supabase
+          .from('correction_packets')
+          .select('id')
+          .eq('practice_website_id', practice_id)
+          .eq('status', 'current');
+
+        if (activePackets && activePackets.length > 0) {
+          for (const pkt of activePackets) {
+            await supabase
+              .from('correction_packets')
+              .update({
+                status: 'completed',
+                expires_at: new Date().toISOString(),
+              })
+              .eq('id', pkt.id);
+          }
+          correctionPacketStatus = `completed (${activePackets.length} packet(s) resolved)`;
+        }
+      } else {
+        // Mismatches exist — update or create a current correction packet
+        const { data: existingPackets } = await supabase
+          .from('correction_packets')
+          .select('id')
+          .eq('practice_website_id', practice_id)
+          .eq('status', 'current')
+          .limit(1);
+
+        const packetData = {
+          practice_website_id: practice_id,
+          total_mismatches: allMismatches.length,
+          payers_affected: new Set(allMismatches.map(m => m.payer_code)).size,
+          providers_affected: new Set(allMismatches.filter(m => m.npi !== 'PRACTICE').map(m => m.npi)).size,
+          caqh_fixable_count: allMismatches.filter(m => m.fix_via_caqh).length,
+          direct_fix_count: allMismatches.filter(m => !m.fix_via_caqh && m.mismatch_type !== 'acceptance_gap').length,
+          nppes_fix_count: allMismatches.filter(m => m.field_name === 'address' || m.field_name === 'phone').length,
+          status: 'current',
+          generated_at: new Date().toISOString(),
+        };
+
+        if (existingPackets && existingPackets.length > 0) {
+          await supabase
+            .from('correction_packets')
+            .update(packetData)
+            .eq('id', existingPackets[0].id);
+          correctionPacketStatus = 'updated';
+        } else {
+          await supabase
+            .from('correction_packets')
+            .insert(packetData);
+          correctionPacketStatus = 'created';
+        }
+      }
+    } catch (cpErr) {
+      console.warn('[practice-payer-sync] Correction packet tracking error:', cpErr);
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -392,6 +517,12 @@ export async function POST(request: NextRequest) {
       mismatches_detected: allMismatches.length,
       mismatches_upserted: mismatchesCreated,
       acceptance_gaps: acceptanceGapsCreated,
+      acceptance_context: {
+        claimed_payers: acceptedPayers,
+        source: acceptedPayersSource,
+        signal_type: signalType,
+      },
+      correction_packet: correctionPacketStatus,
       fhir_refresh: refresh ? { ...fhirRefreshStats, failed_payers: [...failedPayers], error_samples: errorSamples } : null,
       warnings: warnings.length > 0 ? warnings : undefined,
       elapsed_seconds: parseFloat(elapsed),
@@ -410,4 +541,6 @@ export async function POST(request: NextRequest) {
       activeSyncs.delete(lockedPracticeId);
     }
   }
-}
+});
+
+export { POST_HANDLER as POST };

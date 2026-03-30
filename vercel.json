@@ -4,8 +4,24 @@
     "installCommand": "npm install",
     "crons": [
         {
+            "path": "/api/cron/archive",
+            "schedule": "0 3 * * *"
+        },
+        {
             "path": "/api/cron/nppes-monitor",
             "schedule": "0 6 * * 1"
+        },
+        {
+            "path": "/api/cron/exclusion-check",
+            "schedule": "0 7 1 * *"
+        },
+        {
+            "path": "/api/cron/stale-workflows",
+            "schedule": "0 8 * * 3"
+        },
+        {
+            "path": "/api/cron/license-renewal",
+            "schedule": "0 7 * * 1"
         }
     ]
 }

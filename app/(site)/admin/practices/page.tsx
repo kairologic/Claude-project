@@ -143,17 +143,10 @@ export default function AdminPracticesPage() {
   return (
     <div style={{ minHeight: '100vh', background: C.gray100 }}>
       {/* Header */}
-      <div style={{ background: C.navy, padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button
-            onClick={() => router.push('/admin/dashboard')}
-            style={{ color: C.navyLight, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}
-          >
-            ← Back
-          </button>
-          <span style={{ color: C.gold, fontWeight: 700, fontSize: 18, letterSpacing: 0.5 }}>
-            PRACTICE MANAGEMENT
-          </span>
+      <div style={{ padding: '24px 32px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: C.navy, margin: 0 }}>Practice Management</h1>
+          <p style={{ fontSize: 13, color: C.gray400, margin: '4px 0 0' }}>Monitor health, issues, and onboarding across all practices</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}

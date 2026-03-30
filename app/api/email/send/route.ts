@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/lib/api/with-auth';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Amazon SES SMTP Configuration
 const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
@@ -11,11 +12,13 @@ const SES_SMTP_PASS = process.env.SES_SMTP_PASS || '';
 const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'compliance@kairologic.net';
 const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Compliance';
 
-function replaceVariables(template: string, vars: Record<string, string>): string {
+function replaceVariables(template: string, vars: Record<string, string>, isHtml: boolean = false): string {
   let result = template;
   for (const [key, value] of Object.entries(vars)) {
     const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-    result = result.replace(regex, value || '');
+    // Escape HTML in variable values when inserting into HTML templates
+    const replacementValue = isHtml ? escapeHtml(value || '') : (value || '');
+    result = result.replace(regex, replacementValue);
   }
   return result;
 }
@@ -80,8 +83,8 @@ function buildResultsSummaryHTML(vars: Record<string, string>): string {
 
   <!-- Score Section -->
   <div style="padding:32px 40px;text-align:center;border-bottom:1px solid #e5e7eb">
-    <div style="font-size:14px;color:#666;margin-bottom:8px">${vars.practice_name || 'Healthcare Provider'}</div>
-    <div style="font-size:12px;color:#999;margin-bottom:16px">NPI: ${vars.npi || 'N/A'} ${vars.website_url ? '• ' + vars.website_url : ''}</div>
+    <div style="font-size:14px;color:#666;margin-bottom:8px">${escapeHtml(vars.practice_name || 'Healthcare Provider')}</div>
+    <div style="font-size:12px;color:#999;margin-bottom:16px">NPI: ${escapeHtml(vars.npi || 'N/A')} ${vars.website_url ? '• ' + escapeHtml(vars.website_url) : ''}</div>
     <div style="display:inline-block;width:120px;height:120px;border-radius:50%;border:6px solid ${scoreColor};line-height:108px;font-size:48px;font-weight:800;color:${scoreColor}">${score}</div>
     <div style="font-size:16px;font-weight:700;color:${scoreColor};margin-top:12px">${riskLevel}</div>
     <div style="font-size:12px;color:#999;margin-top:4px">out of 100</div>
@@ -107,7 +110,7 @@ function buildResultsSummaryHTML(vars: Record<string, string>): string {
   ${vars.findings_summary ? `
   <div style="padding:24px 40px;border-bottom:1px solid #e5e7eb">
     <div style="font-size:13px;font-weight:700;color:#00234E;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Top Findings (${findingsCount} total)</div>
-    <div style="font-size:13px;color:#444;line-height:2;white-space:pre-line">${vars.findings_summary}</div>
+    <div style="font-size:13px;color:#444;line-height:2;white-space:pre-line">${escapeHtml(vars.findings_summary)}</div>
   </div>` : ''}
 
   <!-- CTA -->
@@ -130,7 +133,7 @@ function buildResultsSummaryHTML(vars: Record<string, string>): string {
   <div style="background:#f8f9fa;padding:24px 40px;text-align:center;border-top:1px solid #e5e7eb">
     <div style="font-size:11px;color:#999">
       KairoLogic Compliance • TX SB 1188 & HB 149<br>
-      ${vars.date || new Date().toLocaleDateString()}<br>
+      ${escapeHtml(vars.date || new Date().toLocaleDateString())}<br>
       <a href="https://kairologic.net" style="color:#C5A059">kairologic.net</a>
     </div>
   </div>
@@ -221,8 +224,8 @@ export async function POST(request: NextRequest) {
         : `Your Compliance Score: ${scoreNum}/100 — ${allVars.practice_name || 'Scan Results'}`;
       htmlBody = buildResultsSummaryHTML(allVars);
     } else {
-      subject = replaceVariables(template.subject, allVars);
-      htmlBody = replaceVariables(template.html_body, allVars);
+      subject = replaceVariables(template.subject, allVars, false);
+      htmlBody = replaceVariables(template.html_body, allVars, true);
     }
 
     // 5. Determine recipient

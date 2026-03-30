@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { withAuth, API_ERRORS } from '@/lib/api/with-auth';
+import type { AuthContext } from '@/lib/api/with-auth';
 import { canTransitionWorkflow, logStatusChange, logApproval } from '@/lib/workflow';
 import type { WorkflowStatus } from '@/lib/workflow';
 
 /**
  * GET /api/workflows/[id]
  * Returns workflow instance + tasks + events for the detail panel.
+ *
+ * Secured with withAuth: requires authenticated user.
+ * NOTE: Practice scoping is validated by looking up the workflow's practice_id
+ * and ensuring the user has access to that practice. This is done via RLS on the workflow table.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  const supabase = createAdminSupabaseClient();
+const GET_HANDLER = withAuth(
+  async (
+    _request: NextRequest,
+    ctx: AuthContext,
+    { params }: { params: Promise<{ id: string }> }
+  ) => {
+    const { id } = await params;
+    const supabase = ctx.supabase;
 
   const [workflowRes, tasksRes, eventsRes] = await Promise.all([
     supabase
@@ -32,82 +39,86 @@ export async function GET(
       .order('created_at', { ascending: true }),
   ]);
 
-  if (workflowRes.error) {
-    return NextResponse.json(
-      { error: workflowRes.error.message },
-      { status: workflowRes.error.code === 'PGRST116' ? 404 : 500 }
-    );
-  }
+    if (workflowRes.error) {
+      return API_ERRORS.notFound('Workflow');
+    }
 
-  return NextResponse.json({
-    workflow: workflowRes.data,
-    tasks: tasksRes.data || [],
-    events: eventsRes.data || [],
-  });
-}
+    return NextResponse.json({
+      workflow: workflowRes.data,
+      tasks: tasksRes.data || [],
+      events: eventsRes.data || [],
+    });
+  }
+);
 
 /**
  * PATCH /api/workflows/[id]
  * Update workflow instance fields (status, approved_value, etc.)
+ *
+ * Secured with withAuth: requires authenticated user.
+ * NOTE: Practice scoping is validated by looking up the workflow's practice_id
+ * and ensuring the user has access to that practice. This is done via RLS on the workflow table.
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  const body = await request.json();
-  const supabase = createAdminSupabaseClient();
+const PATCH_HANDLER = withAuth(
+  async (
+    request: NextRequest,
+    ctx: AuthContext,
+    { params }: { params: Promise<{ id: string }> }
+  ) => {
+    const { id } = await params;
+    const body = await request.json();
+    const supabase = ctx.supabase;
 
-  // Load current workflow for transition validation
-  const { data: current } = await supabase
-    .from('workflow_instances')
-    .select('status')
-    .eq('id', id)
-    .single();
+    // Load current workflow for transition validation
+    const { data: current } = await supabase
+      .from('workflow_instances')
+      .select('status')
+      .eq('id', id)
+      .single();
 
-  const oldStatus = current?.status as WorkflowStatus | undefined;
+    const oldStatus = current?.status as WorkflowStatus | undefined;
 
-  // Validate status transition if status is changing
-  if (body.status && oldStatus && body.status !== oldStatus) {
-    const transition = canTransitionWorkflow(
-      oldStatus,
-      body.status as WorkflowStatus
-    );
-    if (!transition.allowed) {
-      return NextResponse.json(
-        { error: transition.reason },
-        { status: 422 }
+    // Validate status transition if status is changing
+    if (body.status && oldStatus && body.status !== oldStatus) {
+      const transition = canTransitionWorkflow(
+        oldStatus,
+        body.status as WorkflowStatus
       );
+      if (!transition.allowed) {
+        return API_ERRORS.badRequest(transition.reason || 'Invalid status transition', { code: 'INVALID_TRANSITION' });
+      }
     }
-  }
 
-  const allowedFields = [
-    'status', 'approved_value', 'approved_by', 'approved_at',
-    'completed_at', 'completed_reason',
-  ];
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const key of allowedFields) {
-    if (key in body) updates[key] = body[key];
-  }
+    const allowedFields = [
+      'status', 'approved_value', 'approved_by', 'approved_at',
+      'completed_at', 'completed_reason',
+    ];
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    for (const key of allowedFields) {
+      if (key in body) updates[key] = body[key];
+    }
 
-  const { data, error } = await supabase
-    .from('workflow_instances')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+    const { data, error } = await supabase
+      .from('workflow_instances')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+    if (error) {
+      return API_ERRORS.internal(error.message);
+    }
 
-  // Audit logging
-  if (body.status && oldStatus && body.status !== oldStatus) {
-    await logStatusChange(supabase, id, oldStatus, body.status, { type: 'user' });
-  }
-  if (body.approved_value) {
-    await logApproval(supabase, id, body.approved_value, { type: 'user' });
-  }
+    // Audit logging
+    if (body.status && oldStatus && body.status !== oldStatus) {
+      await logStatusChange(supabase, id, oldStatus, body.status, { type: 'user' });
+    }
+    if (body.approved_value) {
+      await logApproval(supabase, id, body.approved_value, { type: 'user' });
+    }
 
-  return NextResponse.json({ workflow: data });
-}
+    return NextResponse.json({ workflow: data });
+  }
+);
+
+export { GET_HANDLER as GET, PATCH_HANDLER as PATCH };

@@ -6,30 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// TODO: Add system-admin role check when role system is expanded
 
-async function db(path: string, options: RequestInit = {}): Promise<any> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: options.method === 'POST' ? 'return=representation' : 'return=representation',
-      ...((options.headers as Record<string, string>) || {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`DB ${options.method || 'GET'} ${path}: ${res.status} ${err}`);
-  }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('json') ? res.json() : null;
-}
-
-export async function POST(request: NextRequest) {
+const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
+  const supabase = ctx.supabase;
   try {
     const { practice_id, action } = await request.json();
 
@@ -41,8 +23,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify practice exists
-    const practices = await db(`practice_websites?id=eq.${practice_id}&select=id,name,url`);
-    if (!practices || practices.length === 0) {
+    const { data: practices, error: practiceError } = await supabase
+      .from('practice_websites')
+      .select('id,name,url')
+      .eq('id', practice_id);
+
+    if (practiceError || !practices || practices.length === 0) {
       return NextResponse.json({ error: 'Practice not found' }, { status: 404 });
     }
 
@@ -51,13 +37,13 @@ export async function POST(request: NextRequest) {
     if (action === 'scan' || action === 'both') {
       // Force the practice to be scanned on the next scheduler run
       // by setting scan_scheduled_at to now
-      await db(`practice_websites?id=eq.${practice_id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
+      await supabase
+        .from('practice_websites')
+        .update({
           scan_scheduled_at: new Date().toISOString(),
           scan_status: 'pending',
-        }),
-      });
+        })
+        .eq('id', practice_id);
       results.scan = 'queued';
     }
 
@@ -94,4 +80,6 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
+
+export { POST_HANDLER as POST };

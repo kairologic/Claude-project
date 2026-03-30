@@ -9,8 +9,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * On success, Stripe webhook calls recordUpgrade().
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net';
 

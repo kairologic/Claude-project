@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 
 const execAsync = promisify(exec);
+
+// TODO: Add system-admin role check when role system is expanded
 
 // Asset definitions — maps asset IDs to their generator scripts and output filenames
 const ASSET_GENERATORS: Record<string, { script: string; outputFile: string; type: 'pdf' | 'xlsx' }> = {
@@ -40,14 +43,8 @@ const ASSET_GENERATORS: Record<string, { script: string; outputFile: string; typ
   },
 };
 
-export async function POST(req: NextRequest) {
+const POST_HANDLER = withAuth(async (req: NextRequest, ctx) => {
   try {
-    // Auth check
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json();
     const { assetId } = body;
 
@@ -118,10 +115,12 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
+
+export { POST_HANDLER as POST };
 
 // GET: List all available assets and their status
-export async function GET() {
+const GET_HANDLER = async () => {
   const outputDir = path.join(process.cwd(), 'public', 'assets', 'safe-harbor');
 
   const assets = Object.entries(ASSET_GENERATORS).map(([id, config]) => {
@@ -143,5 +142,7 @@ export async function GET() {
   });
 
   return NextResponse.json({ assets });
-}
+};
+
+export { GET_HANDLER as GET };
 

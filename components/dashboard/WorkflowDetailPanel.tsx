@@ -1,7 +1,19 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { colors, statusColors, statusBgColors, statusLabels, workflowTypeLabels } from '@/lib/design-tokens';
+import {
+  colors,
+  statusColors,
+  statusBgColors,
+  statusLabels,
+  workflowTypeLabels,
+  shadows,
+  transitions,
+  radii,
+  spacing,
+  typography,
+} from '@/lib/design-tokens';
+import { LoadingSpinner, Skeleton } from './ui';
 import FindingReview from './FindingReview';
 import ApproveCorrection from './ApproveCorrection';
 import SubmitNppes from './SubmitNppes';
@@ -265,6 +277,8 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
       {/* Side panel */}
       <div
+        role="dialog"
+        aria-label="Workflow details panel"
         style={{
           position: 'fixed',
           top: 0,
@@ -275,12 +289,12 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
           zIndex: 100,
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-2px 0 8px rgba(0,0,0,0.12)',
-          animation: 'slideIn 0.3s ease-out',
+          boxShadow: shadows.xl,
+          animation: 'slideInPanel 0.3s ease-out',
         }}
       >
         <style>{`
-          @keyframes slideIn {
+          @keyframes slideInPanel {
             from {
               transform: translateX(100%);
             }
@@ -294,24 +308,25 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
         <div
           style={{
             borderBottom: `1px solid ${colors.gray200}`,
-            padding: '16px',
+            padding: spacing.lg,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
-            gap: 12,
+            gap: spacing.md,
           }}
         >
           <div style={{ flex: 1 }}>
             {isLoading ? (
-              <div style={{ height: 80, display: 'flex', alignItems: 'center' }}>
-                <div style={{ fontSize: 12, color: colors.gray400 }}>Loading...</div>
+              <div style={{ height: 80, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                <LoadingSpinner size={24} />
+                <div style={{ ...typography.bodySmall, color: colors.gray400 }}>Loading workflow...</div>
               </div>
             ) : fetchError ? (
-              <div style={{ color: colors.red, fontSize: 12 }}>
+              <div style={{ ...typography.bodySmall, color: colors.red }}>
                 Error: {fetchError}
                 <button onClick={fetchWorkflowData} style={{
-                  marginLeft: 8, color: colors.blue, background: 'none',
-                  border: 'none', cursor: 'pointer', fontSize: 12, textDecoration: 'underline',
+                  marginLeft: spacing.xs, color: colors.blue, background: 'none',
+                  border: 'none', cursor: 'pointer', ...typography.bodySmall, textDecoration: 'underline',
                 }}>
                   Retry
                 </button>
@@ -321,50 +336,43 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 8,
+                  gap: spacing.sm,
+                  marginBottom: spacing.sm,
                   flexWrap: 'wrap',
                 }}>
                   {typeInfo && (
                     <div style={{
-                      fontSize: 9,
-                      fontWeight: 700,
+                      ...typography.label,
                       background: colors.goldPale,
                       color: colors.gold,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
+                      padding: `2px ${spacing.sm}px`,
+                      borderRadius: radii.sm,
                     }}>
                       {typeInfo.label}
                     </div>
                   )}
                   {statusColor && (
                     <div style={{
-                      fontSize: 9,
-                      fontWeight: 700,
+                      ...typography.label,
                       background: statusBg || undefined,
                       color: statusColor,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
+                      padding: `2px ${spacing.sm}px`,
+                      borderRadius: radii.sm,
                     }}>
                       {statusLabel}
                     </div>
                   )}
                 </div>
                 <div style={{
-                  fontSize: 16,
-                  fontWeight: 700,
+                  ...typography.h3,
                   color: colors.navy,
                 }}>
                   {workflow.provider_name || 'Unknown Provider'}
                 </div>
                 <div style={{
-                  fontSize: 12,
+                  ...typography.bodySmall,
                   color: colors.gray600,
-                  marginTop: 6,
+                  marginTop: spacing.xs,
                   lineHeight: 1.4,
                 }}>
                   {workflow.finding_summary || 'No summary'}
@@ -375,6 +383,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
           <button
             onClick={onClose}
+            aria-label="Close workflow details"
             style={{
               background: 'none',
               border: 'none',
@@ -383,8 +392,10 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
               cursor: 'pointer',
               padding: 0,
               lineHeight: 1,
+              transition: `color ${transitions.fast}`,
             }}
-            title="Close"
+            onMouseEnter={(e) => e.currentTarget.style.color = colors.navy}
+            onMouseLeave={(e) => e.currentTarget.style.color = colors.gray400}
           >
             &times;
           </button>
@@ -395,20 +406,17 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
           style={{
             flex: 1,
             overflow: 'auto',
-            padding: '16px',
+            padding: spacing.lg,
           }}
         >
           {activeView === 'main' && (
             <>
               {/* Task checklist */}
-              <div style={{ marginBottom: 24 }}>
+              <div style={{ marginBottom: spacing['2xl'] }}>
                 <div style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  ...typography.label,
                   color: colors.gray400,
-                  marginBottom: 10,
+                  marginBottom: spacing.sm,
                 }}>
                   Tasks
                 </div>
@@ -416,7 +424,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 8,
+                  gap: spacing.sm,
                 }}>
                   {tasks.map((task) => (
                     <button
@@ -425,22 +433,25 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                       style={{
                         background: colors.white,
                         border: `1px solid ${colors.gray200}`,
-                        borderRadius: 6,
-                        padding: 10,
+                        borderRadius: radii.sm,
+                        padding: spacing.sm,
                         textAlign: 'left',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease',
+                        transition: `all ${transitions.base}`,
                         display: 'flex',
                         alignItems: 'flex-start',
-                        gap: 10,
+                        gap: spacing.sm,
+                        boxShadow: shadows.xs,
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = colors.gray50;
                         e.currentTarget.style.borderColor = colors.blue;
+                        e.currentTarget.style.boxShadow = shadows.md;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = colors.white;
                         e.currentTarget.style.borderColor = colors.gray200;
+                        e.currentTarget.style.boxShadow = shadows.xs;
                       }}
                     >
                       <div
@@ -457,7 +468,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
                       <div style={{ flex: 1 }}>
                         <div style={{
-                          fontSize: 12,
+                          ...typography.body,
                           fontWeight: 700,
                           color: colors.navy,
                           marginBottom: 2,
@@ -466,7 +477,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                         </div>
                         {task.description && (
                           <div style={{
-                            fontSize: 11,
+                            ...typography.caption,
                             color: colors.gray600,
                           }}>
                             {task.description}
@@ -480,14 +491,11 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
               {/* Timeline/Events */}
               {events.length > 0 && (
-                <div>
+                <div role="region" aria-label="Activity timeline">
                   <div style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
+                    ...typography.label,
                     color: colors.gray400,
-                    marginBottom: 10,
+                    marginBottom: spacing.sm,
                   }}>
                     Activity
                   </div>
@@ -495,14 +503,14 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 8,
+                    gap: spacing.sm,
                   }}>
                     {events.map((event, idx) => (
                       <div
                         key={event.id}
                         style={{
                           display: 'flex',
-                          gap: 10,
+                          gap: spacing.sm,
                         }}
                       >
                         {idx < events.length - 1 && (
@@ -530,9 +538,9 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                           }}
                         />
 
-                        <div style={{ paddingBottom: 12, flex: 1 }}>
+                        <div style={{ paddingBottom: spacing.sm, flex: 1 }}>
                           <div style={{
-                            fontSize: 12,
+                            ...typography.body,
                             fontWeight: 600,
                             color: colors.navy,
                             marginBottom: 2,
@@ -540,7 +548,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                             {event.title}
                           </div>
                           <div style={{
-                            fontSize: 10,
+                            ...typography.caption,
                             color: colors.gray400,
                           }}>
                             {new Date(event.created_at).toLocaleString()}
@@ -582,13 +590,13 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
           {/* Download Form view — shows PDF download inline */}
           {activeView === 'download_form' && workflow && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 0', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg, padding: `${spacing.lg}px 0`, alignItems: 'center', textAlign: 'center' }}>
               <div style={{ fontSize: 40 }}>&#128196;</div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: colors.navy, marginBottom: 6 }}>
+                <div style={{ ...typography.h2, color: colors.navy, marginBottom: spacing.xs }}>
                   Download NPPES Form
                 </div>
-                <div style={{ fontSize: 12, color: colors.gray600, lineHeight: 1.5 }}>
+                <div style={{ ...typography.body, color: colors.gray600, lineHeight: 1.5 }}>
                   The pre-filled PDF correction form is ready for download.
                 </div>
               </div>
@@ -596,11 +604,14 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 href={`/api/workflows/nppes-form?workflowId=${workflowId}`}
                 download
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  display: 'inline-flex', alignItems: 'center', gap: spacing.sm,
                   background: colors.green, color: colors.white,
-                  padding: '10px 20px', borderRadius: 6, textDecoration: 'none',
-                  fontWeight: 700, fontSize: 13,
+                  padding: `${spacing.sm}px ${spacing.lg}px`, borderRadius: radii.md, textDecoration: 'none',
+                  ...typography.body, fontWeight: 700,
+                  transition: `all ${transitions.fast}`,
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
               >
                 &#128229; Download PDF Form
               </a>
@@ -608,9 +619,12 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 onClick={() => setActiveView('main')}
                 style={{
                   background: colors.gray200, color: colors.navy, border: 'none',
-                  borderRadius: 6, padding: '10px 16px', fontSize: 12,
-                  fontWeight: 600, cursor: 'pointer', marginTop: 8,
+                  borderRadius: radii.md, padding: `${spacing.sm}px ${spacing.lg}px`, ...typography.body,
+                  fontWeight: 600, cursor: 'pointer', marginTop: spacing.sm,
+                  transition: `all ${transitions.fast}`,
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = colors.gray300}
+                onMouseLeave={(e) => e.currentTarget.style.background = colors.gray200}
               >
                 &larr; Back to tasks
               </button>
@@ -631,13 +645,13 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
 
           {/* Monitor view — read-only status */}
           {activeView === 'monitor' && workflow && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 0', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg, padding: `${spacing.lg}px 0`, alignItems: 'center', textAlign: 'center' }}>
               <div style={{ fontSize: 40 }}>&#128225;</div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: colors.navy, marginBottom: 6 }}>
+                <div style={{ ...typography.h2, color: colors.navy, marginBottom: spacing.xs }}>
                   {workflow.workflow_type === 'payer_directory' ? 'Monitoring Payer Directories' : 'Monitoring NPPES'}
                 </div>
-                <div style={{ fontSize: 12, color: colors.gray600, lineHeight: 1.5, maxWidth: 320 }}>
+                <div style={{ ...typography.body, color: colors.gray600, lineHeight: 1.5, maxWidth: 320 }}>
                   {workflow.workflow_type === 'payer_directory'
                     ? 'KairoLogic is automatically monitoring payer directories via FHIR to confirm the update has propagated. This typically takes 1-2 weeks.'
                     : 'KairoLogic is automatically monitoring the NPPES registry for confirmation that the update has been applied. This typically takes 1-2 weeks.'}
@@ -646,7 +660,7 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
               {Boolean(activeTask?.metadata?.expected_value) && (
                 <div style={{
                   background: colors.bluePale, border: `1px solid ${colors.blue}`,
-                  borderRadius: 6, padding: 12, fontSize: 12, color: colors.navy, maxWidth: 340,
+                  borderRadius: radii.md, padding: spacing.md, ...typography.body, color: colors.navy, maxWidth: 340,
                 }}>
                   <strong>Expected value:</strong><br />
                   {String(activeTask?.metadata?.expected_value ?? '')}
@@ -656,9 +670,12 @@ export default function WorkflowDetailPanel({ workflowId, practiceId, onClose }:
                 onClick={() => setActiveView('main')}
                 style={{
                   background: colors.gray200, color: colors.navy, border: 'none',
-                  borderRadius: 6, padding: '10px 16px', fontSize: 12,
-                  fontWeight: 600, cursor: 'pointer', marginTop: 8,
+                  borderRadius: radii.md, padding: `${spacing.sm}px ${spacing.lg}px`, ...typography.body,
+                  fontWeight: 600, cursor: 'pointer', marginTop: spacing.sm,
+                  transition: `all ${transitions.fast}`,
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = colors.gray300}
+                onMouseLeave={(e) => e.currentTarget.style.background = colors.gray200}
               >
                 &larr; Back to tasks
               </button>

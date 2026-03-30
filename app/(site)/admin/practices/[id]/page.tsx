@@ -149,17 +149,17 @@ export default function AdminPracticeDetailPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: gold, fontSize: 18 }}>Loading practice...</div>
+      <div style={{ minHeight: '100vh', background: '#F4F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: navy, fontSize: 18 }}>Loading practice...</div>
       </div>
     );
   }
 
   if (error || !practice) {
     return (
-      <div style={{ minHeight: '100vh', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+      <div style={{ minHeight: '100vh', background: '#F4F5F7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
         <div style={{ color: red, fontSize: 18 }}>{error || 'Practice not found'}</div>
-        <button onClick={() => router.push('/admin/practices')} style={{ color: gold, background: 'none', border: `1px solid ${gold}`, padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}>
+        <button onClick={() => router.push('/admin/practices')} style={{ color: navy, background: 'none', border: `1px solid ${navy}`, padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}>
           ← Back to Practices
         </button>
       </div>
@@ -171,31 +171,18 @@ export default function AdminPracticeDetailPage() {
   const scanBadge = scanStatusBadge(p.scan_status);
 
   return (
-    <div style={{ minHeight: '100vh', background: navy, color: '#e2e8f0' }}>
-      {/* ── Admin toolbar ─────────────────────────────────── */}
-      <div style={{ background: '#1a2940', borderBottom: `2px solid ${gold}`, padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+    <div style={{ minHeight: '100vh', background: '#F4F5F7', color: navy }}>
+      {/* ── Page header ───────────────────────────────────── */}
+      <div style={{ padding: '24px 24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={() => router.push('/admin/practices')}
-            style={{ color: gold, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}
+            style={{ color: navy, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
           >
             ← Practices
           </button>
           <span style={{ color: gray400, fontSize: 12 }}>|</span>
-          <span style={{ color: gold, fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>SENTRY CONTROL CENTER</span>
-          <span style={{ color: gray400, fontSize: 12 }}>|</span>
-          <span style={{ color: '#e2e8f0', fontSize: 14 }}>Practice Detail</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            background: '#991b1b',
-            color: 'white',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1,
-          }}>ADMIN VIEW</span>
+          <span style={{ color: navy, fontSize: 14, fontWeight: 600 }}>Practice Detail</span>
         </div>
       </div>
 
@@ -203,14 +190,14 @@ export default function AdminPracticeDetailPage() {
         {/* ── Practice header ──────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#fff', margin: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: navy, margin: 0 }}>
               {p.name || 'Unnamed Practice'}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
               <span style={{ background: badge.bg, color: badge.text, padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
                 {badge.label}
               </span>
-              <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ color: '#93c5fd', fontSize: 13, textDecoration: 'none' }}>
+              <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ color: '#185FA5', fontSize: 13, textDecoration: 'none' }}>
                 {p.url} ↗
               </a>
               {p.npi && <span style={{ color: gray400, fontSize: 13 }}>NPI: {p.npi}</span>}

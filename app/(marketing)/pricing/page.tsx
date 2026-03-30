@@ -73,7 +73,7 @@ const tiers = [
 const faqs = [
   {
     q: 'How does the free trial work?',
-    a: 'Every plan includes a 14-day free trial with full access. No credit card required. We\'ll run a scan on your providers within 24 hours so you can see real results immediately.',
+    a: 'Every plan includes a 21-day free trial with full access. No credit card required. We\'ll run a scan on your providers within 24 hours so you can see real results immediately.',
   },
   {
     q: 'What counts as a "provider"?',
@@ -131,7 +131,7 @@ export default function PricingPage() {
             lineHeight: 1.6,
           }}>
             Start with monitoring. Add correction workflows when you&apos;re ready.
-            Every plan includes a 14-day free trial.
+            Every plan includes a 21-day free trial.
           </p>
         </div>
       </section>
@@ -341,7 +341,7 @@ export default function PricingPage() {
       }}>
         <div className="m-container">
           <h2 style={{ fontSize: 28, fontWeight: 700, color: '#FFFFFF', margin: '0 0 12px' }}>
-            Start your 14-day free trial
+            Start your 21-day free trial
           </h2>
           <p style={{ fontSize: 16, color: '#8BA3B8', margin: '0 0 24px' }}>
             No credit card required. See your provider data within 24 hours.

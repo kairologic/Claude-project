@@ -10,8 +10,8 @@
 import { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { colors, statusColors, statusLabels, workflowTypeLabels } from '@/lib/design-tokens';
-import { WorkflowCard } from './ui';
+import { colors, statusColors, statusLabels, workflowTypeLabels, typography, spacing, shadows, transitions, radii } from '@/lib/design-tokens';
+import { WorkflowCard, EmptyState, StaggeredList } from './ui';
 import WorkflowDetailPanel from './WorkflowDetailPanel';
 import type { WorkflowStatus } from '@/lib/types/dashboard-schema';
 
@@ -121,7 +121,7 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
   return (
     <div>
       {/* Filter bar */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: spacing.lg, flexWrap: 'wrap' }} role="tablist">
         {filters.map(f => {
           const count = f.key === 'all' ? counts.all : counts[f.key];
           const isActive = activeFilter === f.key;
@@ -129,12 +129,15 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
             <button
               key={f.key}
               onClick={() => setActiveFilter(f.key)}
+              role="tab"
+              aria-selected={isActive}
               style={{
-                padding: '6px 14px', borderRadius: 100, fontSize: 12, fontWeight: 600,
+                padding: '6px 14px', borderRadius: radii.full, ...typography.label,
                 border: `1px solid ${isActive ? colors.navy : colors.gray200}`,
                 background: isActive ? colors.navy : '#fff',
                 color: isActive ? '#fff' : colors.gray600,
-                cursor: 'pointer', transition: 'all .1s', fontFamily: 'inherit',
+                cursor: 'pointer', transition: `all ${transitions.fast}`, fontFamily: 'inherit',
+                transform: isActive ? 'scale(1.02)' : 'scale(1)',
               }}
               onMouseOver={e => { if (!isActive) (e.currentTarget as HTMLElement).style.borderColor = colors.navy; }}
               onMouseOut={e => { if (!isActive) (e.currentTarget as HTMLElement).style.borderColor = colors.gray200; }}
@@ -146,7 +149,7 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
       </div>
 
       {/* Type filter bar */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: spacing.lg, flexWrap: 'wrap' }} role="tablist">
         {typeFilters.map(f => {
           const count = typeCounts[f.key] || 0;
           const isActive = activeType === f.key;
@@ -155,12 +158,15 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
             <button
               key={f.key}
               onClick={() => setActiveType(f.key)}
+              role="tab"
+              aria-selected={isActive}
               style={{
-                padding: '5px 12px', borderRadius: 100, fontSize: 11, fontWeight: 600,
+                padding: '5px 12px', borderRadius: radii.full, ...typography.label,
                 border: `1px solid ${isActive ? colors.gold : colors.gray200}`,
                 background: isActive ? colors.goldPale : '#fff',
                 color: isActive ? colors.navy : colors.gray600,
-                cursor: 'pointer', transition: 'all .1s', fontFamily: 'inherit',
+                cursor: 'pointer', transition: `all ${transitions.fast}`, fontFamily: 'inherit',
+                transform: isActive ? 'scale(1.02)' : 'scale(1)',
               }}
               onMouseOver={e => { if (!isActive) (e.currentTarget as HTMLElement).style.borderColor = colors.gold; }}
               onMouseOut={e => { if (!isActive) (e.currentTarget as HTMLElement).style.borderColor = colors.gray200; }}
@@ -172,26 +178,28 @@ function WorkflowsViewInner({ workflows, practiceId, counts }: WorkflowsViewProp
       </div>
 
       {/* Results count */}
-      <div style={{ fontSize: 11, color: colors.gray400, marginBottom: 12 }}>
+      <div style={{ ...typography.caption, color: colors.gray400, marginBottom: spacing.md }}>
         Showing {filtered.length} workflow{filtered.length !== 1 ? 's' : ''}
         {activeFilter !== 'all' && ` · ${filters.find(f => f.key === activeFilter)?.label}`}
         {activeType !== 'all' && ` · ${typeFilters.find(f => f.key === activeType)?.label}`}
       </div>
 
       {/* Workflow list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {filtered.map(wf => (
-          <WorkflowCard key={wf.id} workflow={wf} onClick={handleCardClick} />
-        ))}
-        {filtered.length === 0 && (
-          <div style={{
-            padding: 40, textAlign: 'center', color: colors.gray400, fontSize: 13,
-            background: '#fff', borderRadius: 10, border: `1px solid ${colors.gray200}`,
-          }}>
-            No workflows match this filter.
-          </div>
-        )}
-      </div>
+      {filtered.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <StaggeredList>
+            {filtered.map(wf => (
+              <WorkflowCard key={wf.id} workflow={wf} onClick={handleCardClick} />
+            ))}
+          </StaggeredList>
+        </div>
+      ) : (
+        <EmptyState
+          icon="🔍"
+          title="No workflows found"
+          description="No workflows match the current filters. Try adjusting your selection."
+        />
+      )}
 
       {/* Detail panel */}
       {detailId && (

@@ -19,21 +19,30 @@ export default function GetStartedPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetch('/api/trial/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contactName: `${formData.firstName} ${formData.lastName}`,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           email: formData.email,
           practiceName: formData.practiceName,
           npi: formData.npi,
-          subject: 'Free Trial Signup',
-          message: `NPI: ${formData.npi}\nPractice: ${formData.practiceName}`,
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to send');
-      setSubmitted(true);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create trial');
+      }
+
+      if (data.message === 'existing_trial') {
+        // User already has an active trial — we resent the magic link
+        setSubmitted(true);
+      } else {
+        setSubmitted(true);
+      }
     } catch (error) {
       console.error('Error:', error);
       alert('Something went wrong. Please try again or email us at info@kairologic.net');
@@ -49,13 +58,16 @@ export default function GetStartedPage() {
           <div className="m-trial-success-icon">&#10003;</div>
           <h2>You&apos;re in!</h2>
           <p>
-            We&apos;re setting up your dashboard now. You&apos;ll receive an email at{' '}
-            <strong>{formData.email}</strong> with your login details within the next few minutes.
+            Check your inbox at{' '}
+            <strong>{formData.email}</strong> — we&apos;ve sent you a link to access your dashboard.
           </p>
           <p className="m-trial-success-note">
-            Your 14-day free trial includes full access to all features — compliance monitoring,
-            credentialing workflows, and payer directory tracking. After 14 days, your dashboard
-            switches to read-only mode for 7 additional days.
+            Your 21-day free trial includes full access to all features — compliance monitoring,
+            credentialing workflows, and payer directory tracking. We&apos;re running your first
+            provider data scan now, so you&apos;ll see results within a few minutes of logging in.
+          </p>
+          <p className="m-trial-success-note" style={{ marginTop: '8px' }}>
+            After 21 days, your dashboard switches to read-only mode for 7 additional days.
           </p>
           <Link href="/" className="m-btn-primary m-gold" style={{ marginTop: '24px', display: 'inline-flex' }}>
             Back to Homepage
@@ -116,7 +128,7 @@ export default function GetStartedPage() {
         <div className="m-trial-form-wrap">
           <div className="m-trial-form-card">
             <div className="m-trial-form-header">
-              <h2>14-day free trial</h2>
+              <h2>21-day free trial</h2>
               <p>Full platform access. Read-only for 7 more days after.</p>
             </div>
 

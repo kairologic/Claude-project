@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { withPracticeAccess, API_ERRORS } from '@/lib/api/with-auth';
+import type { PracticeContext } from '@/lib/api/with-auth';
 
 interface SearchQueryRequest {
-  practice_id: string;
   query: string;
 }
 
@@ -34,172 +34,144 @@ type ClaudeResponse = ClaudeDataResponse | ClaudeHelpResponse;
  * 4. Execute query with practice_id filter
  * 5. Log to search_queries table
  * 6. Return results
+ *
+ * Secured with withPracticeAccess: requires authenticated user with access to the practice.
  */
-export async function POST(request: NextRequest) {
-  try {
-    const body: SearchQueryRequest = await request.json();
-    const { practice_id, query } = body;
-
-    if (!practice_id || !query) {
-      return NextResponse.json(
-        { error: 'Missing required fields: practice_id, query' },
-        { status: 400 }
-      );
-    }
-
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error('[Search Query POST] Missing ANTHROPIC_API_KEY');
-      return NextResponse.json(
-        { error: 'AI service not configured' },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createAdminSupabaseClient();
-
-    // Verify practice exists
-    const { data: practice } = await supabase
-      .from('practice_websites')
-      .select('id')
-      .eq('id', practice_id)
-      .single();
-
-    if (!practice) {
-      return NextResponse.json(
-        { error: 'Practice not found' },
-        { status: 404 }
-      );
-    }
-
-    // Step 1: Send query to Claude with system prompt containing schema
-    // Use Haiku (fast + cheap) first, fall back to Sonnet if it fails validation/parse
-    const systemPrompt = buildSystemPrompt();
-    let claudeResponse: string;
-    let parsedResponse: ClaudeResponse;
-    let usedModel: string = 'haiku';
-
+const POST_HANDLER = withPracticeAccess(
+  async (request: NextRequest, ctx: PracticeContext) => {
     try {
-      claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-haiku-4-5-20251001');
-    } catch (aiError: any) {
-      console.error('[Search Query POST] Haiku API error:', aiError?.message || aiError);
-      return NextResponse.json(
-        { error: 'AI service error: ' + (aiError?.message || 'Failed to reach Claude API') },
-        { status: 500 }
-      );
-    }
+      const body: SearchQueryRequest = await request.json();
+      const { query } = body;
+      const practice_id = ctx.practiceId;
 
-    // Step 2: Parse Claude's response — if Haiku fails, retry with Sonnet
-    try {
-      parsedResponse = parseClaudeResponse(claudeResponse);
-      // For data queries, also validate SQL before accepting Haiku's result
-      if (parsedResponse.type === 'data') {
-        validateSQL(parsedResponse.sql);
+      if (!query) {
+        return API_ERRORS.badRequest('Missing required field: query');
       }
-    } catch (haikuError: any) {
-      console.warn('[Search Query POST] Haiku response failed validation, retrying with Sonnet:', haikuError?.message);
-      usedModel = 'sonnet';
+
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.error('[Search Query POST] Missing ANTHROPIC_API_KEY');
+        return API_ERRORS.internal('AI service not configured');
+      }
+
+      const supabase = ctx.supabase;
+
+      // Step 1: Send query to Claude with system prompt containing schema
+      // Use Haiku (fast + cheap) first, fall back to Sonnet if it fails validation/parse
+      const systemPrompt = buildSystemPrompt();
+      let claudeResponse: string;
+      let parsedResponse: ClaudeResponse;
+      let usedModel: string = 'haiku';
+
       try {
-        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-4-20250514');
-        parsedResponse = parseClaudeResponse(claudeResponse);
-      } catch (sonnetError: any) {
-        console.error('[Search Query POST] Sonnet fallback also failed:', sonnetError?.message, 'Raw:', claudeResponse?.slice(0, 300));
-        return NextResponse.json(
-          { error: 'Failed to parse AI response' },
-          { status: 500 }
-        );
+        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-haiku-4-5-20251001');
+      } catch (aiError: any) {
+        console.error('[Search Query POST] Haiku API error:', aiError?.message || aiError);
+        return API_ERRORS.internal('AI service error: ' + (aiError?.message || 'Failed to reach Claude API'));
       }
-    }
 
-    console.log(`[Search Query POST] Used model: ${usedModel} for query: "${query.slice(0, 80)}"`);
+      // Step 2: Parse Claude's response — if Haiku fails, retry with Sonnet
+      try {
+        parsedResponse = parseClaudeResponse(claudeResponse);
+        // For data queries, also validate SQL before accepting Haiku's result
+        if (parsedResponse.type === 'data') {
+          validateSQL(parsedResponse.sql);
+        }
+      } catch (haikuError: any) {
+        console.warn('[Search Query POST] Haiku response failed validation, retrying with Sonnet:', haikuError?.message);
+        usedModel = 'sonnet';
+        try {
+          claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-4-20250514');
+          parsedResponse = parseClaudeResponse(claudeResponse);
+        } catch (sonnetError: any) {
+          console.error('[Search Query POST] Sonnet fallback also failed:', sonnetError?.message, 'Raw:', claudeResponse?.slice(0, 300));
+          return API_ERRORS.internal('Failed to parse AI response');
+        }
+      }
 
-    // ── BRANCH: Help response (no SQL needed) ──
-    if (parsedResponse.type === 'help') {
-      // Log the help query
+      console.log(`[Search Query POST] Used model: ${usedModel} for query: "${query.slice(0, 80)}"`);
+
+      // ── BRANCH: Help response (no SQL needed) ──
+      if (parsedResponse.type === 'help') {
+        // Log the help query
+        try {
+          await supabase.from('search_queries').insert({
+            practice_id,
+            user_query: query,
+            generated_sql: null,
+            result_count: 0,
+            status: 'help',
+          });
+        } catch (logError) {
+          console.error('[Search Query POST] Error logging help query:', logError);
+        }
+
+        return NextResponse.json({
+          success: true,
+          type: 'help',
+          practice_id,
+          query,
+          answer: parsedResponse.answer,
+          relatedQueries: parsedResponse.relatedQueries || [],
+          executed_at: new Date().toISOString(),
+        });
+      }
+
+      // ── BRANCH: Data query (SQL path) ──
+      // SQL was already validated during parse (and triggers Sonnet fallback if invalid)
+      // Re-validate here as a safety net
+      try {
+        validateSQL(parsedResponse.sql);
+      } catch (valError: any) {
+        console.error('[Search Query POST] SQL validation:', valError?.message);
+        return API_ERRORS.badRequest('Query validation failed: ' + valError?.message);
+      }
+
+      // Step 4: Inject practice_id filter and execute query
+      let rows: any[] = [];
+      try {
+        const { sql: filteredSQL, params } = injectPracticeFilter(parsedResponse.sql, practice_id);
+        console.log('[Search Query POST] Executing parameterized query for practice');
+        rows = await executeQuery(supabase, filteredSQL, params[0]);
+      } catch (execError: any) {
+        console.error('[Search Query POST] SQL exec error:', execError?.message || execError);
+        return API_ERRORS.internal('Failed to execute query: ' + (execError?.message || 'Unknown DB error'));
+      }
+
+      // Step 5: Log search query
       try {
         await supabase.from('search_queries').insert({
           practice_id,
           user_query: query,
-          generated_sql: null,
-          result_count: 0,
-          status: 'help',
+          generated_sql: parsedResponse.sql,
+          result_count: rows.length,
+          status: 'success',
         });
       } catch (logError) {
-        console.error('[Search Query POST] Error logging help query:', logError);
+        console.error('[Search Query POST] Error logging search:', logError);
       }
 
+      // Step 6: Return results
       return NextResponse.json({
         success: true,
-        type: 'help',
+        type: 'data',
         practice_id,
         query,
-        answer: parsedResponse.answer,
-        relatedQueries: parsedResponse.relatedQueries || [],
+        explanation: parsedResponse.explanation,
+        columns: parsedResponse.columns,
+        chartType: parsedResponse.chartType || 'table',
+        sql: parsedResponse.sql,
+        rowCount: rows.length,
+        data: rows,
         executed_at: new Date().toISOString(),
       });
+    } catch (error: any) {
+      console.error('[Search Query POST] Unhandled error:', error?.message || error);
+      return API_ERRORS.internal();
     }
-
-    // ── BRANCH: Data query (SQL path) ──
-    // SQL was already validated during parse (and triggers Sonnet fallback if invalid)
-    // Re-validate here as a safety net
-    try {
-      validateSQL(parsedResponse.sql);
-    } catch (valError: any) {
-      console.error('[Search Query POST] SQL validation:', valError?.message);
-      return NextResponse.json(
-        { error: 'Query validation failed: ' + valError?.message },
-        { status: 400 }
-      );
-    }
-
-    // Step 4: Inject practice_id filter and execute query
-    let rows: any[] = [];
-    try {
-      const filteredSQL = injectPracticeFilter(parsedResponse.sql, practice_id);
-      console.log('[Search Query POST] Executing:', filteredSQL);
-      rows = await executeQuery(supabase, filteredSQL);
-    } catch (execError: any) {
-      console.error('[Search Query POST] SQL exec error:', execError?.message || execError);
-      return NextResponse.json(
-        { error: 'Failed to execute query: ' + (execError?.message || 'Unknown DB error') },
-        { status: 500 }
-      );
-    }
-
-    // Step 5: Log search query
-    try {
-      await supabase.from('search_queries').insert({
-        practice_id,
-        user_query: query,
-        generated_sql: parsedResponse.sql,
-        result_count: rows.length,
-        status: 'success',
-      });
-    } catch (logError) {
-      console.error('[Search Query POST] Error logging search:', logError);
-    }
-
-    // Step 6: Return results
-    return NextResponse.json({
-      success: true,
-      type: 'data',
-      practice_id,
-      query,
-      explanation: parsedResponse.explanation,
-      columns: parsedResponse.columns,
-      chartType: parsedResponse.chartType || 'table',
-      sql: parsedResponse.sql,
-      rowCount: rows.length,
-      data: rows,
-      executed_at: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('[Search Query POST] Unhandled error:', error?.message || error);
-    return NextResponse.json(
-      { error: error?.message || 'Internal server error' },
-      { status: 500 }
-    );
   }
-}
+);
+
+export { POST_HANDLER as POST };
 
 /**
  * Build system prompt with database schema
@@ -519,8 +491,15 @@ function validateSQL(sql: string): void {
 /**
  * Inject practice filter into SQL.
  * Tables use either practice_id or practice_website_id — detect which.
+ * Returns { sql, params } for parameterized query execution.
  */
-function injectPracticeFilter(sql: string, practice_id: string): string {
+function injectPracticeFilter(sql: string, practice_id: string): { sql: string; params: string[] } {
+  // Validate practice_id is a valid UUID (already done by middleware, but defense-in-depth)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(practice_id)) {
+    throw new Error('Invalid practice_id format');
+  }
+
   // Determine the correct column based on tables used
   const usesWebsiteId = [
     'practice_providers',
@@ -553,41 +532,61 @@ function injectPracticeFilter(sql: string, practice_id: string): string {
     }
   }
 
-  const filterClause = `${prefix}${colName} = '${practice_id}'`;
+  // Use $1 placeholder for parameterized query
+  const filterClause = `${prefix}${colName} = $1`;
   const hasWhere = /WHERE\s+/i.test(sql);
   const hasGroupOrOrder = /\b(GROUP\s+BY|ORDER\s+BY)\b/i.test(sql);
   const hasLimit = /LIMIT\s+\d+/i.test(sql);
 
+  let finalSql: string;
   if (hasWhere) {
     if (hasGroupOrOrder) {
-      return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `AND ${filterClause} $1`);
+      finalSql = sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `AND ${filterClause} $1`);
     } else if (hasLimit) {
-      return sql.replace(/(LIMIT\s+\d+)/i, `AND ${filterClause} $1`);
+      finalSql = sql.replace(/(LIMIT\s+\d+)/i, `AND ${filterClause} $1`);
     } else {
-      return sql + ` AND ${filterClause}`;
+      finalSql = sql + ` AND ${filterClause}`;
     }
   } else {
     if (hasGroupOrOrder) {
-      return sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `WHERE ${filterClause} $1`);
+      finalSql = sql.replace(/(GROUP\s+BY|ORDER\s+BY)/i, `WHERE ${filterClause} $1`);
     } else if (hasLimit) {
-      return sql.replace(/(LIMIT\s+\d+)/i, `WHERE ${filterClause} $1`);
+      finalSql = sql.replace(/(LIMIT\s+\d+)/i, `WHERE ${filterClause} $1`);
     } else {
-      return sql + ` WHERE ${filterClause}`;
+      finalSql = sql + ` WHERE ${filterClause}`;
     }
   }
+
+  return { sql: finalSql, params: [practice_id] };
 }
 
 /**
- * Execute query against Supabase
+ * Execute query against Supabase with parameterized queries
  */
-async function executeQuery(supabase: any, sql: string): Promise<any[]> {
-  const { data, error } = await supabase.rpc('execute_query', { query: sql });
+async function executeQuery(supabase: any, sql: string, practice_id?: string): Promise<any[]> {
+  // If practice_id is provided separately, pass it as a parameter
+  // Otherwise assume sql already has parameterized query built-in
+  if (practice_id) {
+    const { data, error } = await supabase.rpc('execute_query', {
+      query: sql,
+      params: [practice_id]
+    });
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error;
+    }
+
+    return data || [];
+  } else {
+    // Legacy support: raw SQL without parameters
+    const { data, error } = await supabase.rpc('execute_query', { query: sql });
+
+    if (error) {
+      throw error;
+    }
+
+    return data || [];
   }
-
-  return data || [];
 }
 
 // Timeout wrapper

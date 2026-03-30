@@ -1,45 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { withPracticeAccess, API_ERRORS } from '@/lib/api/with-auth';
+import type { PracticeContext } from '@/lib/api/with-auth';
 
 /**
  * GET /api/settings/team
  * List team members for a practice from practice_team_members
  * Query param: practice_id
  */
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const practice_id = searchParams.get('practice_id');
+const GET_HANDLER = withPracticeAccess(
+  async (request: NextRequest, ctx: PracticeContext) => {
+    try {
+      const { data, error } = await ctx.supabase
+        .from('practice_team_members')
+        .select('*')
+        .eq('practice_id', ctx.practiceId)
+        .order('created_at', { ascending: false });
 
-    if (!practice_id) {
-      return NextResponse.json(
-        { error: 'Missing practice_id query parameter' },
-        { status: 400 }
-      );
+      if (error) {
+        console.error('[Team GET] Error fetching team members:', error);
+        return API_ERRORS.internal('Failed to fetch team members');
+      }
+
+      return NextResponse.json(data || []);
+    } catch (error) {
+      console.error('[Team GET] Error:', error);
+      return API_ERRORS.internal();
     }
-
-    const supabase = createAdminSupabaseClient();
-
-    const { data, error } = await supabase
-      .from('practice_team_members')
-      .select('*')
-      .eq('practice_id', practice_id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[Team GET] Error fetching team members:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch team members' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(data || []);
-  } catch (error) {
-    console.error('[Team GET] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
   }
-}
+);
+
+export { GET_HANDLER as GET };

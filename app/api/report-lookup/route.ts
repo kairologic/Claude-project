@@ -13,8 +13,8 @@ import { NextRequest, NextResponse } from 'next/server';
  *   2. Legacy pre-grouped: `sb1188_findings`, `hb149_findings`, `npi_checks`
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 async function supabaseGet(table: string, query: string): Promise<Record<string, unknown>[] | null> {
   try {

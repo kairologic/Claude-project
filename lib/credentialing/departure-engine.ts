@@ -8,6 +8,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { verifyPecosEnrollment } from './pecos-verification';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export async function runDepartureAssessment(
     cigna: assessPayerListing('cigna'),
     humana: assessPayerListing('humana'),
     bcbstx: assessPayerListing('bcbstx'),
-    pecos: 'not_checked', // TODO: wire PECOS check
+    pecos: (await verifyPecosEnrollment(supabase, npi, practice?.state)).enrolled ? 'listed' : 'not_listed',
     website: 'listed',    // Assume provider is on website until verified
   };
 
@@ -218,8 +219,8 @@ function generateDepartureTasks(
     }
   }
 
-  // PECOS termination
-  if (assessment.pecos === 'listed' || assessment.pecos === 'not_checked') {
+  // PECOS termination (only if provider is confirmed enrolled)
+  if (assessment.pecos === 'listed') {
     tasks.push({
       task_order: order++,
       task_type: 'submit_pecos_termination',

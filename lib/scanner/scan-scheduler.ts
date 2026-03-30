@@ -27,8 +27,9 @@ import {
   saveExtractionToProviderSites,
   saveExtractionToPracticeProviders,
 } from '../address/scan-plugin';
-import { triggerWorkflowsForPractice } from './trigger-workflows';
+import { triggerWorkflowsForPractice, triggerDepartureWorkflow, triggerComplianceWorkflows } from './trigger-workflows';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
+import { runComplianceChecks, getActionableFindings, type ComplianceScanResult } from './compliance-checks';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ export interface ScanResult {
   providers_detected: string[];     // provider names found on site
   providers_matched: MatchedProvider[];
   payer_extraction: PayerExtractionResult | null;  // #111: insurance accepted on website
+  compliance_scan: ComplianceScanResult | null;     // WF6: compliance check results
   scan_duration_ms: number;
   error?: string;
 }
@@ -82,8 +84,8 @@ export interface SchedulerResult {
 
 // ── Supabase Client ──────────────────────────────────────
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -318,6 +320,17 @@ async function updatePracticeProviders(
           }),
         });
         departures++;
+
+        // WF4: Auto-trigger release workflow for departed provider
+        try {
+          await triggerDepartureWorkflow(
+            practiceWebsiteId,
+            assoc.npi,
+            assoc.provider_name || '',
+          );
+        } catch (err) {
+          console.warn(`[Scanner] Failed to trigger departure workflow for NPI ${assoc.npi}:`, err);
+        }
       }
     }
   }
@@ -358,6 +371,7 @@ export async function scanSite(
     providers_detected: [],
     providers_matched: [],
     payer_extraction: null,
+    compliance_scan: null,
     scan_duration_ms: 0,
   };
 
@@ -427,6 +441,34 @@ export async function scanSite(
       }
     } catch (err) {
       console.warn(`[Scanner] Payer extraction failed for ${site.url}:`, err);
+    }
+
+    // 3c. Run compliance checks (WF6: DR/AI/ER scans)
+    try {
+      // Build response headers map from crawl result (if available)
+      const responseHeaders: Record<string, string> = {};
+      if (crawl.headers) {
+        for (const [k, v] of Object.entries(crawl.headers)) {
+          responseHeaders[k.toLowerCase()] = String(v).toLowerCase();
+        }
+      }
+
+      const complianceResult = await runComplianceChecks({
+        url: site.url,
+        html: crawl.html,
+        text: crawl.text,
+        responseHeaders,
+      });
+      result.compliance_scan = complianceResult;
+
+      if (complianceResult.failing_count > 0 || complianceResult.warning_count > 0) {
+        console.log(
+          `[Scanner] Compliance: ${complianceResult.composite_score}/100 (${complianceResult.risk_level}) — ` +
+          `${complianceResult.failing_count} fails, ${complianceResult.warning_count} warns`,
+        );
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Compliance checks failed for ${site.url}:`, err);
     }
 
     // 4. Update practice_providers (Task 1.12)
@@ -580,6 +622,35 @@ async function updateScanMetadata(
       }
     } catch (err) {
       console.warn(`[Scanner] Failed to trigger workflows for practice ${site.id}:`, err);
+    }
+
+    // 7. WF6: Trigger compliance workflows for actionable findings
+    if (result.compliance_scan) {
+      try {
+        const actionable = getActionableFindings(result.compliance_scan.findings);
+        if (actionable.length > 0) {
+          const compWfResult = await triggerComplianceWorkflows(
+            site.id,
+            actionable.map(f => ({
+              check_id: f.id,
+              name: f.name,
+              status: f.status as 'fail' | 'warn',
+              severity: f.severity,
+              category: f.category,
+              detail: f.detail,
+              clause: f.clause,
+              recommended_fix: f.recommended_fix,
+            })),
+          );
+          if (compWfResult.workflows_created > 0) {
+            console.log(
+              `[Scanner] Created ${compWfResult.workflows_created} compliance workflows for practice ${site.id}`,
+            );
+          }
+        }
+      } catch (err) {
+        console.warn(`[Scanner] Failed to trigger compliance workflows for practice ${site.id}:`, err);
+      }
     }
   }
 }

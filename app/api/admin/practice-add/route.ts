@@ -7,30 +7,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
+import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// TODO: Add system-admin role check when role system is expanded
 
-async function db(path: string, options: RequestInit = {}): Promise<any> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: options.method === 'POST' ? 'return=representation' : 'return=representation',
-      ...((options.headers as Record<string, string>) || {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`DB ${options.method || 'GET'} ${path}: ${res.status} ${err}`);
-  }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('json') ? res.json() : null;
-}
-
-export async function POST(request: NextRequest) {
+const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
   try {
     const { npi, url } = await request.json();
 
@@ -44,18 +26,24 @@ export async function POST(request: NextRequest) {
       normalizedUrl = `https://${normalizedUrl}`;
     }
 
+    // Use admin Supabase client from auth middleware
+    const supabase = ctx.supabase;
+
     // Check for duplicate URL — strip trailing slash for comparison
     const baseUrl = normalizedUrl.replace(/\/+$/, '');
     // Match exact URL or URL with trailing slash/query params only
-    const existing = await db(
-      `practice_websites?or=(url.eq.${encodeURIComponent(baseUrl)},url.eq.${encodeURIComponent(baseUrl + '/')},url.like.${encodeURIComponent(baseUrl + '?')}*,url.like.${encodeURIComponent(baseUrl + '/?')}*)&select=id,name,url&limit=1`
-    );
+    const { data: existing } = await supabase
+      .from('practice_websites')
+      .select('id,name,url')
+      .or(`url.eq.${baseUrl},url.eq.${baseUrl + '/'}`)
+      .limit(1);
+
     if (existing && existing.length > 0) {
       // Practice exists from a prior scan — adopt it into admin tracking
-      await db(`practice_websites?id=eq.${existing[0].id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ admin_tracked: true }),
-      });
+      await supabase
+        .from('practice_websites')
+        .update({ admin_tracked: true })
+        .eq('id', existing[0].id);
       return NextResponse.json({
         success: true,
         adopted: true,
@@ -69,9 +57,11 @@ export async function POST(request: NextRequest) {
     let state: string | null = null;
 
     if (npi) {
-      const npiData = await db(
-        `providers?npi=eq.${npi}&select=first_name,last_name,organization_name,state&limit=1`
-      );
+      const { data: npiData } = await supabase
+        .from('providers')
+        .select('first_name,last_name,organization_name,state')
+        .eq('npi', npi)
+        .limit(1);
       if (npiData && npiData.length > 0) {
         const p = npiData[0];
         practiceName = p.organization_name || `${p.first_name} ${p.last_name}`.trim();
@@ -80,9 +70,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create practice_websites row
-    const newPractice = await db('practice_websites', {
-      method: 'POST',
-      body: JSON.stringify({
+    const { data: newPractice } = await supabase
+      .from('practice_websites')
+      .insert({
         url: normalizedUrl,
         npi: npi || null,
         name: practiceName,
@@ -93,16 +83,16 @@ export async function POST(request: NextRequest) {
         provider_count: 0,
         mismatch_count: 0,
         admin_tracked: true,
-      }),
-    });
+      })
+      .select();
 
     const practiceId = newPractice?.[0]?.id;
 
     // If NPI provided, also add to practice_providers
     if (npi && practiceId) {
-      await db('practice_providers', {
-        method: 'POST',
-        body: JSON.stringify({
+      await supabase
+        .from('practice_providers')
+        .insert({
           practice_website_id: practiceId,
           npi,
           provider_name: practiceName,
@@ -110,9 +100,7 @@ export async function POST(request: NextRequest) {
           roster_status: 'active',
           first_detected_at: new Date().toISOString(),
           last_seen_at: new Date().toISOString(),
-        }),
-        headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' } as any,
-      });
+        });
     }
 
     return NextResponse.json({
@@ -127,4 +115,6 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
+
+export { POST_HANDLER as POST };
