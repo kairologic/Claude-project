@@ -1,116 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { withPracticeAccess, withAdminAccess, API_ERRORS } from '@/lib/api/with-auth';
+import type { PracticeContext } from '@/lib/api/with-auth';
 
 /**
  * GET /api/settings/notifications
  * Fetch notification_preferences for practice
  * Query param: practice_id
  */
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const practice_id = searchParams.get('practice_id');
+const GET_HANDLER = withPracticeAccess(
+  async (request: NextRequest, ctx: PracticeContext) => {
+    try {
+      const { data, error } = await ctx.supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('practice_id', ctx.practiceId)
+        .single();
 
-    if (!practice_id) {
-      return NextResponse.json(
-        { error: 'Missing practice_id query parameter' },
-        { status: 400 }
-      );
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = no rows returned, which is OK
+        console.error('[Notifications GET] Error fetching preferences:', error);
+        return API_ERRORS.internal('Failed to fetch notification preferences');
+      }
+
+      // Return preferences or empty object if none exist
+      return NextResponse.json(data || { practice_id: ctx.practiceId, created_at: new Date().toISOString() });
+    } catch (error) {
+      console.error('[Notifications GET] Error:', error);
+      return API_ERRORS.internal();
     }
-
-    const supabase = createAdminSupabaseClient();
-
-    const { data, error } = await supabase
-      .from('notification_preferences')
-      .select('*')
-      .eq('practice_id', practice_id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows returned, which is OK
-      console.error('[Notifications GET] Error fetching preferences:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch notification preferences' },
-        { status: 500 }
-      );
-    }
-
-    // Return preferences or empty object if none exist
-    return NextResponse.json(data || { practice_id, created_at: new Date().toISOString() });
-  } catch (error) {
-    console.error('[Notifications GET] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
   }
-}
+);
 
 /**
  * PUT /api/settings/notifications
  * Update notification_preferences
  * Body: { practice_id, ...preference_fields }
  */
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { practice_id, ...updateData } = body;
+const PUT_HANDLER = withAdminAccess(
+  async (request: NextRequest, ctx: PracticeContext) => {
+    try {
+      const body = await request.json();
+      const { ...updateData } = body;
 
-    if (!practice_id) {
-      return NextResponse.json(
-        { error: 'Missing practice_id in request body' },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminSupabaseClient();
-
-    // Check if preferences exist
-    const { data: existing } = await supabase
-      .from('notification_preferences')
-      .select('id')
-      .eq('practice_id', practice_id)
-      .single();
-
-    let data, error;
-
-    if (existing) {
-      // Update existing
-      ({ data, error } = await supabase
+      // Check if preferences exist
+      const { data: existing } = await ctx.supabase
         .from('notification_preferences')
-        .update({
-          ...updateData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('practice_id', practice_id)
-        .select()
-        .single());
-    } else {
-      // Create new
-      ({ data, error } = await supabase
-        .from('notification_preferences')
-        .insert({
-          practice_id,
-          ...updateData,
-        })
-        .select()
-        .single());
-    }
+        .select('id')
+        .eq('practice_id', ctx.practiceId)
+        .single();
 
-    if (error) {
-      console.error('[Notifications PUT] Error updating preferences:', error);
-      return NextResponse.json(
-        { error: 'Failed to update notification preferences' },
-        { status: 500 }
-      );
-    }
+      let data, error;
 
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('[Notifications PUT] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+      if (existing) {
+        // Update existing
+        ({ data, error } = await ctx.supabase
+          .from('notification_preferences')
+          .update({
+            ...updateData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('practice_id', ctx.practiceId)
+          .select()
+          .single());
+      } else {
+        // Create new
+        ({ data, error } = await ctx.supabase
+          .from('notification_preferences')
+          .insert({
+            practice_id: ctx.practiceId,
+            ...updateData,
+          })
+          .select()
+          .single());
+      }
+
+      if (error) {
+        console.error('[Notifications PUT] Error updating preferences:', error);
+        return API_ERRORS.internal('Failed to update notification preferences');
+      }
+
+      return NextResponse.json(data);
+    } catch (error) {
+      console.error('[Notifications PUT] Error:', error);
+      return API_ERRORS.internal();
+    }
   }
-}
+);
+
+export { GET_HANDLER as GET, PUT_HANDLER as PUT };

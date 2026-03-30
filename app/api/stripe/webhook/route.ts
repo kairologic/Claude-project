@@ -28,9 +28,9 @@ import { NextRequest, NextResponse } from 'next/server';
  *   7. Log to prospects
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY!;
 
 // ── Stripe recurring price IDs ──
 const STRIPE_SHIELD_PRICE_ID = process.env.STRIPE_SHIELD_PRICE_ID || ''; // $79/mo recurring price

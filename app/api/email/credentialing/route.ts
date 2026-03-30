@@ -19,13 +19,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/lib/api/with-auth';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'ravi@kairologic.net';
 const FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const DASHBOARD_URL = 'https://kairologic.net';
 
@@ -40,90 +41,90 @@ type Vars = Record<string, any>;
 
 const TEMPLATES: Record<string, EmailTemplate> = {
   onboarding_started: {
-    subject: (v) => `Credentialing started — ${v.provider_name}`,
+    subject: (v) => `Credentialing started — ${escapeHtml(v.provider_name)}`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#00234E;margin-bottom:8px">
         Credentialing Started
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        ${v.provider_name} (NPI: ${v.provider_npi}) has been added to ${v.practice_name}
+        ${escapeHtml(v.provider_name)} (NPI: ${escapeHtml(v.provider_npi)}) has been added to ${escapeHtml(v.practice_name)}
       </div>
       <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:12px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Assessment Summary</div>
         <div style="font-size:13px;color:#444;line-height:1.8">
-          ${v.task_count || '—'} tasks auto-generated<br>
-          Est. timeline: ~${v.estimated_weeks || '8-12'} weeks<br>
-          ${v.bottleneck ? `Bottleneck: ${v.bottleneck}` : 'No bottleneck identified'}
+          ${escapeHtml(v.task_count || '—')} tasks auto-generated<br>
+          Est. timeline: ~${escapeHtml(v.estimated_weeks || '8-12')} weeks<br>
+          ${v.bottleneck ? `Bottleneck: ${escapeHtml(v.bottleneck)}` : 'No bottleneck identified'}
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Dashboard')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Dashboard')}
     `),
   },
 
   departure_started: {
-    subject: (v) => `Departure checklist created — ${v.provider_name}`,
+    subject: (v) => `Departure checklist created — ${escapeHtml(v.provider_name)}`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#00234E;margin-bottom:8px">
         Provider Departure Started
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        ${v.provider_name} (NPI: ${v.provider_npi}) has been marked as departing from ${v.practice_name}
+        ${escapeHtml(v.provider_name)} (NPI: ${escapeHtml(v.provider_npi)}) has been marked as departing from ${escapeHtml(v.practice_name)}
       </div>
       <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Departure Checklist</div>
         <div style="font-size:13px;color:#444;line-height:1.8">
-          ${v.directories_to_clear || '—'} directories to clear<br>
-          ${v.task_count || '—'} tasks generated<br>
+          ${escapeHtml(v.directories_to_clear || '—')} directories to clear<br>
+          ${escapeHtml(v.task_count || '—')} tasks generated<br>
           90-day phantom monitoring will begin after tasks complete
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Departure Checklist')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Departure Checklist')}
     `),
   },
 
   task_overdue: {
-    subject: (v) => `Action needed: ${v.task_title} overdue — ${v.provider_name}`,
+    subject: (v) => `Action needed: ${escapeHtml(v.task_title)} overdue — ${escapeHtml(v.provider_name)}`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">
         Task Overdue
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        A credentialing task for ${v.provider_name} has been open for ${v.days_overdue || '3+'} days
+        A credentialing task for ${escapeHtml(v.provider_name)} has been open for ${escapeHtml(v.days_overdue || '3+')} days
       </div>
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:20px">
-        <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:4px">${v.task_title || 'Task'}</div>
-        <div style="font-size:13px;color:#666">${v.task_description || ''}</div>
+        <div style="font-size:14px;font-weight:700;color:#dc2626;margin-bottom:4px">${escapeHtml(v.task_title || 'Task')}</div>
+        <div style="font-size:13px;color:#666">${escapeHtml(v.task_description || '')}</div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'Complete Task')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'Complete Task')}
     `),
   },
 
   payer_confirmed: {
-    subject: (v) => `${v.payer_name} listing confirmed — ${v.provider_name}`,
+    subject: (v) => `${escapeHtml(v.payer_name)} listing confirmed — ${escapeHtml(v.provider_name)}`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#16a34a;margin-bottom:8px">
         Directory Update Confirmed
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        ${v.provider_name} now appears correctly in the ${v.payer_name} provider directory
+        ${escapeHtml(v.provider_name)} now appears correctly in the ${escapeHtml(v.payer_name)} provider directory
       </div>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#444">
           Auto-monitoring detected the update. This task has been marked complete.
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Progress')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Progress')}
     `),
   },
 
   onboarding_complete: {
-    subject: (v) => `Credentialing complete — ${v.provider_name} is fully onboarded`,
+    subject: (v) => `Credentialing complete — ${escapeHtml(v.provider_name)} is fully onboarded`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#16a34a;margin-bottom:8px">
         Credentialing Complete
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        ${v.provider_name} has been fully credentialed and added to the active roster at ${v.practice_name}
+        ${escapeHtml(v.provider_name)} has been fully credentialed and added to the active roster at ${escapeHtml(v.practice_name)}
       </div>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#444;line-height:1.8">
@@ -132,81 +133,81 @@ const TEMPLATES: Record<string, EmailTemplate> = {
           Ongoing automated monitoring now in effect
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Dashboard')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Dashboard')}
     `),
   },
 
   departure_complete: {
-    subject: (v) => `Departure monitoring complete — ${v.provider_name}`,
+    subject: (v) => `Departure monitoring complete — ${escapeHtml(v.provider_name)}`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#16a34a;margin-bottom:8px">
         Departure Complete
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        90-day phantom monitoring for ${v.provider_name} is complete
+        90-day phantom monitoring for ${escapeHtml(v.provider_name)} is complete
       </div>
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#444;line-height:1.8">
-          Provider removed from ${v.directories_cleared || 'all'} directories<br>
-          ${v.remaining_issues ? `Remaining: ${v.remaining_issues}` : 'No phantom listings detected'}
+          Provider removed from ${escapeHtml(v.directories_cleared || 'all')} directories<br>
+          ${v.remaining_issues ? `Remaining: ${escapeHtml(v.remaining_issues)}` : 'No phantom listings detected'}
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Final Report')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Final Report')}
     `),
   },
 
   phantom_listing: {
-    subject: (v) => `Alert: ${v.provider_name} still listed in ${v.payer_name} — action needed`,
+    subject: (v) => `Alert: ${escapeHtml(v.provider_name)} still listed in ${escapeHtml(v.payer_name)} — action needed`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#d97706;margin-bottom:8px">
         Phantom Listing Detected
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        ${v.days_since || '30'}+ days after departure, ${v.provider_name} still appears in ${v.payer_name}
+        ${escapeHtml(v.days_since || '30')}+ days after departure, ${escapeHtml(v.provider_name)} still appears in ${escapeHtml(v.payer_name)}
       </div>
       <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#444;line-height:1.8">
-          Directory: ${v.payer_name}<br>
-          Listed address: ${v.listed_address || 'Unknown'}<br>
-          Days since departure: ${v.days_since || '30+'}
+          Directory: ${escapeHtml(v.payer_name)}<br>
+          Listed address: ${escapeHtml(v.listed_address || 'Unknown')}<br>
+          Days since departure: ${escapeHtml(v.days_since || '30+')}
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Details')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Details')}
     `),
   },
 
   phantom_escalation: {
-    subject: (v) => `Urgent: ${v.provider_name} still listed in ${v.directory_count} directories after 60 days`,
+    subject: (v) => `Urgent: ${escapeHtml(v.provider_name)} still listed in ${escapeHtml(v.directory_count)} directories after 60 days`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">
         Phantom Listing Escalation
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        60 days after departure, ${v.provider_name} remains listed in ${v.directory_count} directories
+        60 days after departure, ${escapeHtml(v.provider_name)} remains listed in ${escapeHtml(v.directory_count)} directories
       </div>
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:8px">DIRECTORIES STILL LISTING PROVIDER</div>
-        <div style="font-size:13px;color:#444;line-height:1.8">${v.directories || 'See dashboard for details'}</div>
+        <div style="font-size:13px;color:#444;line-height:1.8">${escapeHtml(v.directories || 'See dashboard for details')}</div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'Take Action')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'Take Action')}
     `),
   },
 
   phantom_final: {
-    subject: (v) => `Departure monitoring complete — ${v.provider_name}`,
+    subject: (v) => `Departure monitoring complete — ${escapeHtml(v.provider_name)}`,
     body: (v) => wrapInLayout(`
       <div style="font-size:20px;font-weight:800;color:#00234E;margin-bottom:8px">
         90-Day Monitoring Complete
       </div>
       <div style="font-size:14px;color:#666;margin-bottom:24px">
-        Final departure status for ${v.provider_name} at ${v.practice_name}
+        Final departure status for ${escapeHtml(v.provider_name)} at ${escapeHtml(v.practice_name)}
       </div>
       <div style="${v.all_clear ? 'background:#f0fdf4;border:1px solid #bbf7d0' : 'background:#fef2f2;border:1px solid #fecaca'};border-radius:8px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#444;line-height:1.8">
-          ${v.all_clear ? 'Provider successfully removed from all directories.' : `Provider still appears in ${v.remaining_count || 'some'} directories. Manual follow-up may be needed.`}
+          ${v.all_clear ? 'Provider successfully removed from all directories.' : `Provider still appears in ${escapeHtml(v.remaining_count || 'some')} directories. Manual follow-up may be needed.`}
         </div>
       </div>
-      ${ctaButton(`${DASHBOARD_URL}/practice/${v.practice_id}`, 'View Report')}
+      ${ctaButton(`${DASHBOARD_URL}/practice/${escapeHtml(v.practice_id)}`, 'View Report')}
     `),
   },
 };

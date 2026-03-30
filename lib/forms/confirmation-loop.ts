@@ -9,8 +9,8 @@
 // NPPES Live API: https://npiregistry.cms.hhs.gov/api/
 // Auth: None. No API key. Free REST API.
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const NPPES_API = 'https://npiregistry.cms.hhs.gov/api/';
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {

@@ -18,7 +18,7 @@
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const BASE_URL = `${SUPABASE_URL}/rest/v1`;

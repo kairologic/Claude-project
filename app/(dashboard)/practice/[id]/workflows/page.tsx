@@ -3,9 +3,12 @@
  *
  * Workflows page — server component that fetches all workflows
  * for this practice and passes them to the WorkflowsView client component.
+ *
+ * Optimization: 90-day retention filter on resolved/cancelled workflows.
  */
 
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { safeQuery, safeQuerySingle } from '@/lib/supabase/safe-query';
 import WorkflowsView from '@/components/dashboard/WorkflowsView';
 
 export default async function WorkflowsPage({
@@ -16,22 +19,49 @@ export default async function WorkflowsPage({
   const practiceId = params.id;
   const admin = createAdminSupabaseClient();
 
-  // Fetch all workflows for this practice
-  const { data: workflows } = await admin
-    .from('workflow_instances')
-    .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, priority, overdue_at, created_at')
-    .eq('practice_id', practiceId)
-    .order('priority', { ascending: false })
-    .order('created_at', { ascending: false });
+  // Parallel queries: workflows + KPI data
+  const [workflowsResult, kpiResult] = await Promise.all([
+    safeQuery(
+      admin
+        .from('workflow_instances')
+        .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, priority, overdue_at, created_at')
+        .eq('practice_id', practiceId)
+        .or(`status.not.in.(resolved,cancelled),updated_at.gt.${new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()}`)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false }),
+      []
+    ),
+    safeQuerySingle(
+      admin
+        .from('v_workflow_kpis')
+        .select('action_needed_count, in_progress_count, awaiting_count, resolved_count')
+        .eq('practice_id', practiceId)
+        .single(),
+      null
+    ),
+  ]);
 
-  // Get counts per status
-  const { data: kpiData } = await admin
-    .from('v_workflow_kpis')
-    .select('*')
-    .eq('practice_id', practiceId)
-    .single();
+  interface WorkflowRow {
+    id: string;
+    workflow_type: string;
+    status: string;
+    provider_npi: string | null;
+    provider_name: string | null;
+    finding_summary: string | null;
+    finding_details: Record<string, unknown> | null;
+    priority: number;
+    overdue_at: string | null;
+    created_at: string;
+  }
+  interface WorkflowKpiRow {
+    action_needed_count: number;
+    in_progress_count: number;
+    awaiting_count: number;
+    resolved_count: number;
+  }
 
-  const allWorkflows = workflows || [];
+  const allWorkflows = (workflowsResult.data || []) as WorkflowRow[];
+  const kpiData = kpiResult.data as WorkflowKpiRow | null;
 
   const counts = {
     all: allWorkflows.length,

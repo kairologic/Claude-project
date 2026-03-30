@@ -144,6 +144,39 @@ export const RELEASE_TASKS: TaskTemplate[] = [
   },
 ];
 
+// ── License Renewal ───────────────────────────────────────
+
+export const LICENSE_RENEWAL_TASKS: TaskTemplate[] = [
+  {
+    task_order: 1,
+    task_type: 'review_license',
+    title: 'Review expiring license details',
+    description: 'Confirm which state license is expiring and verify current license number and status with the state board',
+    group: 'immediate',
+  },
+  {
+    task_order: 2,
+    task_type: 'submit_renewal',
+    title: 'Submit license renewal application',
+    description: 'Complete and submit the renewal application with the state medical board, including any required CE documentation',
+    group: 'submit_wait',
+  },
+  {
+    task_order: 3,
+    task_type: 'update_credentials',
+    title: 'Update credentials with new license',
+    description: 'Once renewed, update CAQH ProView profile and notify contracted payers of new license number and expiration date',
+    group: 'submit_wait',
+  },
+  {
+    task_order: 4,
+    task_type: 'monitor_license_update',
+    title: 'Monitor & confirm license active',
+    description: 'Auto-checks weekly until the state board shows the license as active with the new expiration date',
+    group: 'monitoring',
+  },
+];
+
 // ── Compliance Remediation ────────────────────────────────────
 
 export const COMPLIANCE_TASKS: TaskTemplate[] = [
@@ -174,7 +207,7 @@ export const WORKFLOW_TASK_TEMPLATES: Record<WorkflowType, TaskTemplate[]> = {
   payer_directory: PAYER_DIRECTORY_TASKS,
   onboarding: ONBOARDING_TASKS,
   release: RELEASE_TASKS,
-  license_renewal: [], // TODO: Day 3
+  license_renewal: LICENSE_RENEWAL_TASKS,
   compliance: COMPLIANCE_TASKS,
 };
 

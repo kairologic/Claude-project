@@ -238,7 +238,7 @@ export default function CompliancePage() {
           <div className="m-cta-inner">
             <span className="m-tag" style={{ background: 'rgba(212,160,23,0.15)', color: 'var(--m-gold)', borderColor: 'rgba(212,160,23,0.3)' }}>Get Started</span>
             <h2>See where your providers stand <em>today.</em></h2>
-            <p>Start your 14-day free trial and get compliance visibility across your entire roster — TX and CA coverage included.</p>
+            <p>Start your 21-day free trial and get compliance visibility across your entire roster — TX and CA coverage included.</p>
             <div className="m-cta-actions">
               <Link href="/contact" className="m-btn-primary m-gold">
                 Get Started

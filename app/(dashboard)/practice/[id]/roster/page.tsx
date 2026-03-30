@@ -6,6 +6,7 @@
  */
 
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { safeQuery } from '@/lib/supabase/safe-query';
 import ProviderRosterView from '@/components/dashboard/ProviderRosterView';
 
 export default async function RosterPage({
@@ -16,19 +17,28 @@ export default async function RosterPage({
   const practiceId = params.id;
   const admin = createAdminSupabaseClient();
 
-  // Fetch from practice_providers (source of truth for mismatch flags)
-  const { data: providers } = await admin
-    .from('practice_providers')
-    .select('id, npi, provider_name, roster_status, active_mismatch_count, web_specialty, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type')
-    .eq('practice_website_id', practiceId)
-    .neq('roster_status', 'onboarding')
-    .order('active_mismatch_count', { ascending: false, nullsFirst: false });
+  // Parallel queries: providers + health data
+  const [providersResult, healthResult] = await Promise.all([
+    safeQuery(
+      admin
+        .from('practice_providers')
+        .select('id, npi, provider_name, roster_status, active_mismatch_count, web_specialty, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type')
+        .eq('practice_website_id', practiceId)
+        .neq('roster_status', 'onboarding')
+        .order('active_mismatch_count', { ascending: false, nullsFirst: false }),
+      []
+    ),
+    safeQuery(
+      admin
+        .from('v_provider_health')
+        .select('npi, health_score, open_issues, specialty')
+        .eq('practice_website_id', practiceId),
+      []
+    ),
+  ]);
 
-  // Fetch health scores from v_provider_health
-  const { data: healthData } = await admin
-    .from('v_provider_health')
-    .select('npi, health_score, open_issues, specialty')
-    .eq('practice_website_id', practiceId);
+  const providers = providersResult.data;
+  const healthData = healthResult.data;
 
   const healthMap: Record<string, { health_score: number; open_issues: number; specialty: string | null }> = {};
   (healthData || []).forEach(h => {

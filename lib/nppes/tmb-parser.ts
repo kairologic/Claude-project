@@ -404,7 +404,7 @@ export async function upsertTmbRecords(
 ): Promise<number> {
   if (rows.length === 0) return 0;
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || '';
+  const SUPABASE_URL = process.env.SUPABASE_URL!;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
   const BATCH_SIZE = 500;

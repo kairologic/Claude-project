@@ -7,14 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky",
     "test": "npx playwright test",
-    "test:content": "npx playwright test static-content",
-    "test:visual": "npx playwright test visual-regression",
-    "test:links": "npx playwright test broken-links",
-    "test:functionality": "npx playwright test functionality",
-    "test:structure": "npx playwright test page-structure",
-    "test:guide": "npx playwright test dashboard-guide",
-    "test:update-snapshots": "npx playwright test visual-regression --update-snapshots",
+    "test:e2e": "npx playwright test --project=chromium",
+    "test:e2e:mobile": "npx playwright test --project=mobile-chrome",
+    "test:audit": "npx tsx scripts/generate-test-stub.ts",
+    "test:audit:generate": "npx tsx scripts/generate-test-stub.ts --generate",
     "test:report": "npx playwright show-report"
   },
   "dependencies": {
@@ -34,17 +36,38 @@
     "react-dom": "^18.3.1",
     "recharts": "^3.8.0",
     "stripe": "^17.5.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/compat": "^2.0.3",
+    "@eslint/eslintrc": "^3.3.5",
     "@playwright/test": "^1.58.2",
     "@types/node": "^22.10.2",
     "@types/nodemailer": "^6.4.17",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "postcss": "^8.4.49",
+    "prettier": "^3.8.1",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "typescript-eslint": "^8.57.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings=500",
+      "prettier --write"
+    ],
+    "*.{js,jsx,json,css,md}": [
+      "prettier --write"
+    ]
   }
 }

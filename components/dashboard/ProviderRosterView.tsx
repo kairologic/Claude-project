@@ -11,8 +11,8 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { colors, rosterStatusMap, avatarColors } from '@/lib/design-tokens';
-import { Tooltip } from './ui';
+import { colors, rosterStatusMap, avatarColors, shadows, transitions, radii, spacing, typography } from '@/lib/design-tokens';
+import { Tooltip, EmptyState } from './ui';
 import ProviderDetailPanel from './ProviderDetailPanel';
 import { titleCase } from '@/lib/format-helpers';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
@@ -178,7 +178,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
   return (
     <div>
       {/* Summary bar */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, fontSize: 12, color: colors.gray400 }}>
+      <div style={{ display: 'flex', gap: spacing.md, marginBottom: spacing.lg, ...typography.bodySmall, color: colors.gray400 }}>
         <span>{providers.length} providers</span>
         <span>·</span>
         <span>{providers.filter(p => (p.active_mismatch_count || 0) > 0).length} with issues</span>
@@ -187,14 +187,14 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
       </div>
 
       {/* Table */}
-      <div style={{ background: '#fff', borderRadius: 10, border: `1px solid ${colors.gray200}`, overflow: 'hidden' }}>
+      <div style={{ background: '#fff', borderRadius: radii.lg, border: `1px solid ${colors.gray200}`, overflow: 'hidden', boxShadow: shadows.xs }} role="table">
         {/* Header */}
         <div style={{
           display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.7fr 0.7fr 0.7fr 40px',
-          padding: '10px 16px', background: colors.gray100, borderBottom: `1px solid ${colors.gray200}`,
-          fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.gray400,
+          padding: `${spacing.xs}px ${spacing.md}px`, background: colors.gray100, borderBottom: `1px solid ${colors.gray200}`,
+          ...typography.label, color: colors.gray400,
         }}>
-          <span>Provider</span><span>Specialty</span><span>NPI</span><span>Health</span><span>Issues</span><span>Status</span><span></span>
+          <span role="columnheader">Provider</span><span role="columnheader">Specialty</span><span role="columnheader">NPI</span><span role="columnheader">Health</span><span role="columnheader">Issues</span><span role="columnheader">Status</span><span></span>
         </div>
 
         {/* Rows */}
@@ -210,33 +210,35 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
               <div
                 style={{
                   display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.7fr 0.7fr 0.7fr 40px',
-                  padding: '10px 16px', alignItems: 'center',
+                  padding: `${spacing.xs}px ${spacing.md}px`, alignItems: 'center',
                   borderBottom: `1px solid ${colors.gray100}`,
-                  cursor: 'pointer', transition: 'background .1s',
+                  cursor: 'pointer', transition: `background ${transitions.fast}, box-shadow ${transitions.fast}`,
+                  boxShadow: 'none',
                 }}
-                onMouseOver={e => (e.currentTarget as HTMLElement).style.background = colors.gray50}
-                onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = colors.gray50; (e.currentTarget as HTMLElement).style.boxShadow = shadows.sm; }}
+                onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
                 onClick={() => setSelectedNpi(p.npi)}
+                role="row"
               >
                 {/* Provider name + avatar */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%', background: avatarBg,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontSize: 10, fontWeight: 700, flexShrink: 0,
+                    color: '#fff', ...typography.caption, fontWeight: 700, flexShrink: 0,
                   }}>{getInitials(p.provider_name)}</div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: colors.navy }}>
+                  <span style={{ ...typography.body, fontWeight: 600, color: colors.navy }}>
                     {titleCase(p.provider_name) || 'Unknown'}
                   </span>
                 </div>
 
                 {/* Specialty */}
-                <span style={{ fontSize: 12, color: colors.gray600 }}>
+                <span style={{ ...typography.bodySmall, color: colors.gray600 }}>
                   {p.web_specialty || '—'}
                 </span>
 
                 {/* NPI */}
-                <span style={{ fontFamily: 'monospace', fontSize: 10, color: colors.gray400 }}>
+                <span style={{ ...typography.mono, color: colors.gray400 }}>
                   {p.npi}
                 </span>
 
@@ -246,11 +248,11 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
                   const score = h?.health_score ?? 100;
                   const hColor = score >= 80 ? colors.green : score >= 50 ? colors.gold : colors.red;
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 40, height: 6, background: colors.gray200, borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${score}%`, background: hColor, borderRadius: 3 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
+                      <div style={{ width: 40, height: 6, background: colors.gray200, borderRadius: radii.sm, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${score}%`, background: hColor, borderRadius: radii.sm, transition: `width ${transitions.base}` }} />
                       </div>
-                      <span style={{ fontSize: 10, color: hColor, fontWeight: 600 }}>{score}%</span>
+                      <span style={{ ...typography.caption, color: hColor, fontWeight: 600 }}>{score}%</span>
                     </div>
                   );
                 })()}
@@ -259,7 +261,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
                 <Tooltip text={getIssueTooltip(p)}>
                   {issueCount > 0 || hasLicense ? (
                     <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                      ...typography.caption, fontWeight: 700, padding: `${spacing.xxs}px ${spacing.xs}px`, borderRadius: radii.full,
                       background: hasLicense ? colors.redPale : colors.goldPale,
                       color: hasLicense ? colors.red : colors.gold,
                       display: 'inline-block', cursor: 'help',
@@ -267,7 +269,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
                       {hasLicense ? '⚠ License' : `${issueCount} issue${issueCount !== 1 ? 's' : ''}`}
                     </span>
                   ) : (
-                    <span style={{ fontSize: 10, fontWeight: 600, color: colors.green, cursor: 'help' }}>
+                    <span style={{ ...typography.caption, fontWeight: 600, color: colors.green, cursor: 'help' }}>
                       ✓ Clear
                     </span>
                   )}
@@ -275,7 +277,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
 
                 {/* Status badge */}
                 <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100,
+                  ...typography.caption, fontWeight: 700, padding: `${spacing.xxs}px ${spacing.xs}px`, borderRadius: radii.full,
                   background: statusInfo.bg, color: statusInfo.color,
                   display: 'inline-block', width: 'fit-content', textTransform: 'uppercase',
                 }}>
@@ -287,7 +289,7 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
                   onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === p.id ? null : p.id); }}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer', fontSize: 16,
-                    color: colors.gray400, padding: '0 4px', fontFamily: 'inherit',
+                    color: colors.gray400, padding: `0 ${spacing.xs}px`, fontFamily: 'inherit',
                   }}
                 >⋮</button>
               </div>
@@ -295,9 +297,10 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
               {/* Action menu dropdown */}
               {openMenu === p.id && (
                 <div style={{
-                  position: 'absolute', right: 16, top: '100%', zIndex: 70,
-                  background: '#fff', border: `1px solid ${colors.gray200}`, borderRadius: 8,
-                  boxShadow: '0 8px 24px rgba(0,0,0,.12)', overflow: 'hidden', minWidth: 200,
+                  position: 'absolute', right: spacing.md, top: '100%', zIndex: 70,
+                  background: '#fff', border: `1px solid ${colors.gray200}`, borderRadius: radii.md,
+                  boxShadow: shadows.lg, overflow: 'hidden', minWidth: 200,
+                  animation: 'scaleIn 0.15s ease-out',
                 }}>
                   <button onClick={() => { setOpenMenu(null); setSelectedNpi(p.npi); }}
                     style={menuItemStyle}>
@@ -336,8 +339,8 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
         })}
 
         {providers.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: colors.gray400, fontSize: 13 }}>
-            No providers linked to this practice yet.
+          <div style={{ padding: spacing['3xl'], textAlign: 'center' }}>
+            <EmptyState icon="👥" title="No providers yet" description="No providers are linked to this practice. Add providers to get started." />
           </div>
         )}
       </div>
@@ -355,10 +358,10 @@ export default function ProviderRosterView({ providers, practiceId, workflowMap,
 }
 
 const menuItemStyle: React.CSSProperties = {
-  width: '100%', padding: '9px 14px', background: 'none', border: 'none',
-  borderBottom: `1px solid ${colors.gray100}`, fontSize: 12, fontWeight: 500,
+  width: '100%', padding: `${spacing.xs}px ${spacing.md}px`, background: 'none', border: 'none',
+  borderBottom: `1px solid ${colors.gray100}`, ...typography.body, fontWeight: 500,
   color: colors.navy, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-  display: 'flex', alignItems: 'center', gap: 8,
+  display: 'flex', alignItems: 'center', gap: spacing.xs,
 };
 
 const menuIconStyle: React.CSSProperties = {

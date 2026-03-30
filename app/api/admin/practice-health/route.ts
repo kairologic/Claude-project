@@ -10,27 +10,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-async function rpc(fnName: string, params: Record<string, any> = {}): Promise<any> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`RPC ${fnName}: ${res.status} ${err}`);
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
-}
+// TODO: Add system-admin role check when role system is expanded
 
 export interface PracticeHealth {
   id: string;
@@ -112,15 +94,20 @@ function detectIssues(p: PracticeHealth): DashboardIssue[] {
   return issues;
 }
 
-export async function GET(request: NextRequest) {
+const GET_HANDLER = withAuth(async (request: NextRequest, ctx) => {
   try {
     const { searchParams } = new URL(request.url);
     const practiceId = searchParams.get('id');
+    const supabase = ctx.supabase;
 
     // Call the server-side RPC function that does all aggregation in SQL
-    const rows = await rpc('get_practice_health_summary', {
+    const { data: rows, error } = await supabase.rpc('get_practice_health_summary', {
       p_practice_id: practiceId || null,
     });
+
+    if (error) {
+      throw new Error(`RPC get_practice_health_summary: ${error.message}`);
+    }
 
     // The RPC returns a JSONB array directly
     const rawPractices = Array.isArray(rows) ? rows : (rows || []);
@@ -154,4 +141,6 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
+
+export { GET_HANDLER as GET };

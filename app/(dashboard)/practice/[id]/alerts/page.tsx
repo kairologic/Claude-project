@@ -6,6 +6,7 @@
  */
 
 import { createAdminSupabaseClient, getAuthenticatedUser } from '@/lib/auth/auth-helpers';
+import { safeQuery } from '@/lib/supabase/safe-query';
 import AlertsView from '@/components/dashboard/AlertsView';
 
 export default async function AlertsPage({
@@ -19,21 +20,29 @@ export default async function AlertsPage({
   const userId = auth?.user?.id || '';
 
   // Fetch all active alerts for this practice
-  const { data: alertsRaw } = await admin
-    .from('alerts')
-    .select('id, severity, title, description, provider_name, workflow_id, created_at')
-    .eq('practice_id', practiceId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
+  const alertsResult = await safeQuery(
+    admin
+      .from('alerts')
+      .select('id, severity, title, description, provider_name, workflow_id, created_at')
+      .eq('practice_id', practiceId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false }),
+    []
+  );
 
-  // Fetch user's read state
+  const alertsRaw = alertsResult.data;
+
+  // Fetch user's read state (if user exists)
   let readAlertIds = new Set<string>();
   if (userId) {
-    const { data: reads } = await admin
-      .from('user_alert_reads')
-      .select('alert_id')
-      .eq('user_id', userId);
-    readAlertIds = new Set((reads || []).map(r => r.alert_id));
+    const readsResult = await safeQuery(
+      admin
+        .from('user_alert_reads')
+        .select('alert_id')
+        .eq('user_id', userId),
+      []
+    );
+    readAlertIds = new Set((readsResult.data || []).map(r => r.alert_id));
   }
 
   const alerts = (alertsRaw || []).map(a => ({

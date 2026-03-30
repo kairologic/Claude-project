@@ -34,59 +34,53 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// TODO: Add system-admin role check when role system is expanded
 
-async function db(path: string): Promise<any> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`DB GET ${path.slice(0, 80)}: ${res.status} ${err}`);
-  }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('json') ? res.json() : null;
-}
-
-export async function GET(request: NextRequest) {
+const GET_HANDLER = withAuth(async (request: NextRequest, ctx) => {
   try {
     const practice_id = request.nextUrl.searchParams.get('practice_id');
     if (!practice_id) {
       return NextResponse.json({ error: 'practice_id required' }, { status: 400 });
     }
 
+    const supabase = ctx.supabase;
+
     // 1. Get practice info
-    const practices = await db(
-      `practice_websites?id=eq.${practice_id}&select=id,name,url,accepted_payers,accepted_payers_source`
-    );
-    if (!practices || practices.length === 0) {
+    const { data: practices, error: practiceError } = await supabase
+      .from('practice_websites')
+      .select('id,name,url,accepted_payers,accepted_payers_source')
+      .eq('id', practice_id);
+
+    if (practiceError || !practices || practices.length === 0) {
       return NextResponse.json({ error: 'Practice not found' }, { status: 404 });
     }
     const practice = practices[0];
 
     // 2. Get active providers
-    const providers = await db(
-      `practice_providers?practice_website_id=eq.${practice_id}&roster_status=eq.active&select=npi,provider_name,has_license_issue,license_issue_type`
-    );
+    const { data: providers } = await supabase
+      .from('practice_providers')
+      .select('npi,provider_name,has_license_issue,license_issue_type')
+      .eq('practice_website_id', practice_id)
+      .eq('roster_status', 'active');
+
     const npiList = (providers || []).map((p: any) => p.npi).filter(Boolean);
 
     // 3. Get active payer endpoints
-    const endpoints = await db(
-      `payer_directory_endpoints?is_active=eq.true&select=payer_code,payer_name,auth_type`
-    );
+    const { data: endpoints } = await supabase
+      .from('payer_directory_endpoints')
+      .select('payer_code,payer_name,auth_type')
+      .eq('is_active', true);
 
     // 4. Get payer directory snapshots for these providers
     let snapshots: any[] = [];
     if (npiList.length > 0) {
-      snapshots = await db(
-        `payer_directory_snapshots?npi=in.(${npiList.join(',')})&select=npi,payer_code,fhir_practitioner_id`
-      ) || [];
+      const { data: snapshotData } = await supabase
+        .from('payer_directory_snapshots')
+        .select('npi,payer_code,fhir_practitioner_id')
+        .in('npi', npiList);
+      snapshots = snapshotData || [];
     }
 
     // 5. Aggregate per payer
@@ -109,9 +103,12 @@ export async function GET(request: NextRequest) {
     // 6. Get open mismatches count per payer
     let mismatches: any[] = [];
     if (npiList.length > 0) {
-      mismatches = await db(
-        `payer_directory_mismatches?practice_website_id=eq.${practice_id}&status=eq.open&select=payer_code,mismatch_type,signal_type`
-      ) || [];
+      const { data: mismatchData } = await supabase
+        .from('payer_directory_mismatches')
+        .select('payer_code,mismatch_type,signal_type')
+        .eq('practice_website_id', practice_id)
+        .eq('status', 'open');
+      mismatches = mismatchData || [];
     }
     const mismatchByPayer = new Map<string, number>();
     for (const m of mismatches) {
@@ -182,10 +179,12 @@ export async function GET(request: NextRequest) {
     // Provider departures
     let departures = 0;
     try {
-      const departed = await db(
-        `practice_providers?practice_website_id=eq.${practice_id}&roster_status=eq.departed&select=npi`
-      );
-      departures = departed?.length || 0;
+      const { data: departedData } = await supabase
+        .from('practice_providers')
+        .select('npi')
+        .eq('practice_website_id', practice_id)
+        .eq('roster_status', 'departed');
+      departures = departedData?.length || 0;
     } catch { /* no departed column or empty */ }
 
     return NextResponse.json({
@@ -210,4 +209,6 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
+
+export { GET_HANDLER as GET };

@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { verifyPecosEnrollment } from './pecos-verification';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ export async function runCredentialingAssessment(
     humana: assessPayer('humana'),
     bcbstx: assessPayer('bcbstx'),
     blueshieldca: assessPayer('blueshieldca'),
-    pecos: 'not_checked', // TODO: wire PECOS check
+    pecos: (await verifyPecosEnrollment(supabase, npi, practice?.state)).status,
     license: pp?.has_license_issue ? 'expired' : 'active',
     website: 'not_listed', // New provider won't be on website yet
     caqh_inferred: determineCaqhStaleness(latestByPayer),
@@ -253,18 +254,31 @@ function generateTasksFromAssessment(
 
   // ── Group B: Submit and wait ──────────────────────────────────────────────
 
-  // PECOS reassignment
-  if (assessment.pecos === 'needs_reassignment' || assessment.pecos === 'not_checked') {
+  // PECOS enrollment / reassignment
+  if (assessment.pecos === 'needs_reassignment') {
     tasks.push({
       task_order: order++,
       task_type: 'submit_pecos',
       title: 'Submit PECOS reassignment',
-      description: 'Reassign provider Medicare billing to this practice TIN. Expected: 30-60 days.',
+      description: 'Provider is Medicare-enrolled in a different state — reassign billing to this practice TIN. Expected: 30-60 days.',
       status: 'pending',
       metadata: {
         group: 'submit_wait',
         portal_url: 'https://pecos.cms.hhs.gov/',
         expected_days: 45,
+      },
+    });
+  } else if (assessment.pecos === 'not_listed') {
+    tasks.push({
+      task_order: order++,
+      task_type: 'submit_pecos',
+      title: 'Enroll provider in Medicare (PECOS)',
+      description: 'Provider NPI not found in PECOS enrollment data — submit Medicare enrollment application. Expected: 60-90 days.',
+      status: 'pending',
+      metadata: {
+        group: 'submit_wait',
+        portal_url: 'https://pecos.cms.hhs.gov/',
+        expected_days: 75,
       },
     });
   }

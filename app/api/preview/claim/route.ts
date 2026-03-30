@@ -10,8 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { startTrial, FOUNDERS_RATE } from '@/lib/trial/trial-manager';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     });
     const orgId = orgs?.[0]?.id;
 
-    // 5. Start the 14-day reverse trial
+    // 5. Start the 21-day reverse trial
     await startTrial(orgId);
 
     // 6. Link organization to practice_websites
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
       practice_website_id: practiceWebsiteId,
       organization_id: orgId,
       dashboard_url: `/practice/${practiceWebsiteId}`,
-      trial_days: 14,
+      trial_days: 21,
       founders_rate: foundersSlotAvailable,
       founders_slots_remaining: foundersSlotAvailable
         ? FOUNDERS_RATE.slots_total - (existingOrgs?.length || 0) - 1

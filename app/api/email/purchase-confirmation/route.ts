@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml } from '@/lib/api/with-auth';
 
 /**
  * POST /api/email/purchase-confirmation
@@ -66,7 +67,7 @@ function buildConfirmationEmail(params: {
 </div>
 
 <p style="margin:0 0 20px;font-size:15px;color:#1e293b;line-height:1.6;">
-Hi there, thank you for investing in your practice's compliance. Your report and monitoring tools are ready for <strong>${titleCase(practiceName)}</strong>.
+Hi there, thank you for investing in your practice's compliance. Your report and monitoring tools are ready for <strong>${escapeHtml(titleCase(practiceName))}</strong>.
 </p>
 
 <!-- 1. Report Download -->
@@ -74,7 +75,7 @@ Hi there, thank you for investing in your practice's compliance. Your report and
 <tr><td style="padding:16px 20px;">
 <div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:6px;">&#128196; Your Compliance Report</div>
 <p style="margin:0 0 12px;font-size:13px;color:#78350f;line-height:1.5;">
-Your full Sovereignty Audit Report with compliance score (${score}/100), findings breakdown, data border map, and remediation roadmap is ready to download.
+Your full Sovereignty Audit Report with compliance score (${escapeHtml(String(score))}/100), findings breakdown, data border map, and remediation roadmap is ready to download.
 </p>
 <a href="${successUrl}" style="display:inline-block;background:#0a1628;color:#fff;font-size:13px;font-weight:700;padding:10px 20px;border-radius:6px;text-decoration:none;">
 Download Your Report &rarr;
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
     });
 
     const productLabel = product === 'safe-harbor' ? 'Safe Harbor Bundle' : 'Audit Report';
-    const subject = `Your KairoLogic ${productLabel} is ready, ${titleCase(practiceName || 'Healthcare Provider')}`;
+    const subject = `Your KairoLogic ${productLabel} is ready, ${escapeHtml(titleCase(practiceName || 'Healthcare Provider'))}`;
 
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',

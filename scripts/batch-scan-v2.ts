@@ -5,8 +5,8 @@
 // Run with: npx tsx scripts/batch-scan-v2.ts
 
 // ═══ CONFIGURATION ═══
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const BATCH_DELAY_MS = 500;
 const MAX_PROVIDERS = 0;  // 0 = all, set a number to limit for testing
 const DRY_RUN = false;

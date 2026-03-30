@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { withPracticeAccess, API_ERRORS } from '@/lib/api/with-auth';
+import type { PracticeContext } from '@/lib/api/with-auth';
 
 type ReportType =
   | 'provider_roster'
@@ -10,118 +11,96 @@ type ReportType =
   | 'workflow_activity'
   | 'payer_comparison';
 
+const validReportTypes: ReportType[] = [
+  'provider_roster',
+  'data_accuracy',
+  'payer_directory_status',
+  'compliance_status',
+  'credential_expiry',
+  'workflow_activity',
+  'payer_comparison',
+];
+
 /**
  * POST /api/reports/generate
  * Generate report based on report_type and filters
  * Body: { practice_id, report_type, filters? }
+ *
+ * Secured with withPracticeAccess: requires authenticated user with access to the practice.
  */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { practice_id, report_type, filters = {} } = body;
-
-    if (!practice_id || !report_type) {
-      return NextResponse.json(
-        { error: 'Missing required fields: practice_id, report_type' },
-        { status: 400 }
-      );
-    }
-
-    const validReportTypes: ReportType[] = [
-      'provider_roster',
-      'data_accuracy',
-      'payer_directory_status',
-      'compliance_status',
-      'credential_expiry',
-      'workflow_activity',
-      'payer_comparison',
-    ];
-
-    if (!validReportTypes.includes(report_type as ReportType)) {
-      return NextResponse.json(
-        { error: `Invalid report_type. Must be one of: ${validReportTypes.join(', ')}` },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminSupabaseClient();
-
-    // Verify practice exists
-    const { data: practice } = await supabase
-      .from('practice_websites')
-      .select('id')
-      .eq('id', practice_id)
-      .single();
-
-    if (!practice) {
-      return NextResponse.json(
-        { error: 'Practice not found' },
-        { status: 404 }
-      );
-    }
-
-    let data: any[] = [];
-    let error: string | null = null;
-
+const POST_HANDLER = withPracticeAccess(
+  async (request: NextRequest, ctx: PracticeContext) => {
     try {
-      // Generate report based on type
-      switch (report_type) {
-        case 'provider_roster':
-          data = await generateProviderRoster(supabase, practice_id, filters);
-          break;
+      const body = await request.json();
+      const { report_type, filters = {} } = body;
+      const practice_id = ctx.practiceId;
 
-        case 'data_accuracy':
-          data = await generateDataAccuracy(supabase, practice_id, filters);
-          break;
-
-        case 'payer_directory_status':
-          data = await generatePayerDirectoryStatus(supabase, practice_id, filters);
-          break;
-
-        case 'compliance_status':
-          data = await generateComplianceStatus(supabase, practice_id, filters);
-          break;
-
-        case 'credential_expiry':
-          data = await generateCredentialExpiry(supabase, practice_id, filters);
-          break;
-
-        case 'workflow_activity':
-          data = await generateWorkflowActivity(supabase, practice_id, filters);
-          break;
-
-        case 'payer_comparison':
-          data = await generatePayerComparison(supabase, practice_id, filters);
-          break;
+      if (!report_type) {
+        return API_ERRORS.badRequest('Missing required field: report_type');
       }
-    } catch (err) {
-      console.error('[Reports Generate POST] Error generating report:', err);
-      error = 'Failed to generate report';
-    }
 
-    if (error) {
-      return NextResponse.json(
-        { error },
-        { status: 500 }
-      );
-    }
+      if (!validReportTypes.includes(report_type as ReportType)) {
+        return API_ERRORS.badRequest(
+          `Invalid report_type. Must be one of: ${validReportTypes.join(', ')}`
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      report_type,
-      practice_id,
-      generated_at: new Date().toISOString(),
-      row_count: data.length,
-      rows: data,
-    });
-  } catch (error) {
-    console.error('[Reports Generate POST] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+      const supabase = ctx.supabase;
+
+      let data: any[] = [];
+
+      try {
+        // Generate report based on type
+        switch (report_type) {
+          case 'provider_roster':
+            data = await generateProviderRoster(supabase, practice_id, filters);
+            break;
+
+          case 'data_accuracy':
+            data = await generateDataAccuracy(supabase, practice_id, filters);
+            break;
+
+          case 'payer_directory_status':
+            data = await generatePayerDirectoryStatus(supabase, practice_id, filters);
+            break;
+
+          case 'compliance_status':
+            data = await generateComplianceStatus(supabase, practice_id, filters);
+            break;
+
+          case 'credential_expiry':
+            data = await generateCredentialExpiry(supabase, practice_id, filters);
+            break;
+
+          case 'workflow_activity':
+            data = await generateWorkflowActivity(supabase, practice_id, filters);
+            break;
+
+          case 'payer_comparison':
+            data = await generatePayerComparison(supabase, practice_id, filters);
+            break;
+        }
+      } catch (err) {
+        console.error('[Reports Generate POST] Error generating report:', err);
+        return API_ERRORS.internal('Failed to generate report');
+      }
+
+      return NextResponse.json({
+        success: true,
+        report_type,
+        practice_id,
+        generated_at: new Date().toISOString(),
+        row_count: data.length,
+        rows: data,
+      });
+    } catch (error) {
+      console.error('[Reports Generate POST] Error:', error);
+      return API_ERRORS.internal();
+    }
   }
-}
+);
+
+export { POST_HANDLER as POST };
 
 /**
  * Generate provider roster report

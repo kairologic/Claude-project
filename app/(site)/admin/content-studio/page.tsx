@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BarChart3, Sparkles, RefreshCw, Linkedin, Unlink, Building2, ChevronDown } from 'lucide-react';
-import Link from 'next/link';
+import { BarChart3, Sparkles, RefreshCw, Linkedin, Unlink, Building2, ChevronDown } from 'lucide-react';
 import TopicInput from '@/components/content-studio/TopicInput';
 import PostQueue from '@/components/content-studio/PostQueue';
 import PostPreview from '@/components/content-studio/PostPreview';
@@ -280,18 +279,13 @@ export default function ContentStudioPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              href="/admin/dashboard"
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <ArrowLeft size={18} />
-            </Link>
             <div className="flex items-center gap-2">
               <Sparkles size={20} className="text-amber-500" />
               <h1 className="text-lg font-bold text-slate-800">Content Studio</h1>
+              <span className="text-xs text-slate-400 hidden md:inline">Create and publish content across channels</span>
             </div>
           </div>
           <div className="flex items-center gap-4">

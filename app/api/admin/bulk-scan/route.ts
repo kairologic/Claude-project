@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/api/with-auth';
 
 /**
  * POST /api/admin/bulk-scan
@@ -7,19 +8,19 @@ import { NextRequest, NextResponse } from 'next/server';
  * and updates registry + scan_reports tables.
  *
  * Body: { providers: [{ npi, name, url, city?, zip?, email?, phone? }] }
- * 
+ *
  * This is a long-running endpoint. For 500 providers at ~4s each,
  * it takes ~33 minutes. Vercel Pro has a 300s (5min) timeout.
- * 
+ *
  * To handle this, we process in batches and return results for each batch.
  * The frontend calls this endpoint repeatedly with the remaining providers.
- * 
+ *
  * Query params:
  *   ?batch_size=10  (default 10, max 25 per call to stay under Vercel timeout)
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mxrtltezhkxhqizvxvsz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// TODO: Add system-admin role check when role system is expanded
+
 const SCAN_DELAY_MS = 2500; // Delay between scans to respect ip-api rate limits
 
 interface ProviderInput {
@@ -49,76 +50,6 @@ interface ScanResultItem {
   duration_ms?: number;
 }
 
-// ── Supabase helpers ──
-async function supabaseUpsert(table: string, data: Record<string, unknown>, conflictColumn: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates',
-      },
-      body: JSON.stringify(data),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function supabaseFindByNpi(npi: string): Promise<Record<string, unknown> | null> {
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}&limit=1`,
-      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.[0] || null;
-  } catch {
-    return null;
-  }
-}
-
-async function supabasePatch(table: string, filter: string, data: Record<string, unknown>): Promise<boolean> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
-      method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify(data),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function supabaseInsert(table: string, data: Record<string, unknown>): Promise<Record<string, unknown> | null> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) return null;
-    const result = await res.json();
-    return Array.isArray(result) ? result[0] : result;
-  } catch {
-    return null;
-  }
-}
 
 // ── Run a single scan via the internal /api/scan endpoint ──
 async function runScan(npi: string, url: string, origin: string): Promise<Record<string, unknown> | null> {
@@ -175,7 +106,49 @@ async function storeReport(
 // ═══ ENDPOINT ═══
 // ═══════════════════════════════════════════════
 
-export async function POST(request: NextRequest) {
+const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
+  const supabase = ctx.supabase;
+
+  // Supabase helpers using authenticated client
+  async function supabaseFindByNpi(npi: string): Promise<Record<string, unknown> | null> {
+    try {
+      const { data, error } = await supabase
+        .from('registry')
+        .select('*')
+        .eq('npi', npi)
+        .limit(1);
+      if (error) return null;
+      return data?.[0] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function supabasePatch(table: string, filter: { [key: string]: unknown }, data: Record<string, unknown>): Promise<boolean> {
+    try {
+      let query = supabase.from(table).update(data);
+      for (const [key, value] of Object.entries(filter)) {
+        query = query.eq(key, value);
+      }
+      const { error } = await query;
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  async function supabaseInsert(table: string, data: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+    try {
+      const { data: result, error } = await supabase
+        .from(table)
+        .insert(data)
+        .select();
+      if (error || !result) return null;
+      return Array.isArray(result) ? result[0] : result;
+    } catch {
+      return null;
+    }
+  }
   try {
     const body = await request.json();
     const providers: ProviderInput[] = body.providers || [];
@@ -245,7 +218,7 @@ export async function POST(request: NextRequest) {
         if (p.email && !existing.email) updates.email = p.email;
         if (p.phone && !existing.phone) updates.phone = p.phone;
         if (Object.keys(updates).length > 1) {
-          await supabasePatch('registry', `npi=eq.${p.npi}`, updates);
+          await supabasePatch('registry', { npi: p.npi }, updates);
         }
       }
 
@@ -304,7 +277,7 @@ export async function POST(request: NextRequest) {
         registryUpdate.latest_report_url = `/api/report?reportId=${reportId}`;
       }
 
-      await supabasePatch('registry', `npi=eq.${p.npi}`, registryUpdate);
+      await supabasePatch('registry', { npi: p.npi }, registryUpdate);
 
       // ── 5. Upsert prospect ──
       if (p.email || p.name) {
@@ -370,5 +343,7 @@ export async function POST(request: NextRequest) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: 'Bulk scan failed', message: msg }, { status: 500 });
   }
-}
+});
+
+export { POST_HANDLER as POST };
 

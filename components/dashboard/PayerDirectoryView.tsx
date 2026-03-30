@@ -10,7 +10,7 @@
 'use client';
 
 import { useState } from 'react';
-import { colors } from '@/lib/design-tokens';
+import { colors, typography, spacing, shadows, transitions, radii } from '@/lib/design-tokens';
 import { Tooltip } from './ui';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -138,18 +138,18 @@ export default function PayerDirectoryView({
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 800, color: colors.navy, margin: 0 }}>
+      <div style={{ marginBottom: spacing.lg }}>
+        <h2 style={{ ...typography.h2, color: colors.navy, margin: 0 }}>
           Your data across payer directories
         </h2>
-        <p style={{ fontSize: 12, color: colors.gray600, margin: '4px 0 0', lineHeight: 1.4 }}>
+        <p style={{ ...typography.bodySmall, color: colors.gray600, margin: `${spacing.xs} 0 0`, lineHeight: 1.4 }}>
           Side-by-side view of how each provider appears in insurance company directories.
           Mismatches can cause claim denials and patient routing errors.
         </p>
       </div>
 
       {/* Summary pills */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' }}>
         <FilterPill
           label="All"
           count={providers.length * allPayers.length}
@@ -188,34 +188,34 @@ export default function PayerDirectoryView({
       </div>
 
       {/* Grid */}
-      <div style={{ background: '#fff', borderRadius: 10, border: `1px solid ${colors.gray200}`, overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div style={{ background: '#fff', borderRadius: radii.lg, border: `1px solid ${colors.gray200}`, overflow: 'auto', boxShadow: shadows.xs }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', ...typography.bodySmall }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${colors.gray200}` }}>
               <th style={{
-                textAlign: 'left', padding: '10px 14px', fontSize: 10, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.gray400,
+                textAlign: 'left', padding: `${spacing.sm} ${spacing.md}`, ...typography.label,
+                color: colors.gray400,
                 position: 'sticky', left: 0, background: '#fff', zIndex: 2, minWidth: 200,
               }}>
                 Provider
               </th>
               {allPayers.map(payer => (
                 <th key={payer.payer_code} style={{
-                  textAlign: 'center', padding: '10px 8px', fontSize: 10, fontWeight: 700,
-                  textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.gray400,
+                  textAlign: 'center', padding: `${spacing.sm} ${spacing.xs}`, ...typography.label,
+                  color: colors.gray400,
                   minWidth: 110,
                 }}>
                   <Tooltip text={payer.is_active ? 'Connected via FHIR PDex Plan-Net' : 'Not yet connected'}>
-                    <span style={{ cursor: 'help', opacity: payer.is_active ? 1 : 0.5 }}>
+                    <span style={{ cursor: 'help', opacity: payer.is_active ? 1 : 0.5, transition: transitions.base }}>
                       {payer.payer_name}
-                      {!payer.is_active && <span style={{ fontSize: 8, display: 'block', fontWeight: 500, marginTop: 2 }}>not connected</span>}
+                      {!payer.is_active && <span style={{ ...typography.caption, display: 'block', fontWeight: 500, marginTop: spacing.xs }}>not connected</span>}
                     </span>
                   </Tooltip>
                 </th>
               ))}
               <th style={{
-                textAlign: 'center', padding: '10px 8px', fontSize: 10, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.gray400,
+                textAlign: 'center', padding: `${spacing.sm} ${spacing.xs}`, ...typography.label,
+                color: colors.gray400,
                 minWidth: 80,
               }}>
                 NPPES
@@ -247,7 +247,7 @@ export default function PayerDirectoryView({
             {filteredProviders.length === 0 && (
               <tr>
                 <td colSpan={allPayers.length + 2} style={{
-                  padding: 32, textAlign: 'center', color: colors.gray400, fontSize: 13,
+                  padding: spacing['3xl'], textAlign: 'center', color: colors.gray400, ...typography.body,
                 }}>
                   No providers match the selected filter.
                 </td>
@@ -258,11 +258,11 @@ export default function PayerDirectoryView({
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: spacing.lg, marginTop: spacing.sm, flexWrap: 'wrap' }}>
         {(['matched', 'mismatch', 'not_listed', 'no_data', 'inactive'] as CellStatus[]).map(s => (
-          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: colors.gray600 }}>
+          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, ...typography.caption, color: colors.gray600 }}>
             <span style={{
-              width: 12, height: 12, borderRadius: 3,
+              width: 12, height: 12, borderRadius: radii.sm,
               background: cellStyles[s].bg, border: `1px solid ${cellStyles[s].color}40`,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 8, color: cellStyles[s].color, fontWeight: 700,
@@ -284,17 +284,17 @@ function FilterPill({
     <button
       onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-        borderRadius: 100, border: `1px solid ${active ? color : colors.gray200}`,
+        display: 'flex', alignItems: 'center', gap: spacing.xs, padding: `${spacing.xxs} ${spacing.md}`,
+        borderRadius: radii.full, border: `1px solid ${active ? color : colors.gray200}`,
         background: active ? `${color}12` : '#fff', cursor: 'pointer',
-        fontFamily: 'inherit', fontSize: 11, fontWeight: active ? 700 : 500,
-        color: active ? color : colors.gray600, transition: 'all .15s',
+        fontFamily: 'inherit', ...typography.caption, fontWeight: active ? 700 : 500,
+        color: active ? color : colors.gray600, transition: transitions.fast,
       }}
     >
       {label}
       <span style={{
         background: active ? color : colors.gray200, color: active ? '#fff' : colors.gray600,
-        fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 100, minWidth: 18,
+        ...typography.caption, fontWeight: 700, padding: `${spacing.xxs} ${spacing.xs}`, borderRadius: radii.full, minWidth: 18,
         textAlign: 'center',
       }}>{count}</span>
     </button>
@@ -319,10 +319,11 @@ function ProviderGridRow({
       <tr style={{ borderBottom: expandedPayer ? 'none' : borderStyle }}>
         {/* Provider name + NPI */}
         <td style={{
-          padding: '10px 14px', position: 'sticky', left: 0, background: '#fff', zIndex: 1,
+          padding: `${spacing.sm} ${spacing.md}`, position: 'sticky', left: 0, background: '#fff', zIndex: 1,
+          transition: transitions.base,
         }}>
-          <div style={{ fontWeight: 600, color: colors.navy, fontSize: 12 }}>{provider.provider_name}</div>
-          <div style={{ fontSize: 10, color: colors.gray400, marginTop: 1 }}>NPI {provider.npi}</div>
+          <div style={{ ...typography.body, fontWeight: 600, color: colors.navy }}>{provider.provider_name}</div>
+          <div style={{ ...typography.caption, color: colors.gray400, marginTop: spacing.xxs }}>NPI {provider.npi}</div>
         </td>
 
         {/* Payer cells */}
@@ -335,20 +336,21 @@ function ProviderGridRow({
           const isClickable = status !== 'inactive' && status !== 'no_data';
 
           return (
-            <td key={payer.payer_code} style={{ padding: '6px 8px', textAlign: 'center' }}>
+            <td key={payer.payer_code} style={{ padding: `${spacing.xs} ${spacing.xs}`, textAlign: 'center' }}>
               <button
                 onClick={() => isClickable && onCellClick(payer.payer_code)}
                 disabled={!isClickable}
                 style={{
-                  width: '100%', padding: '6px 4px', borderRadius: 6,
+                  width: '100%', padding: `${spacing.xs} ${spacing.xxs}`, borderRadius: radii.md,
                   background: isExpanded ? style.color : style.bg,
                   color: isExpanded ? '#fff' : style.color,
                   border: `1px solid ${style.color}30`,
                   cursor: isClickable ? 'pointer' : 'default',
-                  fontFamily: 'inherit', fontSize: 10, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-                  transition: 'all .15s',
+                  fontFamily: 'inherit', ...typography.label, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+                  transition: transitions.fast,
                   opacity: isClickable ? 1 : 0.6,
+                  boxShadow: isExpanded ? shadows.sm : 'none',
                 }}
               >
                 <span>{style.icon}</span>
@@ -359,12 +361,13 @@ function ProviderGridRow({
         })}
 
         {/* NPPES column (baseline) */}
-        <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+        <td style={{ padding: `${spacing.xs} ${spacing.xs}`, textAlign: 'center' }}>
           <Tooltip text="NPPES is the source of truth for provider data">
             <span style={{
-              display: 'inline-block', padding: '6px 4px', borderRadius: 6,
+              display: 'inline-block', padding: `${spacing.xs} ${spacing.xxs}`, borderRadius: radii.md,
               background: colors.bluePale, color: colors.blue,
-              fontSize: 10, fontWeight: 700, width: '100%',
+              ...typography.label, fontWeight: 700, width: '100%',
+              transition: transitions.fast, cursor: 'help',
             }}>
               ✓ Source
             </span>
@@ -374,8 +377,8 @@ function ProviderGridRow({
 
       {/* Expanded detail row */}
       {expandedPayer && (
-        <tr style={{ borderBottom: borderStyle }}>
-          <td colSpan={payers.length + 2} style={{ padding: 0 }}>
+        <tr style={{ borderBottom: borderStyle, animation: `fadeIn ${transitions.base}` }}>
+          <td colSpan={payers.length + 2} style={{ padding: 0, overflow: 'hidden' }}>
             <CellDetailPanel
               provider={provider}
               payerCode={expandedPayer}
@@ -405,14 +408,14 @@ function CellDetailPanel({
 
   if (isNotListed) {
     return (
-      <div style={{ padding: '12px 14px 16px 14px', background: colors.redPale, borderTop: `1px solid ${colors.red}20` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+      <div style={{ padding: `${spacing.md} ${spacing.md} ${spacing.lg}`, background: colors.redPale, borderTop: `1px solid ${colors.red}20`, transition: transitions.base }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs }}>
           <span style={{ fontSize: 14 }}>🚫</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: colors.red }}>
+          <span style={{ ...typography.body, fontWeight: 700, color: colors.red }}>
             {provider.provider_name} is not listed in {payerName}
           </span>
         </div>
-        <p style={{ fontSize: 11, color: colors.gray600, margin: 0, lineHeight: 1.5 }}>
+        <p style={{ ...typography.bodySmall, color: colors.gray600, margin: 0, lineHeight: 1.5 }}>
           This provider was not found in {payerName}'s directory. Patients searching for in-network providers
           won't find them. Update via CAQH ProView to propagate to this payer.
         </p>
@@ -429,17 +432,17 @@ function CellDetailPanel({
   ];
 
   return (
-    <div style={{ padding: '12px 14px 16px 14px', background: colors.gray50, borderTop: `1px solid ${colors.gray200}` }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: colors.navy, marginBottom: 8 }}>
+    <div style={{ padding: `${spacing.md} ${spacing.md} ${spacing.lg}`, background: colors.gray50, borderTop: `1px solid ${colors.gray200}`, transition: transitions.base }}>
+      <div style={{ ...typography.caption, fontWeight: 700, color: colors.navy, marginBottom: spacing.md }}>
         Field comparison: NPPES vs {payerName}
         {snap?.snapshot_date && (
-          <span style={{ fontWeight: 400, color: colors.gray400, marginLeft: 8 }}>
+          <span style={{ fontWeight: 400, color: colors.gray400, marginLeft: spacing.md }}>
             Last synced {new Date(snap.snapshot_date).toLocaleDateString()}
           </span>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: 0, fontSize: 11 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: 0, ...typography.bodySmall }}>
         {/* Header */}
         <div style={detailHeaderCell}>Field</div>
         <div style={detailHeaderCell}>NPPES (source)</div>
@@ -454,7 +457,7 @@ function CellDetailPanel({
       </div>
 
       {cellMismatches.length > 0 && (
-        <div style={{ marginTop: 10, fontSize: 10, color: colors.gray600, lineHeight: 1.5 }}>
+        <div style={{ marginTop: spacing.md, ...typography.caption, color: colors.gray600, lineHeight: 1.5 }}>
           <strong style={{ color: colors.gold }}>Recommended fix:</strong> Update CAQH ProView with corrected values.
           Changes typically propagate to payer directories within 30 days.
         </div>
@@ -464,8 +467,8 @@ function CellDetailPanel({
 }
 
 const detailHeaderCell: React.CSSProperties = {
-  padding: '6px 8px', fontWeight: 700, fontSize: 9, textTransform: 'uppercase',
-  letterSpacing: '0.05em', color: colors.gray400, borderBottom: `1px solid ${colors.gray200}`,
+  padding: `${spacing.xs} ${spacing.xs}`, ...typography.label, fontWeight: 700,
+  color: colors.gray400, borderBottom: `1px solid ${colors.gray200}`,
 };
 
 function FieldRow({ label, nppes, payer, hasMismatch }: {
@@ -474,27 +477,29 @@ function FieldRow({ label, nppes, payer, hasMismatch }: {
   return (
     <>
       <div style={{
-        padding: '7px 8px', fontWeight: 600, color: colors.navy,
-        borderBottom: `1px solid ${colors.gray100}`,
+        padding: `${spacing.xs} ${spacing.xs}`, fontWeight: 600, color: colors.navy,
+        borderBottom: `1px solid ${colors.gray100}`, transition: transitions.base,
       }}>
         {label}
       </div>
       <div style={{
-        padding: '7px 8px', color: colors.gray600,
+        padding: `${spacing.xs} ${spacing.xs}`, color: colors.gray600,
         borderBottom: `1px solid ${colors.gray100}`,
         background: hasMismatch ? colors.greenPale : 'transparent',
+        transition: transitions.base,
       }}>
         {nppes || <span style={{ color: colors.gray400 }}>—</span>}
-        {hasMismatch && <span style={{ fontSize: 8, fontWeight: 700, color: colors.green, marginLeft: 4 }}>SOURCE</span>}
+        {hasMismatch && <span style={{ ...typography.caption, fontWeight: 700, color: colors.green, marginLeft: spacing.xs }}>SOURCE</span>}
       </div>
       <div style={{
-        padding: '7px 8px', color: hasMismatch ? colors.red : colors.gray600,
+        padding: `${spacing.xs} ${spacing.xs}`, color: hasMismatch ? colors.red : colors.gray600,
         fontWeight: hasMismatch ? 600 : 400,
         borderBottom: `1px solid ${colors.gray100}`,
         background: hasMismatch ? colors.redPale : 'transparent',
+        transition: transitions.base,
       }}>
         {payer || <span style={{ color: colors.gray400 }}>—</span>}
-        {hasMismatch && <span style={{ fontSize: 8, fontWeight: 700, color: colors.red, marginLeft: 4 }}>DIFFERS</span>}
+        {hasMismatch && <span style={{ ...typography.caption, fontWeight: 700, color: colors.red, marginLeft: spacing.xs }}>DIFFERS</span>}
       </div>
     </>
   );

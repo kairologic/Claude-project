@@ -97,7 +97,7 @@ export default function ResourcesPage() {
               <div className="m-resource-tag">Free Trial</div>
               <h2>Get Started</h2>
               <p>
-                Start your 14-day free trial today. Full platform access,
+                Start your 21-day free trial today. Full platform access,
                 no credit card required.
               </p>
               <span className="m-resource-link">

@@ -15,8 +15,8 @@ import { NextRequest, NextResponse } from 'next/server';
  * - Updates campaign_outreach with sent_at
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';

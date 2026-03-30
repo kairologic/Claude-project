@@ -4,16 +4,19 @@
  * Generic workflow creation endpoint.
  * Accepts a workflow type, provider context, and finding details,
  * then creates the workflow instance + tasks from the template.
+ *
+ * Secured with withPracticeAccess (editor role): requires authenticated user
+ * with editor or admin access to the practice.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { withPracticeAccess, API_ERRORS } from '@/lib/api/with-auth';
+import type { PracticeContext } from '@/lib/api/with-auth';
 import { getTaskTemplates } from '@/lib/workflow/workflow-templates';
 import { logWorkflowEvent } from '@/lib/workflow/audit-logger';
 import type { WorkflowType, TaskStatus, FindingDetails, TaskMetadata } from '@/lib/types/dashboard-schema';
 
 interface CreateWorkflowBody {
-  practice_id: string;
   workflow_type: WorkflowType;
   provider_npi?: string;
   provider_name?: string;
@@ -38,31 +41,28 @@ const VALID_WORKFLOW_TYPES: WorkflowType[] = [
   'compliance',
 ];
 
-export async function POST(req: NextRequest) {
-  try {
-    const body: CreateWorkflowBody = await req.json();
+const POST_HANDLER = withPracticeAccess(
+  async (req: NextRequest, ctx: PracticeContext) => {
+    try {
+      const body: CreateWorkflowBody = await req.json();
+      const practice_id = ctx.practiceId;
 
-    // ── Validate required fields ──────────────────────────────
-    if (!body.practice_id) {
-      return NextResponse.json({ error: 'practice_id is required' }, { status: 400 });
-    }
-    if (!body.workflow_type || !VALID_WORKFLOW_TYPES.includes(body.workflow_type)) {
-      return NextResponse.json(
-        { error: `workflow_type must be one of: ${VALID_WORKFLOW_TYPES.join(', ')}` },
-        { status: 400 }
-      );
-    }
+      // ── Validate required fields ──────────────────────────────
+      if (!body.workflow_type || !VALID_WORKFLOW_TYPES.includes(body.workflow_type)) {
+        return API_ERRORS.badRequest(
+          `workflow_type must be one of: ${VALID_WORKFLOW_TYPES.join(', ')}`
+        );
+      }
 
-    // ── Get task templates for this workflow type ──────────────
-    const templates = getTaskTemplates(body.workflow_type);
-    if (templates.length === 0) {
-      return NextResponse.json(
-        { error: `No task templates defined for workflow type: ${body.workflow_type}` },
-        { status: 400 }
-      );
-    }
+      // ── Get task templates for this workflow type ──────────────
+      const templates = getTaskTemplates(body.workflow_type);
+      if (templates.length === 0) {
+        return API_ERRORS.badRequest(
+          `No task templates defined for workflow type: ${body.workflow_type}`
+        );
+      }
 
-    const supabase = createAdminSupabaseClient();
+      const supabase = ctx.supabase;
     const now = new Date();
     const targetDays = body.target_days ?? 21;
     const overdueDays = body.overdue_days ?? 14;
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const { data: workflow, error: wfError } = await supabase
       .from('workflow_instances')
       .insert({
-        practice_id: body.practice_id,
+        practice_id: practice_id,
         workflow_type: body.workflow_type,
         status: 'action_needed',
         priority: body.priority ?? 2,
@@ -93,16 +93,13 @@ export async function POST(req: NextRequest) {
       .select('id, practice_id, workflow_type, status, provider_name, finding_summary')
       .single();
 
-    if (wfError || !workflow) {
-      console.error('Failed to create workflow:', wfError?.message);
-      return NextResponse.json(
-        { error: wfError?.message || 'Failed to create workflow' },
-        { status: 500 }
-      );
-    }
+      if (wfError || !workflow) {
+        console.error('Failed to create workflow:', wfError?.message);
+        return API_ERRORS.internal(wfError?.message || 'Failed to create workflow');
+      }
 
-    // ── Create tasks from template ────────────────────────────
-    const taskRows = templates.map((t) => {
+      // ── Create tasks from template ────────────────────────────
+      const taskRows = templates.map((t) => {
       const extraMeta = body.task_metadata?.[t.task_type] || {};
       const metadata: TaskMetadata = {
         ...extraMeta,
@@ -135,69 +132,70 @@ export async function POST(req: NextRequest) {
         metadata.check_time_utc = '06:00';
       }
 
-      return {
+        return {
+          workflow_id: workflow.id,
+          task_order: t.task_order,
+          task_type: t.task_type,
+          title: t.title,
+          description: t.description,
+          status: (t.task_order === 1 ? 'active' : 'pending') as TaskStatus,
+          metadata,
+        };
+      });
+
+      const { error: taskError } = await supabase
+        .from('workflow_tasks')
+        .insert(taskRows);
+
+      if (taskError) {
+        console.error('Failed to create tasks:', taskError.message);
+        // Workflow was created but tasks failed — still return the workflow
+        return NextResponse.json(
+          { workflow, tasks_created: 0, error: `Workflow created but tasks failed: ${taskError.message}` },
+          { status: 207 }
+        );
+      }
+
+      // ── Log creation event ────────────────────────────────────
+      await logWorkflowEvent(supabase, {
         workflow_id: workflow.id,
-        task_order: t.task_order,
-        task_type: t.task_type,
-        title: t.title,
-        description: t.description,
-        status: (t.task_order === 1 ? 'active' : 'pending') as TaskStatus,
-        metadata,
-      };
-    });
+        event_type: 'workflow_created',
+        actor_type: 'system',
+        title: `${workflow.finding_summary || workflow.workflow_type} — workflow created`,
+        details: {
+          workflow_type: workflow.workflow_type,
+          provider_name: workflow.provider_name,
+          trigger_source: body.trigger_source || 'manual',
+          tasks_created: taskRows.length,
+        },
+      });
 
-    const { error: taskError } = await supabase
-      .from('workflow_tasks')
-      .insert(taskRows);
+      // ── Create alert ──────────────────────────────────────────
+      await supabase.from('alerts').insert({
+        practice_id: practice_id,
+        severity: 'action',
+        title: `${workflow.provider_name || 'Provider'}: ${workflow.finding_summary || 'New workflow'}`,
+        description: `A new ${body.workflow_type.replace(/_/g, ' ')} workflow has been created and needs attention.`,
+        workflow_id: workflow.id,
+        provider_npi: body.provider_npi || null,
+        provider_name: body.provider_name || null,
+        source: body.trigger_source || 'manual',
+        is_active: true,
+      });
 
-    if (taskError) {
-      console.error('Failed to create tasks:', taskError.message);
-      // Workflow was created but tasks failed — still return the workflow
       return NextResponse.json(
-        { workflow, tasks_created: 0, error: `Workflow created but tasks failed: ${taskError.message}` },
-        { status: 207 }
+        {
+          workflow,
+          tasks_created: taskRows.length,
+        },
+        { status: 201 }
       );
+    } catch (err) {
+      console.error('POST /api/workflows/create error:', err);
+      return API_ERRORS.internal(err instanceof Error ? err.message : 'Internal server error');
     }
+  },
+  { requiredRole: 'editor' }
+);
 
-    // ── Log creation event ────────────────────────────────────
-    await logWorkflowEvent(supabase, {
-      workflow_id: workflow.id,
-      event_type: 'workflow_created',
-      actor_type: 'system',
-      title: `${workflow.finding_summary || workflow.workflow_type} — workflow created`,
-      details: {
-        workflow_type: workflow.workflow_type,
-        provider_name: workflow.provider_name,
-        trigger_source: body.trigger_source || 'manual',
-        tasks_created: taskRows.length,
-      },
-    });
-
-    // ── Create alert ──────────────────────────────────────────
-    await supabase.from('alerts').insert({
-      practice_id: body.practice_id,
-      severity: 'action',
-      title: `${workflow.provider_name || 'Provider'}: ${workflow.finding_summary || 'New workflow'}`,
-      description: `A new ${body.workflow_type.replace(/_/g, ' ')} workflow has been created and needs attention.`,
-      workflow_id: workflow.id,
-      provider_npi: body.provider_npi || null,
-      provider_name: body.provider_name || null,
-      source: body.trigger_source || 'manual',
-      is_active: true,
-    });
-
-    return NextResponse.json(
-      {
-        workflow,
-        tasks_created: taskRows.length,
-      },
-      { status: 201 }
-    );
-  } catch (err) {
-    console.error('POST /api/workflows/create error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
+export { POST_HANDLER as POST };

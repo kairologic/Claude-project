@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { escapeHtml, parseBody, API_ERRORS } from '@/lib/api/with-auth';
+import { contactSchema } from '@/lib/api/validation-schemas';
 
 // Amazon SES SMTP Configuration
 const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.us-east-1.amazonaws.com';
@@ -10,16 +12,10 @@ const SES_FROM_NAME = process.env.SES_FROM_NAME || 'KairoLogic Sentry';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { contactName, email, practiceName, subject, message } = body;
-
-    // Validate required fields
-    if (!contactName || !email || !practiceName || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    // Validate request body
+    const parsed = await parseBody(request, contactSchema);
+    if ('error' in parsed) return parsed.error;
+    const { contactName, email, practiceName, subject, message } = parsed.data;
 
     if (!SES_SMTP_USER || !SES_SMTP_PASS) {
       console.error('[Contact] SES SMTP credentials not configured');
@@ -45,7 +41,7 @@ export async function POST(request: NextRequest) {
       from: `"${SES_FROM_NAME}" <${SES_FROM_EMAIL}>`,
       to: 'compliance@kairologic.net',
       replyTo: email,
-      subject: `[${subject}] New Contact from ${practiceName}`,
+      subject: `[${subject || 'General'}] New Contact from ${practiceName}`,
       text: `
 New Contact Form Submission
 ----------------------------
@@ -53,7 +49,7 @@ New Contact Form Submission
 Contact Name: ${contactName}
 Email: ${email}
 Practice Name: ${practiceName}
-Subject: ${subject}
+Subject: ${subject || 'General'}
 
 Message:
 ${message}
@@ -84,23 +80,23 @@ Sent from KairoLogic Sentry Platform
     <div class="content">
       <div class="field">
         <div class="label">Contact Name:</div>
-        <div class="value">${contactName}</div>
+        <div class="value">${escapeHtml(contactName)}</div>
       </div>
       <div class="field">
         <div class="label">Email:</div>
-        <div class="value">${email}</div>
+        <div class="value">${escapeHtml(email)}</div>
       </div>
       <div class="field">
         <div class="label">Practice Name:</div>
-        <div class="value">${practiceName}</div>
+        <div class="value">${escapeHtml(practiceName)}</div>
       </div>
       <div class="field">
         <div class="label">Subject:</div>
-        <div class="value">${subject}</div>
+        <div class="value">${escapeHtml(subject || 'No subject')}</div>
       </div>
       <div class="field">
         <div class="label">Message:</div>
-        <div class="value">${message}</div>
+        <div class="value">${escapeHtml(message)}</div>
       </div>
     </div>
     <div class="footer">

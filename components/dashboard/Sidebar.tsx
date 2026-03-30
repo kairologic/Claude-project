@@ -14,7 +14,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { colors } from '@/lib/design-tokens';
+import { colors, shadows, transitions, radii, spacing, typography } from '@/lib/design-tokens';
+import FeedbackModal from './FeedbackModal';
 
 interface Practice {
   practice_id: string;
@@ -46,10 +47,11 @@ export default function Sidebar({
   const [siteOpen, setSiteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<'issue' | 'feature' | null>(null);
 
   const currentPractice = practices.find(p => p.practice_id === currentPracticeId) || practices[0];
 
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click and Escape key
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
@@ -59,8 +61,21 @@ export default function Sidebar({
         setUserOpen(false);
       }
     }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setSiteOpen(false);
+        setHelpOpen(false);
+        setUserOpen(false);
+      }
+    }
+
     document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const navItems = [
@@ -122,6 +137,7 @@ export default function Sidebar({
       <div className="sidebar-dropdown-area" style={styles.siteSelector}>
         <button
           onClick={(e) => { e.stopPropagation(); setSiteOpen(!siteOpen); setHelpOpen(false); setUserOpen(false); }}
+          aria-expanded={siteOpen}
           style={styles.siteBtn}
         >
           <div style={styles.siteName}>{currentPractice?.practice_name || 'Select practice'}</div>
@@ -131,12 +147,14 @@ export default function Sidebar({
           <span style={styles.siteArrow}>▼</span>
         </button>
         {siteOpen && (
-          <div style={styles.dropdown}>
+          <div style={styles.dropdown} role="menu" aria-label="Practice sites">
             <div style={styles.ddHeader}>Your practice sites</div>
             {practices.map(p => (
               <button
                 key={p.practice_id}
                 onClick={() => switchPractice(p.practice_id)}
+                role="menuitem"
+                aria-current={p.practice_id === currentPracticeId ? 'page' : undefined}
                 style={{
                   ...styles.ddItem,
                   background: p.practice_id === currentPracticeId ? `${colors.navy}80` : 'transparent',
@@ -146,17 +164,18 @@ export default function Sidebar({
                 {p.practice_id === currentPracticeId && '✓ '}{p.practice_name}
               </button>
             ))}
-            <button style={styles.ddAdd}>+ Add practice site</button>
+            <button style={styles.ddAdd} role="menuitem">+ Add practice site</button>
           </div>
         )}
       </div>
 
       {/* Navigation */}
-      <nav style={styles.nav}>
+      <nav style={styles.nav} role="navigation" aria-label="Main navigation"  >
         {navItems.map(item => (
           <button
             key={item.id}
             onClick={() => navigate(item.path)}
+            aria-current={activeId === item.id ? 'page' : undefined}
             style={{
               ...styles.navItem,
               background: activeId === item.id ? colors.navyMid : 'transparent',
@@ -187,16 +206,22 @@ export default function Sidebar({
       <div className="sidebar-dropdown-area" style={styles.helpArea}>
         <button
           onClick={(e) => { e.stopPropagation(); setHelpOpen(!helpOpen); setUserOpen(false); setSiteOpen(false); }}
+          aria-expanded={helpOpen}
           style={styles.helpBtn}
         >
           <span style={styles.helpCircle}>?</span>
           Help &amp; support
         </button>
         {helpOpen && (
-          <div style={styles.popupUp}>
-            {['Help center', 'Common questions', 'Report an issue', 'Request a feature'].map((item, i) => (
-              <button key={i} onClick={() => setHelpOpen(false)} style={styles.popupItem}>
-                {item}
+          <div style={styles.popupUp} role="menu">
+            {[
+              { label: 'Help center', action: () => navigate('/help') },
+              { label: 'Common questions', action: () => navigate('/help?section=faq') },
+              { label: 'Report an issue', action: () => setFeedbackModal('issue') },
+              { label: 'Request a feature', action: () => setFeedbackModal('feature') },
+            ].map((item, i) => (
+              <button key={i} onClick={() => { item.action(); setHelpOpen(false); }} role="menuitem" style={styles.popupItem}>
+                {item.label}
               </button>
             ))}
           </div>
@@ -207,6 +232,7 @@ export default function Sidebar({
       <div className="sidebar-dropdown-area" style={styles.userArea}>
         <button
           onClick={(e) => { e.stopPropagation(); setUserOpen(!userOpen); setHelpOpen(false); setSiteOpen(false); }}
+          aria-expanded={userOpen}
           style={styles.userBtn}
         >
           <div style={styles.userAvatar}>{userInitials}</div>
@@ -217,13 +243,13 @@ export default function Sidebar({
           <span style={styles.userArrow}>▲</span>
         </button>
         {userOpen && (
-          <div style={styles.popupUp}>
+          <div style={styles.popupUp} role="menu">
             {[
               { label: 'Account settings', path: '/settings' },
               { label: 'Manage team', path: '/settings' },
               { label: 'Reports', path: '/reports' },
             ].map((item, i) => (
-              <button key={i} onClick={() => { navigate(item.path); setUserOpen(false); }} style={styles.popupItem}>
+              <button key={i} onClick={() => { navigate(item.path); setUserOpen(false); }} role="menuitem" style={styles.popupItem}>
                 {item.label}
               </button>
             ))}
@@ -234,6 +260,7 @@ export default function Sidebar({
                 await supabase.auth.signOut();
                 router.push('/sign-in');
               }}
+              role="menuitem"
               style={{ ...styles.popupItem, color: colors.red, fontWeight: 600, borderBottom: 'none' }}
             >
               Sign out
@@ -241,6 +268,17 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Feedback modal (rendered via portal-like positioning) */}
+      {feedbackModal && (
+        <FeedbackModal
+          type={feedbackModal}
+          onClose={() => setFeedbackModal(null)}
+          practiceId={currentPracticeId}
+          practiceName={currentPractice?.practice_name || ''}
+          userName={userName}
+        />
+      )}
     </aside>
   );
 }
@@ -252,94 +290,95 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative', zIndex: 50,
   },
   logo: {
-    padding: '18px 18px 14px', fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em',
+    padding: `${spacing.lg}px ${spacing.lg}px 14px`, ...typography.h2, letterSpacing: '-0.02em',
   },
-  siteSelector: { padding: '0 12px 12px', position: 'relative' },
+  siteSelector: { padding: `0 ${spacing.sm}px ${spacing.sm}px`, position: 'relative' },
   siteBtn: {
-    width: '100%', background: colors.navyMid, border: 'none', borderRadius: 8,
-    padding: '10px 12px', cursor: 'pointer', textAlign: 'left' as const, color: '#fff',
-    position: 'relative' as const, fontFamily: 'inherit',
+    width: '100%', background: colors.navyMid, border: 'none', borderRadius: radii.md,
+    padding: `10px ${spacing.sm}px`, cursor: 'pointer', textAlign: 'left' as const, color: '#fff',
+    position: 'relative' as const, fontFamily: 'inherit', transition: `background ${transitions.fast}`,
   },
-  siteName: { fontSize: 12, fontWeight: 700 },
-  siteMeta: { fontSize: 10, color: colors.navyLight, marginTop: 2 },
-  siteArrow: { position: 'absolute' as const, right: 12, top: 14, fontSize: 10, color: colors.navyLight },
+  siteName: { ...typography.caption, fontWeight: 700 },
+  siteMeta: { fontSize: 10, color: colors.navyLight, marginTop: spacing.xxs },
+  siteArrow: { position: 'absolute' as const, right: spacing.sm, top: 14, fontSize: 10, color: colors.navyLight },
   dropdown: {
-    position: 'absolute' as const, top: '100%', left: 12, right: 12,
-    background: colors.navyMid, borderRadius: 8, marginTop: 4,
-    overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,.3)', zIndex: 60,
+    position: 'absolute' as const, top: '100%', left: spacing.sm, right: spacing.sm,
+    background: colors.navyMid, borderRadius: radii.md, marginTop: spacing.xs,
+    overflow: 'hidden', boxShadow: shadows.xl, zIndex: 60, animation: `scaleIn 0.15s ease-out`,
   },
   ddHeader: {
-    padding: '10px 12px', borderBottom: '1px solid rgba(139,163,184,.15)',
-    fontSize: 11, color: colors.navyLight,
+    padding: `10px ${spacing.sm}px`, borderBottom: '1px solid rgba(139,163,184,.15)',
+    ...typography.caption, color: colors.navyLight,
   },
   ddItem: {
-    width: '100%', padding: '8px 12px', background: 'none', border: 'none',
-    color: '#fff', fontSize: 12, cursor: 'pointer', textAlign: 'left' as const,
-    fontFamily: 'inherit',
+    width: '100%', padding: `${spacing.xs}px ${spacing.sm}px`, background: 'none', border: 'none',
+    color: '#fff', ...typography.bodySmall, cursor: 'pointer', textAlign: 'left' as const,
+    fontFamily: 'inherit', transition: `background ${transitions.fast}`,
   },
   ddAdd: {
-    width: '100%', padding: '10px 12px', background: 'none', border: 'none',
+    width: '100%', padding: `10px ${spacing.sm}px`, background: 'none', border: 'none',
     borderTop: '1px solid rgba(139,163,184,.15)', color: colors.gold,
-    fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left' as const,
-    fontFamily: 'inherit',
+    ...typography.caption, fontWeight: 600, cursor: 'pointer', textAlign: 'left' as const,
+    fontFamily: 'inherit', transition: `background ${transitions.fast}`,
   },
-  nav: { flex: 1, padding: '8px 0' },
+  nav: { flex: 1, padding: `${spacing.xs}px 0` },
   navItem: {
-    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 18px',
-    border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-    position: 'relative' as const, transition: 'background .1s',
+    display: 'flex', alignItems: 'center', gap: spacing.sm, width: '100%', padding: `9px ${spacing.lg}px`,
+    border: 'none', cursor: 'pointer', ...typography.body, fontFamily: 'inherit',
+    position: 'relative' as const, transition: `background ${transitions.fast}`,
   },
   navIcon: { fontSize: 14, width: 20, textAlign: 'center' as const },
   alertBadge: {
-    marginLeft: 'auto', background: colors.red, color: '#fff', fontSize: 9, fontWeight: 700,
-    padding: '1px 6px', borderRadius: 100, minWidth: 16, textAlign: 'center' as const,
+    marginLeft: 'auto', background: colors.red, color: '#fff', ...typography.caption,
+    padding: `1px 6px`, borderRadius: radii.full, minWidth: 16, textAlign: 'center' as const,
+    transition: `all ${transitions.base}`,
   },
   comingSoonLabel: {
-    padding: '12px 18px 4px', fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const,
-    letterSpacing: '0.08em', color: 'rgba(139,163,184,.5)',
+    padding: `${spacing.md}px ${spacing.lg}px ${spacing.xs}px`, ...typography.label,
+    color: 'rgba(139,163,184,.5)',
   },
   disabledItem: {
-    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 18px',
-    color: colors.navyLight, fontSize: 13, fontWeight: 500, opacity: 0.45,
+    display: 'flex', alignItems: 'center', gap: spacing.sm, padding: `${spacing.xs}px ${spacing.lg}px`,
+    color: colors.navyLight, ...typography.body, opacity: 0.45,
   },
-  helpArea: { padding: '0 12px', position: 'relative' as const },
+  helpArea: { padding: `0 ${spacing.sm}px`, position: 'relative' as const },
   helpBtn: {
-    display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 6px',
+    display: 'flex', alignItems: 'center', gap: spacing.xs, width: '100%', padding: `${spacing.xs}px 6px`,
     background: 'none', border: 'none', color: colors.navyLight, cursor: 'pointer',
-    fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+    ...typography.bodySmall, fontFamily: 'inherit', transition: `all ${transitions.fast}`,
   },
   helpCircle: {
-    width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${colors.navyLight}`,
+    width: 22, height: 22, borderRadius: radii.full, border: `1.5px solid ${colors.navyLight}`,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 12, fontWeight: 700,
   },
   popupUp: {
-    position: 'absolute' as const, bottom: '100%', left: 12, right: 12,
-    background: colors.navyMid, borderRadius: 8, marginBottom: 4,
-    overflow: 'hidden', boxShadow: '0 -8px 24px rgba(0,0,0,.3)', zIndex: 60,
+    position: 'absolute' as const, bottom: '100%', left: spacing.sm, right: spacing.sm,
+    background: colors.navyMid, borderRadius: radii.md, marginBottom: spacing.xs,
+    overflow: 'hidden', boxShadow: shadows.xl, zIndex: 60, animation: `scaleIn 0.15s ease-out`,
   },
   popupItem: {
-    width: '100%', padding: '9px 12px', background: 'none', border: 'none',
+    width: '100%', padding: `9px ${spacing.sm}px`, background: 'none', border: 'none',
     borderBottom: '1px solid rgba(139,163,184,.1)', color: '#fff',
-    fontSize: 11, fontWeight: 500, cursor: 'pointer', textAlign: 'left' as const,
-    fontFamily: 'inherit',
+    ...typography.caption, cursor: 'pointer', textAlign: 'left' as const,
+    fontFamily: 'inherit', transition: `background ${transitions.fast}`,
   },
   userArea: {
-    padding: '8px 12px 14px', borderTop: '1px solid rgba(139,163,184,.1)',
+    padding: `${spacing.xs}px ${spacing.sm}px 14px`, borderTop: '1px solid rgba(139,163,184,.1)',
     position: 'relative' as const,
   },
   userBtn: {
-    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: 6,
+    display: 'flex', alignItems: 'center', gap: spacing.sm, width: '100%', padding: 6,
     background: 'none', border: 'none', cursor: 'pointer', color: '#fff',
-    fontFamily: 'inherit',
+    fontFamily: 'inherit', transition: `all ${transitions.fast}`,
   },
   userAvatar: {
-    width: 30, height: 30, borderRadius: '50%', background: colors.gold,
+    width: 30, height: 30, borderRadius: radii.full, background: colors.gold,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 11, fontWeight: 800, color: colors.navy,
   },
   userInfo: { textAlign: 'left' as const },
-  userName: { fontSize: 12, fontWeight: 600 },
+  userName: { ...typography.bodySmall, fontWeight: 600 },
   userRoleText: { fontSize: 10, color: colors.navyLight },
   userArrow: { marginLeft: 'auto', fontSize: 10, color: colors.navyLight },
 };
