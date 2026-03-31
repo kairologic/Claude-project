@@ -4,7 +4,7 @@
  * Client component shell for the dashboard.
  * Combines Sidebar + HeaderBar + scrollable main content.
  * Manages alert badge count via Supabase subscription.
- */
+ */h
 
 'use client';
 
@@ -49,7 +49,7 @@ const pageTitles: Record<string, string> = {
   '/release': 'Provider release',
   '/compliance': 'Compliance',
   '/audit': 'Audit trail',
-  '/help': 'Help center',
+  '/help': 'Help center',  '/requests': 'My Requests',
 };
 
 export default function DashboardShell({
