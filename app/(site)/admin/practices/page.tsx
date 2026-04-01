@@ -551,7 +551,7 @@ function PracticeRow({
               Admin Detail →
             </a>
             <a
-              href={`/practice/${p.id}`}
+              href={`/practice/${p.organization_id || p.id}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{

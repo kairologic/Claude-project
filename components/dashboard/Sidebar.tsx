@@ -79,20 +79,19 @@ export default function Sidebar({
   }, []);
 
   const navItems = [
-    { id: 'dashboard', path: '', icon: 'â', label: 'Dashboard' },
-    { id: 'workflows', path: '/workflows', icon: 'â¡', label: 'Workflows' },
-    { id: 'roster', path: '/roster', icon: 'ð¥', label: 'Provider roster' },
-    { id: 'alerts', path: '/alerts', icon: 'ð', label: 'Alerts', badge: unseenAlertCount },
-    { id: 'documents', path: '/documents', icon: 'ð', label: 'Documents' },
-    { id: 'payer-directory', path: '/payer-directory', icon: 'ð¥', label: 'Payer directories' },
-    { id: 'search', path: '/search', icon: 'ð', label: 'NL Search' },
-    { id: 'reports', path: '/reports', icon: 'ð', label: 'Reports' },
-    { id: 'blog', path: '/blog', icon: 'ð', label: 'Blog' },
-    { id: 'settings', path: '/settings', icon: 'âï¸', label: 'Settings' },
+    { id: 'dashboard', path: '', icon: '📊', label: 'Dashboard' },
+    { id: 'workflows', path: '/workflows', icon: '⚙', label: 'Workflows' },
+    { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster' },
+    { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
+    { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
+    { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
+    { id: 'search', path: '/search', icon: '🔍', label: 'NL Search' },
+    { id: 'reports', path: '/reports', icon: '📈', label: 'Reports' },
+    { id: 'settings', path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
   const comingSoon = [
-    { icon: 'ð', label: 'Credentialing' },
+    { icon: '📋', label: 'Credentialing' },
   ];
 
   function getActiveId(): string {
@@ -106,7 +105,6 @@ export default function Sidebar({
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
     if (sub.startsWith('/search')) return 'search';
     if (sub.startsWith('/reports')) return 'reports';
-    if (sub.startsWith('/blog')) return 'blog';
     if (sub.startsWith('/settings')) return 'settings';
     if (sub.startsWith('/requests')) return 'requests';
     return 'dashboard';
