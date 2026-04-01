@@ -20,16 +20,13 @@ async function isAdmin(request: NextRequest): Promise<boolean> {
 
 // GET: Fetch a single post by ID
 // Public users can only view published posts, admins can view any
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const supabase = await createAdminSupabaseClient();
     const userIsAdmin = await isAdmin(request);
 
-    let query = supabase.from('blog_posts').select('*').eq('id', id).single();
+    const query = supabase.from('blog_posts').select('*').eq('id', id).single();
 
     const { data, error } = await query;
 
@@ -44,26 +41,19 @@ export async function GET(
 
     return NextResponse.json({ post: data });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch post' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch post' }, { status: 500 });
   }
 }
 
 // PUT: Update a post (admin only)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const userIsAdmin = await isAdmin(request);
 
     if (!userIsAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-
-    const { id } = params;
     const body = await request.json();
 
     const supabase = await createAdminSupabaseClient();
@@ -92,26 +82,22 @@ export async function PUT(
 
     return NextResponse.json({ post: data });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to update post' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update post' }, { status: 500 });
   }
 }
 
 // DELETE: Hard delete a post (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const userIsAdmin = await isAdmin(request);
 
     if (!userIsAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-
-    const { id } = params;
     const supabase = await createAdminSupabaseClient();
 
     // Verify post exists
@@ -134,9 +120,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to delete post' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to delete post' }, { status: 500 });
   }
 }

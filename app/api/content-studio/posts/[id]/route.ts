@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
       .from('content_posts')
       .select('*, content_graphics(*), content_publish_log(*)')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error) {
@@ -23,15 +21,18 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const allowedFields = [
-      'headline', 'body_linkedin', 'body_blog', 'body_substack',
-      'channels', 'scheduled_at', 'status',
+      'headline',
+      'body_linkedin',
+      'body_blog',
+      'body_substack',
+      'channels',
+      'scheduled_at',
+      'status',
     ];
 
     const updates: Record<string, unknown> = {};
@@ -47,7 +48,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('content_posts')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -61,16 +62,11 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabaseClient();
-    const { error } = await supabase
-      .from('content_posts')
-      .delete()
-      .eq('id', params.id);
+    const { error } = await supabase.from('content_posts').delete().eq('id', id);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

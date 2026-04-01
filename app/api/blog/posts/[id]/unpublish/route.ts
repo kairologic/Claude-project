@@ -19,18 +19,14 @@ async function isAdmin(request: NextRequest): Promise<boolean> {
 }
 
 // POST: Unpublish a post (set status=draft)
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const userIsAdmin = await isAdmin(request);
 
     if (!userIsAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
-
-    const { id } = params;
     const supabase = await createAdminSupabaseClient();
 
     // Verify post exists
@@ -60,9 +56,6 @@ export async function POST(
 
     return NextResponse.json({ post: data });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to unpublish post' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to unpublish post' }, { status: 500 });
   }
 }

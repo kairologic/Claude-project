@@ -15,9 +15,10 @@ export default async function PracticeLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const practiceId = params.id;
+  const { id } = await params;
+  const practiceId = id;
 
   // Get authenticated user + practices
   const auth = await getAuthenticatedUser();
@@ -27,9 +28,7 @@ export default async function PracticeLayout({
   }
 
   // Verify user has access to this practice
-  const practiceAccess = auth.practices?.find(
-    (p: any) => p.practice_id === practiceId
-  );
+  const practiceAccess = auth.practices?.find((p: any) => p.practice_id === practiceId);
 
   if (!practiceAccess) {
     // User is authenticated but doesn't have access to this practice
@@ -52,8 +51,18 @@ export default async function PracticeLayout({
   const currentPractice = practices.find((p: any) => p.practice_id === practiceId);
   const rawName = auth.user.user_metadata?.name || auth.user.email?.split('@')[0] || 'User';
   const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-  const userRole = practiceAccess.role === 'admin' ? 'Practice Manager' : practiceAccess.role === 'viewer' ? 'Viewer' : 'Editor';
-  const initials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  const userRole =
+    practiceAccess.role === 'admin'
+      ? 'Practice Manager'
+      : practiceAccess.role === 'viewer'
+        ? 'Viewer'
+        : 'Editor';
+  const initials = userName
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <DashboardShell

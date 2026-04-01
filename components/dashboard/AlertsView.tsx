@@ -11,6 +11,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { colors, shadows, transitions, radii, spacing, typography } from '@/lib/design-tokens';
 import { AlertCard } from './ui';
 import { EmptyState, StaggeredList } from './ui';
@@ -34,8 +35,15 @@ interface AlertsViewProps {
 }
 
 export default function AlertsView({ alerts, practiceId, userId }: AlertsViewProps) {
-  const newAlerts = alerts.filter(a => !a.is_seen);
-  const seenAlerts = alerts.filter(a => a.is_seen);
+  const router = useRouter();
+  const newAlerts = alerts.filter((a) => !a.is_seen);
+  const seenAlerts = alerts.filter((a) => a.is_seen);
+
+  function handleAlertClick(alert: AlertData) {
+    if (alert.workflow_id) {
+      router.push(`/practice/${practiceId}/workflows?highlight=${alert.workflow_id}`);
+    }
+  }
 
   // Mark all unseen alerts as seen on mount
   useEffect(() => {
@@ -43,7 +51,7 @@ export default function AlertsView({ alerts, practiceId, userId }: AlertsViewPro
       if (newAlerts.length === 0) return;
       const supabase = createBrowserSupabaseClient();
 
-      const inserts = newAlerts.map(a => ({
+      const inserts = newAlerts.map((a) => ({
         user_id: userId,
         alert_id: a.id,
       }));
@@ -61,24 +69,34 @@ export default function AlertsView({ alerts, practiceId, userId }: AlertsViewPro
       {/* Summary */}
       <div style={{ ...typography.bodySmall, color: colors.gray400, marginBottom: spacing.lg }}>
         {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
-        {newAlerts.length > 0 && <span> · <span style={{ color: colors.red, fontWeight: 600 }}>{newAlerts.length} new</span></span>}
+        {newAlerts.length > 0 && (
+          <span>
+            {' '}
+            · <span style={{ color: colors.red, fontWeight: 600 }}>{newAlerts.length} new</span>
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
         {/* New alerts */}
         {newAlerts.length > 0 && (
           <>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: spacing.sm, margin: `${spacing.xs}px 0 ${spacing.xs}px`,
-              ...typography.label,
-              color: colors.gray400,
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: spacing.sm,
+                margin: `${spacing.xs}px 0 ${spacing.xs}px`,
+                ...typography.label,
+                color: colors.gray400,
+              }}
+            >
               {newAlerts.length} new since your last visit
               <div style={{ flex: 1, height: 1, background: colors.gray200 }} />
             </div>
             <StaggeredList>
-              {newAlerts.map(a => (
-                <AlertCard key={a.id} alert={a} />
+              {newAlerts.map((a) => (
+                <AlertCard key={a.id} alert={a} onClick={() => handleAlertClick(a)} />
               ))}
             </StaggeredList>
           </>
@@ -88,25 +106,34 @@ export default function AlertsView({ alerts, practiceId, userId }: AlertsViewPro
         {seenAlerts.length > 0 && (
           <>
             {newAlerts.length > 0 && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: spacing.sm, margin: `${spacing.md}px 0 ${spacing.xs}px`,
-                ...typography.label,
-                color: colors.gray400,
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  margin: `${spacing.md}px 0 ${spacing.xs}px`,
+                  ...typography.label,
+                  color: colors.gray400,
+                }}
+              >
                 Earlier
                 <div style={{ flex: 1, height: 1, background: colors.gray200 }} />
               </div>
             )}
             <StaggeredList key="seen-alerts">
-              {seenAlerts.map(a => (
-                <AlertCard key={a.id} alert={a} />
+              {seenAlerts.map((a) => (
+                <AlertCard key={a.id} alert={a} onClick={() => handleAlertClick(a)} />
               ))}
             </StaggeredList>
           </>
         )}
 
         {alerts.length === 0 && (
-          <EmptyState icon="🔔" title="No alerts yet" description="We'll notify you when we detect issues with your providers." />
+          <EmptyState
+            icon="🔔"
+            title="No alerts yet"
+            description="We'll notify you when we detect issues with your providers."
+          />
         )}
       </div>
     </div>

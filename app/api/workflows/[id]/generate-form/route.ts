@@ -14,16 +14,17 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/auth/auth-helpers';
 import { generateNPPESForm } from '@/lib/workflows/generate-nppes-form';
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = await createServerSupabaseClient();
-    const workflowId = params.id;
+    const workflowId = id;
 
     // 1. Auth check
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
     if (authErr || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -31,7 +32,9 @@ export async function POST(
     // 2. Fetch the workflow instance
     const { data: workflow, error: wfErr } = await supabase
       .from('workflow_instances')
-      .select('id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, approved_value, approved_at, practice_id')
+      .select(
+        'id, workflow_type, status, provider_npi, provider_name, finding_summary, finding_details, approved_value, approved_at, practice_id',
+      )
       .eq('id', workflowId)
       .single();
 
@@ -59,7 +62,9 @@ export async function POST(
     // 5. Fetch provider record for full context
     const { data: provider } = await supabase
       .from('providers')
-      .select('first_name, last_name, address_line_1, address_line_2, city, state, zip_code, phone, primary_taxonomy_code, taxonomy_desc')
+      .select(
+        'first_name, last_name, address_line_1, address_line_2, city, state, zip_code, phone, primary_taxonomy_code, taxonomy_desc',
+      )
       .eq('npi', workflow.provider_npi)
       .single();
 
@@ -107,7 +112,8 @@ export async function POST(
         .maybeSingle();
 
       if (existingArtifact) {
-        await supabase.from('workflow_artifacts')
+        await supabase
+          .from('workflow_artifacts')
           .update({
             name: artifactName,
             file_size_kb: Math.round(pdfBytes.length / 1024),
@@ -145,12 +151,8 @@ export async function POST(
         'Content-Length': pdfBytes.length.toString(),
       },
     });
-
   } catch (err) {
     console.error('Generate form error:', err);
-    return NextResponse.json(
-      { error: 'Failed to generate form' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate form' }, { status: 500 });
   }
 }

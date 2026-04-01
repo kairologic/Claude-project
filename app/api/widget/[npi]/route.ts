@@ -1,9 +1,9 @@
 /**
  * KairoLogic Sentry Widget API
  * GET /api/widget/[npi]
- * 
+ *
  * Returns compliance status for the embeddable widget
- * 
+ *
  * BUSINESS RULES:
  * - Score >= COMPLIANCE_THRESHOLD: Widget visible, shows "Verified" green status
  * - Score < COMPLIANCE_THRESHOLD: Widget HIDDEN from public (returns hidden status)
@@ -30,27 +30,24 @@ const corsHeaders = {
 };
 
 export async function OPTIONS() {
-  return new NextResponse(null, { 
-    status: 204, 
-    headers: corsHeaders 
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
   });
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { npi: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ npi: string }> }) {
   try {
-    const npi = params.npi;
+    const { npi } = await params;
 
     // Validate NPI format
     if (!npi || !/^\d{10}$/.test(npi)) {
       return NextResponse.json(
-        { 
-          error: 'Invalid NPI', 
-          message: 'NPI must be a 10-digit number' 
+        {
+          error: 'Invalid NPI',
+          message: 'NPI must be a 10-digit number',
         },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -59,23 +56,23 @@ export async function GET(
       `${SUPABASE_URL}/rest/v1/registry?npi=eq.${npi}&select=id,npi,name,url,risk_score,widget_status,subscription_status,subscription_tier,last_scan_timestamp,updated_at,is_visible`,
       {
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
         },
         // Cache for 5 minutes
-        next: { revalidate: 300 }
-      }
+        next: { revalidate: 300 },
+      },
     );
 
     if (!response.ok) {
       console.error('[Widget API] Supabase error:', response.status);
       return NextResponse.json(
-        { 
-          error: 'Database error', 
-          message: 'Unable to fetch provider data' 
+        {
+          error: 'Database error',
+          message: 'Unable to fetch provider data',
         },
-        { status: 500, headers: corsHeaders }
+        { status: 500, headers: corsHeaders },
       );
     }
 
@@ -84,16 +81,16 @@ export async function GET(
     // Provider not found in registry - but still allow scan for new NPIs
     if (!data || data.length === 0) {
       return NextResponse.json(
-        { 
+        {
           npi: npi,
           widget_status: 'not_registered',
           registered: false,
           message: 'Provider not found in registry - scan available',
           // Allow them to run a scan
           scan_url: `/scan?npi=${npi}`,
-          can_scan: true
+          can_scan: true,
         },
-        { status: 200, headers: corsHeaders }  // 200 not 404 - this is valid state
+        { status: 200, headers: corsHeaders }, // 200 not 404 - this is valid state
       );
     }
 
@@ -110,13 +107,14 @@ export async function GET(
           npi: provider.npi,
           widget_status: 'hidden',
           admin_status: adminStatus, // For debugging/admin reference
-          message: adminStatus === 'inactive' 
-            ? 'Subscription inactive' 
-            : adminStatus === 'warning'
-            ? 'Compliance score below threshold'
-            : 'Widget hidden by administrator'
+          message:
+            adminStatus === 'inactive'
+              ? 'Subscription inactive'
+              : adminStatus === 'warning'
+                ? 'Compliance score below threshold'
+                : 'Widget hidden by administrator',
         },
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -133,32 +131,31 @@ export async function GET(
       last_scan_timestamp: provider.last_scan_timestamp || provider.updated_at,
       updated_at: provider.updated_at,
       // Link to results page (will show top issues only)
-      report_url: `/scan/results?npi=${provider.npi}&mode=verified`
+      report_url: `/scan/results?npi=${provider.npi}&mode=verified`,
     };
 
-    return NextResponse.json(publicData, { 
-      status: 200, 
+    return NextResponse.json(publicData, {
+      status: 200,
       headers: {
         ...corsHeaders,
         'Cache-Control': 'public, max-age=300, s-maxage=300', // 5 min cache
-      }
+      },
     });
-
   } catch (error) {
     console.error('[Widget API] Error:', error);
     return NextResponse.json(
-      { 
-        error: 'Server error', 
-        message: 'An unexpected error occurred' 
+      {
+        error: 'Server error',
+        message: 'An unexpected error occurred',
       },
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders },
     );
   }
 }
 
 /**
  * Determine the widget status based on provider data
- * 
+ *
  * PUBLIC WIDGET RULES:
  * - Only shows if score >= COMPLIANCE_THRESHOLD (75%)
  * - Below threshold = widget hidden from public
@@ -173,7 +170,7 @@ function determineWidgetStatus(provider: {
   risk_score?: number;
 }): { publicStatus: string; adminStatus: string } {
   const score = provider.risk_score ?? 0;
-  
+
   // Explicit admin override - hidden
   if (provider.widget_status === 'hidden') {
     return { publicStatus: 'hidden', adminStatus: 'hidden' };
@@ -191,13 +188,16 @@ function determineWidgetStatus(provider: {
 
   // Active subscribers (Shield/Watch/trialing) always show widget regardless of score
   // This is the value prop: they pay for the badge even when score is below threshold
-  const isActiveSubscriber = 
+  const isActiveSubscriber =
     provider.widget_status === 'active' ||
     provider.subscription_status === 'active' ||
     provider.subscription_status === 'trialing';
 
   if (isActiveSubscriber) {
-    return { publicStatus: 'active', adminStatus: score < COMPLIANCE_THRESHOLD ? 'warning' : 'active' };
+    return {
+      publicStatus: 'active',
+      adminStatus: score < COMPLIANCE_THRESHOLD ? 'warning' : 'active',
+    };
   }
 
   // THRESHOLD CHECK - Only applies to non-subscribers

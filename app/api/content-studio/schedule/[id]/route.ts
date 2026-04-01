@@ -8,11 +8,9 @@ import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
  *   e.g. { "linkedin": "2026-03-28T14:00:00Z", "blog": "2026-03-29T14:00:00Z" }
  * DELETE: Cancel schedule
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabaseClient();
     const { scheduled_at, channels, channel_schedules } = await request.json();
 
@@ -44,7 +42,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('content_posts')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 
@@ -60,9 +58,10 @@ export async function POST(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabaseClient();
 
     const { data, error } = await supabase
@@ -73,7 +72,7 @@ export async function DELETE(
         schedule_metadata: null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single();
 

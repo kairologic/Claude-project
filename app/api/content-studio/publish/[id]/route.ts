@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 import { publishToLinkedIn } from '@/lib/content-studio/linkedin-api';
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const supabase = createAdminSupabaseClient();
 
     // Read channels and target LinkedIn account from the request body
@@ -18,7 +16,7 @@ export async function POST(
     const { data: post, error: fetchError } = await supabase
       .from('content_posts')
       .select('*, content_graphics(*)')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (fetchError || !post) {
@@ -26,7 +24,7 @@ export async function POST(
     }
 
     // Use channels from the request body, fall back to post.channels
-    const channels = requestedChannels.length > 0 ? requestedChannels : (post.channels || []);
+    const channels = requestedChannels.length > 0 ? requestedChannels : post.channels || [];
 
     if (channels.length === 0) {
       return NextResponse.json({ error: 'No channels selected for publishing' }, { status: 400 });
@@ -39,7 +37,11 @@ export async function POST(
     for (const channel of channels) {
       try {
         if (channel === 'linkedin') {
-          const liResult = await publishToLinkedIn(post.body_linkedin || '', graphicUrl, linkedinAccountType);
+          const liResult = await publishToLinkedIn(
+            post.body_linkedin || '',
+            graphicUrl,
+            linkedinAccountType,
+          );
           results.linkedin = {
             success: liResult.success,
             url: liResult.postUrl,
@@ -77,7 +79,7 @@ export async function POST(
                 meta_title: post.headline,
                 meta_description: (post.body_blog || '').substring(0, 160),
               },
-              { onConflict: 'slug' }
+              { onConflict: 'slug' },
             )
             .select()
             .single();
@@ -119,11 +121,9 @@ export async function POST(
     // Update post status — never downgrade from 'published' to 'failed'
     const allSuccess = Object.values(results).every((r) => r.success);
     const anySuccess = Object.values(results).some((r) => r.success);
-    const newStatus = allSuccess || anySuccess || post.status === 'published' ? 'published' : 'failed';
-    await supabase
-      .from('content_posts')
-      .update({ status: newStatus })
-      .eq('id', post.id);
+    const newStatus =
+      allSuccess || anySuccess || post.status === 'published' ? 'published' : 'failed';
+    await supabase.from('content_posts').update({ status: newStatus }).eq('id', post.id);
 
     return NextResponse.json({ success: true, results });
   } catch (err) {

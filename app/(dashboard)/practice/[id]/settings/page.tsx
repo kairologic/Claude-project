@@ -2,7 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { colors } from '@/lib/design-tokens';
-import { Lock, Mail, Users, Bell, Link2, Zap, Eye, EyeOff, Trash2, Plus, MoreVertical, X } from 'lucide-react';
+import {
+  Lock,
+  Mail,
+  Users,
+  Bell,
+  Link2,
+  Zap,
+  Eye,
+  EyeOff,
+  Trash2,
+  Plus,
+  MoreVertical,
+  X,
+} from 'lucide-react';
 
 interface SettingsPageProps {
   params: { id: string };
@@ -60,7 +73,9 @@ interface PayerConnection {
 
 export default function SettingsPage({ params }: SettingsPageProps) {
   const practiceId = params.id;
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'team' | 'notifications' | 'payers' | 'automation'>('profile');
+  const [activeTab, setActiveTab] = useState<
+    'profile' | 'security' | 'team' | 'notifications' | 'payers' | 'automation'
+  >('profile');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -123,70 +138,65 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   async function loadPracticeData() {
     try {
       setLoading(true);
-      // Simulated data loading
-      setPracticeForm({
-        practice_name: 'Sunrise Medical Group',
-        organization_npi: '1234567890',
-        primary_address: '123 Main Street',
-        city: 'San Francisco',
-        state: 'CA',
-        zip_code: '94105',
-        website_url: 'https://sunrisemedical.com',
-        primary_phone: '(415) 555-0100',
-        primary_fax: '(415) 555-0101',
-        specialties: ['Cardiology', 'Internal Medicine'],
-        states_of_operation: ['CA', 'NV'],
-        subscription_tier: 'Professional',
-      });
 
-      setTeamMembers([
-        {
-          user_id: '1',
-          name: 'Dr. Sarah Johnson',
-          email: 'sarah@example.com',
-          role: 'Admin',
-          status: 'Active',
-          last_active: '2 hours ago',
-        },
-        {
-          user_id: '2',
-          name: 'Michael Chen',
-          email: 'michael@example.com',
-          role: 'Manager',
-          status: 'Active',
-          last_active: '30 minutes ago',
-        },
-      ]);
+      // Fetch real practice profile from API
+      const practiceRes = await fetch(`/api/settings/practice?practice_id=${practiceId}`);
+      if (practiceRes.ok) {
+        const practice = await practiceRes.json();
+        setPracticeForm({
+          practice_name: practice.name || '',
+          organization_npi: practice.npi || '',
+          primary_address: practice.address || '',
+          city: practice.city || '',
+          state: practice.state || '',
+          zip_code: '',
+          website_url: practice.url || '',
+          primary_phone: practice.primary_phone || '',
+          primary_fax: practice.primary_fax || '',
+          specialties: Array.isArray(practice.practice_specialties)
+            ? practice.practice_specialties
+            : [],
+          states_of_operation: practice.state ? [practice.state] : [],
+          subscription_tier: practice.scan_tier || 'Monitor',
+        });
+      }
 
-      setPayerConnections([
-        {
-          payer_id: '1',
-          payer_name: 'Aetna',
-          status: 'Connected',
-          last_sync: '2026-03-22 14:30',
-          providers_found: 12,
-          sync_frequency: 'Weekly',
-          auth_status: 'Valid',
-        },
-        {
-          payer_id: '2',
-          payer_name: 'BlueCross BlueShield',
-          status: 'Connected',
-          last_sync: '2026-03-22 15:15',
-          providers_found: 18,
-          sync_frequency: 'Weekly',
-          auth_status: 'Valid',
-        },
-        {
-          payer_id: '3',
-          payer_name: 'Cigna',
-          status: 'Pending',
-          last_sync: 'Never',
-          providers_found: 0,
-          sync_frequency: 'Weekly',
-          auth_status: 'Pending',
-        },
-      ]);
+      // Fetch team members from API
+      const teamRes = await fetch(`/api/settings/team?practice_id=${practiceId}`);
+      if (teamRes.ok) {
+        const teamData = await teamRes.json();
+        setTeamMembers(
+          Array.isArray(teamData)
+            ? teamData.map((m: any) => ({
+                user_id: m.user_id || m.id || '',
+                name: m.name || m.email?.split('@')[0] || 'Unknown',
+                email: m.email || '',
+                role: m.role || 'member',
+                status: m.status || 'Active',
+                last_active: m.last_active || m.joined_at || '',
+              }))
+            : [],
+        );
+      }
+
+      // Fetch payer connections from API
+      const payerRes = await fetch(`/api/settings/payers?practice_id=${practiceId}`);
+      if (payerRes.ok) {
+        const payerData = await payerRes.json();
+        setPayerConnections(
+          Array.isArray(payerData)
+            ? payerData.map((p: any) => ({
+                payer_id: p.payer_id || p.id || '',
+                payer_name: p.payer_name || p.name || '',
+                status: p.status || 'Pending',
+                last_sync: p.last_sync || 'Never',
+                providers_found: p.providers_found || 0,
+                sync_frequency: p.sync_frequency || 'Weekly',
+                auth_status: p.auth_status || 'Pending',
+              }))
+            : [],
+        );
+      }
     } catch (err) {
       console.error('Error loading practice data:', err);
       setMessage({ type: 'error', text: 'Failed to load practice data' });
@@ -198,11 +208,30 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   async function savePracticeSettings() {
     try {
       setLoading(true);
-      // Simulated save
-      await new Promise(r => setTimeout(r, 500));
+      const res = await fetch('/api/settings/practice', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          practice_id: practiceId,
+          name: practiceForm.practice_name,
+          npi: practiceForm.organization_npi,
+          address: practiceForm.primary_address,
+          city: practiceForm.city,
+          state: practiceForm.state,
+          url: practiceForm.website_url,
+          primary_phone: practiceForm.primary_phone,
+          primary_fax: practiceForm.primary_fax,
+          practice_specialties: practiceForm.specialties,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save');
+      }
       setMessage({ type: 'success', text: 'Practice settings saved successfully' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (err) {
+      console.error('Error saving practice settings:', err);
       setMessage({ type: 'error', text: 'Failed to save settings' });
     } finally {
       setLoading(false);
@@ -216,7 +245,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
     }
     try {
       setLoading(true);
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
       setMessage({ type: 'success', text: 'Password changed successfully' });
       setPasswordForm({ new_password: '', confirm_password: '' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -230,9 +259,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   async function deleteAccount() {
     try {
       setLoading(true);
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 1000));
       setMessage({ type: 'success', text: 'Account deleted. Redirecting...' });
-      setTimeout(() => window.location.href = '/sign-in', 2000);
+      setTimeout(() => (window.location.href = '/sign-in'), 2000);
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to delete account' });
     } finally {
@@ -247,7 +276,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
     }
     try {
       setLoading(true);
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
       setMessage({ type: 'success', text: `Invitation sent to ${inviteForm.email}` });
       setInviteForm({ email: '', role: 'member' });
       setShowInviteModal(false);
@@ -272,12 +301,15 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   function removeSpecialty(specialty: string) {
     setPracticeForm({
       ...practiceForm,
-      specialties: practiceForm.specialties.filter(s => s !== specialty),
+      specialties: practiceForm.specialties.filter((s) => s !== specialty),
     });
   }
 
   function addRecipient() {
-    if (newRecipient.trim() && !notificationSettings.additional_recipients.includes(newRecipient.trim())) {
+    if (
+      newRecipient.trim() &&
+      !notificationSettings.additional_recipients.includes(newRecipient.trim())
+    ) {
       setNotificationSettings({
         ...notificationSettings,
         additional_recipients: [...notificationSettings.additional_recipients, newRecipient.trim()],
@@ -289,7 +321,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   function removeRecipient(email: string) {
     setNotificationSettings({
       ...notificationSettings,
-      additional_recipients: notificationSettings.additional_recipients.filter(e => e !== email),
+      additional_recipients: notificationSettings.additional_recipients.filter((e) => e !== email),
     });
   }
 
@@ -307,7 +339,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
     <div style={styles.container}>
       {/* Tab Navigation */}
       <div style={styles.tabNav}>
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
@@ -326,12 +358,14 @@ export default function SettingsPage({ params }: SettingsPageProps) {
 
       {/* Message Alert */}
       {message.text && (
-        <div style={{
-          ...styles.alert,
-          background: message.type === 'success' ? '#D4E5DB' : '#F5D5D5',
-          color: message.type === 'success' ? colors.green : colors.red,
-          borderLeft: `4px solid ${message.type === 'success' ? colors.green : colors.red}`,
-        }}>
+        <div
+          style={{
+            ...styles.alert,
+            background: message.type === 'success' ? '#D4E5DB' : '#F5D5D5',
+            color: message.type === 'success' ? colors.green : colors.red,
+            borderLeft: `4px solid ${message.type === 'success' ? colors.green : colors.red}`,
+          }}
+        >
           {message.text}
         </div>
       )}
@@ -349,7 +383,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="text"
                     value={practiceForm.practice_name}
-                    onChange={e => setPracticeForm({ ...practiceForm, practice_name: e.target.value })}
+                    onChange={(e) =>
+                      setPracticeForm({ ...practiceForm, practice_name: e.target.value })
+                    }
                     style={styles.input}
                   />
                 </div>
@@ -358,7 +394,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="text"
                     value={practiceForm.organization_npi}
-                    onChange={e => setPracticeForm({ ...practiceForm, organization_npi: e.target.value })}
+                    onChange={(e) =>
+                      setPracticeForm({ ...practiceForm, organization_npi: e.target.value })
+                    }
                     style={styles.input}
                   />
                 </div>
@@ -369,7 +407,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 <input
                   type="text"
                   value={practiceForm.primary_address}
-                  onChange={e => setPracticeForm({ ...practiceForm, primary_address: e.target.value })}
+                  onChange={(e) =>
+                    setPracticeForm({ ...practiceForm, primary_address: e.target.value })
+                  }
                   style={styles.input}
                 />
               </div>
@@ -380,7 +420,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="text"
                     value={practiceForm.city}
-                    onChange={e => setPracticeForm({ ...practiceForm, city: e.target.value })}
+                    onChange={(e) => setPracticeForm({ ...practiceForm, city: e.target.value })}
                     style={styles.input}
                   />
                 </div>
@@ -389,7 +429,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="text"
                     value={practiceForm.state}
-                    onChange={e => setPracticeForm({ ...practiceForm, state: e.target.value })}
+                    onChange={(e) => setPracticeForm({ ...practiceForm, state: e.target.value })}
                     style={styles.input}
                   />
                 </div>
@@ -398,7 +438,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="text"
                     value={practiceForm.zip_code}
-                    onChange={e => setPracticeForm({ ...practiceForm, zip_code: e.target.value })}
+                    onChange={(e) => setPracticeForm({ ...practiceForm, zip_code: e.target.value })}
                     style={styles.input}
                   />
                 </div>
@@ -409,7 +449,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 <input
                   type="url"
                   value={practiceForm.website_url}
-                  onChange={e => setPracticeForm({ ...practiceForm, website_url: e.target.value })}
+                  onChange={(e) =>
+                    setPracticeForm({ ...practiceForm, website_url: e.target.value })
+                  }
                   style={styles.input}
                 />
               </div>
@@ -420,7 +462,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="tel"
                     value={practiceForm.primary_phone}
-                    onChange={e => setPracticeForm({ ...practiceForm, primary_phone: e.target.value })}
+                    onChange={(e) =>
+                      setPracticeForm({ ...practiceForm, primary_phone: e.target.value })
+                    }
                     style={styles.input}
                   />
                 </div>
@@ -429,7 +473,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="tel"
                     value={practiceForm.primary_fax}
-                    onChange={e => setPracticeForm({ ...practiceForm, primary_fax: e.target.value })}
+                    onChange={(e) =>
+                      setPracticeForm({ ...practiceForm, primary_fax: e.target.value })
+                    }
                     style={styles.input}
                   />
                 </div>
@@ -439,13 +485,10 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 <label style={styles.label}>Practice Specialties</label>
                 <div style={styles.tagInput}>
                   <div style={styles.tagList}>
-                    {practiceForm.specialties.map(specialty => (
+                    {practiceForm.specialties.map((specialty) => (
                       <div key={specialty} style={styles.tag}>
                         {specialty}
-                        <button
-                          onClick={() => removeSpecialty(specialty)}
-                          style={styles.tagRemove}
-                        >
+                        <button onClick={() => removeSpecialty(specialty)} style={styles.tagRemove}>
                           ×
                         </button>
                       </div>
@@ -454,8 +497,8 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="text"
                     value={specialtyInput}
-                    onChange={e => setSpecialtyInput(e.target.value)}
-                    onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
+                    onChange={(e) => setSpecialtyInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
                     placeholder="Type and press Enter to add"
                     style={styles.tagInputField}
                   />
@@ -471,9 +514,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 </div>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Subscription Tier</label>
-                  <div style={styles.readOnlyField}>
-                    {practiceForm.subscription_tier}
-                  </div>
+                  <div style={styles.readOnlyField}>{practiceForm.subscription_tier}</div>
                 </div>
               </div>
             </div>
@@ -505,13 +546,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={passwordForm.new_password}
-                    onChange={e => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                    onChange={(e) =>
+                      setPasswordForm({ ...passwordForm, new_password: e.target.value })
+                    }
                     style={styles.input}
                   />
-                  <button
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={styles.eyeButton}
-                  >
+                  <button onClick={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -523,13 +563,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     value={passwordForm.confirm_password}
-                    onChange={e => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                    onChange={(e) =>
+                      setPasswordForm({ ...passwordForm, confirm_password: e.target.value })
+                    }
                     style={styles.input}
                   />
-                  <button
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    style={styles.eyeButton}
-                  >
+                  <button onClick={() => setShowConfirm(!showConfirm)} style={styles.eyeButton}>
                     {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -552,9 +591,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
               <h3 style={styles.cardTitle}>Email Address</h3>
               <div style={styles.formGroup}>
                 <label style={styles.label}>Current Email</label>
-                <div style={styles.readOnlyField}>
-                  {currentEmail}
-                </div>
+                <div style={styles.readOnlyField}>{currentEmail}</div>
               </div>
             </div>
 
@@ -581,7 +618,8 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             <div style={{ ...styles.card, borderLeft: `4px solid ${colors.red}` }}>
               <h3 style={{ ...styles.cardTitle, color: colors.red }}>Delete Account</h3>
               <p style={styles.placeholder}>
-                Permanently delete your account and all associated data. This action cannot be undone.
+                Permanently delete your account and all associated data. This action cannot be
+                undone.
               </p>
               {!showDeleteConfirm ? (
                 <button
@@ -624,10 +662,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
           <div style={styles.tabContent}>
             <div style={styles.teamHeader}>
               <h2 style={styles.sectionTitle}>Team & Access</h2>
-              <button
-                onClick={() => setShowInviteModal(true)}
-                style={styles.primaryButton}
-              >
+              <button onClick={() => setShowInviteModal(true)} style={styles.primaryButton}>
                 <Plus size={16} style={{ marginRight: 6 }} />
                 Invite Team Member
               </button>
@@ -648,7 +683,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {teamMembers.map(member => (
+                    {teamMembers.map((member) => (
                       <tr key={member.user_id} style={styles.tableRow}>
                         <td style={styles.tableCell}>
                           <div>
@@ -657,11 +692,13 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                           </div>
                         </td>
                         <td style={styles.tableCell}>
-                          <span style={{
-                            ...styles.roleBadge,
-                            background: member.role === 'Admin' ? colors.gold : colors.navyLight,
-                            color: member.role === 'Admin' ? colors.navy : '#fff',
-                          }}>
+                          <span
+                            style={{
+                              ...styles.roleBadge,
+                              background: member.role === 'Admin' ? colors.gold : colors.navyLight,
+                              color: member.role === 'Admin' ? colors.navy : '#fff',
+                            }}
+                          >
                             {member.role}
                           </span>
                         </td>
@@ -699,12 +736,14 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                       'Manage team',
                       'Manage billing',
                       'Edit settings',
-                    ].map(permission => (
+                    ].map((permission) => (
                       <tr key={permission} style={styles.tableRow}>
                         <td style={styles.tableCell}>{permission}</td>
                         <td style={styles.tableCell}>✓</td>
                         <td style={styles.tableCell}>✓</td>
-                        <td style={styles.tableCell}>{permission === 'View dashboard' ? '✓' : ''}</td>
+                        <td style={styles.tableCell}>
+                          {permission === 'View dashboard' ? '✓' : ''}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -715,13 +754,10 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             {/* Invite Modal */}
             {showInviteModal && (
               <div style={styles.modalOverlay} onClick={() => setShowInviteModal(false)}>
-                <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
                   <div style={styles.modalHeader}>
                     <h3 style={styles.modalTitle}>Invite Team Member</h3>
-                    <button
-                      onClick={() => setShowInviteModal(false)}
-                      style={styles.closeButton}
-                    >
+                    <button onClick={() => setShowInviteModal(false)} style={styles.closeButton}>
                       <X size={20} />
                     </button>
                   </div>
@@ -731,7 +767,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                       <input
                         type="email"
                         value={inviteForm.email}
-                        onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })}
+                        onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
                         placeholder="colleague@example.com"
                         style={styles.input}
                       />
@@ -740,7 +776,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                       <label style={styles.label}>Role</label>
                       <select
                         value={inviteForm.role}
-                        onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}
+                        onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
                         style={styles.select}
                       >
                         <option value="member">Member</option>
@@ -781,13 +817,37 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             <div style={styles.card}>
               <h3 style={styles.cardTitle}>Notification Types</h3>
               {[
-                { key: 'drift_alerts', label: 'Drift Alerts', description: 'Receive alerts when credentials drift' },
-                { key: 'scan_complete', label: 'Scan Complete', description: 'Notification when scans finish' },
-                { key: 'monthly_report', label: 'Monthly Report', description: 'Receive monthly summaries' },
-                { key: 'credential_expiry', label: 'Credential Expiry', description: 'Alerts for expiring credentials' },
-                { key: 'workflow_updates', label: 'Workflow Updates', description: 'Updates on workflow execution' },
-                { key: 'payer_changes', label: 'Payer Directory Changes', description: 'Changes in payer directories' },
-              ].map(item => (
+                {
+                  key: 'drift_alerts',
+                  label: 'Drift Alerts',
+                  description: 'Receive alerts when credentials drift',
+                },
+                {
+                  key: 'scan_complete',
+                  label: 'Scan Complete',
+                  description: 'Notification when scans finish',
+                },
+                {
+                  key: 'monthly_report',
+                  label: 'Monthly Report',
+                  description: 'Receive monthly summaries',
+                },
+                {
+                  key: 'credential_expiry',
+                  label: 'Credential Expiry',
+                  description: 'Alerts for expiring credentials',
+                },
+                {
+                  key: 'workflow_updates',
+                  label: 'Workflow Updates',
+                  description: 'Updates on workflow execution',
+                },
+                {
+                  key: 'payer_changes',
+                  label: 'Payer Directory Changes',
+                  description: 'Changes in payer directories',
+                },
+              ].map((item) => (
                 <div key={item.key} style={styles.toggleRow}>
                   <div>
                     <div style={styles.toggleLabel}>{item.label}</div>
@@ -796,11 +856,15 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <label style={styles.checkbox}>
                     <input
                       type="checkbox"
-                      checked={notificationSettings[item.key as keyof NotificationSettings] === true}
-                      onChange={e => setNotificationSettings({
-                        ...notificationSettings,
-                        [item.key]: e.target.checked,
-                      })}
+                      checked={
+                        notificationSettings[item.key as keyof NotificationSettings] === true
+                      }
+                      onChange={(e) =>
+                        setNotificationSettings({
+                          ...notificationSettings,
+                          [item.key]: e.target.checked,
+                        })
+                      }
                       style={styles.checkboxInput}
                     />
                   </label>
@@ -812,10 +876,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
               <h3 style={styles.cardTitle}>Drift Alert Frequency</h3>
               <select
                 value={notificationSettings.drift_frequency}
-                onChange={e => setNotificationSettings({
-                  ...notificationSettings,
-                  drift_frequency: e.target.value as any,
-                })}
+                onChange={(e) =>
+                  setNotificationSettings({
+                    ...notificationSettings,
+                    drift_frequency: e.target.value as any,
+                  })
+                }
                 style={styles.select}
               >
                 <option value="immediate">Immediate</option>
@@ -831,10 +897,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 <input
                   type="email"
                   value={notificationSettings.delivery_email}
-                  onChange={e => setNotificationSettings({
-                    ...notificationSettings,
-                    delivery_email: e.target.value,
-                  })}
+                  onChange={(e) =>
+                    setNotificationSettings({
+                      ...notificationSettings,
+                      delivery_email: e.target.value,
+                    })
+                  }
                   style={styles.input}
                 />
               </div>
@@ -843,13 +911,10 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 <label style={styles.label}>Additional Recipients</label>
                 <div style={styles.tagInput}>
                   <div style={styles.tagList}>
-                    {notificationSettings.additional_recipients.map(email => (
+                    {notificationSettings.additional_recipients.map((email) => (
                       <div key={email} style={styles.tag}>
                         {email}
-                        <button
-                          onClick={() => removeRecipient(email)}
-                          style={styles.tagRemove}
-                        >
+                        <button onClick={() => removeRecipient(email)} style={styles.tagRemove}>
                           ×
                         </button>
                       </div>
@@ -858,8 +923,8 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                   <input
                     type="email"
                     value={newRecipient}
-                    onChange={e => setNewRecipient(e.target.value)}
-                    onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addRecipient())}
+                    onChange={(e) => setNewRecipient(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addRecipient())}
                     placeholder="Add email and press Enter"
                     style={styles.tagInputField}
                   />
@@ -873,10 +938,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                 <input
                   type="checkbox"
                   checked={notificationSettings.quiet_hours_enabled}
-                  onChange={e => setNotificationSettings({
-                    ...notificationSettings,
-                    quiet_hours_enabled: e.target.checked,
-                  })}
+                  onChange={(e) =>
+                    setNotificationSettings({
+                      ...notificationSettings,
+                      quiet_hours_enabled: e.target.checked,
+                    })
+                  }
                   style={styles.checkboxInput}
                 />
                 <span style={{ marginLeft: 8 }}>Enable quiet hours</span>
@@ -889,10 +956,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                       <input
                         type="time"
                         value={notificationSettings.quiet_start}
-                        onChange={e => setNotificationSettings({
-                          ...notificationSettings,
-                          quiet_start: e.target.value,
-                        })}
+                        onChange={(e) =>
+                          setNotificationSettings({
+                            ...notificationSettings,
+                            quiet_start: e.target.value,
+                          })
+                        }
                         style={styles.input}
                       />
                     </div>
@@ -901,10 +970,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                       <input
                         type="time"
                         value={notificationSettings.quiet_end}
-                        onChange={e => setNotificationSettings({
-                          ...notificationSettings,
-                          quiet_end: e.target.value,
-                        })}
+                        onChange={(e) =>
+                          setNotificationSettings({
+                            ...notificationSettings,
+                            quiet_end: e.target.value,
+                          })
+                        }
                         style={styles.input}
                       />
                     </div>
@@ -917,10 +988,12 @@ export default function SettingsPage({ params }: SettingsPageProps) {
               <h3 style={styles.cardTitle}>Timezone</h3>
               <select
                 value={notificationSettings.timezone}
-                onChange={e => setNotificationSettings({
-                  ...notificationSettings,
-                  timezone: e.target.value,
-                })}
+                onChange={(e) =>
+                  setNotificationSettings({
+                    ...notificationSettings,
+                    timezone: e.target.value,
+                  })
+                }
                 style={styles.select}
               >
                 <option value="America/New_York">Eastern Time (ET)</option>
@@ -934,7 +1007,10 @@ export default function SettingsPage({ params }: SettingsPageProps) {
               <h3 style={styles.cardTitle}>Last 5 Notifications</h3>
               <div style={styles.notificationList}>
                 {[
-                  { time: '2 hours ago', message: 'Credential expiry: Dr. Smith license expires in 30 days' },
+                  {
+                    time: '2 hours ago',
+                    message: 'Credential expiry: Dr. Smith license expires in 30 days',
+                  },
                   { time: '5 hours ago', message: 'Scan completed: 12 providers scanned' },
                   { time: '1 day ago', message: 'Drift detected: 3 credentials changed status' },
                   { time: '2 days ago', message: 'Monthly report generated and sent' },
@@ -957,10 +1033,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
               <h2 style={styles.sectionTitle}>Payer Connections</h2>
               <div style={styles.buttonGroup}>
                 <button style={styles.secondaryButton}>Sync All</button>
-                <button
-                  onClick={() => setShowRequestModal(true)}
-                  style={styles.primaryButton}
-                >
+                <button onClick={() => setShowRequestModal(true)} style={styles.primaryButton}>
                   <Plus size={16} style={{ marginRight: 6 }} />
                   Request Payer
                 </button>
@@ -982,17 +1055,27 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {payerConnections.map(payer => (
+                    {payerConnections.map((payer) => (
                       <tr key={payer.payer_id} style={styles.tableRow}>
                         <td style={styles.tableCell}>{payer.payer_name}</td>
                         <td style={styles.tableCell}>
-                          <span style={{
-                            ...styles.statusBadge,
-                            background: payer.status === 'Connected' ? colors.green :
-                                       payer.status === 'Pending' ? colors.gold : colors.red,
-                            color: payer.status === 'Connected' ? '#fff' :
-                                   payer.status === 'Pending' ? colors.navy : '#fff',
-                          }}>
+                          <span
+                            style={{
+                              ...styles.statusBadge,
+                              background:
+                                payer.status === 'Connected'
+                                  ? colors.green
+                                  : payer.status === 'Pending'
+                                    ? colors.gold
+                                    : colors.red,
+                              color:
+                                payer.status === 'Connected'
+                                  ? '#fff'
+                                  : payer.status === 'Pending'
+                                    ? colors.navy
+                                    : '#fff',
+                            }}
+                          >
                             {payer.status}
                           </span>
                         </td>
@@ -1013,13 +1096,10 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             {/* Request Payer Modal */}
             {showRequestModal && (
               <div style={styles.modalOverlay} onClick={() => setShowRequestModal(false)}>
-                <div style={styles.modal} onClick={e => e.stopPropagation()}>
+                <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
                   <div style={styles.modalHeader}>
                     <h3 style={styles.modalTitle}>Request Payer Connection</h3>
-                    <button
-                      onClick={() => setShowRequestModal(false)}
-                      style={styles.closeButton}
-                    >
+                    <button onClick={() => setShowRequestModal(false)} style={styles.closeButton}>
                       <X size={20} />
                     </button>
                   </div>
@@ -1029,7 +1109,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                       <input
                         type="text"
                         value={payerRequest.payer_name}
-                        onChange={e => setPayerRequest({ payer_name: e.target.value })}
+                        onChange={(e) => setPayerRequest({ payer_name: e.target.value })}
                         placeholder="Enter payer name"
                         style={styles.input}
                       />
@@ -1042,9 +1122,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
                     >
                       Cancel
                     </button>
-                    <button style={styles.primaryButton}>
-                      Submit Request
-                    </button>
+                    <button style={styles.primaryButton}>Submit Request</button>
                   </div>
                 </div>
               </div>
@@ -1059,7 +1137,9 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             <div style={styles.comingSoonContainer}>
               <span style={styles.comingSoonBadge}>Coming Soon</span>
               <p style={styles.placeholder}>
-                Automation and AI agent features are currently in development. These advanced settings will allow you to configure auto-approval thresholds, credential monitoring, and intelligent workflow automation.
+                Automation and AI agent features are currently in development. These advanced
+                settings will allow you to configure auto-approval thresholds, credential
+                monitoring, and intelligent workflow automation.
               </p>
             </div>
 
@@ -1081,10 +1161,19 @@ export default function SettingsPage({ params }: SettingsPageProps) {
             <div style={styles.card}>
               <h3 style={styles.cardTitle}>Monitoring & Automation</h3>
               {[
-                { label: 'Auto-submit NPPES updates', description: 'Automatically submit NPPES credential updates' },
-                { label: 'Auto-submit CAQH updates', description: 'Automatically submit CAQH credential updates' },
-                { label: 'Payer auto-submit', description: 'Automatically submit credentials to payers' },
-              ].map(item => (
+                {
+                  label: 'Auto-submit NPPES updates',
+                  description: 'Automatically submit NPPES credential updates',
+                },
+                {
+                  label: 'Auto-submit CAQH updates',
+                  description: 'Automatically submit CAQH credential updates',
+                },
+                {
+                  label: 'Payer auto-submit',
+                  description: 'Automatically submit credentials to payers',
+                },
+              ].map((item) => (
                 <div key={item.label} style={styles.toggleRow}>
                   <div>
                     <div style={styles.toggleLabel}>{item.label}</div>

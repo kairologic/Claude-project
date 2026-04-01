@@ -1,28 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 /**
  * POST /api/settings/team/[id]/resend
  * Resend invite by calling supabase.auth.admin.inviteUserByEmail again
  */
-export async function POST(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Missing team member ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing team member ID' }, { status: 400 });
     }
 
     const supabase = createAdminSupabaseClient();
@@ -36,17 +24,14 @@ export async function POST(
 
     if (fetchError || !teamMember) {
       console.error('[Team Resend POST] Error fetching team member:', fetchError);
-      return NextResponse.json(
-        { error: 'Team member not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Team member not found' }, { status: 404 });
     }
 
     // Only resend if still pending
     if (teamMember.status !== 'pending') {
       return NextResponse.json(
         { error: 'Can only resend invites for pending team members' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -64,10 +49,7 @@ export async function POST(
       });
     } catch (inviteError) {
       console.error('[Team Resend POST] Error sending invite:', inviteError);
-      return NextResponse.json(
-        { error: 'Failed to send invitation' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to send invitation' }, { status: 500 });
     }
 
     // Update invited_at timestamp
@@ -82,17 +64,12 @@ export async function POST(
       console.error('[Team Resend POST] Error updating invited_at:', updateError);
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Invitation resent successfully'
-      }
-    );
+    return NextResponse.json({
+      success: true,
+      message: 'Invitation resent successfully',
+    });
   } catch (error) {
     console.error('[Team Resend POST] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
