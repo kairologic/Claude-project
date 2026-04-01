@@ -6,12 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api/with-auth';
+import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 
 // TODO: Add system-admin role check when role system is expanded
 
-const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
-  const supabase = ctx.supabase;
+async function POST_HANDLER(request: NextRequest) {
+  const supabase = createAdminSupabaseClient();
   try {
     const { practice_id, action } = await request.json();
 
@@ -19,7 +19,10 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       return NextResponse.json({ error: 'practice_id required' }, { status: 400 });
     }
     if (!action || !['scan', 'payer_sync', 'both'].includes(action)) {
-      return NextResponse.json({ error: 'action must be scan, payer_sync, or both' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'action must be scan, payer_sync, or both' },
+        { status: 400 },
+      );
     }
 
     // Verify practice exists
@@ -80,6 +83,6 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       { status: 500 },
     );
   }
-});
+}
 
 export { POST_HANDLER as POST };
