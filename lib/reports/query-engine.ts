@@ -53,10 +53,10 @@ export async function executeReportQuery(
   // Resolve selected fields (default to fields marked default: true)
   const selectedKeys = request.fields?.length
     ? request.fields
-    : definition.fields.filter(f => f.default).map(f => f.key);
+    : definition.fields.filter((f) => f.default).map((f) => f.key);
 
   // Validate all requested fields exist
-  const fieldMap = new Map(definition.fields.map(f => [f.key, f]));
+  const fieldMap = new Map(definition.fields.map((f) => [f.key, f]));
   const selectedFields: FieldDefinition[] = [];
   for (const key of selectedKeys) {
     const field = fieldMap.get(key);
@@ -145,10 +145,10 @@ export async function executeReportQuery(
   }
 
   // Transform rows: project selected fields, compute derived values
-  const rows = (data || []).map(row => projectRow(row, selectedFields, definition));
+  const rows = (data || []).map((row) => projectRow(row, selectedFields, definition));
 
   // Build column metadata for the response
-  const columns = selectedFields.map(f => ({
+  const columns = selectedFields.map((f) => ({
     key: f.key,
     label: f.label,
     type: f.type,
@@ -199,11 +199,7 @@ function projectRow(
   return projected;
 }
 
-function computeField(
-  key: string,
-  raw: Record<string, any>,
-  definition: ReportDefinition,
-): any {
+function computeField(key: string, raw: Record<string, any>, _definition: ReportDefinition): any {
   switch (key) {
     // Workflow Status report computed fields
     case 'task_count': {
@@ -212,9 +208,7 @@ function computeField(
     }
     case 'tasks_completed': {
       const tasks = raw.workflow_tasks;
-      return Array.isArray(tasks)
-        ? tasks.filter((t: any) => t.status === 'completed').length
-        : 0;
+      return Array.isArray(tasks) ? tasks.filter((t: any) => t.status === 'completed').length : 0;
     }
     case 'age_days': {
       const created = raw.created_at ? new Date(raw.created_at) : null;
@@ -236,8 +230,18 @@ function computeField(
       }
       // Infer from finding_summary
       const summary = (raw.finding_summary || '').toLowerCase();
-      if (summary.includes('data sovereignty') || summary.includes('sb 1188') || summary.includes('dr-')) return 'Data Sovereignty';
-      if (summary.includes('ai transparency') || summary.includes('hb 149') || summary.includes('ai-')) return 'AI Transparency';
+      if (
+        summary.includes('data sovereignty') ||
+        summary.includes('sb 1188') ||
+        summary.includes('dr-')
+      )
+        return 'Data Sovereignty';
+      if (
+        summary.includes('ai transparency') ||
+        summary.includes('hb 149') ||
+        summary.includes('ai-')
+      )
+        return 'AI Transparency';
       if (summary.includes('clinical') || summary.includes('er-')) return 'Clinical Integrity';
       return 'General';
     }
@@ -260,6 +264,13 @@ function computeField(
       return null;
     }
 
+    // Credential Expiry computed fields
+    case 'days_until_expiry': {
+      const expDate = raw.expiration_date ? new Date(raw.expiration_date) : null;
+      if (!expDate) return null;
+      return Math.ceil((expDate.getTime() - Date.now()) / 86400000);
+    }
+
     default:
       return null;
   }
@@ -275,14 +286,16 @@ export function reportToCSV(result: ReportQueryResult): string {
   const { columns, rows } = result;
 
   // Header row
-  const header = columns.map(c => escapeCSV(c.label)).join(',');
+  const header = columns.map((c) => escapeCSV(c.label)).join(',');
 
   // Data rows
-  const dataRows = rows.map(row => {
-    return columns.map(col => {
-      const value = row[col.key];
-      return escapeCSV(formatCSVValue(value, col.type));
-    }).join(',');
+  const dataRows = rows.map((row) => {
+    return columns
+      .map((col) => {
+        const value = row[col.key];
+        return escapeCSV(formatCSVValue(value, col.type));
+      })
+      .join(',');
   });
 
   return [header, ...dataRows].join('\n');
@@ -324,15 +337,15 @@ export function reportToPDFData(result: ReportQueryResult): {
   const { columns, rows, report_name, generated_at, total_count } = result;
 
   // For PDF, skip JSON columns (too wide) and truncate long text
-  const pdfColumns = columns.filter(c => c.type !== 'json');
+  const pdfColumns = columns.filter((c) => c.type !== 'json');
 
   return {
     title: report_name,
     subtitle: `Generated ${new Date(generated_at).toLocaleDateString()} · ${total_count} records`,
-    columns: pdfColumns.map(c => c.label),
-    columnKeys: pdfColumns.map(c => c.key),
-    rows: rows.map(row =>
-      pdfColumns.map(col => {
+    columns: pdfColumns.map((c) => c.label),
+    columnKeys: pdfColumns.map((c) => c.key),
+    rows: rows.map((row) =>
+      pdfColumns.map((col) => {
         const value = row[col.key];
         if (value === null || value === undefined) return '';
         if (col.type === 'datetime') {
@@ -340,7 +353,7 @@ export function reportToPDFData(result: ReportQueryResult): {
         }
         const str = String(value);
         return str.length > 80 ? str.slice(0, 77) + '...' : str;
-      })
+      }),
     ),
     generated_at,
     total_count,
