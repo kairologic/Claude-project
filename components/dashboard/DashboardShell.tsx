@@ -4,7 +4,7 @@
  * Client component shell for the dashboard.
  * Combines Sidebar + HeaderBar + scrollable main content.
  * Manages alert badge count via Supabase subscription.
- */h
+ */
 
 'use client';
 
