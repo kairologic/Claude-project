@@ -1,106 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
 
-const VALID_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabaseHeaders = {
+  'apikey': SUPABASE_ANON,
+  'Authorization': `Bearer ${SUPABASE_ANON}`,
+  'Content-Type': 'application/json',
+};
+
+const VALID_STATUSES = ['new', 'reviewed', 'in_progress', 'resolved', 'closed'] as const;
+type FeedbackStatus = typeof VALID_STATUSES[number];
+
+const STATUS_LABELS: Record<FeedbackStatus, string> = {
+  new: 'New',
+  reviewed: 'Reviewed',
+  in_progress: 'In Progress',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
 
 /**
  * PATCH /api/feedback/[id]/status
- * Update the status of a feedback item.
- * Auto-inserts a system comment when status changes.
+ * Update the status of a feedback item and auto-insert a system comment.
+ * Body: { status: FeedbackStatus }
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
+  const { id } = params;
+
+  let body: { status?: string };
   try {
-    const { id } = await params;
-    const body = await request.json();
-    const { status, changed_by } = body;
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 
-    if (!status || !VALID_STATUSES.includes(status)) {
-      return NextResponse.json(
-        { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` },
-        { status: 400 }
-      );
+  const { status } = body;
+
+  if (!status || !VALID_STATUSES.includes(status as FeedbackStatus)) {
+    return NextResponse.json(
+      { error: `status must be one of: ${VALID_STATUSES.join(', ')}` },
+      { status: 400 }
+    );
+  }
+
+  // Update the feedback status
+  const updateRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/feedback?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers: { ...supabaseHeaders, 'Prefer': 'return=representation' },
+      body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
     }
+  );
 
-    const supabase = getSupabase();
+  if (!updateRes.ok) {
+    const text = await updateRes.text();
+    console.error(`[Status] PATCH failed (${updateRes.status}): ${text}`);
+    return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
+  }
 
-    // Get current status first
-    const { data: current, error: fetchErr } = await supabase
-      .from('feedback')
-      .select('status')
-      .eq('id', id)
-      .single();
+  const rows = await updateRes.json();
+  const updated = Array.isArray(rows) ? rows[0] : rows;
 
-    if (fetchErr || !current) {
-      return NextResponse.json({ error: 'Feedback item not found' }, { status: 404 });
-    }
-
-    if (current.status === status) {
-      return NextResponse.json({ message: 'Status unchanged', status: current.status });
-    }
-
-    // Update the status
-    const { data, error } = await supabase
-      .from('feedback')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('[Status] Update error:', error);
-      return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
-    }
-
-    // Auto-insert system comment about status change
-    const statusLabels: Record<string, string> = {
-      open: 'Open',
-      in_progress: 'In Progress',
-      resolved: 'Resolved',
-      closed: 'Closed',
-    };
-
-    await supabase.from('feedback_comments').insert({
+  // Auto-insert a system comment to record the status change
+  const label = STATUS_LABELS[status as FeedbackStatus];
+  const commentRes = await fetch(`${SUPABASE_URL}/rest/v1/feedback_comments`, {
+    method: 'POST',
+    headers: supabaseHeaders,
+    body: JSON.stringify({
       feedback_id: id,
-      author: changed_by || 'System',
-      author_role: 'system',
-      message: `Status changed from ${statusLabels[current.status] || current.status} to ${statusLabels[status] || status}`,
-    });
+      author: 'System',
+      author_role: 'admin',
+      message: `Status changed to ${label}`,
+    }),
+  });
 
-    return NextResponse.json({ feedback: data });
-  } catch (err) {
-    console.error('[Status] Error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (!commentRes.ok) {
+    // Non-fatal — status was updated successfully
+    console.error(`[Status] System comment insert failed (${commentRes.status})`);
   }
-}
 
-/**
- * GET /api/feedback/[id]/status
- * Get the current status of a feedback item
- */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const supabase = getSupabase();
-
-    const { data, error } = await supabase
-      .from('feedback')
-      .select('id, status, updated_at')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'Feedback item not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ id: data.id, status: data.status, updated_at: data.updated_at });
-  } catch (err) {
-    console.error('[Status] Error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+  return NextResponse.json({ success: true, feedback: updated });
 }

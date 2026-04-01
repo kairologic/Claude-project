@@ -1,17 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * app/(dashboard)/practice/[id]/requests/page.tsx
+ *
+ * "My Requests" — practice user view of all their submitted feedback.
+ * Shows a list of issues and feature requests, with full thread/conversation.
+ */
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { colors } from '@/lib/design-tokens';
+import { colors, spacing, typography, shadows, radii, transitions } from '@/lib/design-tokens';
+
+// ════════════════════════════════════════════════════════════════════
+// TYPES
+// ════════════════════════════════════════════════════════════════════
 
 interface FeedbackItem {
   id: string;
+  practice_id: string;
+  practice_name: string;
   type: 'issue' | 'feature';
-  category: string;
+  category: string | null;
   subject: string;
   description: string;
-  urgency: string;
-  status: string;
+  urgency: string | null;
+  status: 'new' | 'reviewed' | 'in_progress' | 'resolved' | 'closed';
   submitted_by: string;
   created_at: string;
   updated_at: string;
@@ -21,260 +34,466 @@ interface Comment {
   id: string;
   feedback_id: string;
   author: string;
-  author_role: string;
+  author_role: 'practice' | 'admin';
   message: string;
   created_at: string;
 }
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  open: { bg: '#E3F2FD', text: '#1565C0' },
-  in_progress: { bg: '#FFF3E0', text: '#E65100' },
-  resolved: { bg: '#E8F5E9', text: '#2E7D32' },
-  closed: { bg: '#F5F5F5', text: '#616161' },
+// ════════════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════════════
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabaseHeaders = {
+  apikey: SUPABASE_ANON,
+  Authorization: `Bearer ${SUPABASE_ANON}`,
+  'Content-Type': 'application/json',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  open: 'Open',
-  in_progress: 'In Progress',
-  resolved: 'Resolved',
-  closed: 'Closed',
-};
+const statusConfig = {
+  new:         { label: 'New',         color: colors.blue,    bg: colors.bluePale },
+  reviewed:    { label: 'Reviewed',    color: '#D97706',      bg: '#FFFBEB' },
+  in_progress: { label: 'In Progress', color: '#C2410C',      bg: '#FFF7ED' },
+  resolved:    { label: 'Resolved',    color: colors.green,   bg: colors.greenPale },
+  closed:      { label: 'Closed',      color: colors.gray400, bg: colors.gray100 },
+} as const;
+
+const typeConfig = {
+  issue:   { label: 'Issue',   color: colors.red,  bg: colors.redPale },
+  feature: { label: 'Feature', color: colors.blue, bg: colors.bluePale },
+} as const;
+
+// ════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════
+
+function relativeTime(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// COMPONENT
+// ════════════════════════════════════════════════════════════════════
 
 export default function MyRequestsPage() {
   const params = useParams();
   const practiceId = params.id as string;
-  const [requests, setRequests] = useState<FeedbackItem[]>([]);
+
+  const [items, setItems] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<FeedbackItem | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [sendingComment, setSendingComment] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [error, setError] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  // Track items whose status changed since last viewed
+  const [newStatusIds, setNewStatusIds] = useState<Set<string>>(new Set());
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  // Load "last seen" state from localStorage
+  const getLastSeen = useCallback((id: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(`feedback_seen_${id}`);
+  }, []);
 
+  const markSeen = useCallback((item: FeedbackItem) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(`feedback_seen_${item.id}`, item.updated_at);
+    setNewStatusIds(prev => {
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
+  }, []);
+
+  // Fetch feedback for this practice
   useEffect(() => {
-    fetchRequests();
-  }, [practiceId]);
+    const fetchItems = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/feedback?practice_id=eq.${practiceId}&order=created_at.desc`,
+          { headers: supabaseHeaders }
+        );
+        if (!res.ok) {
+          if (res.status === 400 || res.status === 404) {
+            setItems([]);
+            return;
+          }
+          throw new Error(`Failed to fetch requests: ${res.statusText}`);
+        }
+        const data: FeedbackItem[] = await res.json();
+        setItems(data);
 
-  async function fetchRequests() {
-    try {
-      const res = await fetch(
-        `${supabaseUrl}/rest/v1/feedback?practice_id=eq.${practiceId}&order=created_at.desc`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setRequests(data);
+        // Check which items have unseen status changes
+        const changed = new Set<string>();
+        for (const item of data) {
+          const lastSeen = getLastSeen(item.id);
+          if (lastSeen && item.updated_at > lastSeen) {
+            changed.add(item.id);
+          }
+        }
+        setNewStatusIds(changed);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load requests');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to fetch requests:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
+    };
+    fetchItems();
+  }, [practiceId, getLastSeen]);
 
-  async function fetchComments(feedbackId: string) {
+  // Fetch comments when an item is expanded
+  const fetchComments = async (feedbackId: string) => {
     try {
       const res = await fetch(`/api/feedback/${feedbackId}/comments`);
-      if (res.ok) {
-        const data = await res.json();
-        setComments(data.comments || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch comments:', err);
+      if (!res.ok) return;
+      const data: Comment[] = await res.json();
+      setComments(prev => ({ ...prev, [feedbackId]: data }));
+    } catch {
+      // ignore
     }
-  }
+  };
 
-  async function sendComment() {
-    if (!newComment.trim() || !selectedRequest) return;
-    setSendingComment(true);
+  const handleExpand = (item: FeedbackItem) => {
+    if (expandedId === item.id) {
+      setExpandedId(null);
+      setCommentText('');
+    } else {
+      setExpandedId(item.id);
+      setCommentText('');
+      fetchComments(item.id);
+      markSeen(item);
+    }
+  };
+
+  const handleAddComment = async (feedbackId: string) => {
+    if (!commentText.trim()) return;
+    setSubmittingComment(true);
     try {
-      const res = await fetch(`/api/feedback/${selectedRequest.id}/comments`, {
+      const res = await fetch(`/api/feedback/${feedbackId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           author: 'Practice User',
           author_role: 'practice',
-          message: newComment.trim(),
+          message: commentText.trim(),
         }),
       });
-      if (res.ok) {
-        setNewComment('');
-        fetchComments(selectedRequest.id);
-      }
-    } catch (err) {
-      console.error('Failed to send comment:', err);
+      if (!res.ok) throw new Error('Failed to add comment');
+      const newComment: Comment = await res.json();
+      setComments(prev => ({
+        ...prev,
+        [feedbackId]: [...(prev[feedbackId] || []), newComment],
+      }));
+      setCommentText('');
+    } catch {
+      // silent
     } finally {
-      setSendingComment(false);
+      setSubmittingComment(false);
     }
-  }
+  };
 
-  function selectRequest(req: FeedbackItem) {
-    setSelectedRequest(req);
-    setComments([]);
-    fetchComments(req.id);
-  }
-
-  const filtered = requests.filter(r => {
-    if (filter === 'all') return true;
-    if (filter === 'open') return r.status === 'open' || r.status === 'in_progress';
-    return r.status === 'resolved' || r.status === 'closed';
-  });
-
-  if (loading) {
-    return <div style={{ padding: 40, textAlign: 'center', color: colors.gray400 }}>Loading your requests...</div>;
-  }
+  // ── Render ──
 
   return (
-    <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 140px)' }}>
-      {/* Left panel - request list */}
-      <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'white', borderRadius: 12, border: `1px solid ${colors.gray200}`, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${colors.gray200}`, display: 'flex', gap: 8 }}>
-          {(['all', 'open', 'resolved'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                background: filter === f ? colors.navy : colors.gray100,
-                color: filter === f ? 'white' : colors.gray600,
-              }}
-            >
-              {f === 'all' ? 'All' : f === 'open' ? 'Open' : 'Resolved'}
-            </button>
-          ))}
-        </div>
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          {filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: colors.gray400, fontSize: 14 }}>
-              {requests.length === 0 ? 'No requests submitted yet' : 'No matching requests'}
-            </div>
-          ) : filtered.map(req => (
-            <div
-              key={req.id}
-              onClick={() => selectRequest(req)}
-              style={{
-                padding: '14px 20px', borderBottom: `1px solid ${colors.gray100}`, cursor: 'pointer',
-                background: selectedRequest?.id === req.id ? '#F0F4FF' : 'white',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                  color: req.type === 'issue' ? '#DC3545' : '#C8973F',
-                }}>
-                  {req.type === 'issue' ? 'Issue' : 'Feature'}
-                </span>
-                <span style={{
-                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
-                  background: (STATUS_COLORS[req.status] || STATUS_COLORS.open).bg,
-                  color: (STATUS_COLORS[req.status] || STATUS_COLORS.open).text,
-                }}>
-                  {STATUS_LABELS[req.status] || req.status}
-                </span>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: colors.navy, marginBottom: 4 }}>{req.subject}</div>
-              <div style={{ fontSize: 12, color: colors.gray400 }}>
-                {new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                {' · '}{req.category}
-              </div>
-            </div>
-          ))}
-        </div>
+    <div style={{ padding: spacing['4xl'], maxWidth: 900 }}>
+      {/* Header */}
+      <div style={{ marginBottom: spacing['3xl'] }}>
+        <h1 style={{ ...typography.h1, color: colors.navy, marginBottom: spacing.sm }}>
+          My Requests
+        </h1>
+        <p style={{ ...typography.bodySmall, color: colors.gray600 }}>
+          Track your submitted issues and feature requests. Click any item to view the conversation thread.
+        </p>
       </div>
 
-      {/* Right panel - detail + comments */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'white', borderRadius: 12, border: `1px solid ${colors.gray200}`, overflow: 'hidden' }}>
-        {!selectedRequest ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.gray400, fontSize: 14 }}>
-            Select a request to view details
-          </div>
-        ) : (
-          <>
-            <div style={{ padding: 24, borderBottom: `1px solid ${colors.gray200}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <div>
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                    color: selectedRequest.type === 'issue' ? '#DC3545' : '#C8973F',
-                  }}>
-                    {selectedRequest.type === 'issue' ? 'Issue Report' : 'Feature Request'}
-                  </span>
-                  <h2 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 700, color: colors.navy }}>{selectedRequest.subject}</h2>
-                </div>
-                <span style={{
-                  fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
-                  background: (STATUS_COLORS[selectedRequest.status] || STATUS_COLORS.open).bg,
-                  color: (STATUS_COLORS[selectedRequest.status] || STATUS_COLORS.open).text,
-                }}>
-                  {STATUS_LABELS[selectedRequest.status] || selectedRequest.status}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 20, fontSize: 13, color: colors.gray400, marginBottom: 12 }}>
-                <span>Category: {selectedRequest.category}</span>
-                {selectedRequest.urgency && <span>Urgency: {selectedRequest.urgency}</span>}
-                <span>Submitted: {new Date(selectedRequest.created_at).toLocaleDateString()}</span>
-              </div>
-              <p style={{ fontSize: 14, lineHeight: 1.6, color: colors.navy, margin: 0, whiteSpace: 'pre-wrap' }}>{selectedRequest.description}</p>
-            </div>
+      {/* Error */}
+      {error && (
+        <div style={{
+          backgroundColor: colors.redPale,
+          border: `1px solid ${colors.red}`,
+          borderRadius: radii.md,
+          padding: spacing.lg,
+          marginBottom: spacing.lg,
+          color: colors.red,
+          ...typography.body,
+        }}>
+          {error}
+        </div>
+      )}
 
-            {/* Comments thread */}
-            <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: colors.navy, marginBottom: 12 }}>Conversation</h3>
-              {comments.length === 0 ? (
-                <div style={{ color: colors.gray400, fontSize: 13 }}>No comments yet. Start the conversation below.</div>
-              ) : comments.map(c => (
-                <div key={c.id} style={{
-                  marginBottom: 12, padding: 12, borderRadius: 8,
-                  background: c.author_role === 'admin' ? '#F0F4FF' : c.author_role === 'system' ? colors.gray50 : '#FAFAFA',
-                  border: `1px solid ${colors.gray200}`,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: c.author_role === 'admin' ? '#1565C0' : c.author_role === 'system' ? colors.gray400 : colors.navy }}>
-                      {c.author} {c.author_role === 'admin' ? '(Admin)' : c.author_role === 'system' ? '' : '(You)'}
-                    </span>
-                    <span style={{ fontSize: 11, color: colors.gray400 }}>
-                      {new Date(c.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: c.author_role === 'system' ? colors.gray400 : colors.navy, fontStyle: c.author_role === 'system' ? 'italic' : 'normal' }}>
-                    {c.message}
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* Loading */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: spacing['3xl'], color: colors.gray600, ...typography.body }}>
+          Loading your requests...
+        </div>
+      )}
 
-            {/* Comment input */}
-            <div style={{ padding: '12px 24px', borderTop: `1px solid ${colors.gray200}`, display: 'flex', gap: 8 }}>
-              <input
-                type="text"
-                value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendComment()}
-                placeholder="Type a message..."
+      {/* Empty state */}
+      {!loading && items.length === 0 && (
+        <div style={{
+          backgroundColor: colors.gray50,
+          border: `1px dashed ${colors.gray300}`,
+          borderRadius: radii.md,
+          padding: spacing['3xl'],
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 40, marginBottom: spacing.md }}>📬</div>
+          <p style={{ ...typography.body, color: colors.gray600 }}>
+            No requests submitted yet.
+          </p>
+          <p style={{ ...typography.bodySmall, color: colors.gray400, marginTop: spacing.sm }}>
+            Use &ldquo;Report an Issue&rdquo; or &ldquo;Request a Feature&rdquo; from the Help menu in the sidebar.
+          </p>
+        </div>
+      )}
+
+      {/* List */}
+      {!loading && items.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
+          {items.map(item => {
+            const isExpanded = expandedId === item.id;
+            const hasNew = newStatusIds.has(item.id);
+            const statusCfg = statusConfig[item.status];
+            const typeCfg = typeConfig[item.type];
+            const itemComments = comments[item.id] || [];
+
+            return (
+              <div
+                key={item.id}
                 style={{
-                  flex: 1, padding: '10px 14px', borderRadius: 8, border: `1px solid ${colors.gray200}`,
-                  fontSize: 13, fontFamily: 'inherit', outline: 'none',
-                }}
-              />
-              <button
-                onClick={sendComment}
-                disabled={sendingComment || !newComment.trim()}
-                style={{
-                  padding: '10px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  background: colors.navy, color: 'white', fontSize: 13, fontWeight: 600,
-                  fontFamily: 'inherit', opacity: sendingComment || !newComment.trim() ? 0.5 : 1,
+                  backgroundColor: colors.white,
+                  border: `1px solid ${isExpanded ? colors.blue : colors.gray200}`,
+                  borderRadius: radii.md,
+                  boxShadow: isExpanded ? shadows.md : shadows.sm,
+                  overflow: 'hidden',
+                  transition: `all ${transitions.base}`,
                 }}
               >
-                Send
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+                {/* Summary row — click to expand */}
+                <button
+                  onClick={() => handleExpand(item)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: spacing.md,
+                    padding: `${spacing.lg}px`,
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {/* Type badge */}
+                  <span style={{
+                    backgroundColor: typeCfg.bg,
+                    color: typeCfg.color,
+                    padding: `2px 10px`,
+                    borderRadius: radii.full,
+                    ...typography.caption,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}>
+                    {typeCfg.label}
+                  </span>
+
+                  {/* Status badge + notification dot */}
+                  <span style={{ position: 'relative', flexShrink: 0 }}>
+                    <span style={{
+                      backgroundColor: statusCfg.bg,
+                      color: statusCfg.color,
+                      padding: `2px 10px`,
+                      borderRadius: radii.full,
+                      ...typography.caption,
+                      fontWeight: 600,
+                    }}>
+                      {statusCfg.label}
+                    </span>
+                    {hasNew && (
+                      <span style={{
+                        position: 'absolute',
+                        top: -3,
+                        right: -3,
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: colors.red,
+                        border: `2px solid ${colors.white}`,
+                      }} />
+                    )}
+                  </span>
+
+                  {/* Subject */}
+                  <span style={{ ...typography.body, color: colors.navy, fontWeight: 600, flex: 1 }}>
+                    {item.subject}
+                  </span>
+
+                  {/* Date */}
+                  <span style={{ ...typography.caption, color: colors.gray400, flexShrink: 0 }}>
+                    {relativeTime(item.created_at)}
+                  </span>
+
+                  {/* Expand arrow */}
+                  <span style={{
+                    color: colors.gray400,
+                    fontSize: 12,
+                    transform: isExpanded ? 'rotate(180deg)' : 'none',
+                    transition: `transform ${transitions.fast}`,
+                    flexShrink: 0,
+                  }}>
+                    ▼
+                  </span>
+                </button>
+
+                {/* Expanded body */}
+                {isExpanded && (
+                  <div style={{ borderTop: `1px solid ${colors.gray200}`, padding: spacing.lg }}>
+                    {/* Meta */}
+                    <div style={{ display: 'flex', gap: spacing.lg, flexWrap: 'wrap', marginBottom: spacing.lg }}>
+                      {item.category && (
+                        <div style={{ ...typography.caption, color: colors.gray600 }}>
+                          <strong>Category:</strong> {item.category}
+                        </div>
+                      )}
+                      {item.urgency && (
+                        <div style={{ ...typography.caption, color: colors.gray600 }}>
+                          <strong>Urgency:</strong> {item.urgency}
+                        </div>
+                      )}
+                      <div style={{ ...typography.caption, color: colors.gray600 }}>
+                        <strong>Submitted:</strong> {new Date(item.created_at).toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div style={{
+                      backgroundColor: colors.gray50,
+                      border: `1px solid ${colors.gray200}`,
+                      borderRadius: radii.md,
+                      padding: spacing.md,
+                      ...typography.body,
+                      color: colors.navy,
+                      whiteSpace: 'pre-wrap',
+                      marginBottom: spacing.xl,
+                    }}>
+                      {item.description}
+                    </div>
+
+                    {/* Comments thread */}
+                    {itemComments.length > 0 && (
+                      <div style={{ marginBottom: spacing.xl }}>
+                        <div style={{ ...typography.h4, color: colors.navy, marginBottom: spacing.md }}>
+                          Conversation
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+                          {itemComments.map(c => {
+                            const isAdmin = c.author_role === 'admin';
+                            const isSystem = c.author === 'System';
+                            if (isSystem) {
+                              return (
+                                <div key={c.id} style={{
+                                  textAlign: 'center',
+                                  ...typography.caption,
+                                  color: colors.gray400,
+                                  fontStyle: 'italic',
+                                }}>
+                                  {c.message} · {relativeTime(c.created_at)}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                key={c.id}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: isAdmin ? 'flex-start' : 'flex-end',
+                                }}
+                              >
+                                <div style={{
+                                  maxWidth: '75%',
+                                  backgroundColor: isAdmin ? colors.bluePale : colors.goldPale,
+                                  border: `1px solid ${isAdmin ? '#C3D8FF' : '#F0D8A0'}`,
+                                  borderRadius: radii.md,
+                                  padding: `${spacing.sm}px ${spacing.md}px`,
+                                }}>
+                                  <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center', marginBottom: 4 }}>
+                                    <span style={{ ...typography.caption, fontWeight: 700, color: isAdmin ? colors.blue : colors.navy }}>
+                                      {isAdmin ? 'KairoLogic Support' : c.author}
+                                    </span>
+                                    <span style={{ ...typography.caption, color: colors.gray400 }}>
+                                      {relativeTime(c.created_at)}
+                                    </span>
+                                  </div>
+                                  <p style={{ ...typography.bodySmall, color: colors.navy, margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {c.message}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Add comment */}
+                    <div>
+                      <div style={{ ...typography.h4, color: colors.navy, marginBottom: spacing.sm }}>
+                        Add a reply
+                      </div>
+                      <textarea
+                        value={commentText}
+                        onChange={e => setCommentText(e.target.value)}
+                        placeholder="Type your message..."
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: `1px solid ${colors.gray200}`,
+                          borderRadius: radii.md,
+                          fontSize: 13,
+                          fontFamily: 'inherit',
+                          color: colors.navy,
+                          backgroundColor: colors.gray50,
+                          resize: 'vertical',
+                          boxSizing: 'border-box',
+                          marginBottom: spacing.sm,
+                        }}
+                      />
+                      <button
+                        onClick={() => handleAddComment(item.id)}
+                        disabled={submittingComment || !commentText.trim()}
+                        style={{
+                          padding: '9px 20px',
+                          backgroundColor: colors.navy,
+                          color: colors.white,
+                          border: 'none',
+                          borderRadius: radii.md,
+                          ...typography.body,
+                          fontWeight: 600,
+                          cursor: submittingComment || !commentText.trim() ? 'not-allowed' : 'pointer',
+                          opacity: submittingComment || !commentText.trim() ? 0.5 : 1,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {submittingComment ? 'Sending...' : 'Send Reply'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

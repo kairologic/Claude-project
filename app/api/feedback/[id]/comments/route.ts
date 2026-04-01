@@ -1,90 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabaseHeaders = {
+  'apikey': SUPABASE_ANON,
+  'Authorization': `Bearer ${SUPABASE_ANON}`,
+  'Content-Type': 'application/json',
+};
 
 /**
  * GET /api/feedback/[id]/comments
- * Fetch all comments for a feedback item
+ * Fetch all comments for a feedback item, ordered by created_at asc.
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  try {
-    const { id } = await params;
-    const supabase = getSupabase();
+  const { id } = params;
 
-    const { data, error } = await supabase
-      .from('feedback_comments')
-      .select('*')
-      .eq('feedback_id', id)
-      .order('created_at', { ascending: true });
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/feedback_comments?feedback_id=eq.${id}&order=created_at.asc`,
+    { headers: supabaseHeaders }
+  );
 
-    if (error) {
-      console.error('[Comments] Fetch error:', error);
-      return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
-    }
-
-    return NextResponse.json({ comments: data || [] });
-  } catch (err) {
-    console.error('[Comments] Error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`[Comments] GET failed (${res.status}): ${text}`);
+    return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
   }
+
+  const comments = await res.json();
+  return NextResponse.json(comments);
 }
 
 /**
  * POST /api/feedback/[id]/comments
- * Add a new comment to a feedback item
+ * Add a new comment to a feedback item.
+ * Body: { author: string, author_role: 'practice' | 'admin', message: string }
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
+  const { id } = params;
+
+  let body: { author?: string; author_role?: string; message?: string };
   try {
-    const { id } = await params;
-    const body = await request.json();
-    const { author, author_role, message } = body;
-
-    if (!author || !author_role || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields: author, author_role, message' },
-        { status: 400 }
-      );
-    }
-
-    if (!['practice', 'admin', 'system'].includes(author_role)) {
-      return NextResponse.json(
-        { error: 'author_role must be practice, admin, or system' },
-        { status: 400 }
-      );
-    }
-
-    const supabase = getSupabase();
-
-    const { data, error } = await supabase
-      .from('feedback_comments')
-      .insert({
-        feedback_id: id,
-        author,
-        author_role,
-        message,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('[Comments] Insert error:', error);
-      return NextResponse.json({ error: 'Failed to add comment' }, { status: 500 });
-    }
-
-    // Also update the feedback updated_at timestamp
-    await supabase
-      .from('feedback')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', id);
-
-    return NextResponse.json({ comment: data }, { status: 201 });
-  } catch (err) {
-    console.error('[Comments] Error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+
+  const { author, author_role, message } = body;
+
+  if (!author || !author_role || !message) {
+    return NextResponse.json({ error: 'author, author_role, and message are required' }, { status: 400 });
+  }
+
+  if (!['practice', 'admin'].includes(author_role)) {
+    return NextResponse.json({ error: 'author_role must be practice or admin' }, { status: 400 });
+  }
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/feedback_comments`, {
+    method: 'POST',
+    headers: { ...supabaseHeaders, 'Prefer': 'return=representation' },
+    body: JSON.stringify({ feedback_id: id, author, author_role, message }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`[Comments] POST failed (${res.status}): ${text}`);
+    return NextResponse.json({ error: 'Failed to add comment' }, { status: 500 });
+  }
+
+  const rows = await res.json();
+  return NextResponse.json(Array.isArray(rows) ? rows[0] : rows, { status: 201 });
 }

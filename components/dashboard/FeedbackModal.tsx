@@ -64,6 +64,7 @@ export default function FeedbackModal({
   const [email, setEmail] = useState(userEmail || '');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [feedbackId, setFeedbackId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -115,6 +116,8 @@ export default function FeedbackModal({
         throw new Error(data.error || 'Failed to submit');
       }
 
+      const data = await res.json().catch(() => ({}));
+      setFeedbackId(data.feedbackId || null);
       setSubmitted(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -335,6 +338,15 @@ export default function FeedbackModal({
                   <br />
                   We&apos;ll follow up at <strong>{email}</strong> if we need more details.
                 </>
+              )}
+              <br /><br />
+              <span style={{ color: colors.blue, fontWeight: 600 }}>
+                Track the status and reply in &ldquo;My Requests&rdquo; from the sidebar.
+              </span>
+              {feedbackId && (
+                <span style={{ display: 'block', marginTop: 6, fontSize: 11, color: colors.gray400, fontFamily: 'monospace' }}>
+                  Ref: {feedbackId}
+                </span>
               )}
             </div>
             <button style={s.doneBtn} onClick={onClose}>

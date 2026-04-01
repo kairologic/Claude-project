@@ -79,19 +79,21 @@ export default function Sidebar({
   }, []);
 
   const navItems = [
-    { id: 'dashboard', path: '', icon: '📊', label: 'Dashboard' },
-    { id: 'workflows', path: '/workflows', icon: '⚙', label: 'Workflows' },
+    { id: 'dashboard', path: '', icon: '◉', label: 'Dashboard' },
+    { id: 'workflows', path: '/workflows', icon: '⚡', label: 'Workflows' },
     { id: 'roster', path: '/roster', icon: '👥', label: 'Provider roster' },
     { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
     { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
     { id: 'search', path: '/search', icon: '🔍', label: 'NL Search' },
-    { id: 'reports', path: '/reports', icon: '📈', label: 'Reports' },
+    { id: 'reports', path: '/reports', icon: '📊', label: 'Reports' },
+    { id: 'blog', path: '/blog', icon: '📝', label: 'Blog' },
+    { id: 'requests', path: '/requests', icon: '💬', label: 'My Requests' },
     { id: 'settings', path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
   const comingSoon = [
-    { icon: '📋', label: 'Credentialing' },
+    { icon: '🔐', label: 'Credentialing' },
   ];
 
   function getActiveId(): string {
@@ -105,8 +107,9 @@ export default function Sidebar({
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
     if (sub.startsWith('/search')) return 'search';
     if (sub.startsWith('/reports')) return 'reports';
-    if (sub.startsWith('/settings')) return 'settings';
+    if (sub.startsWith('/blog')) return 'blog';
     if (sub.startsWith('/requests')) return 'requests';
+    if (sub.startsWith('/settings')) return 'settings';
     return 'dashboard';
   }
 
@@ -141,9 +144,9 @@ export default function Sidebar({
         >
           <div style={styles.siteName}>{currentPractice?.practice_name || 'Select practice'}</div>
           <div style={styles.siteMeta}>
-            {currentPractice?.city}, {currentPractice?.state} Â· {currentPractice?.provider_count || 0} providers
+            {currentPractice?.city}, {currentPractice?.state} · {currentPractice?.provider_count || 0} providers
           </div>
-          <span style={styles.siteArrow}>â¼</span>
+          <span style={styles.siteArrow}>▼</span>
         </button>
         {siteOpen && (
           <div style={styles.dropdown} role="menu" aria-label="Practice sites">
@@ -160,7 +163,7 @@ export default function Sidebar({
                   fontWeight: p.practice_id === currentPracticeId ? 600 : 400,
                 }}
               >
-                {p.practice_id === currentPracticeId && 'â '}{p.practice_name}
+                {p.practice_id === currentPracticeId && '✓ '}{p.practice_name}
               </button>
             ))}
             <button style={styles.ddAdd} role="menuitem">+ Add practice site</button>
@@ -239,7 +242,7 @@ export default function Sidebar({
             <div style={styles.userName}>{userName}</div>
             <div style={styles.userRoleText}>{userRole}</div>
           </div>
-          <span style={styles.userArrow}>â²</span>
+          <span style={styles.userArrow}>▲</span>
         </button>
         {userOpen && (
           <div style={styles.popupUp} role="menu">
