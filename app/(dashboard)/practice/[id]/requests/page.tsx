@@ -213,7 +213,7 @@ export default function MyRequestsPage() {
                   {STATUS_LABELS[selectedRequest.status] || selectedRequest.status}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: 20, fontSize: 13, color: colors.gray500, marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 20, fontSize: 13, color: colors.gray400, marginBottom: 12 }}>
                 <span>Category: {selectedRequest.category}</span>
                 {selectedRequest.urgency && <span>Urgency: {selectedRequest.urgency}</span>}
                 <span>Submitted: {new Date(selectedRequest.created_at).toLocaleDateString()}</span>
@@ -240,7 +240,7 @@ export default function MyRequestsPage() {
                       {new Date(c.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, color: c.author_role === 'system' ? colors.gray500 : colors.navy, fontStyle: c.author_role === 'system' ? 'italic' : 'normal' }}>
+                  <div style={{ fontSize: 13, color: c.author_role === 'system' ? colors.gray400 : colors.navy, fontStyle: c.author_role === 'system' ? 'italic' : 'normal' }}>
                     {c.message}
                   </div>
                 </div>
