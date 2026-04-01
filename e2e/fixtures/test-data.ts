@@ -29,6 +29,7 @@ export const URLS = {
   workflows: (id: string) => `/practice/${id}/workflows`,
   roster: (id: string) => `/practice/${id}/roster`,
   alerts: (id: string) => `/practice/${id}/alerts`,
+  requests: (id: string) => `/practice/${id}/requests`,
   payerDirectory: (id: string) => `/practice/${id}/payer-directory`,
   settings: (id: string) => `/practice/${id}/settings`,
   help: (id: string) => `/practice/${id}/help`,
@@ -45,6 +46,8 @@ export const API = {
   settingsTeam: '/api/settings/team',
   alerts: '/api/alerts/mismatch',
   feedback: '/api/feedback',
+  feedbackStatus: (id: string) => `/api/feedback/${id}/status`,
+  feedbackComments: (id: string) => `/api/feedback/${id}/comments`,
   search: '/api/search/query',
   reports: '/api/reports/generate',
 };

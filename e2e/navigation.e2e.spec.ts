@@ -30,6 +30,7 @@ test.describe('UC-NAV: Navigation', () => {
       'roster',
       'payer-directory',
       'alerts',
+      'requests',
       'reports',
       'settings',
     ];
