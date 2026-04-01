@@ -64,7 +64,7 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setPlaceholderIndex(prev => (prev + 1) % placeholderQueries.length);
+      setPlaceholderIndex((prev) => (prev + 1) % placeholderQueries.length);
     }, 3500);
     return () => clearInterval(interval);
   }, []);
@@ -92,47 +92,50 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
     setError(null);
   }
 
-  const handleSearch = useCallback(async (q: string) => {
-    if (!q.trim()) return;
-    setQuery(q);
-    setLoading(true);
-    setError(null);
-    setResults(null);
+  const handleSearch = useCallback(
+    async (q: string) => {
+      if (!q.trim()) return;
+      setQuery(q);
+      setLoading(true);
+      setError(null);
+      setResults(null);
 
-    try {
-      const response = await fetch('/api/search/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ practice_id: practiceId, query: q }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Search failed');
-      }
-
-      const data = await response.json();
-      if (data.type === 'help') {
-        setResults({
-          type: 'help',
-          answer: data.answer,
-          relatedQueries: data.relatedQueries || [],
+      try {
+        const response = await fetch('/api/search/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ practice_id: practiceId, query: q }),
         });
-      } else {
-        setResults({
-          type: 'data',
-          explanation: data.explanation,
-          data: data.data || [],
-          rowCount: data.rowCount,
-          columns: data.columns || [],
-        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Search failed');
+        }
+
+        const data = await response.json();
+        if (data.type === 'help') {
+          setResults({
+            type: 'help',
+            answer: data.answer,
+            relatedQueries: data.relatedQueries || [],
+          });
+        } else {
+          setResults({
+            type: 'data',
+            explanation: data.explanation,
+            data: data.data || [],
+            rowCount: data.rowCount,
+            columns: data.columns || [],
+          });
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, [practiceId]);
+    },
+    [practiceId],
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,12 +146,14 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
     if (!results || results.type !== 'data') return;
     const csv = [
       results.columns.join(','),
-      ...results.data.map(row =>
-        results.columns.map(col => {
-          const val = row[col];
-          const str = val == null ? '' : typeof val === 'string' ? val : JSON.stringify(val);
-          return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-        }).join(',')
+      ...results.data.map((row) =>
+        results.columns
+          .map((col) => {
+            const val = row[col];
+            const str = val == null ? '' : typeof val === 'string' ? val : JSON.stringify(val);
+            return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+          })
+          .join(','),
       ),
     ].join('\n');
 
@@ -164,13 +169,24 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
   // Simple markdown→HTML for help responses
   function renderMarkdown(md: string): string {
     return md
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 4px;font-size:13px;font-weight:700;">$1</h4>')
-      .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 6px;font-size:14px;font-weight:700;">$1</h3>')
+      .replace(
+        /^### (.+)$/gm,
+        '<h4 style="margin:12px 0 4px;font-size:13px;font-weight:700;">$1</h4>',
+      )
+      .replace(
+        /^## (.+)$/gm,
+        '<h3 style="margin:14px 0 6px;font-size:14px;font-weight:700;">$1</h3>',
+      )
       .replace(/^- (.+)$/gm, '<li style="margin:2px 0;padding-left:4px;">$1</li>')
-      .replace(/(<li.*<\/li>\n?)+/g, (m) => `<ul style="margin:6px 0 6px 16px;padding:0;list-style:disc;">${m}</ul>`)
+      .replace(
+        /(<li.*<\/li>\n?)+/g,
+        (m) => `<ul style="margin:6px 0 6px 16px;padding:0;list-style:disc;">${m}</ul>`,
+      )
       .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
   }
@@ -194,7 +210,7 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
       {/* Modal */}
       {isOpen && (
         <div style={styles.backdrop} onClick={handleClose}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             {/* Search input */}
             <form onSubmit={handleSubmit} style={styles.inputRow}>
               <span style={{ fontSize: 16, flexShrink: 0, marginRight: 10 }}>🔍</span>
@@ -202,20 +218,24 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={e => setQuery(e.target.value)}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder={placeholderQueries[placeholderIndex]}
                 style={styles.input}
                 autoFocus
               />
-              {loading && (
-                <div style={styles.spinner} />
-              )}
+              {loading && <div style={styles.spinner} />}
               {query && !loading && (
                 <button
                   type="button"
-                  onClick={() => { setQuery(''); setResults(null); setError(null); }}
+                  onClick={() => {
+                    setQuery('');
+                    setResults(null);
+                    setError(null);
+                  }}
                   style={styles.clearBtn}
-                >✕</button>
+                >
+                  ✕
+                </button>
               )}
             </form>
 
@@ -227,24 +247,18 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                   <div style={styles.sectionLabel}>Ask about your data</div>
                   <div style={styles.suggestionsGrid}>
                     {suggestedDataQueries.map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSearch(q)}
-                        style={styles.suggestionChip}
-                      >
-                        <span style={{ marginRight: 6, opacity: 0.5 }}>📊</span>{q}
+                      <button key={i} onClick={() => handleSearch(q)} style={styles.suggestionChip}>
+                        <span style={{ marginRight: 6, opacity: 0.5 }}>📊</span>
+                        {q}
                       </button>
                     ))}
                   </div>
                   <div style={{ ...styles.sectionLabel, marginTop: 14 }}>Get help</div>
                   <div style={styles.suggestionsGrid}>
                     {suggestedHelpQueries.map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSearch(q)}
-                        style={styles.suggestionChip}
-                      >
-                        <span style={{ marginRight: 6, opacity: 0.5 }}>💡</span>{q}
+                      <button key={i} onClick={() => handleSearch(q)} style={styles.suggestionChip}>
+                        <span style={{ marginRight: 6, opacity: 0.5 }}>💡</span>
+                        {q}
                       </button>
                     ))}
                   </div>
@@ -278,7 +292,9 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                   />
                   {results.relatedQueries && results.relatedQueries.length > 0 && (
                     <div style={styles.relatedArea}>
-                      <div style={{ ...styles.sectionLabel, marginBottom: 6 }}>Related questions</div>
+                      <div style={{ ...styles.sectionLabel, marginBottom: 6 }}>
+                        Related questions
+                      </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {results.relatedQueries.map((q, i) => (
                           <button
@@ -305,7 +321,9 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                   </div>
                   <div style={styles.rowCount}>
                     {results.rowCount} result{results.rowCount !== 1 ? 's' : ''}
-                    <button onClick={downloadCSV} style={styles.exportBtn}>⬇ CSV</button>
+                    <button onClick={downloadCSV} style={styles.exportBtn}>
+                      ⬇ CSV
+                    </button>
                   </div>
 
                   {/* Table */}
@@ -314,17 +332,23 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                       <table style={styles.table}>
                         <thead>
                           <tr>
-                            {results.columns.map(col => (
-                              <th key={col} style={styles.th}>{col.replace(/_/g, ' ')}</th>
+                            {results.columns.map((col) => (
+                              <th key={col} style={styles.th}>
+                                {col.replace(/_/g, ' ')}
+                              </th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {results.data.slice(0, 50).map((row, i) => (
                             <tr key={i} style={i % 2 === 0 ? {} : { background: colors.gray100 }}>
-                              {results.columns.map(col => (
+                              {results.columns.map((col) => (
                                 <td key={col} style={styles.td}>
-                                  {row[col] == null ? '—' : typeof row[col] === 'object' ? JSON.stringify(row[col]) : String(row[col])}
+                                  {row[col] == null
+                                    ? '—'
+                                    : typeof row[col] === 'object'
+                                      ? JSON.stringify(row[col])
+                                      : String(row[col])}
                                 </td>
                               ))}
                             </tr>
@@ -332,7 +356,14 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                         </tbody>
                       </table>
                       {results.data.length > 50 && (
-                        <div style={{ padding: '8px 12px', fontSize: 11, color: colors.gray400, textAlign: 'center' }}>
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            fontSize: 11,
+                            color: colors.gray400,
+                            textAlign: 'center',
+                          }}
+                        >
                           Showing 50 of {results.rowCount} rows. Download CSV for full results.
                         </div>
                       )}
@@ -340,7 +371,14 @@ export default function NLSearchModal({ practiceId }: NLSearchModalProps) {
                   )}
 
                   {results.data.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: 20, fontSize: 13, color: colors.gray400 }}>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: 20,
+                        fontSize: 13,
+                        color: colors.gray400,
+                      }}
+                    >
                       No matching records found.
                     </div>
                   )}
@@ -378,7 +416,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: colors.gray400,
     transition: 'border-color .15s, background .15s',
-    minWidth: 220,
+    minWidth: 360,
   },
   triggerLabel: {
     flex: 1,
