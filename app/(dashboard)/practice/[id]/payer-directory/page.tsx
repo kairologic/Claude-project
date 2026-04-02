@@ -97,8 +97,7 @@ export default async function PayerDirectoryPage({ params }: { params: { id: str
         admin
           .from('payer_directory_mismatches')
           .select('npi, payer_code, field_name, mismatch_type, nppes_value, payer_value, priority')
-          .eq('practice_website_id', practiceId)
-          .or(`npi.in.(${npiList.join(',')}),npi.eq.PRACTICE`),
+          .in('npi', npiList),
         [],
       ),
       safeQuery(
