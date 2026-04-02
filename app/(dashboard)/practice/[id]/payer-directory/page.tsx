@@ -28,6 +28,7 @@ export default async function PayerDirectoryPage({ params }: { params: { id: str
         .from('practice_providers')
         .select('npi, provider_name, roster_status')
         .eq('practice_website_id', practiceId)
+        .eq('roster_status', 'active')
         .order('provider_name'),
       [],
     ),
