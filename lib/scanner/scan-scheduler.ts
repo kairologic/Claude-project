@@ -27,9 +27,18 @@ import {
   saveExtractionToProviderSites,
   saveExtractionToPracticeProviders,
 } from '../address/scan-plugin';
-import { triggerWorkflowsForPractice, triggerDepartureWorkflow, triggerComplianceWorkflows } from './trigger-workflows';
+import {
+  triggerWorkflowsForPractice,
+  triggerDepartureWorkflow,
+  triggerComplianceWorkflows,
+} from './trigger-workflows';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
-import { runComplianceChecks, getActionableFindings, type ComplianceScanResult } from './compliance-checks';
+import {
+  runComplianceChecks,
+  getActionableFindings,
+  type ComplianceScanResult,
+} from './compliance-checks';
+import { extractProvidersFromWebsite, type ExtractedProvider } from '../crawl/provider-extractor';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -56,10 +65,11 @@ export interface ScanResult {
   success: boolean;
   crawl_strategy: string;
   extraction: ExtractionSummary | null;
-  providers_detected: string[];     // provider names found on site
+  providers_detected: string[]; // provider names found on site
   providers_matched: MatchedProvider[];
-  payer_extraction: PayerExtractionResult | null;  // #111: insurance accepted on website
-  compliance_scan: ComplianceScanResult | null;     // WF6: compliance check results
+  providers_extracted: ExtractedProvider[]; // Phase 1 extraction results
+  payer_extraction: PayerExtractionResult | null; // #111: insurance accepted on website
+  compliance_scan: ComplianceScanResult | null; // WF6: compliance check results
   scan_duration_ms: number;
   error?: string;
 }
@@ -85,7 +95,8 @@ export interface SchedulerResult {
 // ── Supabase Client ──────────────────────────────────────
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -179,7 +190,7 @@ async function matchProviders(
 
   // Verify each NPI against providers table
   if (pageNpis.length > 0 && pageNpis.length <= 100) {
-    const npiList = pageNpis.map(n => `"${n}"`).join(',');
+    const npiList = pageNpis.map((n) => `"${n}"`).join(',');
     const providers: any[] = await db(
       `providers?npi=in.(${npiList})&entity_type_code=eq.1&deactivation_date=is.null&select=npi,first_name,last_name`,
     );
@@ -199,7 +210,7 @@ async function matchProviders(
 
   // Strategy 2: Name matching against state providers
   if (state && names.length > 0 && names.length <= 50) {
-   const cleanNames = names.filter(isValidProviderName);
+    const cleanNames = names.filter(isValidProviderName);
     for (const name of cleanNames) {
       // Parse name into parts
       const parts = name.replace(/^Dr\.?\s*/i, '').split(/\s+/);
@@ -207,7 +218,9 @@ async function matchProviders(
 
       const lastName = parts[parts.length - 1];
       // Remove credential suffixes
-      const cleanLast = lastName.replace(/,?\s*(MD|DO|NP|PA|DPM|DDS|DMD|OD|PhD|APRN|FNP|DNP)$/i, '').trim();
+      const cleanLast = lastName
+        .replace(/,?\s*(MD|DO|NP|PA|DPM|DDS|DMD|OD|PhD|APRN|FNP|DNP)$/i, '')
+        .trim();
       if (!cleanLast || cleanLast.length < 2) continue;
 
       const encoded = encodeURIComponent(cleanLast.toLowerCase());
@@ -221,10 +234,7 @@ async function matchProviders(
         // Check first name similarity
         const firstName = parts[0];
         const candidateFirst = c.first_name || '';
-        const sim = jaroWinklerSimple(
-          firstName.toLowerCase(),
-          candidateFirst.toLowerCase(),
-        );
+        const sim = jaroWinklerSimple(firstName.toLowerCase(), candidateFirst.toLowerCase());
 
         if (sim >= 0.85) {
           seen.add(c.npi);
@@ -232,7 +242,7 @@ async function matchProviders(
             npi: c.npi,
             name: `${c.first_name || ''} ${c.last_name || ''}`.trim(),
             match_method: 'name_fuzzy',
-            confidence: parseFloat((sim * 0.90).toFixed(2)), // cap at 0.90 for fuzzy
+            confidence: parseFloat((sim * 0.9).toFixed(2)), // cap at 0.90 for fuzzy
           });
         }
       }
@@ -260,8 +270,8 @@ async function updatePracticeProviders(
     `practice_providers?practice_website_id=eq.${practiceWebsiteId}&select=id,npi,status,last_seen_at`,
   );
 
-  const currentNpis = new Set(current.map(c => c.npi));
-  const detectedNpis = new Set(matchedProviders.map(m => m.npi));
+  const currentNpis = new Set(current.map((c) => c.npi));
+  const detectedNpis = new Set(matchedProviders.map((m) => m.npi));
   const now = new Date().toISOString();
 
   // 1. New detections: provider found on site but not in practice_providers
@@ -284,7 +294,7 @@ async function updatePracticeProviders(
       newAssociations++;
     } else {
       // Update last_seen_at for existing associations
-      const existing = current.find(c => c.npi === provider.npi);
+      const existing = current.find((c) => c.npi === provider.npi);
       if (existing) {
         await db(`practice_providers?id=eq.${existing.id}`, {
           method: 'PATCH',
@@ -323,11 +333,7 @@ async function updatePracticeProviders(
 
         // WF4: Auto-trigger release workflow for departed provider
         try {
-          await triggerDepartureWorkflow(
-            practiceWebsiteId,
-            assoc.npi,
-            assoc.provider_name || '',
-          );
+          await triggerDepartureWorkflow(practiceWebsiteId, assoc.npi, assoc.provider_name || '');
         } catch (err) {
           console.warn(`[Scanner] Failed to trigger departure workflow for NPI ${assoc.npi}:`, err);
         }
@@ -358,9 +364,7 @@ async function updatePracticeProviders(
  * Run a complete scan cycle for one practice website:
  * crawl → extract address → extract providers → match → update associations
  */
-export async function scanSite(
-  site: PracticeWebsite,
-): Promise<ScanResult> {
+export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
   const startTime = Date.now();
   const result: ScanResult = {
     practice_website_id: site.id,
@@ -370,6 +374,7 @@ export async function scanSite(
     extraction: null,
     providers_detected: [],
     providers_matched: [],
+    providers_extracted: [],
     payer_extraction: null,
     compliance_scan: null,
     scan_duration_ms: 0,
@@ -402,22 +407,54 @@ export async function scanSite(
     }
 
     // 2. Run address extraction (with sub-page discovery)
-    const extraction = await extractAddressFromSite(
-      site.url,
-      crawl.html,
-      crawl.text,
-      { maxSubPages: 3 },
-    );
+    const extraction = await extractAddressFromSite(site.url, crawl.html, crawl.text, {
+      maxSubPages: 3,
+    });
     result.extraction = extraction;
     result.providers_detected = extraction.provider_names;
 
     // 3. Match detected providers against providers table
-    const matched = await matchProviders(
-      extraction.provider_names,
-      crawl.html,
-      site.state,
-    );
+    const matched = await matchProviders(extraction.provider_names, crawl.html, site.state);
     result.providers_matched = matched;
+
+    // 3a. Phase 1 provider extraction — populate web_specialty from website
+    try {
+      const extraction_phase1 = await extractProvidersFromWebsite(site.url, {
+        timeout: 15000,
+        maxPages: 3,
+      });
+      result.providers_extracted = extraction_phase1.providers;
+
+      if (extraction_phase1.providers.length > 0) {
+        console.log(
+          `[Scanner] Phase 1 extraction: ${extraction_phase1.providers.length} providers with specialties`,
+        );
+
+        // Update web_specialty for matched providers in practice_providers
+        for (const extracted of extraction_phase1.providers) {
+          if (extracted.specialty) {
+            // Try to match by name against existing practice_providers
+            const matchedNpi = result.providers_matched.find((m) =>
+              m.name.toLowerCase().includes(extracted.name.split(' ').pop()?.toLowerCase() || ''),
+            );
+            if (matchedNpi) {
+              await db(
+                `practice_providers?practice_website_id=eq.${site.id}&npi=eq.${matchedNpi.npi}`,
+                {
+                  method: 'PATCH',
+                  body: JSON.stringify({
+                    web_specialty: extracted.specialty,
+                    updated_at: new Date().toISOString(),
+                  }),
+                },
+              );
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Phase 1 extraction failed for ${site.url}:`, err);
+    }
 
     // 3b. Extract accepted payers from website (#111)
     try {
@@ -427,7 +464,7 @@ export async function scanSite(
       if (payerResult.accepted_payers.length > 0) {
         console.log(
           `[Scanner] Payer acceptance: ${payerResult.accepted_payers.join(', ')} ` +
-          `(${payerResult.confidence} confidence, source: ${payerResult.extraction_source})`,
+            `(${payerResult.confidence} confidence, source: ${payerResult.extraction_source})`,
         );
 
         // Write accepted_payers to practice_websites
@@ -464,7 +501,7 @@ export async function scanSite(
       if (complianceResult.failing_count > 0 || complianceResult.warning_count > 0) {
         console.log(
           `[Scanner] Compliance: ${complianceResult.composite_score}/100 (${complianceResult.risk_level}) — ` +
-          `${complianceResult.failing_count} fails, ${complianceResult.warning_count} warns`,
+            `${complianceResult.failing_count} fails, ${complianceResult.warning_count} warns`,
         );
       }
     } catch (err) {
@@ -488,24 +525,24 @@ export async function scanSite(
     // Some providers (e.g., matched by NPI-on-page) may not have gotten
     // the address from saveExtractionToPracticeProviders if the extractor
     // didn't produce a best_address. Use the practice-level address as fallback.
-    const practiceAddress = extraction.best_address?.address?.full_address
-      || (extraction.all_addresses?.length > 0 ? extraction.all_addresses[0]?.address?.full_address : null);
+    const practiceAddress =
+      extraction.best_address?.address?.full_address ||
+      (extraction.all_addresses?.length > 0
+        ? extraction.all_addresses[0]?.address?.full_address
+        : null);
 
     if (practiceAddress) {
       const practicePhone = extraction.phone?.phone || null;
       try {
         // Update providers that still have no web_address
-        await db(
-          `practice_providers?practice_website_id=eq.${site.id}&web_address=is.null`,
-          {
-            method: 'PATCH',
-            body: JSON.stringify({
-              web_address: practiceAddress,
-              ...(practicePhone ? { web_phone: practicePhone } : {}),
-              updated_at: new Date().toISOString(),
-            }),
-          },
-        );
+        await db(`practice_providers?practice_website_id=eq.${site.id}&web_address=is.null`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            web_address: practiceAddress,
+            ...(practicePhone ? { web_phone: practicePhone } : {}),
+            updated_at: new Date().toISOString(),
+          }),
+        });
       } catch (err) {
         console.warn(`[Scanner] Failed to backfill web_address for practice ${site.id}:`, err);
       }
@@ -522,10 +559,7 @@ export async function scanSite(
 
 // ── Update Scan Metadata ─────────────────────────────────
 
-async function updateScanMetadata(
-  site: PracticeWebsite,
-  result: ScanResult,
-): Promise<void> {
+async function updateScanMetadata(site: PracticeWebsite, result: ScanResult): Promise<void> {
   const now = new Date().toISOString();
 
   if (result.success) {
@@ -571,17 +605,17 @@ async function updateScanMetadata(
       );
 
       checksTotal = providers.length;
-      checksPassed = providers.filter(p => p.active_mismatch_count === 0 && !p.has_license_issue).length;
-      checksFailed = providers.filter(p => p.active_mismatch_count > 0 || p.has_license_issue).length;
+      checksPassed = providers.filter(
+        (p) => p.active_mismatch_count === 0 && !p.has_license_issue,
+      ).length;
+      checksFailed = providers.filter(
+        (p) => p.active_mismatch_count > 0 || p.has_license_issue,
+      ).length;
 
       // Score: percentage of providers with clean data (0-100)
-      compositeScore = checksTotal > 0
-        ? Math.round((checksPassed / checksTotal) * 100)
-        : 100;
+      compositeScore = checksTotal > 0 ? Math.round((checksPassed / checksTotal) * 100) : 100;
 
-      riskLevel = compositeScore >= 80 ? 'Low'
-        : compositeScore >= 50 ? 'Medium'
-        : 'High';
+      riskLevel = compositeScore >= 80 ? 'Low' : compositeScore >= 50 ? 'Medium' : 'High';
     } catch (err) {
       console.warn(`[Scanner] Failed to compute scan scores for practice ${site.id}:`, err);
     }
@@ -631,7 +665,7 @@ async function updateScanMetadata(
         if (actionable.length > 0) {
           const compWfResult = await triggerComplianceWorkflows(
             site.id,
-            actionable.map(f => ({
+            actionable.map((f) => ({
               check_id: f.id,
               name: f.name,
               status: f.status as 'fail' | 'warn',
@@ -649,7 +683,10 @@ async function updateScanMetadata(
           }
         }
       } catch (err) {
-        console.warn(`[Scanner] Failed to trigger compliance workflows for practice ${site.id}:`, err);
+        console.warn(
+          `[Scanner] Failed to trigger compliance workflows for practice ${site.id}:`,
+          err,
+        );
       }
     }
   }
@@ -665,20 +702,16 @@ async function updateScanMetadata(
  * @param options.dryRun - Crawl and extract but don't write to DB
  * @param options.concurrency - Max parallel scans (default 3)
  */
-export async function runScheduler(options: {
-  limit?: number;
-  forceAll?: boolean;
-  dryRun?: boolean;
-  concurrency?: number;
-  onProgress?: (scanned: number, total: number) => void;
-} = {}): Promise<SchedulerResult> {
-  const {
-    limit = 50,
-    forceAll = false,
-    dryRun = false,
-    concurrency = 5,
-    onProgress,
-  } = options;
+export async function runScheduler(
+  options: {
+    limit?: number;
+    forceAll?: boolean;
+    dryRun?: boolean;
+    concurrency?: number;
+    onProgress?: (scanned: number, total: number) => void;
+  } = {},
+): Promise<SchedulerResult> {
+  const { limit = 50, forceAll = false, dryRun = false, concurrency = 5, onProgress } = options;
 
   const startTime = Date.now();
 
@@ -688,9 +721,13 @@ export async function runScheduler(options: {
   if (sites.length === 0) {
     console.log('[Scheduler] No sites due for scanning.');
     return {
-      sites_scanned: 0, sites_succeeded: 0, sites_failed: 0,
-      providers_detected: 0, providers_matched: 0,
-      new_associations: 0, departures_detected: 0,
+      sites_scanned: 0,
+      sites_succeeded: 0,
+      sites_failed: 0,
+      providers_detected: 0,
+      providers_matched: 0,
+      new_associations: 0,
+      departures_detected: 0,
       total_duration_ms: Date.now() - startTime,
     };
   }
@@ -770,7 +807,10 @@ function jaroWinklerSimple(s1: string, s2: string): number {
     const hi = Math.min(i + matchWindow + 1, s2.length);
     for (let j = lo; j < hi; j++) {
       if (s2m[j] || s1[i] !== s2[j]) continue;
-      s1m[i] = true; s2m[j] = true; matches++; break;
+      s1m[i] = true;
+      s2m[j] = true;
+      matches++;
+      break;
     }
   }
   if (matches === 0) return 0.0;
@@ -783,10 +823,12 @@ function jaroWinklerSimple(s1: string, s2: string): number {
     k++;
   }
 
-  const jaro = (matches / s1.length + matches / s2.length + (matches - transpositions / 2) / matches) / 3;
+  const jaro =
+    (matches / s1.length + matches / s2.length + (matches - transpositions / 2) / matches) / 3;
   let prefix = 0;
   for (let i = 0; i < Math.min(4, s1.length, s2.length); i++) {
-    if (s1[i] === s2[i]) prefix++; else break;
+    if (s1[i] === s2[i]) prefix++;
+    else break;
   }
   return jaro + prefix * 0.1 * (1 - jaro);
 }
