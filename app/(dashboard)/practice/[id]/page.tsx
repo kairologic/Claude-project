@@ -23,21 +23,10 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
   const rawName = auth?.user?.user_metadata?.name || auth?.user?.email?.split('@')[0] || 'there';
   const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
-  // Parallel query 1: practice name + KPI data + compliance (independent queries)
-  const [
-    practiceResult,
-    kpiResult,
-    topIssuesResult,
-    credentialingResult,
-    complianceResult,
-    payerSnapshotsResult,
-  ] = await Promise.all([
+  // Parallel query 1: practice name + KPI data (independent queries)
+  const [practiceResult, kpiResult, topIssuesResult, credentialingResult] = await Promise.all([
     safeQuerySingle(
-      admin
-        .from('practice_websites')
-        .select('name, provider_count, practice_group_id')
-        .eq('id', practiceId)
-        .single(),
+      admin.from('practice_websites').select('name, provider_count').eq('id', practiceId).single(),
       null,
     ),
     safeQuerySingle(
@@ -66,24 +55,11 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
         .in('roster_status', ['onboarding', 'departing']),
       [],
     ),
-    // compliance_findings query placeholder — resolved after practice record is available
-    Promise.resolve({ data: [], error: null }),
-    // Payer sync: fetch via payer_directory_mismatches (has practice_website_id)
-    safeQuery(
-      admin
-        .from('payer_directory_mismatches')
-        .select('payer_code, status, last_detected_at, mismatch_type')
-        .eq('practice_website_id', practiceId)
-        .eq('npi', 'PRACTICE')
-        .order('payer_code'),
-      [],
-    ),
   ]);
 
   interface PracticeRecord {
     name: string;
     provider_count: number;
-    practice_group_id: string | null;
   }
   interface KpiRecord {
     needs_attention: number;
@@ -93,33 +69,11 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     total_providers: number;
   }
 
-  interface PayerMismatchRow {
-    payer_code: string;
-    status: string;
-    last_detected_at: string | null;
-    mismatch_type: string;
-  }
-
   const practice = practiceResult.data as PracticeRecord | null;
   const kpiData = kpiResult.data as KpiRecord | null;
   // v_provider_health returns all fields expected by DashboardHome's ProviderHealth interface
   const topIssues = topIssuesResult.data || [];
   const credentialingProviders = credentialingResult.data || [];
-  const payerMismatches = payerSnapshotsResult.data as PayerMismatchRow[] | null;
-
-  // Resolve compliance findings via practice_group_id (FK from practice_websites → practice_groups)
-  // Fallback: if practice_group_id is null, try practiceId directly (self-referencing case)
-  const practiceGroupId = practice?.practice_group_id || practiceId;
-  const cfResult = await safeQuery(
-    admin
-      .from('compliance_findings')
-      .select('check_id, category, severity, status, title, score')
-      .eq('practice_group_id', practiceGroupId)
-      .eq('is_domain_level', true)
-      .order('created_at', { ascending: true }),
-    [],
-  );
-  const complianceFindings: any[] = cfResult.data || [];
 
   // Merge: credentialing providers first, then top issues (deduplicated)
   const seen = new Set<string>();
@@ -152,22 +106,26 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     unseenAlertCount = (allAlertsResult.data || []).filter((a) => !readIds.has(a.id)).length;
   }
 
-  // 4. Payer sync status from payer_directory_snapshots
-  const getRelativeTime = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  // 4. Payer sync status from payer_directory_mismatches (PRACTICE-level acceptance gaps)
+  const payerMismatchResult = await safeQuery(
+    admin
+      .from('payer_directory_mismatches')
+      .select('payer_code, status, last_detected_at, mismatch_type')
+      .eq('practice_website_id', practiceId)
+      .eq('npi', 'PRACTICE')
+      .order('payer_code'),
+    [],
+  );
 
-    if (diffDays === 0) return 'today';
-    if (diffDays === 1) return '1 day ago';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) {
-      const weeks = Math.floor(diffDays / 7);
-      return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-    }
-    const months = Math.floor(diffDays / 30);
-    return `${months} month${months > 1 ? 's' : ''} ago`;
+  const getRelativeTime = (dateString: string): string => {
+    const diff = Date.now() - new Date(dateString).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'today';
+    if (days === 1) return '1 day ago';
+    if (days < 7) return `${days} days ago`;
+    if (days < 14) return '1 week ago';
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return `${Math.floor(days / 30)} month(s) ago`;
   };
 
   const getPayerColor = (status: string): string => {
@@ -185,68 +143,25 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     return 'Pending';
   };
 
-  const payers = (payerMismatches || []).map((m) => ({
-    payer: m.payer_code,
+  // Friendly payer display names
+  const PAYER_DISPLAY_NAMES: Record<string, string> = {
+    aetna: 'Aetna',
+    bcbs: 'BCBS',
+    bcbs_tx: 'BCBS TX',
+    bcbs_ca: 'BCBS CA',
+    cigna: 'Cigna',
+    curative: 'Curative',
+    humana: 'Humana',
+    medicare: 'Medicare',
+    tricare: 'TRICARE',
+    uhc: 'UnitedHealthcare',
+  };
+
+  const payers = (payerMismatchResult.data || []).map((m: any) => ({
+    payer: PAYER_DISPLAY_NAMES[m.payer_code] || m.payer_code,
     status: getPayerStatusText(m.status, m.last_detected_at),
     color: getPayerColor(m.status),
   }));
-
-  // Build compliance checks from findings
-  const complianceStatusMap: Record<string, string> = {
-    open: 'Action needed',
-    remediated: 'Compliant',
-    accepted_risk: 'Accepted risk',
-    false_positive: 'N/A',
-  };
-
-  const complianceLabelMap: Record<string, string> = {
-    sb_1188_data_sovereignty: 'SB 1188 (Data sovereignty)',
-    hb_149_ai_transparency: 'HB 149 (AI transparency)',
-    ai_05_ehr_vendor: 'AI-05 (EHR vendor AI detection)',
-    ab_3030_ca_ai_disclosure: 'AB 3030 (CA AI disclosure)',
-  };
-
-  // Build compliance checks dynamically from findings, with "Not scanned" as default
-  const allCheckIds = [
-    'sb_1188_data_sovereignty',
-    'hb_149_ai_transparency',
-    'ai_05_ehr_vendor',
-    'ab_3030_ca_ai_disclosure',
-  ];
-  const findingsByCheckId = new Map(complianceFindings.map((f: any) => [f.check_id, f]));
-
-  const complianceChecks = allCheckIds.map((checkId) => {
-    const finding = findingsByCheckId.get(checkId);
-
-    if (finding) {
-      return {
-        check_id: checkId,
-        label: complianceLabelMap[checkId] || checkId,
-        value: complianceStatusMap[finding.status] || finding.status,
-        status: finding.status,
-      };
-    }
-
-    // No finding for this check: show "Not scanned"
-    return {
-      check_id: checkId,
-      label: complianceLabelMap[checkId] || checkId,
-      value: 'Not scanned',
-      status: 'not_scanned',
-    };
-  });
-
-  // Calculate overall compliance score
-  const scoredFindings = complianceFindings.filter(
-    (f: any) => f.score !== null && f.status !== 'false_positive',
-  );
-  const complianceScore =
-    scoredFindings.length > 0
-      ? Math.round(
-          scoredFindings.reduce((sum: number, f: any) => sum + (f.score || 0), 0) /
-            scoredFindings.length,
-        )
-      : null;
 
   const kpis = {
     needs_attention: kpiData?.needs_attention || 0,
@@ -265,8 +180,6 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
       practiceId={practiceId}
       practiceName={practice?.name || 'Practice'}
       userName={userName}
-      complianceChecks={complianceChecks}
-      complianceScore={complianceScore}
     />
   );
 }

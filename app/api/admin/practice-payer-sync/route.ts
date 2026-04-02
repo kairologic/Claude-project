@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
 import { FhirDirectoryClient } from '@/lib/payer-directory/fhir-client';
+import { PayerDirectoryLookup } from '@/lib/payer-directory/payer-lookup';
 import {
   detectMismatches,
   buildAcceptanceGapMismatch,
@@ -104,6 +105,31 @@ async function POST_HANDLER(request: NextRequest) {
     //   assumed       → indicative (default/unknown)
     const signalType = acceptedPayersSource === 'admin_entered' ? 'confirmed' : 'indicative';
 
+    // ── Payer code normalization ──────────────────────────────────
+    // Website-facing payer names (e.g. "bcbs") may differ from endpoint
+    // payer_codes which are state-specific (e.g. "bcbs_tx").
+    // Build a bidirectional map so acceptance gap detection can match.
+    // Also resolves the state-specific practice location to BCBS affiliate.
+    const PAYER_ALIASES: Record<string, string[]> = {
+      bcbs: ['bcbs_tx', 'bcbs_ca', 'bcbs_il', 'bcbs_fl', 'bcbs_ga'],
+    };
+    // Expand accepted payers to include state-specific codes
+    const expandedAcceptedPayers = new Set<string>();
+    for (const p of acceptedPayers) {
+      expandedAcceptedPayers.add(p);
+      if (PAYER_ALIASES[p]) {
+        for (const alias of PAYER_ALIASES[p]) expandedAcceptedPayers.add(alias);
+      }
+    }
+    // Reverse map: endpoint code → canonical accepted code (for gap reporting)
+    const endpointToCanonical = new Map<string, string>();
+    for (const p of acceptedPayers) {
+      endpointToCanonical.set(p, p);
+      if (PAYER_ALIASES[p]) {
+        for (const alias of PAYER_ALIASES[p]) endpointToCanonical.set(alias, p);
+      }
+    }
+
     // 2. Bulk-fetch NPPES data for all provider NPIs
     //    CRITICAL: If NPPES data is unavailable, mismatch detection is meaningless.
     //    We fail explicitly rather than producing misleading "0 mismatches" results.
@@ -172,20 +198,40 @@ async function POST_HANDLER(request: NextRequest) {
 
       if (!endpointsError && endpoints && endpoints.length > 0) {
         const fhirClient = new FhirDirectoryClient();
+        const payerLookup = new PayerDirectoryLookup();
         const batchId = `admin-sync-${practice_id.slice(0, 8)}-${Date.now()}`;
 
         for (const provider of providers) {
           if (!provider.npi) continue;
+          // Resolve first/last name from NPPES data (needed for scrape endpoints)
+          const nppesData = nppesMap.get(provider.npi);
+          const firstName = nppesData?.first_name || '';
+          const lastName = nppesData?.last_name || '';
           for (const endpoint of endpoints) {
             if (failedPayers.has(endpoint.payer_code)) continue; // Skip payer if already failed
             fhirRefreshStats.attempted++;
             try {
-              const snapshot = await fhirClient.lookupByNpi(
-                provider.npi,
-                endpoint,
-                batchId,
-                provider.provider_name,
-              );
+              // Route through PayerDirectoryLookup for SCRAPE: endpoints (e.g. BCBS TX)
+              // which delegates to the appropriate scraper adapter.
+              // Standard FHIR endpoints continue to use FhirDirectoryClient directly.
+              let snapshot: DirectorySnapshot | null;
+              if (endpoint.fhir_base_url.startsWith('SCRAPE:')) {
+                snapshot = await payerLookup.lookup(
+                  provider.npi,
+                  firstName,
+                  lastName,
+                  endpoint,
+                  undefined, // geoLocation
+                  batchId,
+                );
+              } else {
+                snapshot = await fhirClient.lookupByNpi(
+                  provider.npi,
+                  endpoint,
+                  batchId,
+                  provider.provider_name,
+                );
+              }
               if (!snapshot) continue;
 
               const isListed = !!snapshot.fhir_practitioner_id;
@@ -397,19 +443,21 @@ async function POST_HANDLER(request: NextRequest) {
       for (const snapshot of snapshots) {
         const ps = statusMap.get(snapshot.npi);
         if (!ps) continue;
-        // Only track status for claimed payers
-        if (!acceptedPayers.includes(snapshot.payer_code)) continue;
+        // Only track status for claimed payers (including state-specific aliases)
+        if (!expandedAcceptedPayers.has(snapshot.payer_code)) continue;
 
         const isListed = !!snapshot.fhir_practitioner_id;
+        // Map endpoint code to canonical accepted payer code (e.g. bcbs_tx → bcbs)
+        const canonicalCode = endpointToCanonical.get(snapshot.payer_code) || snapshot.payer_code;
 
         if (isListed) {
-          ps.payer_statuses[snapshot.payer_code] = 'listed';
+          ps.payer_statuses[canonicalCode] = 'listed';
         } else {
           // Layer 1: Only count as not_listed if consecutive_not_listed_count >= 2
           // This prevents single-cycle false positives (transient FHIR errors, etc.)
           const consecutiveCount = (snapshot as any).consecutive_not_listed_count || 0;
           if (consecutiveCount >= 2) {
-            ps.payer_statuses[snapshot.payer_code] = 'not_listed';
+            ps.payer_statuses[canonicalCode] = 'not_listed';
           }
           // Below threshold: leave as undefined (not yet conclusive)
         }
