@@ -199,7 +199,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: colors.gray50,
   },
   resultCount: {
-    ...typography.caption,
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 1.4,
     color: colors.gray400,
   },
   tableWrapper: {
