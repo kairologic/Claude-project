@@ -23,6 +23,7 @@ interface AlertData {
   title: string;
   description: string | null;
   provider_name: string | null;
+  provider_npi: string | null;
   workflow_id: string | null;
   created_at: string;
   is_seen: boolean;
@@ -42,6 +43,10 @@ export default function AlertsView({ alerts, practiceId, userId }: AlertsViewPro
   function handleAlertClick(alert: AlertData) {
     if (alert.workflow_id) {
       router.push(`/practice/${practiceId}/workflows?highlight=${alert.workflow_id}`);
+    } else if (alert.provider_npi) {
+      router.push(`/practice/${practiceId}/roster?npi=${alert.provider_npi}`);
+    } else {
+      router.push(`/practice/${practiceId}/workflows`);
     }
   }
 
