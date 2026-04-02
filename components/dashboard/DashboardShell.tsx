@@ -35,7 +35,7 @@ interface DashboardShellProps {
 }
 
 const pageTitles: Record<string, string> = {
-  '': 'Dashboard',
+  '': 'Provider Intelligence Dashboard',
   '/workflows': 'Workflows',
   '/roster': 'Provider roster',
   '/alerts': 'Alerts',
@@ -49,7 +49,7 @@ const pageTitles: Record<string, string> = {
   '/release': 'Provider release',
   '/compliance': 'Compliance',
   '/audit': 'Audit trail',
-  '/help': 'Help center',  '/requests': 'My Requests',
+  '/help': 'Help center',
 };
 
 export default function DashboardShell({

@@ -55,6 +55,13 @@ interface PayerData {
   color: string;
 }
 
+interface ComplianceCheck {
+  check_id: string;
+  label: string;
+  value: string;
+  status: string;
+}
+
 interface DashboardHomeProps {
   kpis: KPIs;
   priorityProviders: ProviderHealth[];
@@ -62,10 +69,13 @@ interface DashboardHomeProps {
   practiceId: string;
   practiceName: string;
   userName: string;
+  complianceChecks?: ComplianceCheck[];
+  complianceScore?: number | null;
 }
 
 export default function DashboardHome({
   kpis, priorityProviders, payers, practiceId, practiceName, userName,
+  complianceChecks, complianceScore,
 }: DashboardHomeProps) {
   const router = useRouter();
   const [showWelcome, setShowWelcome] = useState(true);
@@ -360,22 +370,33 @@ export default function DashboardHome({
             }}
             onMouseOver={e => (e.currentTarget.style.boxShadow = shadows.md)}
             onMouseOut={e => (e.currentTarget.style.boxShadow = shadows.xs)}>
-              <div style={{ ...typography.h2, color: colors.green }}>—</div>
+              <div style={{ ...typography.h2, color: complianceScore != null && complianceScore >= 80 ? colors.green : complianceScore != null && complianceScore >= 50 ? colors.gold : complianceScore != null ? '#D64545' : colors.gray400 }}>
+                {complianceScore != null ? `${complianceScore}%` : '—'}
+              </div>
               <div style={{ ...typography.bodySmall, color: colors.gray400, marginTop: spacing.xs }}>Compliance score</div>
               <div style={{ marginTop: spacing.sm, borderTop: `1px solid ${colors.gray200}`, paddingTop: spacing.xs }}>
-                {[
-                  { label: 'SB 1188 (Data sovereignty)', value: 'Pending' },
-                  { label: 'HB 149 (AI transparency)', value: 'Pending' },
-                  { label: 'AB 3030 (CA AI disclosure)', value: 'N/A' },
-                ].map((row, i) => (
+                {(complianceChecks || [
+                  { check_id: 'sb_1188', label: 'SB 1188 (Data sovereignty)', value: 'Pending', status: 'pending' },
+                  { check_id: 'hb_149', label: 'HB 149 (AI transparency)', value: 'Pending', status: 'pending' },
+                  { check_id: 'ab_3030', label: 'AB 3030 (CA AI disclosure)', value: 'N/A', status: 'false_positive' },
+                ]).map((row, i) => {
+                  const statusColor = row.status === 'remediated' ? colors.green
+                    : row.status === 'open' ? '#D64545'
+                    : row.status === 'false_positive' ? colors.gray400
+                    : colors.gray400;
+                  const statusBg = row.status === 'remediated' ? 'rgba(34,197,94,0.1)'
+                    : row.status === 'open' ? 'rgba(214,69,69,0.1)'
+                    : colors.gray100;
+                  return (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: `${spacing.xs}px 0`, ...typography.body }}>
                     <span style={{ color: colors.gray600 }}>{row.label}</span>
                     <span style={{
                       ...typography.label, padding: `2px ${spacing.xs}px`, borderRadius: radii.full,
-                      background: colors.gray100, color: colors.gray400,
+                      background: statusBg, color: statusColor,
                     }}>{row.value}</span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

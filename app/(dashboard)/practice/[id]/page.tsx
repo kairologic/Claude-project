@@ -29,8 +29,8 @@ export default async function DashboardHomePage({
     || 'there';
   const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
-  // Parallel query 1: practice name + KPI data (independent queries)
-  const [practiceResult, kpiResult, topIssuesResult, credentialingResult] = await Promise.all([
+  // Parallel query 1: practice name + KPI data + compliance (independent queries)
+  const [practiceResult, kpiResult, topIssuesResult, credentialingResult, complianceResult] = await Promise.all([
     safeQuerySingle(
       admin
         .from('practice_websites')
@@ -65,6 +65,15 @@ export default async function DashboardHomePage({
         .in('roster_status', ['onboarding', 'departing']),
       []
     ),
+    safeQuery(
+      admin
+        .from('compliance_findings')
+        .select('check_id, category, severity, status, title, score')
+        .eq('practice_group_id', practiceId)
+        .eq('is_domain_level', true)
+        .order('created_at', { ascending: true }),
+      []
+    ),
   ]);
 
   interface PracticeRecord { name: string; provider_count: number }
@@ -75,6 +84,7 @@ export default async function DashboardHomePage({
   // v_provider_health returns all fields expected by DashboardHome's ProviderHealth interface
   const topIssues = topIssuesResult.data || [];
   const credentialingProviders = credentialingResult.data || [];
+  const complianceFindings = complianceResult.data || [];
 
   // Merge: credentialing providers first, then top issues (deduplicated)
   const seen = new Set<string>();
@@ -120,6 +130,41 @@ export default async function DashboardHomePage({
     { payer: 'BCBS TX', status: 'Pending credentials', color: colors.gray400 },
   ];
 
+  // Build compliance checks from findings
+  const complianceStatusMap: Record<string, string> = {
+    open: 'Action needed',
+    remediated: 'Compliant',
+    accepted_risk: 'Accepted risk',
+    false_positive: 'N/A',
+  };
+
+  const complianceLabelMap: Record<string, string> = {
+    sb_1188_data_sovereignty: 'SB 1188 (Data sovereignty)',
+    hb_149_ai_transparency: 'HB 149 (AI transparency)',
+    ab_3030_ca_ai_disclosure: 'AB 3030 (CA AI disclosure)',
+  };
+
+  const complianceChecks = [
+    { check_id: 'sb_1188_data_sovereignty', label: 'SB 1188 (Data sovereignty)', value: 'Pending', status: 'pending' },
+    { check_id: 'hb_149_ai_transparency', label: 'HB 149 (AI transparency)', value: 'Pending', status: 'pending' },
+    { check_id: 'ab_3030_ca_ai_disclosure', label: 'AB 3030 (CA AI disclosure)', value: 'N/A', status: 'false_positive' },
+  ];
+
+  // Override with actual findings
+  for (const finding of complianceFindings) {
+    const idx = complianceChecks.findIndex(c => c.check_id === finding.check_id);
+    if (idx >= 0) {
+      complianceChecks[idx].value = complianceStatusMap[finding.status] || finding.status;
+      complianceChecks[idx].status = finding.status;
+    }
+  }
+
+  // Calculate overall compliance score
+  const scoredFindings = complianceFindings.filter((f: any) => f.score !== null && f.status !== 'false_positive');
+  const complianceScore = scoredFindings.length > 0
+    ? Math.round(scoredFindings.reduce((sum: number, f: any) => sum + (f.score || 0), 0) / scoredFindings.length)
+    : null;
+
   const kpis = {
     needs_attention: kpiData?.needs_attention || 0,
     in_progress: kpiData?.in_progress || 0,
@@ -137,6 +182,8 @@ export default async function DashboardHomePage({
       practiceId={practiceId}
       practiceName={practice?.name || 'Practice'}
       userName={userName}
+      complianceChecks={complianceChecks}
+      complianceScore={complianceScore}
     />
   );
 }
