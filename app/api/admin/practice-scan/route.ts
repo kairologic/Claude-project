@@ -57,7 +57,7 @@ async function POST_HANDLER(request: NextRequest) {
         const syncRes = await fetch(`${origin}/api/admin/practice-payer-sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ practice_id }),
+          body: JSON.stringify({ practice_id, refresh: true }),
         });
         const syncData = await syncRes.json();
         if (syncRes.ok) {
