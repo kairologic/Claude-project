@@ -38,12 +38,12 @@ export async function createServerSupabaseClient() {
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             );
           } catch {}
         },
       },
-    }
+    },
   );
 }
 
@@ -66,7 +66,6 @@ export function createAdminSupabaseClient(): SupabaseClient {
   });
   return adminInstance;
 }
-
 
 // ---------------------------------------------------------------------------
 // User & practice helpers
@@ -106,7 +105,7 @@ export async function getUserPractices(userId: string) {
     .from('practice_users')
     .select(
       `practice_id, role, is_primary, joined_at,
-      practice_websites!inner (id, name, city, state, provider_count, mismatch_count)`,
+      practice_websites!inner (id, name, city, state, provider_count, mismatch_count, last_scan_at)`,
     )
     .eq('user_id', userId)
     .order('is_primary', { ascending: false });

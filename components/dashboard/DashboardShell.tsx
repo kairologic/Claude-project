@@ -29,13 +29,14 @@ interface DashboardShellProps {
   currentPracticeId: string;
   currentPracticeName: string;
   currentProviderCount: number;
+  lastScanAt: string | null;
   userName: string;
   userRole: string;
   userInitials: string;
 }
 
 const pageTitles: Record<string, string> = {
-  '': 'Provider Intelligence Dashboard',
+  '': 'Dashboard',
   '/workflows': 'Workflows',
   '/roster': 'Provider roster',
   '/alerts': 'Alerts',
@@ -58,6 +59,7 @@ export default function DashboardShell({
   currentPracticeId,
   currentPracticeName,
   currentProviderCount,
+  lastScanAt,
   userName,
   userRole,
   userInitials,
@@ -69,6 +71,29 @@ export default function DashboardShell({
   const basePath = `/practice/${currentPracticeId}`;
   const subPath = pathname.replace(basePath, '') || '';
   const pageTitle = pageTitles[subPath] || 'Dashboard';
+
+  // Set browser tab title: "{Page} · Practice Intelligence Dashboard"
+  useEffect(() => {
+    document.title = `${pageTitle} · Practice Intelligence Dashboard`;
+  }, [pageTitle]);
+
+  // Compute relative "last sync" time from lastScanAt
+  const lastSync = (() => {
+    if (!lastScanAt) return null;
+    const scanDate = new Date(lastScanAt);
+    const now = new Date();
+    const diffMs = now.getTime() - scanDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    const diffWeeks = Math.floor(diffDays / 7);
+    return `${diffWeeks}w ago`;
+  })();
 
   // Fetch unseen alert count
   useEffect(() => {
@@ -122,7 +147,7 @@ export default function DashboardShell({
           title={pageTitle}
           practiceName={currentPracticeName}
           providerCount={currentProviderCount}
-          lastSync="2 hours ago"
+          lastSync={lastSync || undefined}
           practiceId={currentPracticeId}
         />
         <div style={styles.content}>{children}</div>

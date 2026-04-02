@@ -46,6 +46,7 @@ export default async function PracticeLayout({
     city: p.practice_websites?.city || '',
     state: p.practice_websites?.state || '',
     provider_count: p.practice_websites?.provider_count || 0,
+    last_scan_at: p.practice_websites?.last_scan_at || null,
   }));
 
   const currentPractice = practices.find((p: any) => p.practice_id === practiceId);
@@ -70,6 +71,7 @@ export default async function PracticeLayout({
       currentPracticeId={practiceId}
       currentPracticeName={currentPractice?.practice_name || 'Practice'}
       currentProviderCount={currentPractice?.provider_count || 0}
+      lastScanAt={currentPractice?.last_scan_at || null}
       userName={userName}
       userRole={userRole}
       userInitials={initials}
