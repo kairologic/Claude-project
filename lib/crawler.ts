@@ -168,9 +168,9 @@ async function headlessChromeFetch(url: string): Promise<{
       // @sparticuz/chromium provides a pre-built Chromium binary for Lambda/Vercel
       browser = await puppeteer.launch({
         args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
+        defaultViewport: { width: 1920, height: 1080 },
         executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
+        headless: true,
       });
 
       const page = await browser.newPage();
