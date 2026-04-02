@@ -68,11 +68,14 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     ),
     // compliance_findings query placeholder — resolved after practice record is available
     Promise.resolve({ data: [], error: null }),
+    // Payer sync: fetch via payer_directory_mismatches (has practice_website_id)
     safeQuery(
       admin
-        .from('payer_directory_snapshots')
-        .select('payer_name, snapshot_date, status')
-        .eq('practice_website_id', practiceId),
+        .from('payer_directory_mismatches')
+        .select('payer_code, status, last_detected_at, mismatch_type')
+        .eq('practice_website_id', practiceId)
+        .eq('npi', 'PRACTICE')
+        .order('payer_code'),
       [],
     ),
   ]);
@@ -90,10 +93,11 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     total_providers: number;
   }
 
-  interface PayerSnapshot {
-    payer_name: string;
-    snapshot_date: string;
-    status: 'active' | 'pending' | 'error';
+  interface PayerMismatchRow {
+    payer_code: string;
+    status: string;
+    last_detected_at: string | null;
+    mismatch_type: string;
   }
 
   const practice = practiceResult.data as PracticeRecord | null;
@@ -101,23 +105,21 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
   // v_provider_health returns all fields expected by DashboardHome's ProviderHealth interface
   const topIssues = topIssuesResult.data || [];
   const credentialingProviders = credentialingResult.data || [];
-  const payerSnapshots = payerSnapshotsResult.data as PayerSnapshot[] | null;
+  const payerMismatches = payerSnapshotsResult.data as PayerMismatchRow[] | null;
 
   // Resolve compliance findings via practice_group_id (FK from practice_websites → practice_groups)
-  const practiceGroupId = practice?.practice_group_id;
-  let complianceFindings: any[] = [];
-  if (practiceGroupId) {
-    const cfResult = await safeQuery(
-      admin
-        .from('compliance_findings')
-        .select('check_id, category, severity, status, title, score')
-        .eq('practice_group_id', practiceGroupId)
-        .eq('is_domain_level', true)
-        .order('created_at', { ascending: true }),
-      [],
-    );
-    complianceFindings = cfResult.data || [];
-  }
+  // Fallback: if practice_group_id is null, try practiceId directly (self-referencing case)
+  const practiceGroupId = practice?.practice_group_id || practiceId;
+  const cfResult = await safeQuery(
+    admin
+      .from('compliance_findings')
+      .select('check_id, category, severity, status, title, score')
+      .eq('practice_group_id', practiceGroupId)
+      .eq('is_domain_level', true)
+      .order('created_at', { ascending: true }),
+    [],
+  );
+  const complianceFindings: any[] = cfResult.data || [];
 
   // Merge: credentialing providers first, then top issues (deduplicated)
   const seen = new Set<string>();
@@ -168,33 +170,26 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     return `${months} month${months > 1 ? 's' : ''} ago`;
   };
 
-  const getPayerColor = (status: string, daysSinceSync: number): string => {
-    if (status === 'pending') return colors.gray400;
-    if (status === 'error') return colors.red;
-    if (daysSinceSync <= 3) return colors.green;
-    if (daysSinceSync <= 10) return colors.gold;
-    return colors.red;
+  const getPayerColor = (status: string): string => {
+    if (status === 'open') return colors.red;
+    if (status === 'resolved') return colors.green;
+    if (status === 'accepted_risk') return colors.gold;
+    return colors.gray400;
   };
 
-  const payers = (payerSnapshots || []).map((snapshot) => {
-    const syncDate = new Date(snapshot.snapshot_date);
-    const now = new Date();
-    const diffMs = now.getTime() - syncDate.getTime();
-    const daysSinceSync = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const getPayerStatusText = (status: string, lastDetected: string | null): string => {
+    if (status === 'open')
+      return lastDetected ? `Not listed · ${getRelativeTime(lastDetected)}` : 'Not listed';
+    if (status === 'resolved') return 'Listed';
+    if (status === 'accepted_risk') return 'Accepted risk';
+    return 'Pending';
+  };
 
-    let statusText = getRelativeTime(snapshot.snapshot_date);
-    if (snapshot.status === 'pending') {
-      statusText = 'Pending credentials';
-    } else if (snapshot.status === 'error') {
-      statusText = 'Sync error';
-    }
-
-    return {
-      payer: snapshot.payer_name,
-      status: statusText,
-      color: getPayerColor(snapshot.status, daysSinceSync),
-    };
-  });
+  const payers = (payerMismatches || []).map((m) => ({
+    payer: m.payer_code,
+    status: getPayerStatusText(m.status, m.last_detected_at),
+    color: getPayerColor(m.status),
+  }));
 
   // Build compliance checks from findings
   const complianceStatusMap: Record<string, string> = {
