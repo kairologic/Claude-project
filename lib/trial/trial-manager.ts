@@ -11,8 +11,11 @@
 //
 // Trial state: ACTIVE → EXPIRING (day 12+) → EXPIRED → CONVERTED | CHURNED
 
+import { resolveScanTier } from '@/lib/scanner/scan-tier-resolver';
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -74,7 +77,7 @@ export interface TrialState {
  */
 export async function getTrialState(organizationId: string): Promise<TrialState> {
   const orgs = await db(
-    `organizations?id=eq.${organizationId}&select=id,plan_tier,trial_start,trial_end,trial_status,stripe_subscription_id`
+    `organizations?id=eq.${organizationId}&select=id,plan_tier,trial_start,trial_end,trial_status,stripe_subscription_id`,
   );
 
   if (!orgs?.length) {
@@ -82,7 +85,7 @@ export async function getTrialState(organizationId: string): Promise<TrialState>
   }
 
   const org = orgs[0];
-  const tier = org.plan_tier as PlanTier || 'free';
+  const tier = (org.plan_tier as PlanTier) || 'free';
   const isPaid = !!org.stripe_subscription_id;
 
   if (isPaid) {
@@ -98,24 +101,51 @@ export async function getTrialState(organizationId: string): Promise<TrialState>
       return makeState(organizationId, 'free', 'EXPIRED', org.trial_start, org.trial_end, false);
     }
     if (daysRemaining <= 2) {
-      return makeState(organizationId, 'trial_protect', 'EXPIRING', org.trial_start, org.trial_end, false);
+      return makeState(
+        organizationId,
+        'trial_protect',
+        'EXPIRING',
+        org.trial_start,
+        org.trial_end,
+        false,
+      );
     }
-    return makeState(organizationId, 'trial_protect', 'ACTIVE', org.trial_start, org.trial_end, false);
+    return makeState(
+      organizationId,
+      'trial_protect',
+      'ACTIVE',
+      org.trial_start,
+      org.trial_end,
+      false,
+    );
   }
 
-  return makeState(organizationId, tier, org.trial_status || 'NONE', org.trial_start, org.trial_end, false);
+  return makeState(
+    organizationId,
+    tier,
+    org.trial_status || 'NONE',
+    org.trial_start,
+    org.trial_end,
+    false,
+  );
 }
 
 function makeState(
-  orgId: string, tier: PlanTier, status: TrialStatus,
-  trialStart: string | null, trialEnd: string | null, isPaid: boolean,
+  orgId: string,
+  tier: PlanTier,
+  status: TrialStatus,
+  trialStart: string | null,
+  trialEnd: string | null,
+  isPaid: boolean,
 ): TrialState {
   const now = new Date();
   const start = trialStart ? new Date(trialStart) : null;
   const end = trialEnd ? new Date(trialEnd) : null;
-  const daysRemaining = end ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000)) : 0;
+  const daysRemaining = end
+    ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000))
+    : 0;
   const daysElapsed = start ? Math.floor((now.getTime() - start.getTime()) / 86400000) : 0;
-  const isTrial = tier === 'trial_protect' && status === 'ACTIVE' || status === 'EXPIRING';
+  const isTrial = (tier === 'trial_protect' && status === 'ACTIVE') || status === 'EXPIRING';
   const isFree = tier === 'free' && !isPaid;
 
   const gates = getFeatureGates(isTrial ? 'trial_protect' : tier);
@@ -171,7 +201,7 @@ export async function downgradeExpiredTrials(): Promise<{
 
   // Fetch all trial_protect orgs where trial_end has passed
   const expired = await db(
-    `organizations?plan_tier=eq.trial_protect&trial_end=lte.${now}&trial_status=in.(ACTIVE,EXPIRING)&select=id,stripe_subscription_id,contact_email,name`
+    `organizations?plan_tier=eq.trial_protect&trial_end=lte.${now}&trial_status=in.(ACTIVE,EXPIRING)&select=id,stripe_subscription_id,contact_email,name`,
   );
 
   if (!expired?.length) return result;
@@ -226,8 +256,8 @@ export async function recordUpgrade(
     }),
   });
 
-  // Upgrade scan tier
-  const scanTier = planTier === 'command' ? 'daily' : 'weekly';
+  // Upgrade scan tier based on plan tier
+  const scanTier = resolveScanTier(planTier);
   await db(`practice_websites?organization_id=eq.${organizationId}`, {
     method: 'PATCH',
     body: JSON.stringify({ scan_tier: scanTier }),
@@ -237,33 +267,33 @@ export async function recordUpgrade(
 // ── Feature Gates ────────────────────────────────────────
 
 export interface FeatureGates {
-  dashboard_view: boolean;        // can see dashboard at all
-  findings_visible: boolean;      // can see mismatch details
-  field_diffs: boolean;           // can see field-level diffs (red/green)
-  forms_single: boolean;          // can generate single NPPES form
-  forms_bulk: boolean;            // can generate bulk forms
-  forms_first_free: boolean;      // first form is free (then locked)
-  auto_confirmation: boolean;     // NPPES polling active
-  alert_emails: boolean;          // real-time mismatch alerts
-  roster_surveillance: boolean;   // departed/new provider detection
-  state_regulatory: boolean;      // SB 1188, AB 3030 scanning
-  license_monitoring: boolean;    // TMB, CA MB license checks
-  sanctions_screening: boolean;   // LEIE, SAM.gov
-  multi_location: boolean;        // multiple practice sites
-  api_access: boolean;            // REST API for integrations
-  max_locations: number;          // location limit
+  dashboard_view: boolean; // can see dashboard at all
+  findings_visible: boolean; // can see mismatch details
+  field_diffs: boolean; // can see field-level diffs (red/green)
+  forms_single: boolean; // can generate single NPPES form
+  forms_bulk: boolean; // can generate bulk forms
+  forms_first_free: boolean; // first form is free (then locked)
+  auto_confirmation: boolean; // NPPES polling active
+  alert_emails: boolean; // real-time mismatch alerts
+  roster_surveillance: boolean; // departed/new provider detection
+  state_regulatory: boolean; // SB 1188, AB 3030 scanning
+  license_monitoring: boolean; // TMB, CA MB license checks
+  sanctions_screening: boolean; // LEIE, SAM.gov
+  multi_location: boolean; // multiple practice sites
+  api_access: boolean; // REST API for integrations
+  max_locations: number; // location limit
 }
 
 const TIER_GATES: Record<PlanTier, FeatureGates> = {
   free: {
     dashboard_view: true,
-    findings_visible: true,        // they can SEE the fire
-    field_diffs: true,             // they can SEE the diffs (loss aversion)
-    forms_single: false,           // but can't download the extinguisher
+    findings_visible: true, // they can SEE the fire
+    field_diffs: true, // they can SEE the diffs (loss aversion)
+    forms_single: false, // but can't download the extinguisher
     forms_bulk: false,
-    forms_first_free: true,        // EXCEPT: first form is free (aha moment)
+    forms_first_free: true, // EXCEPT: first form is free (aha moment)
     auto_confirmation: false,
-    alert_emails: false,           // no alerts on free
+    alert_emails: false, // no alerts on free
     roster_surveillance: false,
     state_regulatory: false,
     license_monitoring: false,
@@ -283,8 +313,8 @@ const TIER_GATES: Record<PlanTier, FeatureGates> = {
     alert_emails: true,
     roster_surveillance: true,
     state_regulatory: true,
-    license_monitoring: false,     // Command only
-    sanctions_screening: false,    // Command only
+    license_monitoring: false, // Command only
+    sanctions_screening: false, // Command only
     multi_location: true,
     api_access: false,
     max_locations: 5,
@@ -297,7 +327,7 @@ const TIER_GATES: Record<PlanTier, FeatureGates> = {
     forms_bulk: false,
     forms_first_free: true,
     auto_confirmation: false,
-    alert_emails: true,            // weekly digest only (enforced in email logic)
+    alert_emails: true, // weekly digest only (enforced in email logic)
     roster_surveillance: false,
     state_regulatory: false,
     license_monitoring: false,
@@ -360,7 +390,7 @@ export async function checkFeatureAccess(
   if (feature === 'forms_single' && !gates.forms_single && gates.forms_first_free) {
     // Check if they've already used their free form
     const requests = await db(
-      `update_requests?organization_id=eq.${organizationId}&select=id&limit=2`
+      `update_requests?organization_id=eq.${organizationId}&select=id&limit=2`,
     );
     if (!requests?.length || requests.length === 0) {
       return { allowed: true }; // first form is free

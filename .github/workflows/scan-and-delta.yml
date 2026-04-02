@@ -50,6 +50,10 @@ on:
           - 'false'
           - 'true'
 
+concurrency:
+  group: kairologic-scan
+  cancel-in-progress: false
+
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

@@ -395,6 +395,20 @@ _Clinical Integrity (all states)_
 | 144 | EHR registry expansion — add new vendors as discovered          | Eng   | 🔲 Ongoing |
 | 145 | Phase 2: headless browser EHR detection for JS-rendered portals | Eng   | 🔲 TODO    |
 
+### Scan Scheduling & Tier Automation
+
+| #   | Task                                                             | Owner | Status  |
+| --- | ---------------------------------------------------------------- | ----- | ------- |
+| 146 | Scan tier resolver utility (`lib/scanner/scan-tier-resolver.ts`) | Eng   | ✅ Done |
+| 147 | Auto-promote scan_tier on practice claim (`finalize-claim`)      | Eng   | ✅ Done |
+| 148 | Auto-promote scan_tier on subscription upgrade (`trial-manager`) | Eng   | ✅ Done |
+| 149 | Wire Phase 1 provider extractor into scan-scheduler loop         | Eng   | ✅ Done |
+| 150 | Populate web_specialty from extracted website data during scan   | Eng   | ✅ Done |
+| 151 | Daily cron workflow for CVO/claimed practices (`scan-daily.yml`) | Eng   | ✅ Done |
+| 152 | Concurrency group to prevent daily + weekly scan overlap         | Eng   | ✅ Done |
+| 153 | Scan tier mapping: free→monthly, paid→weekly, enterprise→daily   | Eng   | ✅ Done |
+| 154 | Immediate scan scheduling on claim (scan_scheduled_at = now)     | Eng   | ✅ Done |
+
 ---
 
 ## Key Files
@@ -419,18 +433,20 @@ _Clinical Integrity (all states)_
 | `lib/crawl/provider-extractor.ts`                  | Phase 1 HTTP-based provider extraction     |
 | `components/dashboard/RosterOnboardingCard.tsx`    | Inline roster confirmation card            |
 | `components/dashboard/RosterOnboardingWrapper.tsx` | Onboarding card client wrapper             |
+| `lib/scanner/scan-tier-resolver.ts`                | Subscription → scan cadence tier mapping   |
 
 ---
 
 ## GitHub Actions Workflows
 
-| Workflow                      | Schedule             | Status                            |
-| ----------------------------- | -------------------- | --------------------------------- |
-| `nppes-weekly-sync.yml`       | Monday 6am UTC       | Needs verification                |
-| `pecos-monthly-sync.yml`      | 1st of month 7am UTC | Needs verification                |
-| `tmb-monthly-sync.yml`        | Manual trigger       | —                                 |
-| `ca-mb-resolution-sync.yml`   | 2nd Tuesday 8am UTC  | Needs verification                |
-| `scan-and-delta.yml`          | Wednesday 5am UTC    | Fixed (state filter + limit bump) |
-| `nppes-confirmation-poll.yml` | Daily 10am UTC       | Needs verification                |
-| `tmb-newsroom-monitor.yml`    | Wednesday 4am UTC    | Fixed (ts-node → tsx)             |
-| `trial-lifecycle.yml`         | Daily 11am UTC       | Needs verification                |
+| Workflow                      | Schedule             | Status                             |
+| ----------------------------- | -------------------- | ---------------------------------- |
+| `nppes-weekly-sync.yml`       | Monday 6am UTC       | Needs verification                 |
+| `pecos-monthly-sync.yml`      | 1st of month 7am UTC | Needs verification                 |
+| `tmb-monthly-sync.yml`        | Manual trigger       | —                                  |
+| `ca-mb-resolution-sync.yml`   | 2nd Tuesday 8am UTC  | Needs verification                 |
+| `scan-and-delta.yml`          | Wednesday 5am UTC    | Fixed (state filter + limit bump)  |
+| `scan-daily.yml`              | Daily 6am UTC        | NEW — CVO + claimed priority scans |
+| `nppes-confirmation-poll.yml` | Daily 10am UTC       | Needs verification                 |
+| `tmb-newsroom-monitor.yml`    | Wednesday 4am UTC    | Fixed (ts-node → tsx)              |
+| `trial-lifecycle.yml`         | Daily 11am UTC       | Needs verification                 |

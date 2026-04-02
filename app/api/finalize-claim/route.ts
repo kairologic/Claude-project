@@ -10,9 +10,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createServerSupabaseClient,
+  createAdminSupabaseClient,
   linkUserToPractice,
   markTokenClaimed,
 } from '@/lib/auth/auth-helpers';
+import { resolveScanTierOnClaim } from '@/lib/scanner/scan-tier-resolver';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +26,10 @@ export async function POST(request: NextRequest) {
 
     // Get the authenticated user
     const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -32,6 +37,26 @@ export async function POST(request: NextRequest) {
 
     // Link user to practice as admin (they claimed it)
     await linkUserToPractice(user.id, practice_id, 'admin', true);
+
+    // Promote scan tier: claimed practices get at least weekly scans
+    const admin = createAdminSupabaseClient();
+
+    // Get the practice to determine subscription tier
+    const { data: practiceData } = await admin
+      .from('practice_websites')
+      .select('subscription_tier')
+      .eq('id', practice_id)
+      .single();
+
+    const scanTier = resolveScanTierOnClaim(practiceData?.subscription_tier || null);
+
+    await admin
+      .from('practice_websites')
+      .update({
+        scan_tier: scanTier,
+        scan_scheduled_at: new Date().toISOString(), // Schedule immediate first scan
+      })
+      .eq('id', practice_id);
 
     // Mark the preview token as claimed
     if (token_id) {
@@ -47,7 +72,7 @@ export async function POST(request: NextRequest) {
     console.error('Finalize claim error:', err);
     return NextResponse.json(
       { error: err.message || 'An unexpected error occurred' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
