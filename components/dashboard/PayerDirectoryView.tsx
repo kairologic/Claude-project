@@ -78,6 +78,8 @@ function getCellStatus(
 
   const snap = snapshots.find((s) => s.npi === npi && s.payer_code === payerCode) || null;
   if (!snap) return { status: 'no_data', mismatchCount: 0, snapshot: null };
+    if (!snap.listed_name_full) return { status: 'not_listed', mismatchCount: 0, snapshot: snap };
+
   if (!snap.listed_name_full) return { status: 'not_listed', mismatchCount: 0, snapshot: snap };
 
   // Helper function
