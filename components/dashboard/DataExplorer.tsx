@@ -781,7 +781,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 12,
     overflowY: 'auto' as const,
-    maxHeight: 'calc(100vh - 260px)',
   },
   sidebarSection: {
     background: colors.white,
@@ -889,9 +888,9 @@ const styles: Record<string, React.CSSProperties> = {
   savedItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 1,
-    padding: '7px 10px',
-    background: 'none',
+    gap: 2,
+    padding: '8px 10px',
+    background: colors.gray50,
     border: `1px solid ${colors.gray200}`,
     borderRadius: 6,
     cursor: 'pointer',
