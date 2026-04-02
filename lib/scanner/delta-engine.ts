@@ -20,6 +20,7 @@
 // ── Types ────────────────────────────────────────────────
 
 import { stampDeltaEventVerification } from './validation-gate-status';
+import { compareFourWaySpecialty } from './taxonomy-normalizer';
 
 export interface DeltaEvent {
   npi: string;
@@ -280,6 +281,47 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
         signal_type: 'license_status_change',
         corroborated_by: [data.board_source || 'state_board'],
         corroboration_count: 1,
+      });
+    }
+  }
+
+  // ── Specialty / Taxonomy Comparison ─────────────────────
+  // 4-way comparison: web vs NPPES vs state board vs payer directory
+  // Uses taxonomy normalizer to handle freeform text ↔ NUCC codes
+
+  const specialtyResult = compareFourWaySpecialty({
+    webSpecialty: data.web_specialty,
+    nppesCode: data.nppes_taxonomy,
+    boardSpecialty: data.board_specialty,
+    payerSpecialty: null,  // TODO #133: wire payer_directory_snapshots specialty
+  });
+
+  if (specialtyResult.hasMismatch) {
+    for (const mismatch of specialtyResult.mismatches) {
+      // Skip low-confidence mismatches (unresolvable / one_null)
+      if (mismatch.confidence > 0.5) continue;
+
+      // Determine which source disagrees with consensus
+      const isCorroborated = specialtyResult.consensusSources.length >= 2;
+      const consensusAgrees = specialtyResult.consensusSources.includes(mismatch.sourceA)
+        || specialtyResult.consensusSources.includes(mismatch.sourceB);
+
+      deltas.push({
+        npi: data.npi,
+        practice_website_id: data.practice_website_id,
+        field_name: 'specialty',
+        old_value: `${mismatch.sourceA}: ${mismatch.specialtyA}`,
+        new_value: `${mismatch.sourceB}: ${mismatch.specialtyB}`,
+        detection_source: mismatch.sourceA === 'website' ? 'web_scan' : mismatch.sourceA,
+        confidence: isCorroborated && consensusAgrees ? 'HIGH' : 'MEDIUM',
+        confidence_score: isCorroborated ? 0.90 : 0.75,
+        signal_type: 'taxonomy_change',
+        corroborated_by: isCorroborated
+          ? specialtyResult.consensusSources
+          : [mismatch.sourceA],
+        corroboration_count: isCorroborated
+          ? specialtyResult.consensusSources.length
+          : 1,
       });
     }
   }
