@@ -7,6 +7,9 @@ import { FhirDirectoryClient } from './fhir-client';
 import { BcbsTxProviderFinder } from './bcbstx-provider-finder';
 import type { PayerEndpoint, DirectorySnapshot } from './types';
 
+// Payer codes that have a scraper fallback when FHIR is unavailable or fails
+const SCRAPER_FALLBACK_PAYERS = new Set(['bcbs_tx', 'bcbstx']);
+
 export class PayerDirectoryLookup {
   private fhirClient = new FhirDirectoryClient();
   private bcbstxFinder = new BcbsTxProviderFinder();
@@ -14,6 +17,7 @@ export class PayerDirectoryLookup {
   /**
    * Look up a provider across a single payer.
    * Automatically routes to the correct adapter based on endpoint config.
+   * Falls back to scraper for supported payers if FHIR fails.
    */
   async lookup(
     npi: string,
@@ -21,30 +25,66 @@ export class PayerDirectoryLookup {
     providerLastName: string,
     endpoint: PayerEndpoint,
     geoLocation?: string,
-    batchId?: string
+    batchId?: string,
   ): Promise<DirectorySnapshot | null> {
     // Skip inactive endpoints
     if (!endpoint.is_active) return null;
 
     // Route to BCBS TX scraper if endpoint URL starts with SCRAPE:
     if (endpoint.fhir_base_url.startsWith('SCRAPE:')) {
-      if (endpoint.payer_code === 'bcbs_tx' || endpoint.payer_code === 'bcbstx') {
-        return this.bcbstxFinder.lookupByName(
-          providerFirstName,
-          providerLastName,
-          npi,
-          geoLocation,
-          batchId
-        );
-      }
-      // Future scrapers for other payers would go here
-      console.warn(`[PayerLookup] No scraper for ${endpoint.payer_code}`);
-      return null;
+      return this.lookupViaScraper(
+        npi,
+        providerFirstName,
+        providerLastName,
+        endpoint,
+        geoLocation,
+        batchId,
+      );
     }
 
     // Standard FHIR lookup (pass name for fallback on payers that don't support identifier search)
     const fullName = `${providerFirstName} ${providerLastName}`.trim();
-    return this.fhirClient.lookupByNpi(npi, endpoint, batchId, fullName || null);
+    const result = await this.fhirClient.lookupByNpi(npi, endpoint, batchId, fullName || null);
+
+    // Fallback to scraper if FHIR returned null and payer has a scraper
+    if (!result && SCRAPER_FALLBACK_PAYERS.has(endpoint.payer_code)) {
+      console.log(`  [${endpoint.payer_code}] FHIR returned no result — falling back to scraper`);
+      return this.lookupViaScraper(
+        npi,
+        providerFirstName,
+        providerLastName,
+        endpoint,
+        geoLocation,
+        batchId,
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Route to the appropriate scraper adapter.
+   */
+  private async lookupViaScraper(
+    npi: string,
+    providerFirstName: string,
+    providerLastName: string,
+    endpoint: PayerEndpoint,
+    geoLocation?: string,
+    batchId?: string,
+  ): Promise<DirectorySnapshot | null> {
+    if (endpoint.payer_code === 'bcbs_tx' || endpoint.payer_code === 'bcbstx') {
+      return this.bcbstxFinder.lookupByName(
+        providerFirstName,
+        providerLastName,
+        npi,
+        geoLocation,
+        batchId,
+      );
+    }
+    // Future scrapers for other payers would go here
+    console.warn(`[PayerLookup] No scraper for ${endpoint.payer_code}`);
+    return null;
   }
 
   /**
@@ -58,13 +98,13 @@ export class PayerDirectoryLookup {
     providerLastName: string,
     endpoints: PayerEndpoint[],
     geoLocation?: string,
-    batchId?: string
+    batchId?: string,
   ): Promise<DirectorySnapshot[]> {
     const fhirEndpoints = endpoints.filter(
-      e => e.is_active && !e.fhir_base_url.startsWith('SCRAPE:')
+      (e) => e.is_active && !e.fhir_base_url.startsWith('SCRAPE:'),
     );
     const scrapeEndpoints = endpoints.filter(
-      e => e.is_active && e.fhir_base_url.startsWith('SCRAPE:')
+      (e) => e.is_active && e.fhir_base_url.startsWith('SCRAPE:'),
     );
 
     // Run FHIR lookups in parallel
@@ -73,7 +113,7 @@ export class PayerDirectoryLookup {
         console.log(`  [${endpoint.payer_code}] Querying ${endpoint.payer_name} (FHIR)...`);
         const fullName = `${providerFirstName} ${providerLastName}`.trim();
         return this.fhirClient.lookupByNpi(npi, endpoint, batchId, fullName || null);
-      })
+      }),
     );
 
     const results: DirectorySnapshot[] = [];
@@ -86,13 +126,18 @@ export class PayerDirectoryLookup {
       console.log(`  [${endpoint.payer_code}] Querying ${endpoint.payer_name} (scrape)...`);
       try {
         const snapshot = await this.lookup(
-          npi, providerFirstName, providerLastName, endpoint, geoLocation, batchId
+          npi,
+          providerFirstName,
+          providerLastName,
+          endpoint,
+          geoLocation,
+          batchId,
         );
         if (snapshot) results.push(snapshot);
 
         // Rate limit: 2 second delay between scrape calls
         if (scrapeEndpoints.indexOf(endpoint) < scrapeEndpoints.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       } catch (err) {
         console.error(`  [${endpoint.payer_code}] Scrape error: ${err}`);
@@ -109,10 +154,10 @@ export class PayerDirectoryLookup {
   async lookupAllFhirOnly(
     npi: string,
     endpoints: PayerEndpoint[],
-    batchId?: string
+    batchId?: string,
   ): Promise<DirectorySnapshot[]> {
     const fhirEndpoints = endpoints.filter(
-      e => e.is_active && !e.fhir_base_url.startsWith('SCRAPE:')
+      (e) => e.is_active && !e.fhir_base_url.startsWith('SCRAPE:'),
     );
     return this.fhirClient.lookupAllPayers(npi, fhirEndpoints, batchId);
   }

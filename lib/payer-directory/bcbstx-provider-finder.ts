@@ -1,9 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
-// KairoLogic: BCBS TX Provider Finder Adapter
+// KairoLogic: BCBS TX Provider Finder Adapter v2.0
 // On-demand lookup via my.providerfinderonline.com (Sapphire365)
-// Uses Browserless for session management
+// Uses local headless Chrome via @sparticuz/chromium + puppeteer-core
+// (replaces Browserless.io — zero per-unit cost)
 // ═══════════════════════════════════════════════════════════════
 
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 import type { DirectorySnapshot } from './types';
 
 const BCBSTX_CONFIG = {
@@ -44,11 +47,6 @@ interface BcbsTxProvider {
 
 export class BcbsTxProviderFinder {
   private session: BcbsTxSession | null = null;
-  private browserlessUrl: string;
-
-  constructor(browserlessUrl?: string) {
-    this.browserlessUrl = browserlessUrl || process.env.BROWSERLESS_URL || 'https://chrome.browserless.io';
-  }
 
   /**
    * Look up a provider by name in BCBS TX directory.
@@ -62,7 +60,7 @@ export class BcbsTxProviderFinder {
     lastName: string,
     npi: string,
     geoLocation?: string,
-    batchId?: string
+    batchId?: string,
   ): Promise<DirectorySnapshot | null> {
     try {
       // Ensure we have a valid session
@@ -75,7 +73,8 @@ export class BcbsTxProviderFinder {
       }
 
       // Search by last name
-      const searchUrl = `${BCBSTX_CONFIG.baseUrl}/api/providers/summary.json?` +
+      const searchUrl =
+        `${BCBSTX_CONFIG.baseUrl}/api/providers/summary.json?` +
         `fulltext=${encodeURIComponent(lastName)}&` +
         `network_id=${BCBSTX_CONFIG.networkId}&` +
         `geo_location=${this.session.geoLocation}&` +
@@ -105,80 +104,90 @@ export class BcbsTxProviderFinder {
   }
 
   /**
-   * Initialize a Browserless session to get cookies and config_signature.
+   * Initialize a headless Chrome session to get cookies and config_signature.
+   * Uses local @sparticuz/chromium (works on Vercel serverless).
    */
   private async initSession(geoLocation?: string): Promise<void> {
     const geo = geoLocation || BCBSTX_CONFIG.defaultGeoLocation;
-    const pageUrl = `${BCBSTX_CONFIG.baseUrl}/?` +
+    const pageUrl =
+      `${BCBSTX_CONFIG.baseUrl}/?` +
       `ci=${BCBSTX_CONFIG.ci}&` +
       `corp_code=${BCBSTX_CONFIG.corpCode}&` +
       `network_id=${BCBSTX_CONFIG.networkId}&` +
       `geo_location=${geo}&` +
       `locale=${BCBSTX_CONFIG.locale}`;
 
-    // Use Browserless /function endpoint to run a script in headless Chrome
-    const browserlessApiUrl = `${this.browserlessUrl}/function?token=${process.env.BROWSERLESS_API_KEY}`;
-
-    const script = `
-      module.exports = async ({ page }) => {
-        // Intercept network requests to capture config_signature
-        let configSignature = '';
-        page.on('request', (req) => {
-          const url = req.url();
-          if (url.includes('config_signature=')) {
-            const m = url.match(/config_signature=([^&]+)/);
-            if (m) configSignature = decodeURIComponent(m[1]);
-          }
-        });
-
-        await page.goto('${pageUrl}', { waitUntil: 'networkidle0', timeout: 30000 });
-
-        // Wait for the app to initialize and make its config calls
-        await page.waitForTimeout(3000);
-
-        // Extract cookies
-        const cookies = await page.cookies();
-        const cookieString = cookies.map(c => c.name + '=' + c.value).join('; ');
-
-        // Fallback: check performance entries if request interception missed it
-        if (!configSignature) {
-          const entries = await page.evaluate(() => {
-            return performance.getEntriesByType('resource')
-              .filter(r => r.name.includes('config_signature='))
-              .map(r => r.name);
-          });
-          if (entries.length > 0) {
-            const m = entries[0].match(/config_signature=([^&]+)/);
-            if (m) configSignature = decodeURIComponent(m[1]);
-          }
-        }
-
-        return { cookies: cookieString, configSignature };
-      };
-    `;
-
+    let browser = null;
     try {
-      const res = await fetch(browserlessApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/javascript' },
-        body: script,
-        signal: AbortSignal.timeout(45_000),
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
       });
 
-      if (!res.ok) throw new Error(`Browserless ${res.status}: ${res.statusText}`);
-      const data = await res.json();
+      const page = await browser.newPage();
+      await page.setUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      );
+
+      // Intercept network requests to capture config_signature
+      let configSignature = '';
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        const url = req.url();
+        if (url.includes('config_signature=')) {
+          const m = url.match(/config_signature=([^&]+)/);
+          if (m) configSignature = decodeURIComponent(m[1]);
+        }
+        req.continue();
+      });
+
+      await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 45_000 });
+
+      // Wait for the app to initialize and make its config calls
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // Extract cookies
+      const cookies = await page.cookies();
+      const cookieString = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+
+      // Fallback: check performance entries if request interception missed it
+      if (!configSignature) {
+        const entries = await page.evaluate(() => {
+          return performance
+            .getEntriesByType('resource')
+            .filter((r) => r.name.includes('config_signature='))
+            .map((r) => r.name);
+        });
+        if (entries.length > 0) {
+          const m = entries[0].match(/config_signature=([^&]+)/);
+          if (m) configSignature = decodeURIComponent(m[1]);
+        }
+      }
+
+      await browser.close();
+      browser = null;
 
       this.session = {
-        cookies: data.cookies,
-        configSignature: data.configSignature || '{1289}-{1397|72}-{}',
+        cookies: cookieString,
+        configSignature: configSignature || '{1289}-{1397|72}-{}',
         geoLocation: geo,
         expiresAt: Date.now() + 10 * 60 * 1000, // 10 minute session TTL
       };
 
-      console.log('[BCBSTX] Session established');
+      console.warn('[BCBSTX] Session established via local headless Chrome');
     } catch (err) {
       console.error(`[BCBSTX] Session init failed: ${err}`);
       this.session = null;
+    } finally {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
 
@@ -191,16 +200,16 @@ export class BcbsTxProviderFinder {
     try {
       const res = await fetch(url, {
         headers: {
-          'Accept': 'application/json',
-          'Cookie': this.session.cookies,
+          Accept: 'application/json',
+          Cookie: this.session.cookies,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': `${BCBSTX_CONFIG.baseUrl}/`,
+          Referer: `${BCBSTX_CONFIG.baseUrl}/`,
         },
         signal: AbortSignal.timeout(15_000),
       });
 
       if (!res.ok) {
-        console.log(`[BCBSTX] API ${res.status}: ${res.statusText}`);
+        console.warn(`[BCBSTX] API ${res.status}: ${res.statusText}`);
         // Session may have expired — invalidate it
         if (res.status === 401 || res.status === 403) {
           this.session = null;
@@ -236,7 +245,9 @@ export class BcbsTxProviderFinder {
       if (Array.isArray(providers)) {
         rawProviders = providers;
       } else if (providers?.provider) {
-        rawProviders = Array.isArray(providers.provider) ? providers.provider : [providers.provider];
+        rawProviders = Array.isArray(providers.provider)
+          ? providers.provider
+          : [providers.provider];
       }
     } else if (d?.results) {
       rawProviders = d.results as unknown[];
@@ -270,9 +281,13 @@ export class BcbsTxProviderFinder {
       city: String(addr['city'] || loc['city'] || ''),
       state: String(addr['state'] || loc['state'] || ''),
       zip: String(addr['zip'] || addr['postal_code'] || loc['zip'] || ''),
-      acceptingNewPatients: (r['accepting_new_patients'] ?? loc['accepting_new_patients'] ?? null) as boolean | null,
+      acceptingNewPatients: (r['accepting_new_patients'] ??
+        loc['accepting_new_patients'] ??
+        null) as boolean | null,
       gender: String(r['gender'] || r['professional_gender'] || ''),
-      organizationName: String(r['group_name'] || r['organization_name'] || loc['group_name'] || ''),
+      organizationName: String(
+        r['group_name'] || r['organization_name'] || loc['group_name'] || '',
+      ),
       npi: String(r['npi'] || ''),
     };
   }
@@ -284,26 +299,26 @@ export class BcbsTxProviderFinder {
   private findBestMatch(
     providers: BcbsTxProvider[],
     firstName: string,
-    lastName: string
+    lastName: string,
   ): BcbsTxProvider | null {
     if (providers.length === 0) return null;
 
     const normalizedFirst = firstName.toLowerCase().trim();
     const normalizedLast = lastName.toLowerCase().trim();
 
-    // NPI match (if response includes NPI — some Sapphire365 configs do)
-    // We'd compare against the known NPI, but since we don't have it in this
-    // scope, we rely on name matching
+    // NPI match (if response includes NPI)
+    // Note: some Sapphire365 configs include NPI in the response
 
     // Exact match first
     const exact = providers.find(
-      p => p.lastName.toLowerCase().trim() === normalizedLast &&
-           p.firstName.toLowerCase().trim() === normalizedFirst
+      (p) =>
+        p.lastName.toLowerCase().trim() === normalizedLast &&
+        p.firstName.toLowerCase().trim() === normalizedFirst,
     );
     if (exact) return exact;
 
     // Full name match (display_name contains both)
-    const fullNameMatch = providers.find(p => {
+    const fullNameMatch = providers.find((p) => {
       const fn = p.fullName.toLowerCase();
       return fn.includes(normalizedFirst) && fn.includes(normalizedLast);
     });
@@ -311,15 +326,14 @@ export class BcbsTxProviderFinder {
 
     // Partial match (first initial + last name)
     const partial = providers.find(
-      p => p.lastName.toLowerCase().trim() === normalizedLast &&
-           p.firstName.toLowerCase().trim().startsWith(normalizedFirst.charAt(0))
+      (p) =>
+        p.lastName.toLowerCase().trim() === normalizedLast &&
+        p.firstName.toLowerCase().trim().startsWith(normalizedFirst.charAt(0)),
     );
     if (partial) return partial;
 
     // Last name only (if single result)
-    const lastOnly = providers.filter(
-      p => p.lastName.toLowerCase().trim() === normalizedLast
-    );
+    const lastOnly = providers.filter((p) => p.lastName.toLowerCase().trim() === normalizedLast);
     if (lastOnly.length === 1) return lastOnly[0];
 
     return null;
@@ -331,7 +345,7 @@ export class BcbsTxProviderFinder {
   private buildSnapshot(
     npi: string,
     provider: BcbsTxProvider,
-    batchId?: string
+    batchId?: string,
   ): DirectorySnapshot {
     const today = new Date().toISOString().split('T')[0];
     return {
@@ -376,19 +390,33 @@ export class BcbsTxProviderFinder {
       npi,
       payer_code: 'bcbs_tx',
       snapshot_date: today,
-      listed_name_first: null, listed_name_last: null, listed_name_full: null,
-      listed_credentials: null, listed_gender: null,
-      listed_address_line1: null, listed_address_line2: null,
-      listed_city: null, listed_state: null, listed_zip: null,
-      listed_phone: null, listed_fax: null,
-      listed_specialty_code: null, listed_specialty_display: null,
+      listed_name_first: null,
+      listed_name_last: null,
+      listed_name_full: null,
+      listed_credentials: null,
+      listed_gender: null,
+      listed_address_line1: null,
+      listed_address_line2: null,
+      listed_city: null,
+      listed_state: null,
+      listed_zip: null,
+      listed_phone: null,
+      listed_fax: null,
+      listed_specialty_code: null,
+      listed_specialty_display: null,
       listed_accepting_patients: null,
-      listed_org_name: null, listed_org_npi: null,
-      listed_network_name: null, listed_plan_names: null,
-      listed_languages: null, listed_telehealth_available: null,
-      listed_office_hours: null, listed_disability_access: null,
-      fhir_practitioner_id: null, fhir_practitioner_role_id: null,
-      fhir_location_id: null, fhir_organization_id: null,
+      listed_org_name: null,
+      listed_org_npi: null,
+      listed_network_name: null,
+      listed_plan_names: null,
+      listed_languages: null,
+      listed_telehealth_available: null,
+      listed_office_hours: null,
+      listed_disability_access: null,
+      fhir_practitioner_id: null,
+      fhir_practitioner_role_id: null,
+      fhir_location_id: null,
+      fhir_organization_id: null,
       fhir_raw_bundle: null,
       sync_batch_id: batchId || null,
     };
