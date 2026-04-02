@@ -713,6 +713,28 @@ export default function DashboardHome({
                     </div>
                   );
                 })}
+                {complianceChecks && complianceChecks.some((c) => c.status === 'open') && (
+                  <a
+                    href={`/practice/${practiceId}/compliance`}
+                    style={{
+                      display: 'block',
+                      textAlign: 'center',
+                      marginTop: spacing.sm,
+                      padding: `${spacing.xs}px ${spacing.sm}px`,
+                      background: '#D64545',
+                      color: '#fff',
+                      borderRadius: radii.md,
+                      ...typography.label,
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      transition: `opacity ${transitions.base}`,
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.opacity = '0.9')}
+                    onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+                  >
+                    Start remediation
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -771,6 +793,28 @@ export default function DashboardHome({
                   <span style={{ color: colors.gray400, ...typography.bodySmall }}>{p.status}</span>
                 </div>
               ))}
+              {payers.length > 0 && payers.some((p) => p.status.includes('Not listed')) && (
+                <a
+                  href={`/practice/${practiceId}/payer-directory`}
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    marginTop: spacing.sm,
+                    padding: `${spacing.xs}px ${spacing.sm}px`,
+                    background: colors.navy,
+                    color: '#fff',
+                    borderRadius: radii.md,
+                    ...typography.label,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    transition: `opacity ${transitions.base}`,
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.opacity = '0.9')}
+                  onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  View payer issues
+                </a>
+              )}
             </div>
           </div>
         </div>
