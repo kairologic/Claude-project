@@ -34,6 +34,7 @@ import {
   triggerPayerDirectoryWorkflows,
   triggerLicenseRenewalWorkflows,
 } from './trigger-workflows';
+import { runDeltaDetection } from './delta-engine';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
 import {
   runComplianceChecks,
@@ -70,6 +71,7 @@ export interface ScanResult {
   providers_matched: MatchedProvider[];
   payer_extraction: PayerExtractionResult | null; // #111: insurance accepted on website
   compliance_scan: ComplianceScanResult | null; // WF6: compliance check results
+  delta_count: number; // delta events created by delta engine
   scan_duration_ms: number;
   error?: string;
 }
@@ -376,6 +378,7 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
     providers_matched: [],
     payer_extraction: null,
     compliance_scan: null,
+    delta_count: 0,
     scan_duration_ms: 0,
   };
 
@@ -508,6 +511,22 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
       }
     }
 
+    // 5c. Run delta detection: compare web extraction against NPPES + state board
+    // This populates nppes_delta_events and sets mismatch flags on practice_providers
+    // (has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch)
+    try {
+      const deltaResult = await runDeltaDetection(site.id);
+      if (deltaResult.deltas_created > 0) {
+        console.log(
+          `[Scanner] Delta detection: ${deltaResult.deltas_created} deltas for ${deltaResult.providers_with_deltas} providers ` +
+            `(${deltaResult.high_confidence} high, ${deltaResult.medium_confidence} medium confidence) at practice ${site.id}`,
+        );
+      }
+      result.delta_count = deltaResult.deltas_created;
+    } catch (err) {
+      console.warn(`[Scanner] Failed to run delta detection for practice ${site.id}:`, err);
+    }
+
     result.success = true;
   } catch (err) {
     result.error = err instanceof Error ? err.message : 'Unknown scan error';
@@ -593,7 +612,7 @@ async function updateScanMetadata(site: PracticeWebsite, result: ScanResult): Pr
       completed_at: now,
       practice_website_id: site.id,
       practice_group_id: site.practice_group_id,
-      delta_count: 0, // updated by delta engine in Task 1.11
+      delta_count: result.delta_count || 0,
       composite_score: compositeScore,
       risk_level: riskLevel,
       checks_total: checksTotal,
