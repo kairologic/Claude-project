@@ -12,10 +12,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/with-auth';
-import { FhirDirectoryClient } from '@/lib/payer-directory/fhir-client';
-import { detectMismatches, buildAcceptanceGapMismatch } from '@/lib/payer-directory/mismatch-engine';
-import { detectAcceptanceGaps, type ProviderDirectoryStatus } from '@/lib/payer-directory/acceptance-gap-detector';
-import type { PayerEndpoint, DirectorySnapshot, NppesProviderData, DirectoryMismatch } from '@/lib/payer-directory/types';
+import { PayerDirectoryLookup } from '@/lib/payer-directory/payer-lookup';
+import {
+  detectMismatches,
+  buildAcceptanceGapMismatch,
+} from '@/lib/payer-directory/mismatch-engine';
+import {
+  detectAcceptanceGaps,
+  type ProviderDirectoryStatus,
+} from '@/lib/payer-directory/acceptance-gap-detector';
+import type {
+  PayerEndpoint,
+  DirectorySnapshot,
+  NppesProviderData,
+  DirectoryMismatch,
+} from '@/lib/payer-directory/types';
 
 // TODO: Add system-admin role check when role system is expanded
 
@@ -38,12 +49,15 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
 
     // Check for concurrent sync — reject if another sync is running for this practice
     const existingSync = activeSyncs.get(practice_id);
-    if (existingSync && (Date.now() - existingSync) < SYNC_LOCK_TIMEOUT_MS) {
+    if (existingSync && Date.now() - existingSync < SYNC_LOCK_TIMEOUT_MS) {
       const elapsedSec = Math.round((Date.now() - existingSync) / 1000);
-      return NextResponse.json({
-        error: `Sync already in progress for this practice (started ${elapsedSec}s ago). Please wait for it to complete.`,
-        retry_after_seconds: 30,
-      }, { status: 429 });
+      return NextResponse.json(
+        {
+          error: `Sync already in progress for this practice (started ${elapsedSec}s ago). Please wait for it to complete.`,
+          retry_after_seconds: 30,
+        },
+        { status: 429 },
+      );
     }
     activeSyncs.set(practice_id, startTime);
     lockedPracticeId = practice_id;
@@ -56,7 +70,10 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       .eq('roster_status', 'active');
 
     if (providersError || !providers || providers.length === 0) {
-      return NextResponse.json({ error: 'No active providers found for this practice' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'No active providers found for this practice' },
+        { status: 404 },
+      );
     }
 
     const npiList = providers.map((p: any) => p.npi).filter(Boolean);
@@ -96,7 +113,9 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       try {
         const { data: nppesRows, error: nppesQueryError } = await supabase
           .from('providers')
-          .select('npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip_code,phone,taxonomy_code,taxonomy_desc,gender')
+          .select(
+            'npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip_code,phone,taxonomy_code,taxonomy_desc,gender',
+          )
           .in('npi', npiList);
 
         if (nppesQueryError || !nppesRows) {
@@ -106,7 +125,8 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
         for (const row of nppesRows) {
           nppesMap.set(row.npi, {
             npi: row.npi,
-            provider_name: row.organization_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+            provider_name:
+              row.organization_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
             first_name: row.first_name,
             last_name: row.last_name,
             organization_name: row.organization_name,
@@ -133,7 +153,7 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
     }
 
     // ═══ Phase 2 (optional): Refresh snapshots from FHIR endpoints ═══
-    let fhirRefreshStats = { attempted: 0, upserted: 0, errors: 0 };
+    const fhirRefreshStats = { attempted: 0, upserted: 0, errors: 0 };
     // Capture first N error messages for diagnostics (visible in API response)
     const errorSamples: string[] = [];
     const MAX_ERROR_SAMPLES = 10;
@@ -151,16 +171,30 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
         .eq('is_active', true);
 
       if (!endpointsError && endpoints && endpoints.length > 0) {
-        const fhirClient = new FhirDirectoryClient();
+        const payerLookup = new PayerDirectoryLookup();
         const batchId = `admin-sync-${practice_id.slice(0, 8)}-${Date.now()}`;
 
         for (const provider of providers) {
           if (!provider.npi) continue;
+
+          // Parse first/last name for scraper fallback (BCBS TX etc.)
+          const nppes = nppesMap.get(provider.npi);
+          const firstName = nppes?.first_name || provider.provider_name?.split(' ')[0] || '';
+          const lastName =
+            nppes?.last_name || provider.provider_name?.split(' ').slice(-1)[0] || '';
+
           for (const endpoint of endpoints) {
             if (failedPayers.has(endpoint.payer_code)) continue; // Skip payer if already failed
             fhirRefreshStats.attempted++;
             try {
-              const snapshot = await fhirClient.lookupByNpi(provider.npi, endpoint, batchId, provider.provider_name);
+              const snapshot = await payerLookup.lookup(
+                provider.npi,
+                firstName,
+                lastName,
+                endpoint,
+                undefined,
+                batchId,
+              );
               if (!snapshot) continue;
 
               const isListed = !!snapshot.fhir_practitioner_id;
@@ -175,7 +209,9 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
                   .eq('payer_code', endpoint.payer_code)
                   .limit(1);
                 if (existing?.[0]) prevCount = existing[0].consecutive_not_listed_count || 0;
-              } catch { /* first snapshot */ }
+              } catch {
+                /* first snapshot */
+              }
 
               const snapshotRow: Record<string, unknown> = {
                 npi: provider.npi,
@@ -224,15 +260,18 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
               fhirRefreshStats.upserted++;
               // Reset circuit breaker on success
               consecutiveFailures.set(endpoint.payer_code, 0);
-
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
               const stack = err instanceof Error ? err.stack : undefined;
-              console.warn(`[practice-payer-sync] FHIR error for ${provider.npi}/${endpoint.payer_code}: ${msg}`);
+              console.warn(
+                `[practice-payer-sync] FHIR error for ${provider.npi}/${endpoint.payer_code}: ${msg}`,
+              );
               if (stack) console.warn(`[practice-payer-sync] Stack: ${stack}`);
               // Log full error for DB upsert failures to capture PostgREST error body
               if (msg.includes('DB POST')) {
-                console.warn(`[practice-payer-sync] Upsert failed for NPI ${provider.npi}/${endpoint.payer_code} — full error: ${msg}`);
+                console.warn(
+                  `[practice-payer-sync] Upsert failed for NPI ${provider.npi}/${endpoint.payer_code} — full error: ${msg}`,
+                );
               }
               fhirRefreshStats.errors++;
               if (errorSamples.length < MAX_ERROR_SAMPLES) {
@@ -247,7 +286,9 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
                 msg.includes('FHIR 401') ||
                 msg.includes('FHIR 403');
               if (isAuthError) {
-                console.warn(`[practice-payer-sync] Auth failure for ${endpoint.payer_code} — skipping remaining providers`);
+                console.warn(
+                  `[practice-payer-sync] Auth failure for ${endpoint.payer_code} — skipping remaining providers`,
+                );
                 failedPayers.add(endpoint.payer_code);
                 continue;
               }
@@ -257,7 +298,7 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
               consecutiveFailures.set(endpoint.payer_code, prevFailCount + 1);
               if (prevFailCount + 1 >= CIRCUIT_BREAKER_THRESHOLD) {
                 console.warn(
-                  `[practice-payer-sync] Circuit breaker: ${endpoint.payer_code} failed ${prevFailCount + 1} times consecutively — skipping remaining providers`
+                  `[practice-payer-sync] Circuit breaker: ${endpoint.payer_code} failed ${prevFailCount + 1} times consecutively — skipping remaining providers`,
                 );
                 failedPayers.add(endpoint.payer_code);
               }
@@ -296,7 +337,7 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       const before = snapshots.length;
       snapshots = snapshots.filter((s: DirectorySnapshot) => !failedPayers.has(s.payer_code));
       console.log(
-        `[practice-payer-sync] Excluded ${before - snapshots.length} snapshots from failed payers: ${[...failedPayers].join(', ')}`
+        `[practice-payer-sync] Excluded ${before - snapshots.length} snapshots from failed payers: ${[...failedPayers].join(', ')}`,
       );
     }
 
@@ -322,28 +363,29 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
           if (mismatches.length > 0) {
             allMismatches.push(...mismatches);
             for (const m of mismatches) {
-              await supabase
-                .from('payer_directory_mismatches')
-                .insert({
-                  npi: m.npi,
-                  payer_code: m.payer_code,
-                  practice_website_id: m.practice_website_id,
-                  field_name: m.field_name,
-                  mismatch_type: m.mismatch_type,
-                  nppes_value: m.nppes_value,
-                  website_value: m.website_value,
-                  payer_value: m.payer_value,
-                  recommended_value: m.recommended_value,
-                  priority: m.priority,
-                  fix_via_caqh: m.fix_via_caqh,
-                  fix_instructions: m.fix_instructions,
-                  status: 'open',
-                });
+              await supabase.from('payer_directory_mismatches').insert({
+                npi: m.npi,
+                payer_code: m.payer_code,
+                practice_website_id: m.practice_website_id,
+                field_name: m.field_name,
+                mismatch_type: m.mismatch_type,
+                nppes_value: m.nppes_value,
+                website_value: m.website_value,
+                payer_value: m.payer_value,
+                recommended_value: m.recommended_value,
+                priority: m.priority,
+                fix_via_caqh: m.fix_via_caqh,
+                fix_instructions: m.fix_instructions,
+                status: 'open',
+              });
               mismatchesCreated++;
             }
           }
         } catch (mismatchErr) {
-          console.warn(`[practice-payer-sync] Mismatch error for ${snapshot.npi}/${snapshot.payer_code}:`, mismatchErr);
+          console.warn(
+            `[practice-payer-sync] Mismatch error for ${snapshot.npi}/${snapshot.payer_code}:`,
+            mismatchErr,
+          );
         }
       }
     }
@@ -359,7 +401,7 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
         npi,
         payer_statuses: {} as Record<string, 'listed' | 'not_listed'>,
       }));
-      const statusMap = new Map(providerStatuses.map(ps => [ps.npi, ps]));
+      const statusMap = new Map(providerStatuses.map((ps) => [ps.npi, ps]));
 
       for (const snapshot of snapshots) {
         const ps = statusMap.get(snapshot.npi);
@@ -383,12 +425,10 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
       }
 
       // Detect gaps using the full acceptance-gap-detector module
-      const gaps = detectAcceptanceGaps(
-        practice_id,
-        acceptedPayers,
-        providerStatuses,
-        { name: practiceName, url: practiceUrl },
-      );
+      const gaps = detectAcceptanceGaps(practice_id, acceptedPayers, providerStatuses, {
+        name: practiceName,
+        url: practiceUrl,
+      });
 
       for (const gap of gaps) {
         if (gap.severity === 'warning' || gap.severity === 'action') {
@@ -401,34 +441,37 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
               gap_percentage: gap.gap_percentage,
             });
             allMismatches.push(gapMismatch);
-            await supabase
-              .from('payer_directory_mismatches')
-              .insert({
-                npi: gapMismatch.npi,
-                payer_code: gapMismatch.payer_code,
-                practice_website_id: gapMismatch.practice_website_id,
-                field_name: gapMismatch.field_name,
-                mismatch_type: gapMismatch.mismatch_type,
-                nppes_value: gapMismatch.nppes_value,
-                website_value: gapMismatch.website_value,
-                payer_value: gapMismatch.payer_value,
-                recommended_value: gapMismatch.recommended_value,
-                priority: gapMismatch.priority,
-                fix_via_caqh: gapMismatch.fix_via_caqh,
-                fix_instructions: gapMismatch.fix_instructions,
-                status: 'open',
-                signal_type: signalType,
-                acceptance_source: acceptedPayersSource,
-              });
+            await supabase.from('payer_directory_mismatches').insert({
+              npi: gapMismatch.npi,
+              payer_code: gapMismatch.payer_code,
+              practice_website_id: gapMismatch.practice_website_id,
+              field_name: gapMismatch.field_name,
+              mismatch_type: gapMismatch.mismatch_type,
+              nppes_value: gapMismatch.nppes_value,
+              website_value: gapMismatch.website_value,
+              payer_value: gapMismatch.payer_value,
+              recommended_value: gapMismatch.recommended_value,
+              priority: gapMismatch.priority,
+              fix_via_caqh: gapMismatch.fix_via_caqh,
+              fix_instructions: gapMismatch.fix_instructions,
+              status: 'open',
+              signal_type: signalType,
+              acceptance_source: acceptedPayersSource,
+            });
             acceptanceGapsCreated++;
             mismatchesCreated++;
           } catch (gapErr) {
-            console.warn(`[practice-payer-sync] Acceptance gap error for ${gap.payer_code}:`, gapErr);
+            console.warn(
+              `[practice-payer-sync] Acceptance gap error for ${gap.payer_code}:`,
+              gapErr,
+            );
           }
         }
       }
     } else {
-      console.log(`[practice-payer-sync] No accepted_payers on website — skipping acceptance gap detection`);
+      console.log(
+        `[practice-payer-sync] No accepted_payers on website — skipping acceptance gap detection`,
+      );
     }
 
     // ═══ Correction Packet Completion Tracking ═══
@@ -468,11 +511,17 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
         const packetData = {
           practice_website_id: practice_id,
           total_mismatches: allMismatches.length,
-          payers_affected: new Set(allMismatches.map(m => m.payer_code)).size,
-          providers_affected: new Set(allMismatches.filter(m => m.npi !== 'PRACTICE').map(m => m.npi)).size,
-          caqh_fixable_count: allMismatches.filter(m => m.fix_via_caqh).length,
-          direct_fix_count: allMismatches.filter(m => !m.fix_via_caqh && m.mismatch_type !== 'acceptance_gap').length,
-          nppes_fix_count: allMismatches.filter(m => m.field_name === 'address' || m.field_name === 'phone').length,
+          payers_affected: new Set(allMismatches.map((m) => m.payer_code)).size,
+          providers_affected: new Set(
+            allMismatches.filter((m) => m.npi !== 'PRACTICE').map((m) => m.npi),
+          ).size,
+          caqh_fixable_count: allMismatches.filter((m) => m.fix_via_caqh).length,
+          direct_fix_count: allMismatches.filter(
+            (m) => !m.fix_via_caqh && m.mismatch_type !== 'acceptance_gap',
+          ).length,
+          nppes_fix_count: allMismatches.filter(
+            (m) => m.field_name === 'address' || m.field_name === 'phone',
+          ).length,
           status: 'current',
           generated_at: new Date().toISOString(),
         };
@@ -484,9 +533,7 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
             .eq('id', existingPackets[0].id);
           correctionPacketStatus = 'updated';
         } else {
-          await supabase
-            .from('correction_packets')
-            .insert(packetData);
+          await supabase.from('correction_packets').insert(packetData);
           correctionPacketStatus = 'created';
         }
       }
@@ -523,12 +570,13 @@ const POST_HANDLER = withAuth(async (request: NextRequest, ctx) => {
         signal_type: signalType,
       },
       correction_packet: correctionPacketStatus,
-      fhir_refresh: refresh ? { ...fhirRefreshStats, failed_payers: [...failedPayers], error_samples: errorSamples } : null,
+      fhir_refresh: refresh
+        ? { ...fhirRefreshStats, failed_payers: [...failedPayers], error_samples: errorSamples }
+        : null,
       warnings: warnings.length > 0 ? warnings : undefined,
       elapsed_seconds: parseFloat(elapsed),
       message: `Analyzed ${snapshots.length} snapshots for ${npiList.length} providers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}. Mismatches: ${allMismatches.length}`,
     });
-
   } catch (err) {
     console.error('[practice-payer-sync] Error:', err);
     return NextResponse.json(
