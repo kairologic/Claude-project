@@ -43,8 +43,13 @@ export default function RosterOnboardingCard({
   onConfirm,
   onAddProvider,
 }: RosterOnboardingCardProps) {
+  // Only show for auto-detected, non-departed providers
+  const detectedProviders = providers.filter(
+    (p) => p.association_source === 'DETECTED' && p.roster_status !== 'departed',
+  );
+
   const [confirmed, setConfirmed] = useState<Set<string>>(
-    new Set(providers.map((p) => p.npi)), // All checked by default
+    () => new Set(detectedProviders.map((p) => p.npi)), // Only active detected providers checked by default
   );
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -52,11 +57,6 @@ export default function RosterOnboardingCard({
 
   // Don't render if already confirmed or dismissed
   if (onboardingConfirmed || dismissed) return null;
-
-  // Only show for auto-detected providers
-  const detectedProviders = providers.filter(
-    (p) => p.association_source === 'DETECTED' && p.roster_status !== 'departed',
-  );
 
   if (detectedProviders.length === 0) return null;
 

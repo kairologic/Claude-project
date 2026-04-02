@@ -31,6 +31,8 @@ import {
   triggerWorkflowsForPractice,
   triggerDepartureWorkflow,
   triggerComplianceWorkflows,
+  triggerPayerDirectoryWorkflows,
+  triggerLicenseRenewalWorkflows,
 } from './trigger-workflows';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
 import {
@@ -688,6 +690,79 @@ async function updateScanMetadata(site: PracticeWebsite, result: ScanResult): Pr
           err,
         );
       }
+    }
+
+    // 8. WF2: Trigger payer directory workflows for payer mismatches
+    try {
+      // Fetch open payer mismatches for this practice
+      const payerMismatches: any[] = await db(
+        `payer_directory_mismatches?practice_website_id=eq.${site.id}&status=eq.open&select=npi,payer_code,mismatch_type,field_name,nppes_value,payer_value`,
+      );
+      if (payerMismatches && payerMismatches.length > 0) {
+        // Look up payer names
+        const payerCodes = [...new Set(payerMismatches.map((m: any) => m.payer_code))];
+        const payerEndpoints: any[] = await db(
+          `payer_directory_endpoints?payer_code=in.(${payerCodes.map((c: string) => `"${c}"`).join(',')})&select=payer_code,payer_name`,
+        );
+        const payerNameMap = new Map(
+          (payerEndpoints || []).map((p: any) => [p.payer_code, p.payer_name]),
+        );
+
+        // Look up provider names for individual NPIs
+        const providerNpis = [
+          ...new Set(
+            payerMismatches.filter((m: any) => m.npi !== 'PRACTICE').map((m: any) => m.npi),
+          ),
+        ];
+        let providerNameMap = new Map<string, string>();
+        if (providerNpis.length > 0) {
+          const provRows: any[] = await db(
+            `practice_providers?practice_website_id=eq.${site.id}&npi=in.(${providerNpis.map((n: string) => `"${n}"`).join(',')})&select=npi,provider_name`,
+          );
+          providerNameMap = new Map((provRows || []).map((p: any) => [p.npi, p.provider_name]));
+        }
+
+        const mismatchInputs = payerMismatches.map((m: any) => ({
+          npi: m.npi,
+          provider_name:
+            m.npi === 'PRACTICE'
+              ? site.name || 'Practice'
+              : providerNameMap.get(m.npi) || `NPI ${m.npi}`,
+          payer_code: m.payer_code,
+          payer_name: payerNameMap.get(m.payer_code) || m.payer_code,
+          field: m.field_name || m.mismatch_type || 'listing',
+          payer_value: m.payer_value || '',
+          nppes_value: m.nppes_value || '',
+          caqh_fixable: true,
+        }));
+
+        const payerWfResult = await triggerPayerDirectoryWorkflows(site.id, mismatchInputs);
+        if (payerWfResult.workflows_created > 0) {
+          console.log(
+            `[Scanner] Created ${payerWfResult.workflows_created} payer directory workflows for practice ${site.id}`,
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[Scanner] Failed to trigger payer directory workflows for practice ${site.id}:`,
+        err,
+      );
+    }
+
+    // 9. WF7: Trigger license renewal workflows for providers with license issues
+    try {
+      const licenseWfResult = await triggerLicenseRenewalWorkflows(site.id);
+      if (licenseWfResult.workflows_created > 0) {
+        console.log(
+          `[Scanner] Created ${licenseWfResult.workflows_created} license renewal workflows for practice ${site.id}`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[Scanner] Failed to trigger license renewal workflows for practice ${site.id}:`,
+        err,
+      );
     }
   }
 }
