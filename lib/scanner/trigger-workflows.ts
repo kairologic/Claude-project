@@ -398,6 +398,7 @@ export async function triggerPayerDirectoryWorkflows(
       mismatches = dbMismatches.map((m: any) => ({
         npi: m.npi,
         provider_name: m.npi === 'PRACTICE' ? '' : `NPI ${m.npi}`,
+        payer_code: m.payer_code,
         payer_name: m.payer_code,
         field: m.field_name,
         payer_value: m.payer_value || '',
