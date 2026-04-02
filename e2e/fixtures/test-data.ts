@@ -33,6 +33,8 @@ export const URLS = {
   settings: (id: string) => `/practice/${id}/settings`,
   help: (id: string) => `/practice/${id}/help`,
   search: (id: string) => `/practice/${id}/search`,
+  reports: (id: string) => `/practice/${id}/reports`,
+  compliance: (id: string) => `/practice/${id}/compliance`,
 };
 
 // API endpoints
@@ -51,8 +53,12 @@ export const API = {
 
 // Valid workflow types
 export const WORKFLOW_TYPES = [
-  'nppes_update', 'payer_directory', 'onboarding',
-  'release', 'license_renewal', 'compliance',
+  'nppes_update',
+  'payer_directory',
+  'onboarding',
+  'release',
+  'license_renewal',
+  'compliance',
 ] as const;
 
 // Status transitions

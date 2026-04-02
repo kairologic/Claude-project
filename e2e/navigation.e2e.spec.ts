@@ -35,16 +35,12 @@ test.describe('UC-NAV: Navigation', () => {
     ];
 
     for (const navItem of expectedNavItems) {
-      const item = sidebar.locator(
-        `[data-testid="nav-item-${navItem}"]`
-      );
+      const item = sidebar.locator(`[data-testid="nav-item-${navItem}"]`);
       await expect(item).toBeVisible();
     }
   });
 
-  test('UC-NAV-02: Clicking nav items navigates to correct page', async ({
-    page,
-  }) => {
+  test('UC-NAV-02: Clicking nav items navigates to correct page', async ({ page }) => {
     const sidebar = page.locator('[data-testid="sidebar"]');
 
     // Test dashboard nav
@@ -86,16 +82,12 @@ test.describe('UC-NAV: Navigation', () => {
     await page.waitForURL(`**/workflows**`, { timeout: 5000 });
 
     // Verify workflows nav item has active class
-    const activeWorkflowsItem = sidebar.locator(
-      '[data-testid="nav-item-workflows"]'
-    );
+    const activeWorkflowsItem = sidebar.locator('[data-testid="nav-item-workflows"]');
     const activeClass = await activeWorkflowsItem.getAttribute('data-active');
     expect(activeClass).toBe('true');
 
     // Verify other items are not active
-    const dashboardItem = sidebar.locator(
-      '[data-testid="nav-item-dashboard"]'
-    );
+    const dashboardItem = sidebar.locator('[data-testid="nav-item-dashboard"]');
     const dashboardActive = await dashboardItem.getAttribute('data-active');
     expect(dashboardActive).not.toBe('true');
 
@@ -104,24 +96,18 @@ test.describe('UC-NAV: Navigation', () => {
     await page.waitForURL(`**/roster**`, { timeout: 5000 });
 
     // Verify roster is now active
-    const activeRosterItem = sidebar.locator(
-      '[data-testid="nav-item-roster"]'
-    );
+    const activeRosterItem = sidebar.locator('[data-testid="nav-item-roster"]');
     const rosterActive = await activeRosterItem.getAttribute('data-active');
     expect(rosterActive).toBe('true');
 
     // Verify workflows is no longer active
-    const workflowsActive = await activeWorkflowsItem.getAttribute(
-      'data-active'
-    );
+    const workflowsActive = await activeWorkflowsItem.getAttribute('data-active');
     expect(workflowsActive).not.toBe('true');
   });
 
   test('UC-NAV-04: Practice selector dropdown works', async ({ page }) => {
     // Verify practice selector is visible
-    const practiceSelector = page.locator(
-      '[data-testid="practice-selector"]'
-    );
+    const practiceSelector = page.locator('[data-testid="practice-selector"]');
     await expect(practiceSelector).toBeVisible();
 
     // Click to open dropdown
@@ -132,17 +118,31 @@ test.describe('UC-NAV: Navigation', () => {
     await expect(dropdown).toBeVisible({ timeout: 5000 });
 
     // Verify practices are listed
-    const practiceOptions = dropdown.locator(
-      '[data-testid="practice-option"]'
-    );
+    const practiceOptions = dropdown.locator('[data-testid="practice-option"]');
     const optionCount = await practiceOptions.count();
     expect(optionCount).toBeGreaterThan(0);
 
     // Verify current practice is indicated
-    const currentOption = dropdown.locator(
-      '[data-testid="practice-option"][data-current="true"]'
-    );
+    const currentOption = dropdown.locator('[data-testid="practice-option"][data-current="true"]');
     await expect(currentOption).toBeVisible();
+  });
+
+  test('UC-NAV-05a: Coming soon section shows CAQH ProView Sync, not Credentialing', async ({
+    page,
+  }) => {
+    const sidebar = page.locator('[data-testid="sidebar"]');
+    await expect(sidebar).toBeVisible();
+
+    // The coming soon section should NOT mention "Credentialing" (since onboarding/release are live)
+    const sidebarText = await sidebar.textContent();
+    expect(sidebarText).not.toContain('Credentialing');
+
+    // Instead it should show "CAQH ProView Sync" as the coming soon item
+    const comingSoonSection = sidebar.locator('[data-testid="coming-soon-section"]');
+    if (await comingSoonSection.isVisible().catch(() => false)) {
+      const comingSoonText = await comingSoonSection.textContent();
+      expect(comingSoonText).toMatch(/CAQH/i);
+    }
   });
 
   test('UC-NAV-05: Help menu opens with options', async ({ page }) => {
@@ -165,13 +165,9 @@ test.describe('UC-NAV: Navigation', () => {
     // Verify expected help options are present
     const expectedOptions = ['documentation', 'support', 'feedback'];
     for (const option of expectedOptions) {
-      const optionElement = helpMenu.locator(
-        `[data-testid="help-option-${option}"]`
-      );
+      const optionElement = helpMenu.locator(`[data-testid="help-option-${option}"]`);
       // Some options may not always be present, so we just check they're either visible or not
-      const isVisible = await optionElement
-        .isVisible()
-        .catch(() => false);
+      const isVisible = await optionElement.isVisible().catch(() => false);
       // This is okay - we just want to verify the menu structure is correct
     }
   });

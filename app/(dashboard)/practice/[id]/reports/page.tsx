@@ -54,7 +54,15 @@ const REPORT_TYPES: ReportType[] = [
     description: 'Complete list of all providers with key information',
     icon: <Users size={24} />,
     filters: [
-      { id: 'status', label: 'Status', type: 'select', options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' },
+        ],
+      },
       { id: 'specialty', label: 'Specialty', type: 'multiselect', options: [] },
     ],
     formats: ['Excel', 'CSV', 'PDF'],
@@ -64,9 +72,7 @@ const REPORT_TYPES: ReportType[] = [
     title: 'Data Accuracy Summary',
     description: 'Quality metrics and accuracy scores for provider data',
     icon: <CheckCircle size={24} />,
-    filters: [
-      { id: 'timeframe', label: 'Timeframe', type: 'daterange' },
-    ],
+    filters: [{ id: 'timeframe', label: 'Timeframe', type: 'daterange' }],
     formats: ['Excel', 'CSV', 'PDF'],
   },
   {
@@ -74,9 +80,7 @@ const REPORT_TYPES: ReportType[] = [
     title: 'Payer Directory Status',
     description: 'Coverage and status across all payer directories',
     icon: <AlertCircle size={24} />,
-    filters: [
-      { id: 'payer', label: 'Payer', type: 'multiselect', options: [] },
-    ],
+    filters: [{ id: 'payer', label: 'Payer', type: 'multiselect', options: [] }],
     formats: ['Excel', 'CSV'],
   },
   {
@@ -84,9 +88,7 @@ const REPORT_TYPES: ReportType[] = [
     title: 'Compliance Status',
     description: 'Compliance scores and requirements status',
     icon: <CheckCircle size={24} />,
-    filters: [
-      { id: 'requirement', label: 'Requirement Type', type: 'select', options: [] },
-    ],
+    filters: [{ id: 'requirement', label: 'Requirement Type', type: 'select', options: [] }],
     formats: ['Excel', 'CSV', 'PDF'],
   },
   {
@@ -95,7 +97,16 @@ const REPORT_TYPES: ReportType[] = [
     description: 'Licenses and credentials expiring soon',
     icon: <Calendar size={24} />,
     filters: [
-      { id: 'days', label: 'Days Until Expiry', type: 'select', options: [{ value: '30', label: 'Next 30 days' }, { value: '90', label: 'Next 90 days' }, { value: '180', label: 'Next 180 days' }] },
+      {
+        id: 'days',
+        label: 'Days Until Expiry',
+        type: 'select',
+        options: [
+          { value: '30', label: 'Next 30 days' },
+          { value: '90', label: 'Next 90 days' },
+          { value: '180', label: 'Next 180 days' },
+        ],
+      },
     ],
     formats: ['Excel', 'CSV'],
   },
@@ -105,10 +116,57 @@ const REPORT_TYPES: ReportType[] = [
     description: 'Recent workflow submissions and completions',
     icon: <Zap size={24} />,
     filters: [
-      { id: 'status', label: 'Status', type: 'multiselect', options: [{ value: 'open', label: 'Open' }, { value: 'submitted', label: 'Submitted' }, { value: 'completed', label: 'Completed' }] },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'multiselect',
+        options: [
+          { value: 'open', label: 'Open' },
+          { value: 'submitted', label: 'Submitted' },
+          { value: 'completed', label: 'Completed' },
+        ],
+      },
       { id: 'daterange', label: 'Date Range', type: 'daterange' },
     ],
     formats: ['Excel', 'CSV', 'PDF'],
+  },
+  {
+    id: 'ehr-vendor',
+    title: 'EHR Vendor AI Detection',
+    description: 'AI-enabled EHR vendors detected across your practice with compliance status',
+    icon: <Zap size={24} />,
+    filters: [
+      {
+        id: 'confidence',
+        label: 'Confidence Level',
+        type: 'select',
+        options: [
+          { value: 'confirmed', label: 'Confirmed' },
+          { value: 'likely', label: 'Likely' },
+          { value: 'possible', label: 'Possible' },
+        ],
+      },
+    ],
+    formats: ['Excel', 'CSV', 'PDF'],
+  },
+  {
+    id: 'specialty-mismatch',
+    title: 'Specialty Mismatch',
+    description: 'Provider specialty discrepancies across NPPES, website, board, and payer sources',
+    icon: <AlertCircle size={24} />,
+    filters: [
+      {
+        id: 'confidence',
+        label: 'Match Confidence',
+        type: 'select',
+        options: [
+          { value: 'low', label: 'Low (hard mismatch)' },
+          { value: 'medium', label: 'Medium (soft mismatch)' },
+          { value: 'high', label: 'High (sub-specialty)' },
+        ],
+      },
+    ],
+    formats: ['Excel', 'CSV'],
   },
   {
     id: 'agent',
@@ -123,9 +181,7 @@ const REPORT_TYPES: ReportType[] = [
     title: 'Payer Comparison Grid',
     description: 'Side-by-side comparison of payer requirements',
     icon: <BarChart3 size={24} />,
-    filters: [
-      { id: 'payers', label: 'Select Payers', type: 'multiselect', options: [] },
-    ],
+    filters: [{ id: 'payers', label: 'Select Payers', type: 'multiselect', options: [] }],
     formats: ['Excel', 'CSV'],
   },
   {
@@ -133,9 +189,7 @@ const REPORT_TYPES: ReportType[] = [
     title: 'Monthly Executive Summary',
     description: 'High-level KPIs and trend analysis',
     icon: <BarChart3 size={24} />,
-    filters: [
-      { id: 'month', label: 'Month', type: 'date' },
-    ],
+    filters: [{ id: 'month', label: 'Month', type: 'date' }],
     formats: ['PDF', 'Excel'],
   },
 ];
@@ -155,7 +209,9 @@ export default function ReportsPage() {
   const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([]);
 
   // Data Explorer state
-  const [filters, setFilters] = useState<Array<{ source: string; field: string; operator: string; value: unknown }>>([]);
+  const [filters, setFilters] = useState<
+    Array<{ source: string; field: string; operator: string; value: unknown }>
+  >([]);
   const [filterLogic, setFilterLogic] = useState<'AND' | 'OR'>('AND');
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>('');
@@ -276,12 +332,14 @@ export default function ReportsPage() {
     const headers = Object.keys(explorerResults[0] as Record<string, unknown>);
     const csv = [
       headers.join(','),
-      ...explorerResults.map(row =>
-        headers.map(h => {
-          const val = (row as Record<string, unknown>)[h];
-          const str = typeof val === 'string' ? val : JSON.stringify(val);
-          return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-        }).join(',')
+      ...explorerResults.map((row) =>
+        headers
+          .map((h) => {
+            const val = (row as Record<string, unknown>)[h];
+            const str = typeof val === 'string' ? val : JSON.stringify(val);
+            return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+          })
+          .join(','),
       ),
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -294,8 +352,8 @@ export default function ReportsPage() {
   }
 
   function toggleScheduledReport(id: string) {
-    setScheduledReports(prev =>
-      prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r)
+    setScheduledReports((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)),
     );
   }
 
@@ -307,7 +365,8 @@ export default function ReportsPage() {
           onClick={() => setActiveTab('prebuilt')}
           style={{
             ...styles.tab,
-            borderBottom: activeTab === 'prebuilt' ? `3px solid ${colors.gold}` : `3px solid transparent`,
+            borderBottom:
+              activeTab === 'prebuilt' ? `3px solid ${colors.gold}` : `3px solid transparent`,
             color: activeTab === 'prebuilt' ? colors.navy : colors.navyLight,
             fontWeight: activeTab === 'prebuilt' ? 700 : 500,
           }}
@@ -318,7 +377,8 @@ export default function ReportsPage() {
           onClick={() => setActiveTab('explorer')}
           style={{
             ...styles.tab,
-            borderBottom: activeTab === 'explorer' ? `3px solid ${colors.gold}` : `3px solid transparent`,
+            borderBottom:
+              activeTab === 'explorer' ? `3px solid ${colors.gold}` : `3px solid transparent`,
             color: activeTab === 'explorer' ? colors.navy : colors.navyLight,
             fontWeight: activeTab === 'explorer' ? 700 : 500,
           }}
@@ -331,15 +391,17 @@ export default function ReportsPage() {
       {activeTab === 'prebuilt' && (
         <div style={styles.tabContent}>
           <div style={styles.reportGrid}>
-            {REPORT_TYPES.map(report => (
+            {REPORT_TYPES.map((report) => (
               <div key={report.id} style={styles.reportCard}>
                 <div style={styles.reportIcon}>{report.icon}</div>
                 <div style={styles.reportTitle}>{report.title}</div>
                 <div style={styles.reportDescription}>{report.description}</div>
                 {report.formats.length > 0 && (
                   <div style={styles.reportFormats}>
-                    {report.formats.map(fmt => (
-                      <span key={fmt} style={styles.formatBadge}>{fmt}</span>
+                    {report.formats.map((fmt) => (
+                      <span key={fmt} style={styles.formatBadge}>
+                        {fmt}
+                      </span>
                     ))}
                   </div>
                 )}
@@ -373,8 +435,8 @@ export default function ReportsPage() {
                     type="text"
                     placeholder="Source"
                     value={filter.source}
-                    onChange={e =>
-                      setFilters(prev => {
+                    onChange={(e) =>
+                      setFilters((prev) => {
                         const updated = [...prev];
                         updated[idx].source = e.target.value;
                         return updated;
@@ -386,8 +448,8 @@ export default function ReportsPage() {
                     type="text"
                     placeholder="Field"
                     value={filter.field}
-                    onChange={e =>
-                      setFilters(prev => {
+                    onChange={(e) =>
+                      setFilters((prev) => {
                         const updated = [...prev];
                         updated[idx].field = e.target.value;
                         return updated;
@@ -397,8 +459,8 @@ export default function ReportsPage() {
                   />
                   <select
                     value={filter.operator}
-                    onChange={e =>
-                      setFilters(prev => {
+                    onChange={(e) =>
+                      setFilters((prev) => {
                         const updated = [...prev];
                         updated[idx].operator = e.target.value;
                         return updated;
@@ -416,8 +478,8 @@ export default function ReportsPage() {
                     type="text"
                     placeholder="Value"
                     value={String(filter.value)}
-                    onChange={e =>
-                      setFilters(prev => {
+                    onChange={(e) =>
+                      setFilters((prev) => {
                         const updated = [...prev];
                         updated[idx].value = e.target.value;
                         return updated;
@@ -426,7 +488,7 @@ export default function ReportsPage() {
                     style={styles.filterInput}
                   />
                   <button
-                    onClick={() => setFilters(prev => prev.filter((_, i) => i !== idx))}
+                    onClick={() => setFilters((prev) => prev.filter((_, i) => i !== idx))}
                     style={styles.removeFilterBtn}
                   >
                     ✕
@@ -435,7 +497,12 @@ export default function ReportsPage() {
               ))}
 
               <button
-                onClick={() => setFilters(prev => [...prev, { source: '', field: '', operator: 'equals', value: '' }])}
+                onClick={() =>
+                  setFilters((prev) => [
+                    ...prev,
+                    { source: '', field: '', operator: 'equals', value: '' },
+                  ])
+                }
                 style={styles.addFilterBtn}
               >
                 + Add Filter
@@ -470,22 +537,24 @@ export default function ReportsPage() {
 
               <div style={styles.panelTitle}>Columns</div>
               <div style={styles.columnCheckboxes}>
-                {['provider_id', 'provider_name', 'specialty', 'status', 'last_updated'].map(col => (
-                  <label key={col} style={styles.checkbox}>
-                    <input
-                      type="checkbox"
-                      checked={selectedColumns.includes(col)}
-                      onChange={e => {
-                        if (e.target.checked) {
-                          setSelectedColumns(prev => [...prev, col]);
-                        } else {
-                          setSelectedColumns(prev => prev.filter(c => c !== col));
-                        }
-                      }}
-                    />
-                    {col}
-                  </label>
-                ))}
+                {['provider_id', 'provider_name', 'specialty', 'status', 'last_updated'].map(
+                  (col) => (
+                    <label key={col} style={styles.checkbox}>
+                      <input
+                        type="checkbox"
+                        checked={selectedColumns.includes(col)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedColumns((prev) => [...prev, col]);
+                          } else {
+                            setSelectedColumns((prev) => prev.filter((c) => c !== col));
+                          }
+                        }}
+                      />
+                      {col}
+                    </label>
+                  ),
+                )}
               </div>
 
               <div style={styles.divider} />
@@ -493,7 +562,7 @@ export default function ReportsPage() {
               <div style={styles.panelTitle}>Sort & Group</div>
               <select
                 value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
+                onChange={(e) => setSortBy(e.target.value)}
                 style={styles.filterInput}
               >
                 <option value="">Sort by...</option>
@@ -504,7 +573,7 @@ export default function ReportsPage() {
 
               <select
                 value={groupBy}
-                onChange={e => setGroupBy(e.target.value)}
+                onChange={(e) => setGroupBy(e.target.value)}
                 style={styles.filterInput}
               >
                 <option value="">Group by...</option>
@@ -532,14 +601,23 @@ export default function ReportsPage() {
                   <table style={styles.table}>
                     <thead>
                       <tr style={styles.tableHeader}>
-                        {Object.keys(explorerResults[0] as Record<string, unknown>).map(col => (
-                          <th key={col} style={styles.tableHeaderCell}>{col}</th>
+                        {Object.keys(explorerResults[0] as Record<string, unknown>).map((col) => (
+                          <th key={col} style={styles.tableHeaderCell}>
+                            {col}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {explorerResults.map((row, i) => (
-                        <tr key={i} style={i % 2 === 0 ? styles.tableRow : { ...styles.tableRow, background: colors.gray100 }}>
+                        <tr
+                          key={i}
+                          style={
+                            i % 2 === 0
+                              ? styles.tableRow
+                              : { ...styles.tableRow, background: colors.gray100 }
+                          }
+                        >
                           {Object.values(row as Record<string, unknown>).map((val, j) => (
                             <td key={j} style={styles.tableCell}>
                               {typeof val === 'object' ? JSON.stringify(val) : String(val)}
@@ -551,8 +629,17 @@ export default function ReportsPage() {
                   </table>
                 </div>
                 <div style={styles.actionButtons}>
-                  <button onClick={downloadExplorerCSV} style={styles.button}>Download CSV</button>
-                  <button style={{ ...styles.button, background: colors.gold, color: colors.navy, fontWeight: 600 }}>
+                  <button onClick={downloadExplorerCSV} style={styles.button}>
+                    Download CSV
+                  </button>
+                  <button
+                    style={{
+                      ...styles.button,
+                      background: colors.gold,
+                      color: colors.navy,
+                      fontWeight: 600,
+                    }}
+                  >
                     Save as Report
                   </button>
                 </div>
@@ -573,7 +660,7 @@ export default function ReportsPage() {
         ) : (
           <>
             <div style={styles.scheduledList}>
-              {scheduledReports.map(report => (
+              {scheduledReports.map((report) => (
                 <div key={report.id} style={styles.scheduledItem}>
                   <div style={styles.scheduledItemContent}>
                     <div style={styles.scheduledName}>{report.name}</div>
@@ -603,10 +690,12 @@ export default function ReportsPage() {
       {/* Modal for report generation */}
       {showModal && selectedReport && (
         <div style={styles.modalOverlay} onClick={() => setShowModal(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div style={styles.modalTitle}>{selectedReport.title}</div>
-              <button onClick={() => setShowModal(false)} style={styles.closeBtn}>✕</button>
+              <button onClick={() => setShowModal(false)} style={styles.closeBtn}>
+                ✕
+              </button>
             </div>
 
             <div style={styles.modalContent}>
@@ -614,18 +703,22 @@ export default function ReportsPage() {
               {selectedReport.filters.length > 0 && (
                 <div style={styles.filterSection}>
                   <div style={styles.sectionTitle}>Filters</div>
-                  {selectedReport.filters.map(filter => (
+                  {selectedReport.filters.map((filter) => (
                     <div key={filter.id} style={styles.filterGroup}>
                       <label style={styles.filterLabel}>{filter.label}</label>
                       {filter.type === 'select' && (
                         <select
                           value={String(filterValues[filter.id] || '')}
-                          onChange={e => setFilterValues(prev => ({ ...prev, [filter.id]: e.target.value }))}
+                          onChange={(e) =>
+                            setFilterValues((prev) => ({ ...prev, [filter.id]: e.target.value }))
+                          }
                           style={styles.select}
                         >
                           <option value="">Select {filter.label}...</option>
-                          {filter.options?.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          {filter.options?.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
                           ))}
                         </select>
                       )}
@@ -633,22 +726,16 @@ export default function ReportsPage() {
                         <input
                           type="date"
                           value={String(filterValues[filter.id] || '')}
-                          onChange={e => setFilterValues(prev => ({ ...prev, [filter.id]: e.target.value }))}
+                          onChange={(e) =>
+                            setFilterValues((prev) => ({ ...prev, [filter.id]: e.target.value }))
+                          }
                           style={styles.select}
                         />
                       )}
                       {filter.type === 'daterange' && (
                         <div style={styles.daterangeInputs}>
-                          <input
-                            type="date"
-                            placeholder="From"
-                            style={styles.select}
-                          />
-                          <input
-                            type="date"
-                            placeholder="To"
-                            style={styles.select}
-                          />
+                          <input type="date" placeholder="From" style={styles.select} />
+                          <input type="date" placeholder="To" style={styles.select} />
                         </div>
                       )}
                     </div>
@@ -660,7 +747,7 @@ export default function ReportsPage() {
               <div style={styles.filterSection}>
                 <div style={styles.sectionTitle}>Format</div>
                 <div style={styles.formatOptions}>
-                  {selectedReport.formats.map(fmt => (
+                  {selectedReport.formats.map((fmt) => (
                     <button
                       key={fmt}
                       onClick={() => setSelectedFormat(fmt)}
@@ -684,17 +771,28 @@ export default function ReportsPage() {
                     <table style={styles.table}>
                       <thead>
                         <tr style={styles.tableHeader}>
-                          {previewData.columns.map(col => (
-                            <th key={col} style={styles.tableHeaderCell}>{col}</th>
+                          {previewData.columns.map((col) => (
+                            <th key={col} style={styles.tableHeaderCell}>
+                              {col}
+                            </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {previewData.rows.map((row, i) => (
-                          <tr key={i} style={i % 2 === 0 ? styles.tableRow : { ...styles.tableRow, background: colors.gray100 }}>
-                            {previewData.columns.map(col => (
+                          <tr
+                            key={i}
+                            style={
+                              i % 2 === 0
+                                ? styles.tableRow
+                                : { ...styles.tableRow, background: colors.gray100 }
+                            }
+                          >
+                            {previewData.columns.map((col) => (
                               <td key={col} style={styles.tableCell}>
-                                {typeof row[col] === 'object' ? JSON.stringify(row[col]) : String(row[col])}
+                                {typeof row[col] === 'object'
+                                  ? JSON.stringify(row[col])
+                                  : String(row[col])}
                               </td>
                             ))}
                           </tr>
