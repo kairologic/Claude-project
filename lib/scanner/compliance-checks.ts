@@ -5,7 +5,7 @@
 // module. These checks cover three state compliance categories:
 //
 //   - Data Sovereignty (DR-01..05) — SB 1188
-//   - AI Transparency (AI-01..04)  — HB 149
+//   - AI Transparency (AI-01..05)  — HB 149
 //   - Clinical Integrity (ER-01..04) — SB 1188
 //
 // Each check function takes pre-crawled page data and returns a ComplianceFinding.
@@ -56,50 +56,142 @@ interface PageContext {
 // ─── Constants ──────────────────────────────────────────
 
 const AI_DISCLOSURE_KEYWORDS = [
-  'artificial intelligence', 'ai disclosure', 'machine learning',
-  'algorithm', 'ai-assisted', 'ai assisted', 'automated decision',
-  'clinical ai', 'ai tool', 'ai system', 'ai-powered', 'ai powered',
-  'computer-aided', 'computer aided', 'predictive model',
-  'deep learning', 'neural network', 'intelligent system',
+  'artificial intelligence',
+  'ai disclosure',
+  'machine learning',
+  'algorithm',
+  'ai-assisted',
+  'ai assisted',
+  'automated decision',
+  'clinical ai',
+  'ai tool',
+  'ai system',
+  'ai-powered',
+  'ai powered',
+  'computer-aided',
+  'computer aided',
+  'predictive model',
+  'deep learning',
+  'neural network',
+  'intelligent system',
 ];
 
 const DARK_PATTERN_INDICATORS = [
-  'display:none', 'display: none', 'visibility:hidden', 'visibility: hidden',
-  'opacity:0', 'opacity: 0', 'font-size:0', 'font-size: 0',
-  'height:0', 'height: 0', 'width:0', 'width: 0',
-  'text-indent:-9999', 'position:absolute;left:-9999',
-  'clip:rect(0,0,0,0)', 'overflow:hidden;height:0',
+  'display:none',
+  'display: none',
+  'visibility:hidden',
+  'visibility: hidden',
+  'opacity:0',
+  'opacity: 0',
+  'font-size:0',
+  'font-size: 0',
+  'height:0',
+  'height: 0',
+  'width:0',
+  'width: 0',
+  'text-indent:-9999',
+  'position:absolute;left:-9999',
+  'clip:rect(0,0,0,0)',
+  'overflow:hidden;height:0',
 ];
 
 const CHATBOT_SIGNATURES = [
-  'intercom', 'drift', 'zendesk', 'tidio', 'livechat', 'tawk',
-  'crisp', 'freshchat', 'hubspot-messages', 'olark', 'chatra',
-  'comm100', 'happyfox', 'chatbot', 'dialogflow', 'botpress',
-  'manychat', 'mobilemonkey', 'chatfuel', 'landbot',
+  'intercom',
+  'drift',
+  'zendesk',
+  'tidio',
+  'livechat',
+  'tawk',
+  'crisp',
+  'freshchat',
+  'hubspot-messages',
+  'olark',
+  'chatra',
+  'comm100',
+  'happyfox',
+  'chatbot',
+  'dialogflow',
+  'botpress',
+  'manychat',
+  'mobilemonkey',
+  'chatfuel',
+  'landbot',
 ];
 
 const EHR_SIGNATURES = [
-  'nextgen', 'epic', 'cerner', 'athena', 'allscripts', 'eclinicalworks',
-  'drchrono', 'kareo', 'practice fusion', 'elation', 'greenway',
-  'meditech', 'modernizing medicine', 'advancedmd', 'patientpop',
-  'patient portal', 'myhealth', 'my chart', 'mychart', 'followmyhealth',
+  'nextgen',
+  'epic',
+  'cerner',
+  'athena',
+  'allscripts',
+  'eclinicalworks',
+  'drchrono',
+  'kareo',
+  'practice fusion',
+  'elation',
+  'greenway',
+  'meditech',
+  'modernizing medicine',
+  'advancedmd',
+  'patientpop',
+  'patient portal',
+  'myhealth',
+  'my chart',
+  'mychart',
+  'followmyhealth',
 ];
 
 const US_SAAS = [
-  'google-analytics.com', 'googletagmanager.com', 'googleapis.com', 'gstatic.com',
-  'google.com', 'doubleclick.net', 'facebook.com', 'facebook.net', 'fbcdn.net',
-  'stripe.com', 'stripe.network', 'hubspot.com', 'hsforms.com', 'hs-scripts.com',
-  'cloudflare.com', 'jsdelivr.net', 'jquery.com', 'youtube.com', 'vimeo.com',
-  'fonts.googleapis.com', 'fonts.gstatic.com', 'maps.googleapis.com', 'typekit.net',
-  'calendly.com', 'zocdoc.com', 'patientpop.com', 'accessibe.com', 'userway.org',
-  'intercom.io', 'zendesk.com', 'tawk.to', 'tidio.co', 'instagram.com',
-  'twitter.com', 'linkedin.com', 'pinterest.com',
+  'google-analytics.com',
+  'googletagmanager.com',
+  'googleapis.com',
+  'gstatic.com',
+  'google.com',
+  'doubleclick.net',
+  'facebook.com',
+  'facebook.net',
+  'fbcdn.net',
+  'stripe.com',
+  'stripe.network',
+  'hubspot.com',
+  'hsforms.com',
+  'hs-scripts.com',
+  'cloudflare.com',
+  'jsdelivr.net',
+  'jquery.com',
+  'youtube.com',
+  'vimeo.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+  'maps.googleapis.com',
+  'typekit.net',
+  'calendly.com',
+  'zocdoc.com',
+  'patientpop.com',
+  'accessibe.com',
+  'userway.org',
+  'intercom.io',
+  'zendesk.com',
+  'tawk.to',
+  'tidio.co',
+  'instagram.com',
+  'twitter.com',
+  'linkedin.com',
+  'pinterest.com',
 ];
 
 const US_MAIL = [
-  'google.com', 'googlemail.com', 'outlook.com', 'protection.outlook.com',
-  'amazonses.com', 'pphosted.com', 'mimecast.com', 'emailsrvr.com',
-  'secureserver.net', 'zoho.com', 'paubox.com',
+  'google.com',
+  'googlemail.com',
+  'outlook.com',
+  'protection.outlook.com',
+  'amazonses.com',
+  'pphosted.com',
+  'mimecast.com',
+  'emailsrvr.com',
+  'secureserver.net',
+  'zoho.com',
+  'paubox.com',
 ];
 
 const CNAME_PATTERNS: { pattern: string; provider: string }[] = [
@@ -119,7 +211,12 @@ const CNAME_PATTERNS: { pattern: string; provider: string }[] = [
 ];
 
 const SEVERITY_DEDUCTIONS: Record<string, number> = {
-  critical: 30, high: 20, medium: 10, low: 5, advisory: 5, info: 0,
+  critical: 30,
+  high: 20,
+  medium: 10,
+  low: 5,
+  advisory: 5,
+  info: 0,
 };
 
 // ─── Helpers ────────────────────────────────────────────
@@ -134,12 +231,12 @@ function extractDomain(url: string): string {
 
 function isKnownUSSaaS(domain: string): boolean {
   const l = domain.toLowerCase();
-  return US_SAAS.some(e => l === e || l.endsWith('.' + e));
+  return US_SAAS.some((e) => l === e || l.endsWith('.' + e));
 }
 
 function isKnownUSMail(exchange: string): boolean {
   const l = exchange.toLowerCase();
-  return US_MAIL.some(e => l === e || l.endsWith('.' + e));
+  return US_MAIL.some((e) => l === e || l.endsWith('.' + e));
 }
 
 async function safeFetch(url: string, timeoutMs = 8000): Promise<Response | null> {
@@ -151,7 +248,12 @@ async function safeFetch(url: string, timeoutMs = 8000): Promise<Response | null
 }
 
 async function resolveIPGeo(hostname: string): Promise<{
-  ip: string; country: string; countryCode: string; city: string; org: string; isSovereign: boolean;
+  ip: string;
+  country: string;
+  countryCode: string;
+  city: string;
+  org: string;
+  isSovereign: boolean;
 } | null> {
   try {
     const res = await safeFetch(
@@ -162,8 +264,12 @@ async function resolveIPGeo(hostname: string): Promise<{
     const d = await res.json();
     if (d.status !== 'success') return null;
     return {
-      ip: d.query || '', country: d.country || '', countryCode: d.countryCode || '',
-      city: d.city || '', org: d.org || d.isp || '', isSovereign: d.countryCode === 'US',
+      ip: d.query || '',
+      country: d.country || '',
+      countryCode: d.countryCode || '',
+      city: d.city || '',
+      org: d.org || d.isp || '',
+      isSovereign: d.countryCode === 'US',
     };
   } catch {
     return null;
@@ -176,12 +282,10 @@ async function resolveMX(domain: string): Promise<{ exchange: string; preference
     if (!res || !res.ok) return [];
     const data = await res.json();
     if (!data.Answer) return [];
-    return data.Answer
-      .filter((a: any) => a.type === 15)
-      .map((a: any) => {
-        const p = a.data.split(' ');
-        return { preference: parseInt(p[0]) || 0, exchange: (p[1] || '').replace(/\.$/, '') };
-      });
+    return data.Answer.filter((a: any) => a.type === 15).map((a: any) => {
+      const p = a.data.split(' ');
+      return { preference: parseInt(p[0]) || 0, exchange: (p[1] || '').replace(/\.$/, '') };
+    });
   } catch {
     return [];
   }
@@ -206,7 +310,10 @@ async function detectCDNByCNAME(domain: string): Promise<{ detected: boolean; pr
   }
 }
 
-function detectCDNByHeaders(headers: Record<string, string>): { detected: boolean; provider: string } {
+function detectCDNByHeaders(headers: Record<string, string>): {
+  detected: boolean;
+  provider: string;
+} {
   if (headers['cf-ray'] || headers['server'] === 'cloudflare' || headers['cf-cache-status'])
     return { detected: true, provider: 'Cloudflare' };
   if (headers['x-amz-cf-id'] || headers['x-amz-cf-pop'])
@@ -217,8 +324,7 @@ function detectCDNByHeaders(headers: Record<string, string>): { detected: boolea
     return { detected: true, provider: 'Vercel' };
   if (headers['x-azure-ref'] || headers['x-msedge-ref'])
     return { detected: true, provider: 'Azure CDN' };
-  if (headers['server']?.includes('netlify'))
-    return { detected: true, provider: 'Netlify' };
+  if (headers['server']?.includes('netlify')) return { detected: true, provider: 'Netlify' };
   return { detected: false, provider: '' };
 }
 
@@ -226,12 +332,18 @@ function detectPageContext(html: string, text: string): PageContext {
   const lt = text.toLowerCase();
   const lh = html.toLowerCase();
 
-  const isContact = ['contact us', 'get in touch', 'contact form'].some(k => lt.includes(k));
+  const isContact = ['contact us', 'get in touch', 'contact form'].some((k) => lt.includes(k));
   const isHomepage = lh.includes('og:type" content="website"') || lt.includes('welcome to');
-  const isAbout = ['about us', 'our team', 'our mission', 'our doctors'].some(k => lt.includes(k));
-  const isServices = ['our services', 'services we offer', 'treatments'].some(k => lt.includes(k));
-  const isPortal = ['patient portal', 'login', 'sign in', 'my chart'].some(k => lt.includes(k));
-  const isIntake = ['intake form', 'registration form', 'new patient form'].some(k => lt.includes(k));
+  const isAbout = ['about us', 'our team', 'our mission', 'our doctors'].some((k) =>
+    lt.includes(k),
+  );
+  const isServices = ['our services', 'services we offer', 'treatments'].some((k) =>
+    lt.includes(k),
+  );
+  const isPortal = ['patient portal', 'login', 'sign in', 'my chart'].some((k) => lt.includes(k));
+  const isIntake = ['intake form', 'registration form', 'new patient form'].some((k) =>
+    lt.includes(k),
+  );
 
   let type = 'general';
   if (isIntake) type = 'patient_intake';
@@ -243,10 +355,14 @@ function detectPageContext(html: string, text: string): PageContext {
 
   return {
     type,
-    hasPatientPortal: EHR_SIGNATURES.some(s => lh.includes(s)) || lt.includes('patient portal'),
-    hasIntakeForms: ['intake form', 'registration', 'new patient', 'patient form'].some(k => lt.includes(k)),
-    hasDiagnosticTools: ['symptom checker', 'risk calculator', 'health assessment'].some(k => lt.includes(k)),
-    hasChatbot: CHATBOT_SIGNATURES.some(s => lh.includes(s)),
+    hasPatientPortal: EHR_SIGNATURES.some((s) => lh.includes(s)) || lt.includes('patient portal'),
+    hasIntakeForms: ['intake form', 'registration', 'new patient', 'patient form'].some((k) =>
+      lt.includes(k),
+    ),
+    hasDiagnosticTools: ['symptom checker', 'risk calculator', 'health assessment'].some((k) =>
+      lt.includes(k),
+    ),
+    hasChatbot: CHATBOT_SIGNATURES.some((s) => lh.includes(s)),
   };
 }
 
@@ -260,76 +376,126 @@ async function checkDR01(
   if (!geo) {
     return {
       finding: {
-        id: 'DR-01', name: 'Primary Domain IP Geo-Location',
-        status: 'warn', severity: 'high', category: 'data_sovereignty',
+        id: 'DR-01',
+        name: 'Primary Domain IP Geo-Location',
+        status: 'warn',
+        severity: 'high',
+        category: 'data_sovereignty',
         detail: `Unable to resolve IP for ${domain}. Manual audit needed.`,
         clause: 'SB 1188 Sec. 183.002(a)',
       },
-      cdnDetected: false, cdnProvider: '',
+      cdnDetected: false,
+      cdnProvider: '',
     };
   }
 
   // CDN detection: headers first (cheapest), then CNAME
   const hdrCdn = detectCDNByHeaders(headers);
-  const cnameCdn = hdrCdn.detected ? { detected: false, provider: '' } : await detectCDNByCNAME(domain);
+  const cnameCdn = hdrCdn.detected
+    ? { detected: false, provider: '' }
+    : await detectCDNByCNAME(domain);
   const cdnDetected = hdrCdn.detected || cnameCdn.detected;
   const cdnProvider = hdrCdn.provider || cnameCdn.provider;
 
   if (cdnDetected && !geo.isSovereign) {
     return {
       finding: {
-        id: 'DR-01', name: 'Primary Domain IP Geo-Location',
-        status: 'pass', severity: 'low', category: 'data_sovereignty',
+        id: 'DR-01',
+        name: 'Primary Domain IP Geo-Location',
+        status: 'pass',
+        severity: 'low',
+        category: 'data_sovereignty',
         detail: `IP ${geo.ip} geolocates to ${geo.city}, ${geo.country} but is ${cdnProvider} anycast. US edge nodes serve US traffic.`,
         clause: 'SB 1188 Sec. 183.002(a)',
         evidence: { ip: geo.ip, country: geo.countryCode, cdnProvider },
       },
-      cdnDetected: true, cdnProvider,
+      cdnDetected: true,
+      cdnProvider,
     };
   }
 
   if (geo.isSovereign) {
     return {
       finding: {
-        id: 'DR-01', name: 'Primary Domain IP Geo-Location',
-        status: 'pass', severity: 'low', category: 'data_sovereignty',
+        id: 'DR-01',
+        name: 'Primary Domain IP Geo-Location',
+        status: 'pass',
+        severity: 'low',
+        category: 'data_sovereignty',
         detail: `Server ${geo.ip} in ${geo.city}, US (${geo.org}).`,
         clause: 'SB 1188 Sec. 183.002(a)',
         evidence: { ip: geo.ip, country: 'US', city: geo.city, org: geo.org },
       },
-      cdnDetected, cdnProvider,
+      cdnDetected,
+      cdnProvider,
     };
   }
 
   return {
     finding: {
-      id: 'DR-01', name: 'Primary Domain IP Geo-Location',
-      status: 'fail', severity: 'critical', category: 'data_sovereignty',
+      id: 'DR-01',
+      name: 'Primary Domain IP Geo-Location',
+      status: 'fail',
+      severity: 'critical',
+      category: 'data_sovereignty',
       detail: `Server ${geo.ip} in ${geo.city}, ${geo.country} (${geo.org}). No CDN detected.`,
       clause: 'SB 1188 Sec. 183.002(a)',
       evidence: { ip: geo.ip, country: geo.countryCode, city: geo.city },
       recommended_fix: 'Migrate hosting to a US-based provider or configure a US-only CDN.',
     },
-    cdnDetected: false, cdnProvider: '',
+    cdnDetected: false,
+    cdnProvider: '',
   };
 }
 
 function checkDR02(headers: Record<string, string>): ComplianceFinding {
-  const foreignRegions = ['eu-', 'ap-', 'sa-', 'af-', 'me-', 'cn-', 'ams', 'fra', 'sin', 'syd', 'tok', 'lon', 'cdg'];
+  const foreignRegions = [
+    'eu-',
+    'ap-',
+    'sa-',
+    'af-',
+    'me-',
+    'cn-',
+    'ams',
+    'fra',
+    'sin',
+    'syd',
+    'tok',
+    'lon',
+    'cdg',
+  ];
   const allVals = Object.values(headers).join(' ');
-  const foreignEdges = foreignRegions.filter(r => allVals.includes(r)).map(r => r.toUpperCase());
+  const foreignEdges = foreignRegions
+    .filter((r) => allVals.includes(r))
+    .map((r) => r.toUpperCase());
   const cfPop = (headers['cf-ray'] || '').split('-').pop() || '';
-  const foreignPops = ['AMS', 'FRA', 'SIN', 'SYD', 'TOK', 'LON', 'CDG', 'BOM', 'GRU', 'NRT', 'ICN', 'DUB'];
-  if (foreignPops.some(p => cfPop.toUpperCase().includes(p))) foreignEdges.push(`CF:${cfPop.toUpperCase()}`);
+  const foreignPops = [
+    'AMS',
+    'FRA',
+    'SIN',
+    'SYD',
+    'TOK',
+    'LON',
+    'CDG',
+    'BOM',
+    'GRU',
+    'NRT',
+    'ICN',
+    'DUB',
+  ];
+  if (foreignPops.some((p) => cfPop.toUpperCase().includes(p)))
+    foreignEdges.push(`CF:${cfPop.toUpperCase()}`);
 
   return {
-    id: 'DR-02', name: 'CDN & Edge Cache Analysis',
+    id: 'DR-02',
+    name: 'CDN & Edge Cache Analysis',
     status: foreignEdges.length > 0 ? 'warn' : 'pass',
     severity: foreignEdges.length > 0 ? 'medium' : 'low',
     category: 'data_sovereignty',
-    detail: foreignEdges.length > 0
-      ? `CDN foreign edge indicators: ${foreignEdges.join(', ')}. Static asset caching only.`
-      : 'No foreign edge node indicators detected.',
+    detail:
+      foreignEdges.length > 0
+        ? `CDN foreign edge indicators: ${foreignEdges.join(', ')}. Static asset caching only.`
+        : 'No foreign edge node indicators detected.',
     clause: 'SB 1188 Sec. 183.002(b)',
     evidence: { foreignEdges },
   };
@@ -339,34 +505,40 @@ async function checkDR03(domain: string): Promise<ComplianceFinding> {
   const mxRecords = await resolveMX(domain);
   if (mxRecords.length === 0) {
     return {
-      id: 'DR-03', name: 'Mail Exchange (MX) Pathing',
-      status: 'warn', severity: 'medium', category: 'data_sovereignty',
+      id: 'DR-03',
+      name: 'Mail Exchange (MX) Pathing',
+      status: 'warn',
+      severity: 'medium',
+      category: 'data_sovereignty',
       detail: `No MX records for ${domain}.`,
       clause: 'SB 1188 Sec. 183.002(c)',
     };
   }
 
   const mxGeo = await Promise.all(
-    mxRecords.slice(0, 3).map(async mx => ({
+    mxRecords.slice(0, 3).map(async (mx) => ({
       exchange: mx.exchange,
       geo: await resolveIPGeo(mx.exchange),
     })),
   );
-  const foreignMX = mxGeo.filter(r => r.geo && !r.geo.isSovereign && !isKnownUSMail(r.exchange));
+  const foreignMX = mxGeo.filter((r) => r.geo && !r.geo.isSovereign && !isKnownUSMail(r.exchange));
 
   return {
-    id: 'DR-03', name: 'Mail Exchange (MX) Pathing',
+    id: 'DR-03',
+    name: 'Mail Exchange (MX) Pathing',
     status: foreignMX.length > 0 ? 'fail' : 'pass',
     severity: foreignMX.length > 0 ? 'critical' : 'low',
     category: 'data_sovereignty',
-    detail: foreignMX.length > 0
-      ? `Foreign mail routing: ${foreignMX.map(f => `${f.exchange} (${f.geo?.country})`).join('; ')}`
-      : `${mxRecords.length} MX records, all US. Primary: ${mxRecords[0].exchange}`,
+    detail:
+      foreignMX.length > 0
+        ? `Foreign mail routing: ${foreignMX.map((f) => `${f.exchange} (${f.geo?.country})`).join('; ')}`
+        : `${mxRecords.length} MX records, all US. Primary: ${mxRecords[0].exchange}`,
     clause: 'SB 1188 Sec. 183.002(c)',
-    evidence: { mxRecords: mxRecords.map(r => r.exchange) },
-    recommended_fix: foreignMX.length > 0
-      ? 'Migrate email to a US-based provider (Google Workspace, Microsoft 365, Paubox).'
-      : undefined,
+    evidence: { mxRecords: mxRecords.map((r) => r.exchange) },
+    recommended_fix:
+      foreignMX.length > 0
+        ? 'Migrate email to a US-based provider (Google Workspace, Microsoft 365, Paubox).'
+        : undefined,
   };
 }
 
@@ -378,13 +550,18 @@ async function checkDR04(html: string, domain: string): Promise<ComplianceFindin
     try {
       const d = extractDomain(m[1]);
       if (d && d !== domain && !d.includes('localhost')) extDomains.add(d);
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
 
   if (extDomains.size === 0) {
     return {
-      id: 'DR-04', name: 'Sub-Processor Domain Audit',
-      status: 'pass', severity: 'low', category: 'data_sovereignty',
+      id: 'DR-04',
+      name: 'Sub-Processor Domain Audit',
+      status: 'pass',
+      severity: 'low',
+      category: 'data_sovereignty',
       detail: 'No external domains detected. Self-contained.',
       clause: 'SB 1188 Sec. 183.004',
     };
@@ -392,31 +569,40 @@ async function checkDR04(html: string, domain: string): Promise<ComplianceFindin
 
   const toCheck = [...extDomains].slice(0, 10);
   const geoResults = await Promise.all(
-    toCheck.map(async d => ({ domain: d, geo: await resolveIPGeo(d), isUS: isKnownUSSaaS(d) })),
+    toCheck.map(async (d) => ({ domain: d, geo: await resolveIPGeo(d), isUS: isKnownUSSaaS(d) })),
   );
-  const foreign = geoResults.filter(r => r.geo && !r.geo.isSovereign && !r.isUS);
+  const foreign = geoResults.filter((r) => r.geo && !r.geo.isSovereign && !r.isUS);
 
   return {
-    id: 'DR-04', name: 'Sub-Processor Domain Audit',
+    id: 'DR-04',
+    name: 'Sub-Processor Domain Audit',
     status: foreign.length > 0 ? 'warn' : 'pass',
     severity: foreign.length > 0 ? 'high' : 'low',
     category: 'data_sovereignty',
-    detail: foreign.length > 0
-      ? `${foreign.length} foreign sub-processor(s): ${foreign.map(f => `${f.domain} (${f.geo?.country})`).join(', ')}`
-      : `${extDomains.size} external domains sampled, all US.`,
+    detail:
+      foreign.length > 0
+        ? `${foreign.length} foreign sub-processor(s): ${foreign.map((f) => `${f.domain} (${f.geo?.country})`).join(', ')}`
+        : `${extDomains.size} external domains sampled, all US.`,
     clause: 'SB 1188 Sec. 183.004',
-    evidence: { totalExternal: extDomains.size, foreign: foreign.map(f => ({ d: f.domain, c: f.geo?.country })) },
-    recommended_fix: foreign.length > 0
-      ? `Review foreign sub-processors and migrate to US-hosted alternatives where possible.`
-      : undefined,
+    evidence: {
+      totalExternal: extDomains.size,
+      foreign: foreign.map((f) => ({ d: f.domain, c: f.geo?.country })),
+    },
+    recommended_fix:
+      foreign.length > 0
+        ? `Review foreign sub-processors and migrate to US-hosted alternatives where possible.`
+        : undefined,
   };
 }
 
 function checkDR05(cdnDetected: boolean, cdnProvider: string): ComplianceFinding | null {
   if (!cdnDetected) return null;
   return {
-    id: 'DR-05', name: 'CDN Data Path Transparency',
-    status: 'warn', severity: 'advisory', category: 'data_sovereignty',
+    id: 'DR-05',
+    name: 'CDN Data Path Transparency',
+    status: 'warn',
+    severity: 'advisory',
+    category: 'data_sovereignty',
     detail: `Site uses ${cdnProvider} CDN. SB 1188 requires documented evidence of data residency compliance.`,
     clause: 'SB 1188 Sec. 183.002(a)',
     recommended_fix: `Execute ${cdnProvider} DPA, create Data Flow Map, add compliance attestation.`,
@@ -427,17 +613,21 @@ function checkDR05(cdnDetected: boolean, cdnProvider: string): ComplianceFinding
 
 function checkAI01(text: string): ComplianceFinding {
   const lt = text.toLowerCase();
-  const found = AI_DISCLOSURE_KEYWORDS.filter(kw => lt.includes(kw));
+  const found = AI_DISCLOSURE_KEYWORDS.filter((kw) => lt.includes(kw));
   const pass = found.length >= 2;
   return {
-    id: 'AI-01', name: 'Conspicuous AI Disclosure Text',
-    status: pass ? 'pass' : 'fail', severity: 'high', category: 'ai_transparency',
+    id: 'AI-01',
+    name: 'Conspicuous AI Disclosure Text',
+    status: pass ? 'pass' : 'fail',
+    severity: 'high',
+    category: 'ai_transparency',
     detail: pass
       ? `AI disclosure detected. Found ${found.length} keyword(s): "${found.slice(0, 3).join('", "')}".`
       : `No AI disclosure found. HB 149 requires clear disclosure when AI contributes to patient care.`,
     clause: 'HB 149 Sec. 551.004',
     evidence: { foundKeywords: found, threshold: 2 },
-    recommended_fix: pass ? undefined
+    recommended_fix: pass
+      ? undefined
       : 'Add a clear AI disclosure statement to the website homepage and service pages.',
   };
 }
@@ -453,14 +643,18 @@ function checkAI02(html: string): ComplianceFinding {
   }
   const pass = detected.length === 0;
   return {
-    id: 'AI-02', name: 'Disclosure Link Accessibility',
-    status: pass ? 'pass' : 'fail', severity: 'critical', category: 'ai_transparency',
+    id: 'AI-02',
+    name: 'Disclosure Link Accessibility',
+    status: pass ? 'pass' : 'fail',
+    severity: 'critical',
+    category: 'ai_transparency',
     detail: pass
       ? 'No dark pattern indicators found near AI disclosure content.'
       : `Dark patterns detected near AI disclosure: ${[...new Set(detected)].join(', ')}.`,
     clause: 'HB 149 (d)',
     evidence: { detectedPatterns: [...new Set(detected)] },
-    recommended_fix: pass ? undefined
+    recommended_fix: pass
+      ? undefined
       : 'Remove CSS dark patterns obscuring AI disclosure content. Ensure readable styling.',
   };
 }
@@ -468,118 +662,417 @@ function checkAI02(html: string): ComplianceFinding {
 function checkAI03(html: string, text: string, ctx: PageContext): ComplianceFinding {
   if (!ctx.hasDiagnosticTools) {
     return {
-      id: 'AI-03', name: 'Diagnostic AI Disclaimer Audit',
-      status: 'pass', severity: 'info', category: 'ai_transparency',
+      id: 'AI-03',
+      name: 'Diagnostic AI Disclaimer Audit',
+      status: 'pass',
+      severity: 'info',
+      category: 'ai_transparency',
       detail: `No AI diagnostic tools on this ${ctx.type} page. Not applicable.`,
       clause: 'SB 1188 Sec. 183.005',
     };
   }
   const lt = text.toLowerCase();
-  const disclaimers = ['reviewed by', 'approved by', 'supervised by', 'practitioner review',
-    'physician review', 'licensed provider', 'not a substitute for medical advice'];
-  const has = disclaimers.some(k => lt.includes(k));
+  const disclaimers = [
+    'reviewed by',
+    'approved by',
+    'supervised by',
+    'practitioner review',
+    'physician review',
+    'licensed provider',
+    'not a substitute for medical advice',
+  ];
+  const has = disclaimers.some((k) => lt.includes(k));
   return {
-    id: 'AI-03', name: 'Diagnostic AI Disclaimer Audit',
-    status: has ? 'pass' : 'fail', severity: 'critical', category: 'ai_transparency',
-    detail: has ? 'AI diagnostic tool with practitioner review disclaimer present.'
+    id: 'AI-03',
+    name: 'Diagnostic AI Disclaimer Audit',
+    status: has ? 'pass' : 'fail',
+    severity: 'critical',
+    category: 'ai_transparency',
+    detail: has
+      ? 'AI diagnostic tool with practitioner review disclaimer present.'
       : 'AI diagnostic tool WITHOUT practitioner review disclaimer.',
     clause: 'SB 1188 Sec. 183.005',
-    recommended_fix: has ? undefined
+    recommended_fix: has
+      ? undefined
       : 'Add a practitioner review disclaimer adjacent to all AI diagnostic tools.',
   };
 }
 
 function checkAI04(html: string, text: string, ctx: PageContext): ComplianceFinding {
   const lh = html.toLowerCase();
-  const platforms = CHATBOT_SIGNATURES.filter(sig => lh.includes(sig));
+  const platforms = CHATBOT_SIGNATURES.filter((sig) => lh.includes(sig));
   if (platforms.length === 0) {
     return {
-      id: 'AI-04', name: 'Interactive Chatbot Notice',
-      status: 'pass', severity: 'info', category: 'ai_transparency',
+      id: 'AI-04',
+      name: 'Interactive Chatbot Notice',
+      status: 'pass',
+      severity: 'info',
+      category: 'ai_transparency',
       detail: `No chatbot detected on this ${ctx.type} page.`,
       clause: 'HB 149 (b)',
     };
   }
   const lt = text.toLowerCase();
-  const noticeKw = ['ai assistant', 'chatbot', 'automated', 'virtual assistant', 'bot', 'not a human'];
-  const has = noticeKw.some(k => lt.includes(k) || lh.includes(k));
+  const noticeKw = [
+    'ai assistant',
+    'chatbot',
+    'automated',
+    'virtual assistant',
+    'bot',
+    'not a human',
+  ];
+  const has = noticeKw.some((k) => lt.includes(k) || lh.includes(k));
   return {
-    id: 'AI-04', name: 'Interactive Chatbot Notice',
-    status: has ? 'pass' : 'fail', severity: 'high', category: 'ai_transparency',
-    detail: has ? `Chatbot (${platforms.join(', ')}) with AI notice present.`
+    id: 'AI-04',
+    name: 'Interactive Chatbot Notice',
+    status: has ? 'pass' : 'fail',
+    severity: 'high',
+    category: 'ai_transparency',
+    detail: has
+      ? `Chatbot (${platforms.join(', ')}) with AI notice present.`
       : `Chatbot (${platforms.join(', ')}) WITHOUT AI disclosure. HB 149 requires notification.`,
     clause: 'HB 149 (b)',
     evidence: { detectedPlatforms: platforms, hasNotice: has },
-    recommended_fix: has ? undefined
+    recommended_fix: has
+      ? undefined
       : `Add AI disclosure notice to chatbot (${platforms[0]}) welcome message.`,
+  };
+}
+
+/**
+ * AI-05: EHR/Portal Vendor AI Detection
+ *
+ * Cross-references detected EHR/portal vendor against a registry of platforms
+ * known to include AI features (ambient listening, clinical decision support,
+ * AI documentation, predictive analytics, etc.)
+ *
+ * This is critical because most practices don't realize their EHR has AI baked in.
+ * If eClinicalWorks → Sunoh.ai ambient listening + AI documentation
+ * If Epic → Cognitive Computing / NLP / predictive analytics
+ * If athena → AI-powered clinical decision support
+ *
+ * Relevant for: HB 149 (TX), AB 3030 (CA), and any future state AI transparency laws.
+ */
+
+// EHR platforms with known AI features
+const EHR_AI_REGISTRY: Record<
+  string,
+  { vendor: string; aiFeatures: string[]; confidence: 'confirmed' | 'likely' | 'possible' }
+> = {
+  eclinicalworks: {
+    vendor: 'eClinicalWorks',
+    aiFeatures: [
+      'Sunoh.ai ambient listening',
+      'AI clinical documentation',
+      'AI-powered coding suggestions',
+      'clinical decision support',
+      'revenue cycle AI',
+    ],
+    confidence: 'confirmed',
+  },
+  healow: {
+    vendor: 'eClinicalWorks (Healow)',
+    aiFeatures: [
+      'Sunoh.ai ambient listening',
+      'AI clinical documentation',
+      'predictive scheduling',
+    ],
+    confidence: 'confirmed',
+  },
+  eclinicalweb: {
+    vendor: 'eClinicalWorks',
+    aiFeatures: ['Sunoh.ai ambient listening', 'AI clinical documentation'],
+    confidence: 'confirmed',
+  },
+  epic: {
+    vendor: 'Epic Systems',
+    aiFeatures: [
+      'Cognitive Computing Platform',
+      'NLP for clinical notes',
+      'predictive deterioration index',
+      'sepsis prediction model',
+    ],
+    confidence: 'confirmed',
+  },
+  mychart: {
+    vendor: 'Epic Systems (MyChart)',
+    aiFeatures: ['AI message drafting', 'intelligent scheduling', 'health maintenance reminders'],
+    confidence: 'confirmed',
+  },
+  athena: {
+    vendor: 'athenahealth',
+    aiFeatures: [
+      'AI-powered clinical decision support',
+      'automated charge capture',
+      'NLP coding assist',
+    ],
+    confidence: 'confirmed',
+  },
+  cerner: {
+    vendor: 'Oracle Health (Cerner)',
+    aiFeatures: ['AI clinical decision support', 'predictive analytics', 'sepsis screening'],
+    confidence: 'confirmed',
+  },
+  nextgen: {
+    vendor: 'NextGen Healthcare',
+    aiFeatures: ['Ambient Assist AI documentation', 'AI-powered billing optimization'],
+    confidence: 'confirmed',
+  },
+  allscripts: {
+    vendor: 'Veradigm (Allscripts)',
+    aiFeatures: ['Clinical decision support', 'AI analytics'],
+    confidence: 'likely',
+  },
+  'modernizing medicine': {
+    vendor: 'Modernizing Medicine (ModMed)',
+    aiFeatures: ['EMA AI-assisted documentation', 'adaptive learning algorithms'],
+    confidence: 'confirmed',
+  },
+  advancedmd: {
+    vendor: 'AdvancedMD',
+    aiFeatures: ['AI-assisted coding', 'predictive scheduling'],
+    confidence: 'likely',
+  },
+  drchrono: {
+    vendor: 'DrChrono (EverHealth)',
+    aiFeatures: ['AI medical speech-to-text', 'automated coding suggestions'],
+    confidence: 'likely',
+  },
+  elation: {
+    vendor: 'Elation Health',
+    aiFeatures: ['AI clinical documentation assist', 'smart charting'],
+    confidence: 'likely',
+  },
+  'practice fusion': {
+    vendor: 'Practice Fusion (Veradigm)',
+    aiFeatures: ['Clinical decision support alerts'],
+    confidence: 'possible',
+  },
+};
+
+// Additional URL patterns that indicate specific EHR portals
+const EHR_URL_PATTERNS: { pattern: RegExp; ehrKey: string }[] = [
+  { pattern: /eclinicalweb\.com/i, ehrKey: 'eclinicalworks' },
+  { pattern: /healow\.com/i, ehrKey: 'healow' },
+  { pattern: /mychart\./i, ehrKey: 'mychart' },
+  { pattern: /myhealth\./i, ehrKey: 'epic' },
+  { pattern: /athenahealth\.com/i, ehrKey: 'athena' },
+  { pattern: /nextgen\.com/i, ehrKey: 'nextgen' },
+  { pattern: /followmyhealth/i, ehrKey: 'allscripts' },
+  { pattern: /modmed\.com/i, ehrKey: 'modernizing medicine' },
+  { pattern: /drchrono\.com/i, ehrKey: 'drchrono' },
+  { pattern: /practicefusion/i, ehrKey: 'practice fusion' },
+];
+
+function checkAI05(html: string, text: string, ctx: PageContext): ComplianceFinding {
+  const lh = html.toLowerCase();
+  const lt = text.toLowerCase();
+
+  // Detect EHR vendor from page content and links
+  const detectedVendors: {
+    key: string;
+    vendor: string;
+    aiFeatures: string[];
+    confidence: string;
+    source: string;
+  }[] = [];
+
+  // Check HTML content for EHR signatures
+  for (const [key, info] of Object.entries(EHR_AI_REGISTRY)) {
+    if (lh.includes(key)) {
+      detectedVendors.push({ key, ...info, source: 'html_content' });
+    }
+  }
+
+  // Check all URLs/links in the HTML for EHR portal patterns
+  const urlMatches = html.match(/href=["']([^"']+)["']/gi) || [];
+  for (const match of urlMatches) {
+    const url = match.replace(/href=["']/i, '').replace(/["']$/, '');
+    for (const { pattern, ehrKey } of EHR_URL_PATTERNS) {
+      if (pattern.test(url) && !detectedVendors.some((v) => v.key === ehrKey)) {
+        const info = EHR_AI_REGISTRY[ehrKey];
+        if (info) {
+          detectedVendors.push({ key: ehrKey, ...info, source: `link: ${url.substring(0, 80)}` });
+        }
+      }
+    }
+  }
+
+  if (detectedVendors.length === 0) {
+    return {
+      id: 'AI-05',
+      name: 'EHR Vendor AI Detection',
+      status: 'pass',
+      severity: 'info',
+      category: 'ai_transparency',
+      detail: 'No AI-enabled EHR/portal vendor detected on this page.',
+      clause: 'HB 149 / AB 3030',
+    };
+  }
+
+  // Check if the website already has AI disclosure
+  const hasDisclosure = AI_DISCLOSURE_KEYWORDS.filter((kw) => lt.includes(kw)).length >= 2;
+
+  const vendorNames = detectedVendors.map((v) => v.vendor);
+  const allFeatures = detectedVendors.flatMap((v) => v.aiFeatures);
+  const uniqueFeatures = [...new Set(allFeatures)];
+  const highestConfidence = detectedVendors.some((v) => v.confidence === 'confirmed')
+    ? 'confirmed'
+    : detectedVendors.some((v) => v.confidence === 'likely')
+      ? 'likely'
+      : 'possible';
+
+  if (hasDisclosure) {
+    return {
+      id: 'AI-05',
+      name: 'EHR Vendor AI Detection',
+      status: 'pass',
+      severity: 'advisory',
+      category: 'ai_transparency',
+      detail: `AI-enabled EHR detected (${vendorNames.join(', ')}) with AI disclosure present on website. Features: ${uniqueFeatures.slice(0, 3).join(', ')}.`,
+      clause: 'HB 149 / AB 3030',
+      evidence: { vendors: detectedVendors, hasDisclosure: true },
+    };
+  }
+
+  return {
+    id: 'AI-05',
+    name: 'EHR Vendor AI Detection',
+    status: 'fail',
+    severity: highestConfidence === 'confirmed' ? 'high' : 'medium',
+    category: 'ai_transparency',
+    detail: `AI-enabled EHR detected (${vendorNames.join(', ')}) but NO AI disclosure on website. Known AI features: ${uniqueFeatures.slice(0, 4).join(', ')}. Patients should be informed about AI tools used in their care.`,
+    clause: 'HB 149 Sec. 551.004 / AB 3030',
+    evidence: {
+      vendors: detectedVendors.map((v) => ({
+        vendor: v.vendor,
+        confidence: v.confidence,
+        source: v.source,
+      })),
+      aiFeatures: uniqueFeatures,
+      hasDisclosure: false,
+    },
+    recommended_fix: `Add AI disclosure to website: "${vendorNames[0]} uses AI-powered tools including ${uniqueFeatures.slice(0, 2).join(' and ')} to assist with clinical care. All AI-assisted decisions are reviewed by a licensed provider."`,
   };
 }
 
 // ─── ER Checks (Clinical Integrity — SB 1188) ──────────
 
 function checkER01(html: string, text: string, ctx: PageContext): ComplianceFinding {
-  if (!ctx.hasIntakeForms && !ctx.hasPatientPortal && ['contact', 'about', 'services', 'homepage', 'general'].includes(ctx.type)) {
+  if (
+    !ctx.hasIntakeForms &&
+    !ctx.hasPatientPortal &&
+    ['contact', 'about', 'services', 'homepage', 'general'].includes(ctx.type)
+  ) {
     return {
-      id: 'ER-01', name: 'Biological Sex Input Fields',
-      status: 'pass', severity: 'info', category: 'clinical_integrity',
+      id: 'ER-01',
+      name: 'Biological Sex Input Fields',
+      status: 'pass',
+      severity: 'info',
+      category: 'clinical_integrity',
       detail: `Page type: "${ctx.type}" — no intake forms detected. Applies to registration pages only.`,
       clause: 'SB 1188 Sec. 183.010',
     };
   }
   const lh = html.toLowerCase();
   const lt = text.toLowerCase();
-  const has = ['biological sex', 'sex assigned at birth', 'birth sex', 'patient sex'].some(k => lt.includes(k) || lh.includes(k));
+  const has = ['biological sex', 'sex assigned at birth', 'birth sex', 'patient sex'].some(
+    (k) => lt.includes(k) || lh.includes(k),
+  );
   const hasField = lh.includes('name="sex"') || lh.includes('name="biological_sex"');
   return {
-    id: 'ER-01', name: 'Biological Sex Input Fields',
-    status: (has || hasField) ? 'pass' : 'fail', severity: 'high', category: 'clinical_integrity',
-    detail: (has || hasField)
-      ? 'Patient registration — biological sex field present.'
-      : 'Patient registration — NO biological sex field. Texas statute requires this on intake forms.',
+    id: 'ER-01',
+    name: 'Biological Sex Input Fields',
+    status: has || hasField ? 'pass' : 'fail',
+    severity: 'high',
+    category: 'clinical_integrity',
+    detail:
+      has || hasField
+        ? 'Patient registration — biological sex field present.'
+        : 'Patient registration — NO biological sex field. Texas statute requires this on intake forms.',
     clause: 'SB 1188 Sec. 183.010',
-    recommended_fix: (has || hasField) ? undefined
-      : 'Add a "Biological Sex" field (Male/Female) to patient intake forms.',
+    recommended_fix:
+      has || hasField
+        ? undefined
+        : 'Add a "Biological Sex" field (Male/Female) to patient intake forms.',
   };
 }
 
 function checkER02(html: string, text: string, ctx: PageContext): ComplianceFinding {
   if (!ctx.hasPatientPortal) {
     return {
-      id: 'ER-02', name: 'Minor/Parental Access Portal',
-      status: 'pass', severity: 'info', category: 'clinical_integrity',
+      id: 'ER-02',
+      name: 'Minor/Parental Access Portal',
+      status: 'pass',
+      severity: 'info',
+      category: 'clinical_integrity',
       detail: `No patient portal detected on this ${ctx.type} page.`,
       clause: 'SB 1188 Sec. 183.006',
     };
   }
   const lt = text.toLowerCase();
   const lh = html.toLowerCase();
-  const parentKw = ['parent portal', 'guardian access', 'minor patient', 'parent login', 'family access',
-    'dependent access', 'proxy access', 'parent/guardian', 'parental consent'];
-  const has = parentKw.some(k => lt.includes(k) || lh.includes(k));
-  const portal = EHR_SIGNATURES.find(s => lh.includes(s)) || 'generic';
+  const parentKw = [
+    'parent portal',
+    'guardian access',
+    'minor patient',
+    'parent login',
+    'family access',
+    'dependent access',
+    'proxy access',
+    'parent/guardian',
+    'parental consent',
+  ];
+  const has = parentKw.some((k) => lt.includes(k) || lh.includes(k));
+  const portal = EHR_SIGNATURES.find((s) => lh.includes(s)) || 'generic';
   return {
-    id: 'ER-02', name: 'Minor/Parental Access Portal',
-    status: has ? 'pass' : 'fail', severity: 'high', category: 'clinical_integrity',
-    detail: has ? `Portal (${portal}) with parental/guardian access pathway.`
+    id: 'ER-02',
+    name: 'Minor/Parental Access Portal',
+    status: has ? 'pass' : 'fail',
+    severity: 'high',
+    category: 'clinical_integrity',
+    detail: has
+      ? `Portal (${portal}) with parental/guardian access pathway.`
       : `Portal (${portal}) WITHOUT parental/guardian access. Texas requires distinct auth for parents/guardians.`,
     clause: 'SB 1188 Sec. 183.006',
-    recommended_fix: has ? undefined
+    recommended_fix: has
+      ? undefined
       : `Configure parent/guardian proxy access in ${portal} patient portal.`,
   };
 }
 
 function checkER03(text: string, ctx: PageContext): ComplianceFinding {
   const lt = text.toLowerCase();
-  const kws = ['metabolic health', 'nutrition', 'dietary', 'diet counseling', 'weight management',
-    'bmi', 'body mass', 'nutritionist', 'dietitian', 'metabolic', 'glucose', 'a1c',
-    'lipid', 'cholesterol', 'obesity', 'bariatric', 'endocrin'];
-  const found = kws.filter(k => lt.includes(k));
+  const kws = [
+    'metabolic health',
+    'nutrition',
+    'dietary',
+    'diet counseling',
+    'weight management',
+    'bmi',
+    'body mass',
+    'nutritionist',
+    'dietitian',
+    'metabolic',
+    'glucose',
+    'a1c',
+    'lipid',
+    'cholesterol',
+    'obesity',
+    'bariatric',
+    'endocrin',
+  ];
+  const found = kws.filter((k) => lt.includes(k));
   return {
-    id: 'ER-03', name: 'Metabolic Health Options',
-    status: found.length >= 1 ? 'pass' : 'fail', severity: 'medium', category: 'clinical_integrity',
-    detail: found.length >= 1
-      ? `Metabolic health references: "${found.slice(0, 3).join('", "')}".`
-      : `No metabolic/nutrition references on this ${ctx.type} page.`,
+    id: 'ER-03',
+    name: 'Metabolic Health Options',
+    status: found.length >= 1 ? 'pass' : 'fail',
+    severity: 'medium',
+    category: 'clinical_integrity',
+    detail:
+      found.length >= 1
+        ? `Metabolic health references: "${found.slice(0, 3).join('", "')}".`
+        : `No metabolic/nutrition references on this ${ctx.type} page.`,
     clause: 'SB 1188 Sec. 183.003',
     evidence: { foundKeywords: found },
   };
@@ -595,18 +1088,22 @@ function checkER04(html: string, text: string): ComplianceFinding {
     { keyword: 'political affiliation', field: 'Political Affiliation' },
     { keyword: 'fico score', field: 'FICO Score' },
   ];
-  const detected = forbidden.filter(f => lh.includes(f.keyword) || lt.includes(f.keyword));
+  const detected = forbidden.filter((f) => lh.includes(f.keyword) || lt.includes(f.keyword));
   const pass = detected.length === 0;
   return {
-    id: 'ER-04', name: 'Forbidden Data Field Check',
-    status: pass ? 'pass' : 'fail', severity: 'critical', category: 'clinical_integrity',
+    id: 'ER-04',
+    name: 'Forbidden Data Field Check',
+    status: pass ? 'pass' : 'fail',
+    severity: 'critical',
+    category: 'clinical_integrity',
     detail: pass
       ? 'No prohibited data collection fields detected.'
-      : `VIOLATION: ${detected.map(f => f.field).join(', ')} detected. Texas law forbids non-healthcare data collection.`,
+      : `VIOLATION: ${detected.map((f) => f.field).join(', ')} detected. Texas law forbids non-healthcare data collection.`,
     clause: 'SB 1188 Sec. 183.003',
-    evidence: { detectedFields: detected.map(f => f.field) },
-    recommended_fix: pass ? undefined
-      : `URGENT: Remove prohibited fields: ${detected.map(f => f.field).join(', ')}.`,
+    evidence: { detectedFields: detected.map((f) => f.field) },
+    recommended_fix: pass
+      ? undefined
+      : `URGENT: Remove prohibited fields: ${detected.map((f) => f.field).join(', ')}.`,
   };
 }
 
@@ -616,7 +1113,7 @@ function scoreFindingsByCategory(
   findings: ComplianceFinding[],
   category: string,
 ): { score: number; level: string } {
-  const catF = findings.filter(f => f.category === category);
+  const catF = findings.filter((f) => f.category === category);
   if (catF.length === 0) return { score: 100, level: 'Sovereign' };
 
   let score = 100;
@@ -649,7 +1146,9 @@ function scoreFindingsByCategory(
  *
  * @returns ComplianceScanResult with all findings and composite score
  */
-export async function runComplianceChecks(input: ComplianceScanInput): Promise<ComplianceScanResult> {
+export async function runComplianceChecks(
+  input: ComplianceScanInput,
+): Promise<ComplianceScanResult> {
   const { url, html, text, responseHeaders } = input;
   const domain = extractDomain(url);
   const ctx = detectPageContext(html, text);
@@ -661,10 +1160,7 @@ export async function runComplianceChecks(input: ComplianceScanInput): Promise<C
     findings.push(dr01);
     findings.push(checkDR02(responseHeaders));
 
-    const [dr03, dr04] = await Promise.all([
-      checkDR03(domain),
-      checkDR04(html, domain),
-    ]);
+    const [dr03, dr04] = await Promise.all([checkDR03(domain), checkDR04(html, domain)]);
     findings.push(dr03);
     findings.push(dr04);
 
@@ -673,8 +1169,12 @@ export async function runComplianceChecks(input: ComplianceScanInput): Promise<C
   } catch (err) {
     console.warn(`[ComplianceChecks] DR checks failed for ${domain}:`, err);
     findings.push({
-      id: 'DR-01', name: 'Data Sovereignty', status: 'inconclusive', severity: 'high',
-      category: 'data_sovereignty', detail: 'DR checks failed — manual audit needed.',
+      id: 'DR-01',
+      name: 'Data Sovereignty',
+      status: 'inconclusive',
+      severity: 'high',
+      category: 'data_sovereignty',
+      detail: 'DR checks failed — manual audit needed.',
       clause: 'SB 1188',
     });
   }
@@ -684,6 +1184,7 @@ export async function runComplianceChecks(input: ComplianceScanInput): Promise<C
   findings.push(checkAI02(html));
   findings.push(checkAI03(html, text, ctx));
   findings.push(checkAI04(html, text, ctx));
+  findings.push(checkAI05(html, text, ctx));
 
   // ER checks (sync, HTML only)
   findings.push(checkER01(html, text, ctx));
@@ -697,10 +1198,9 @@ export async function runComplianceChecks(input: ComplianceScanInput): Promise<C
   const ci = scoreFindingsByCategory(findings, 'clinical_integrity');
 
   // Weighted composite: DS 45%, AI 30%, CI 25%
-  const composite = Math.round(ds.score * 0.45 + ai.score * 0.30 + ci.score * 0.25);
-  const riskLevel = composite >= 80 && ds.score >= 75 ? 'Sovereign'
-    : composite >= 60 ? 'Drift'
-    : 'Violation';
+  const composite = Math.round(ds.score * 0.45 + ai.score * 0.3 + ci.score * 0.25);
+  const riskLevel =
+    composite >= 80 && ds.score >= 75 ? 'Sovereign' : composite >= 60 ? 'Drift' : 'Violation';
 
   return {
     findings,
@@ -711,8 +1211,8 @@ export async function runComplianceChecks(input: ComplianceScanInput): Promise<C
       ai_transparency: ai,
       clinical_integrity: ci,
     },
-    failing_count: findings.filter(f => f.status === 'fail').length,
-    warning_count: findings.filter(f => f.status === 'warn').length,
+    failing_count: findings.filter((f) => f.status === 'fail').length,
+    warning_count: findings.filter((f) => f.status === 'warn').length,
   };
 }
 
@@ -721,9 +1221,10 @@ export async function runComplianceChecks(input: ComplianceScanInput): Promise<C
  * These are the findings that should trigger compliance workflows.
  */
 export function getActionableFindings(findings: ComplianceFinding[]): ComplianceFinding[] {
-  return findings.filter(f =>
-    (f.status === 'fail' || f.status === 'warn') &&
-    f.severity !== 'info' &&
-    f.severity !== 'advisory',
+  return findings.filter(
+    (f) =>
+      (f.status === 'fail' || f.status === 'warn') &&
+      f.severity !== 'info' &&
+      f.severity !== 'advisory',
   );
 }

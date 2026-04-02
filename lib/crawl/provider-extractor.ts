@@ -9,19 +9,19 @@
 // ── Types ───────────────────────────────────────────────
 
 export interface ExtractedProvider {
-  name: string;                    // Full display name (e.g. "Dr. Jacqueline Champlain")
-  rawName: string;                 // Original text before cleanup
-  credential: string | null;       // MD, DO, APRN, PA-C, NP, etc.
-  specialty: string | null;        // Freeform specialty from website
-  role: string | null;             // "Physician", "Nurse Practitioner", etc.
-  confidence: number;              // 0-1 extraction confidence
+  name: string; // Full display name (e.g. "Dr. Jacqueline Champlain")
+  rawName: string; // Original text before cleanup
+  credential: string | null; // MD, DO, APRN, PA-C, NP, etc.
+  specialty: string | null; // Freeform specialty from website
+  role: string | null; // "Physician", "Nurse Practitioner", etc.
+  confidence: number; // 0-1 extraction confidence
 }
 
 export interface ProviderExtractionResult {
   url: string;
-  providerPageUrl: string | null;  // Which sub-page we found providers on
+  providerPageUrl: string | null; // Which sub-page we found providers on
   providers: ExtractedProvider[];
-  method: string;                  // 'schema_org' | 'html_pattern' | 'structured_list'
+  method: string; // 'schema_org' | 'html_pattern' | 'structured_list'
   extractedAt: string;
   durationMs: number;
   error: string | null;
@@ -56,35 +56,63 @@ const PROVIDER_PAGE_PATHS = [
 
 /** Known credential patterns */
 const CREDENTIALS = [
-  'MD', 'M\\.D\\.', 'DO', 'D\\.O\\.',
-  'APRN', 'A\\.P\\.R\\.N\\.',
-  'NP', 'N\\.P\\.',  'FNP', 'FNP-C', 'FNP-BC',
-  'CNP', 'ARNP', 'CRNP',
-  'PA', 'PA-C', 'P\\.A\\.',
-  'DNP', 'D\\.N\\.P\\.',
-  'PhD', 'Ph\\.D\\.',
-  'DPM', 'D\\.P\\.M\\.',
-  'DC', 'D\\.C\\.',
-  'OD', 'O\\.D\\.',
-  'DDS', 'D\\.D\\.S\\.',
-  'DMD', 'D\\.M\\.D\\.',
-  'FACP', 'FAAP', 'FACS', 'FACOG', 'FAAFP',
-  'MPH', 'MBA', 'MS', 'MSN', 'BSN', 'RN',
-  'LCSW', 'LPC', 'LMFT',
+  'MD',
+  'M\\.D\\.',
+  'DO',
+  'D\\.O\\.',
+  'APRN',
+  'A\\.P\\.R\\.N\\.',
+  'NP',
+  'N\\.P\\.',
+  'FNP',
+  'FNP-C',
+  'FNP-BC',
+  'CNP',
+  'ARNP',
+  'CRNP',
+  'PA',
+  'PA-C',
+  'P\\.A\\.',
+  'DNP',
+  'D\\.N\\.P\\.',
+  'PhD',
+  'Ph\\.D\\.',
+  'DPM',
+  'D\\.P\\.M\\.',
+  'DC',
+  'D\\.C\\.',
+  'OD',
+  'O\\.D\\.',
+  'DDS',
+  'D\\.D\\.S\\.',
+  'DMD',
+  'D\\.M\\.D\\.',
+  'FACP',
+  'FAAP',
+  'FACS',
+  'FACOG',
+  'FAAFP',
+  'MPH',
+  'MBA',
+  'MS',
+  'MSN',
+  'BSN',
+  'RN',
+  'LCSW',
+  'LPC',
+  'LMFT',
 ];
 
-const CREDENTIAL_PATTERN = new RegExp(
-  `\\b(${CREDENTIALS.join('|')})\\b`,
-  'gi'
-);
+const CREDENTIAL_PATTERN = new RegExp(`\\b(${CREDENTIALS.join('|')})\\b`, 'gi');
 
 /** Pattern for "Dr. FirstName LastName" or "FirstName LastName, MD" */
-const NAME_WITH_TITLE = /(?:Dr\.?\s+)?([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?)/g;
+const NAME_WITH_TITLE =
+  /(?:Dr\.?\s+)?([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?)/g;
 
 /** Pattern: "Name, Credential" (e.g., "John Smith, MD") */
 const NAME_COMMA_CREDENTIAL = new RegExp(
   `([A-Z][a-z]+(?:\\s+[A-Z]\\.?)?\\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?)\\s*,\\s*((?:${CREDENTIALS.join('|')})(?:\\s*,\\s*(?:${CREDENTIALS.join('|')}))*)`,
-  'g'
+  'g',
 );
 
 /** Pattern: "Dr. Name" */
@@ -92,22 +120,54 @@ const DR_PREFIX = /Dr\.?\s+([A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z
 
 /** Common specialty strings found on practice websites */
 const SPECIALTY_KEYWORDS = [
-  'family medicine', 'family practice', 'internal medicine',
-  'pediatrics', 'dermatology', 'cardiology', 'orthopedics',
-  'obstetrics', 'gynecology', 'ob/gyn', 'neurology', 'psychiatry',
-  'urology', 'ophthalmology', 'gastroenterology', 'endocrinology',
-  'rheumatology', 'pulmonology', 'nephrology', 'oncology',
-  'hematology', 'surgery', 'plastic surgery', 'urgent care',
-  'physical therapy', 'chiropractic', 'optometry', 'podiatry',
-  'pain management', 'allergy', 'immunology', 'infectious disease',
-  'sports medicine', 'geriatrics', 'nurse practitioner',
-  'physician assistant', 'anesthesiology', 'radiology', 'pathology',
-  'emergency medicine', 'med-peds', 'internal medicine/pediatrics',
+  'family medicine',
+  'family practice',
+  'internal medicine',
+  'pediatrics',
+  'dermatology',
+  'cardiology',
+  'orthopedics',
+  'obstetrics',
+  'gynecology',
+  'ob/gyn',
+  'neurology',
+  'psychiatry',
+  'urology',
+  'ophthalmology',
+  'gastroenterology',
+  'endocrinology',
+  'rheumatology',
+  'pulmonology',
+  'nephrology',
+  'oncology',
+  'hematology',
+  'surgery',
+  'plastic surgery',
+  'urgent care',
+  'physical therapy',
+  'chiropractic',
+  'optometry',
+  'podiatry',
+  'pain management',
+  'allergy',
+  'immunology',
+  'infectious disease',
+  'sports medicine',
+  'geriatrics',
+  'nurse practitioner',
+  'physician assistant',
+  'anesthesiology',
+  'radiology',
+  'pathology',
+  'emergency medicine',
+  'med-peds',
+  'internal medicine/pediatrics',
 ];
 
 // ── User-Agent ──────────────────────────────────────────
 
-const USER_AGENT = 'KairoLogic-ProviderCrawler/1.0 (+https://kairologic.net; provider-data-verification)';
+const USER_AGENT =
+  'KairoLogic-ProviderCrawler/1.0 (+https://kairologic.net; provider-data-verification)';
 
 // ── Main Extraction Function ────────────────────────────
 
@@ -214,7 +274,7 @@ async function fetchPage(url: string, timeout: number): Promise<string | null> {
       signal: controller.signal,
       headers: {
         'User-Agent': USER_AGENT,
-        'Accept': 'text/html,application/xhtml+xml',
+        Accept: 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
       },
       redirect: 'follow',
@@ -246,7 +306,8 @@ function extractFromSchemaOrg(html: string): ExtractedProvider[] {
   const providers: ExtractedProvider[] = [];
 
   // Find all JSON-LD script blocks
-  const jsonLdPattern = /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const jsonLdPattern =
+    /<script\s+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match;
 
   while ((match = jsonLdPattern.exec(html)) !== null) {
@@ -293,13 +354,10 @@ function parseSchemaOrgPerson(data: any): ExtractedProvider | null {
   if (!name || name.length < 3) return null;
 
   // Extract credential from name or honorificSuffix
-  const credential = data.honorificSuffix
-    || extractCredentialFromName(name)
-    || null;
+  const credential = data.honorificSuffix || extractCredentialFromName(name) || null;
 
-  const specialty = data.medicalSpecialty
-    || (data.specialization ? String(data.specialization) : null)
-    || null;
+  const specialty =
+    data.medicalSpecialty || (data.specialization ? String(data.specialization) : null) || null;
 
   return {
     name: cleanProviderName(name),
@@ -307,7 +365,7 @@ function parseSchemaOrgPerson(data: any): ExtractedProvider | null {
     credential,
     specialty,
     role: data.jobTitle || null,
-    confidence: 0.90,
+    confidence: 0.9,
   };
 }
 
@@ -325,7 +383,8 @@ function extractFromStructuredList(html: string): ExtractedProvider[] {
 
   // Pattern: repeated blocks with heading + credential/specialty
   // Look for <h2>/<h3>/<h4> tags containing names with credentials
-  const headingPattern = /<h[2-4][^>]*>\s*((?:Dr\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?(?:\s*,\s*[A-Z.]+(?:\s*,\s*[A-Z.]+)*)?)\s*<\/h[2-4]>/gi;
+  const headingPattern =
+    /<h[2-4][^>]*>\s*((?:Dr\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?(?:\s*,\s*[A-Z.]+(?:\s*,\s*[A-Z.]+)*)?)\s*<\/h[2-4]>/gi;
 
   let match;
   while ((match = headingPattern.exec(html)) !== null) {
@@ -338,15 +397,18 @@ function extractFromStructuredList(html: string): ExtractedProvider[] {
   }
 
   // Pattern: <a> tags with provider names (common in directory-style pages)
-  const linkPattern = /<a[^>]*>\s*((?:Dr\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?(?:\s*,\s*[A-Z.]+(?:\s*,\s*[A-Z.]+)*)?)\s*<\/a>/gi;
+  const linkPattern =
+    /<a[^>]*>\s*((?:Dr\.?\s+)?[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]{2,}(?:-[A-Z][a-z]+)?(?:\s*,\s*[A-Z.]+(?:\s*,\s*[A-Z.]+)*)?)\s*<\/a>/gi;
 
   while ((match = linkPattern.exec(html)) !== null) {
     const rawText = match[1].trim();
     // Skip if it's a nav link or footer link (typically shorter context)
-    const surroundingHtml = html.substring(
-      Math.max(0, match.index - 200),
-      Math.min(html.length, match.index + match[0].length + 200)
-    ).toLowerCase();
+    const surroundingHtml = html
+      .substring(
+        Math.max(0, match.index - 200),
+        Math.min(html.length, match.index + match[0].length + 200),
+      )
+      .toLowerCase();
 
     if (surroundingHtml.includes('nav') || surroundingHtml.includes('footer')) continue;
 
@@ -390,7 +452,7 @@ function extractFromHtmlPatterns(html: string): ExtractedProvider[] {
         credential: normalizeCredential(credentials),
         specialty,
         role: null,
-        confidence: 0.80,
+        confidence: 0.8,
       });
     }
   }
@@ -401,14 +463,17 @@ function extractFromHtmlPatterns(html: string): ExtractedProvider[] {
     const name = match[1].trim();
 
     // Check we haven't already captured this person
-    const alreadyFound = providers.some(p =>
-      p.name.includes(name) || name.includes(p.name.replace(/^Dr\.?\s+/, ''))
+    const alreadyFound = providers.some(
+      (p) => p.name.includes(name) || name.includes(p.name.replace(/^Dr\.?\s+/, '')),
     );
 
     if (!alreadyFound && isLikelyProviderName(name)) {
       const specialty = findNearbySpecialty(text, match.index + match[0].length);
       // Check for trailing credential
-      const afterMatch = text.substring(match.index + match[0].length, match.index + match[0].length + 30);
+      const afterMatch = text.substring(
+        match.index + match[0].length,
+        match.index + match[0].length + 30,
+      );
       const credMatch = afterMatch.match(/^\s*,?\s*([A-Z]{2,5}(?:\s*,\s*[A-Z]{2,5})*)/);
       const credential = credMatch ? normalizeCredential(credMatch[1]) : null;
 
@@ -418,7 +483,7 @@ function extractFromHtmlPatterns(html: string): ExtractedProvider[] {
         credential,
         specialty,
         role: null,
-        confidence: 0.70,
+        confidence: 0.7,
       });
     }
   }
@@ -434,7 +499,7 @@ function parseProviderText(
   _position: number,
 ): ExtractedProvider | null {
   // Split on comma to separate name from credentials
-  const parts = rawText.split(',').map(p => p.trim());
+  const parts = rawText.split(',').map((p) => p.trim());
   const namePart = parts[0];
   const credentialParts = parts.slice(1).join(', ');
 
@@ -454,7 +519,7 @@ function parseProviderText(
     credential,
     specialty: null,
     role: null,
-    confidence: 0.80,
+    confidence: 0.8,
   };
 }
 
@@ -471,17 +536,17 @@ function extractCredentialFromName(name: string): string | null {
 function normalizeCredential(raw: string): string {
   return raw
     .split(/[\s,]+/)
-    .filter(p => p.match(/^[A-Z.]{2,}[-]?[A-Z.]*$/i))
-    .map(p => p.toUpperCase().replace(/\./g, ''))
-    .filter(p => CREDENTIALS.some(c => c.replace(/\\/g, '').replace(/\./g, '') === p))
+    .filter((p) => p.match(/^[A-Z.]{2,}[-]?[A-Z.]*$/i))
+    .map((p) => p.toUpperCase().replace(/\./g, ''))
+    .filter((p) => CREDENTIALS.some((c) => c.replace(/\\/g, '').replace(/\./g, '') === p))
     .join(', ');
 }
 
 function cleanProviderName(name: string): string {
   return name
-    .replace(CREDENTIAL_PATTERN, '')      // Remove credentials
-    .replace(/,\s*$/, '')                  // Trailing comma
-    .replace(/\s+/g, ' ')                 // Collapse spaces
+    .replace(CREDENTIAL_PATTERN, '') // Remove credentials
+    .replace(/,\s*$/, '') // Trailing comma
+    .replace(/\s+/g, ' ') // Collapse spaces
     .trim();
 }
 
@@ -499,12 +564,25 @@ function isLikelyProviderName(name: string): boolean {
   // Must not contain common non-name patterns
   const lower = name.toLowerCase();
   const skipPatterns = [
-    'click here', 'read more', 'learn more', 'view all', 'see all',
-    'our office', 'our practice', 'contact us', 'book now', 'schedule',
-    'patient portal', 'new patient', 'office hours', 'insurance',
-    'copyright', 'privacy policy', 'all rights',
+    'click here',
+    'read more',
+    'learn more',
+    'view all',
+    'see all',
+    'our office',
+    'our practice',
+    'contact us',
+    'book now',
+    'schedule',
+    'patient portal',
+    'new patient',
+    'office hours',
+    'insurance',
+    'copyright',
+    'privacy policy',
+    'all rights',
   ];
-  if (skipPatterns.some(p => lower.includes(p))) return false;
+  if (skipPatterns.some((p) => lower.includes(p))) return false;
 
   return true;
 }
@@ -516,8 +594,9 @@ function findNearbySpecialty(text: string, position: number): string | null {
   for (const specialty of SPECIALTY_KEYWORDS) {
     if (nearby.includes(specialty)) {
       // Capitalize the first letter of each word
-      return specialty.split(' ')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      return specialty
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
     }
   }
@@ -530,7 +609,8 @@ function deduplicateProviders(providers: ExtractedProvider[]): ExtractedProvider
 
   for (const p of providers) {
     // Normalize key: lowercase name without "Dr." prefix
-    const key = p.name.toLowerCase()
+    const key = p.name
+      .toLowerCase()
       .replace(/^dr\.?\s+/, '')
       .replace(/\s+/g, ' ')
       .trim();
@@ -551,7 +631,7 @@ export interface NppesCrossRefResult {
   matchedNpi: string | null;
   matchedName: string | null;
   matchConfidence: number;
-  matchMethod: string;  // 'exact_name' | 'fuzzy_name' | 'name_plus_phone' | 'not_found'
+  matchMethod: string; // 'exact_name' | 'fuzzy_name' | 'name_plus_phone' | 'not_found'
 }
 
 /**
@@ -626,7 +706,10 @@ export function scoreNppesMatch(
   const methods: string[] = [];
 
   // Name match (required baseline)
-  const extractedParts = extracted.name.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/);
+  const extractedParts = extracted.name
+    .replace(/^Dr\.?\s+/i, '')
+    .trim()
+    .split(/\s+/);
   const extractedFirst = extractedParts[0]?.toLowerCase();
   const extractedLast = extractedParts[extractedParts.length - 1]?.toLowerCase();
 
@@ -634,17 +717,17 @@ export function scoreNppesMatch(
   const nppesLast = nppesRecord.last_name?.toLowerCase();
 
   if (nppesLast === extractedLast) {
-    score += 0.40;
+    score += 0.4;
     methods.push('last_name_exact');
   } else {
     return { score: 0, method: 'no_last_name_match' };
   }
 
   if (nppesFirst === extractedFirst) {
-    score += 0.20;
+    score += 0.2;
     methods.push('first_name_exact');
   } else if (nppesFirst?.startsWith(extractedFirst?.substring(0, 3) || '')) {
-    score += 0.10;
+    score += 0.1;
     methods.push('first_name_partial');
   }
 
@@ -663,7 +746,7 @@ export function scoreNppesMatch(
     const normalizedPractice = practicePhone.replace(/\D/g, '').slice(-10);
     const normalizedNppes = nppesRecord.phone.replace(/\D/g, '').slice(-10);
     if (normalizedPractice === normalizedNppes) {
-      score += 0.20;
+      score += 0.2;
       methods.push('phone_match');
     }
   }

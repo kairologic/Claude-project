@@ -32,8 +32,8 @@ interface RosterOnboardingCardProps {
   practiceId: string;
   providers: DetectedProvider[];
   onboardingConfirmed: boolean;
-  onConfirm: () => void;           // callback after roster confirmed
-  onAddProvider: () => void;        // trigger NPI lookup modal
+  onConfirm: () => void; // callback after roster confirmed
+  onAddProvider: () => void; // trigger NPI lookup modal
 }
 
 export default function RosterOnboardingCard({
@@ -44,7 +44,7 @@ export default function RosterOnboardingCard({
   onAddProvider,
 }: RosterOnboardingCardProps) {
   const [confirmed, setConfirmed] = useState<Set<string>>(
-    new Set(providers.map(p => p.npi))  // All checked by default
+    new Set(providers.map((p) => p.npi)), // All checked by default
   );
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +55,7 @@ export default function RosterOnboardingCard({
 
   // Only show for auto-detected providers
   const detectedProviders = providers.filter(
-    p => p.association_source === 'DETECTED' && p.roster_status !== 'departed'
+    (p) => p.association_source === 'DETECTED' && p.roster_status !== 'departed',
   );
 
   if (detectedProviders.length === 0) return null;
@@ -84,7 +84,8 @@ export default function RosterOnboardingCard({
       // Mark removed providers as departed
       if (removed.size > 0) {
         for (const npi of removed) {
-          await supabase.from('practice_providers')
+          await supabase
+            .from('practice_providers')
             .update({ roster_status: 'departed' })
             .eq('practice_website_id', practiceId)
             .eq('npi', npi);
@@ -94,7 +95,8 @@ export default function RosterOnboardingCard({
       // Mark confirmed providers as active (CONFIRMED association)
       if (confirmed.size > 0) {
         for (const npi of confirmed) {
-          await supabase.from('practice_providers')
+          await supabase
+            .from('practice_providers')
             .update({ association_source: 'CONFIRMED' })
             .eq('practice_website_id', practiceId)
             .eq('npi', npi);
@@ -102,7 +104,8 @@ export default function RosterOnboardingCard({
       }
 
       // Set onboarding_confirmed flag on practice_websites
-      await supabase.from('practice_websites')
+      await supabase
+        .from('practice_websites')
         .update({ onboarding_confirmed: true })
         .eq('id', practiceId);
 
@@ -116,28 +119,39 @@ export default function RosterOnboardingCard({
   }, [practiceId, confirmed, removed, onConfirm]);
 
   return (
-    <div style={{
-      background: `linear-gradient(135deg, ${colors.goldPale} 0%, #fff 100%)`,
-      border: `1px solid ${colors.gold}`,
-      borderRadius: radii.lg,
-      padding: spacing.lg,
-      marginBottom: spacing.lg,
-      boxShadow: shadows.sm,
-    }}>
+    <div
+      style={{
+        background: `linear-gradient(135deg, ${colors.goldPale} 0%, #fff 100%)`,
+        border: `1px solid ${colors.gold}`,
+        borderRadius: radii.lg,
+        padding: spacing.lg,
+        marginBottom: spacing.lg,
+        boxShadow: shadows.sm,
+      }}
+    >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: spacing.md,
+        }}
+      >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: 4 }}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L12.09 7.26L18 8.27L14 12.14L14.18 18.02L10 15.77L5.82 18.02L6 12.14L2 8.27L7.91 7.26L10 2Z" fill={colors.gold} />
+              <path
+                d="M10 2L12.09 7.26L18 8.27L14 12.14L14.18 18.02L10 15.77L5.82 18.02L6 12.14L2 8.27L7.91 7.26L10 2Z"
+                fill={colors.gold}
+              />
             </svg>
-            <span style={{ ...typography.h4, color: colors.navy }}>
-              Review Your Team
-            </span>
+            <span style={{ ...typography.h4, color: colors.navy }}>Review Your Team</span>
           </div>
           <p style={{ ...typography.bodySmall, color: colors.gray400, margin: 0, maxWidth: 500 }}>
-            We detected {detectedProviders.length} provider{detectedProviders.length !== 1 ? 's' : ''} from your website.
-            Confirm your team below so we can start monitoring their data across payers and directories.
+            We detected {detectedProviders.length} provider
+            {detectedProviders.length !== 1 ? 's' : ''} from your website. Confirm your team below
+            so we can start monitoring their data across payers and directories.
           </p>
         </div>
 
@@ -145,12 +159,19 @@ export default function RosterOnboardingCard({
         <button
           onClick={() => setDismissed(true)}
           style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: colors.gray400, padding: 4,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: colors.gray400,
+            padding: 4,
             transition: `color ${transitions.fast}`,
           }}
-          onMouseOver={e => { (e.currentTarget as HTMLElement).style.color = colors.gray600; }}
-          onMouseOut={e => { (e.currentTarget as HTMLElement).style.color = colors.gray400; }}
+          onMouseOver={(e) => {
+            (e.currentTarget as HTMLElement).style.color = colors.gray600;
+          }}
+          onMouseOut={(e) => {
+            (e.currentTarget as HTMLElement).style.color = colors.gray400;
+          }}
           title="Dismiss for now"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -160,22 +181,27 @@ export default function RosterOnboardingCard({
       </div>
 
       {/* Provider checklist */}
-      <div style={{
-        background: '#fff',
-        borderRadius: radii.md,
-        border: `1px solid ${colors.gray200}`,
-        overflow: 'hidden',
-        marginBottom: spacing.md,
-      }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: radii.md,
+          border: `1px solid ${colors.gray200}`,
+          overflow: 'hidden',
+          marginBottom: spacing.md,
+        }}
+      >
         {detectedProviders.map((p, idx) => {
           const isChecked = confirmed.has(p.npi);
           return (
             <div
               key={p.npi}
               style={{
-                display: 'flex', alignItems: 'center', gap: spacing.md,
+                display: 'flex',
+                alignItems: 'center',
+                gap: spacing.md,
                 padding: `${spacing.sm}px ${spacing.md}px`,
-                borderBottom: idx < detectedProviders.length - 1 ? `1px solid ${colors.gray100}` : 'none',
+                borderBottom:
+                  idx < detectedProviders.length - 1 ? `1px solid ${colors.gray100}` : 'none',
                 background: isChecked ? 'transparent' : '#fef2f2',
                 opacity: isChecked ? 1 : 0.7,
                 transition: `all ${transitions.fast}`,
@@ -184,18 +210,29 @@ export default function RosterOnboardingCard({
               onClick={() => toggleProvider(p.npi)}
             >
               {/* Checkbox */}
-              <div style={{
-                width: 20, height: 20,
-                borderRadius: 4,
-                border: `2px solid ${isChecked ? colors.navy : colors.gray300}`,
-                background: isChecked ? colors.navy : '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-                transition: `all ${transitions.fast}`,
-              }}>
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  border: `2px solid ${isChecked ? colors.navy : colors.gray300}`,
+                  background: isChecked ? colors.navy : '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: `all ${transitions.fast}`,
+                }}
+              >
                 {isChecked && (
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6L5 9L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M2 6L5 9L10 3"
+                      stroke="#fff"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 )}
               </div>
@@ -206,26 +243,40 @@ export default function RosterOnboardingCard({
                   {p.provider_name || `NPI ${p.npi}`}
                 </span>
                 {p.web_specialty && (
-                  <span style={{ ...typography.bodySmall, color: colors.gray400, marginLeft: spacing.sm }}>
+                  <span
+                    style={{
+                      ...typography.bodySmall,
+                      color: colors.gray400,
+                      marginLeft: spacing.sm,
+                    }}
+                  >
                     — {p.web_specialty}
                   </span>
                 )}
               </div>
 
               {/* NPI */}
-              <span style={{
-                ...typography.bodySmall, fontFamily: 'monospace',
-                color: colors.gray400, fontSize: 11,
-              }}>
+              <span
+                style={{
+                  ...typography.bodySmall,
+                  fontFamily: 'monospace',
+                  color: colors.gray400,
+                  fontSize: 11,
+                }}
+              >
                 {p.npi}
               </span>
 
               {/* Status */}
               {!isChecked && (
-                <span style={{
-                  ...typography.bodySmall, color: '#dc2626',
-                  fontSize: 11, fontWeight: 600,
-                }}>
+                <span
+                  style={{
+                    ...typography.bodySmall,
+                    color: '#dc2626',
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                >
                   Will be removed
                 </span>
               )}
@@ -252,18 +303,20 @@ export default function RosterOnboardingCard({
             opacity: submitting ? 0.7 : 1,
             transition: `all ${transitions.fast}`,
           }}
-          onMouseOver={e => {
+          onMouseOver={(e) => {
             if (confirmed.size > 0 && !submitting) {
               (e.currentTarget as HTMLElement).style.background = colors.navyLight;
             }
           }}
-          onMouseOut={e => {
+          onMouseOut={(e) => {
             if (confirmed.size > 0) {
               (e.currentTarget as HTMLElement).style.background = colors.navy;
             }
           }}
         >
-          {submitting ? 'Confirming...' : `Confirm ${confirmed.size} Provider${confirmed.size !== 1 ? 's' : ''}`}
+          {submitting
+            ? 'Confirming...'
+            : `Confirm ${confirmed.size} Provider${confirmed.size !== 1 ? 's' : ''}`}
         </button>
 
         {/* Add missing provider */}
@@ -280,11 +333,11 @@ export default function RosterOnboardingCard({
             cursor: 'pointer',
             transition: `all ${transitions.fast}`,
           }}
-          onMouseOver={e => {
+          onMouseOver={(e) => {
             (e.currentTarget as HTMLElement).style.background = colors.navy;
             (e.currentTarget as HTMLElement).style.color = '#fff';
           }}
-          onMouseOut={e => {
+          onMouseOut={(e) => {
             (e.currentTarget as HTMLElement).style.background = 'none';
             (e.currentTarget as HTMLElement).style.color = colors.navy;
           }}

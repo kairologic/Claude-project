@@ -1,19 +1,20 @@
 # KairoLogic Pipeline Checklist
+
 **Last updated:** March 13, 2026
 
 ---
 
 ## Pipeline Status
 
-| Table | TX | CA | Total |
-|---|---|---|---|
-| providers | — | — | 1.8M |
-| provider_pecos | 203K | 258K | 461K |
-| provider_licenses | 192K | 310K | 502K |
-| practice_websites | 25K | 22K | 47K |
-| practice_providers | 38K | 63K | 101K |
-| nppes_delta_events | 9,740 | — | 9,740 |
-| NPI resolutions | 59.5K | pending | 59.5K |
+| Table                       | TX    | CA      | Total |
+| --------------------------- | ----- | ------- | ----- |
+| providers                   | —     | —       | 1.8M  |
+| provider_pecos              | 203K  | 258K    | 461K  |
+| provider_licenses           | 192K  | 310K    | 502K  |
+| practice_websites           | 25K   | 22K     | 47K   |
+| practice_providers          | 38K   | 63K     | 101K  |
+| nppes_delta_events          | 9,740 | —       | 9,740 |
+| NPI resolutions             | 59.5K | pending | 59.5K |
 | disciplinary practices (TX) | 1,258 | pending | 1,258 |
 
 ---
@@ -74,16 +75,19 @@
 Internal admin page (`app/admin/pipeline/page.tsx`) for monitoring data pipeline health and quality.
 
 ### Data Freshness Monitoring
+
 - [ ] #35 — Last sync timestamp per pipeline (NPPES, PECOS, TMB, CA MB, scan+delta)
 - [ ] #36 — Days since last successful run, color-coded (green < 7d, yellow 7-14d, red > 14d)
 - [ ] #37 — GitHub Actions cron status (pass/fail/skipped) via GitHub API
 
 ### Row Count Trends
+
 - [ ] #38 — Current counts per table with week-over-week delta (providers, provider_pecos, provider_licenses, practice_websites, practice_providers, nppes_delta_events)
 - [ ] #39 — NPI resolution progress bar (resolved vs unresolved by state)
 - [ ] #40 — Scan coverage: scanned vs unscanned sites by state
 
 ### Data Quality Flags
+
 - [ ] #41 — practice_websites with null city
 - [ ] #42 — practice_websites pointing to directory/aggregator URLs (blocked domain matches)
 - [ ] #43 — provider_licenses with null NPI by status breakdown (active vs deceased/cancelled)
@@ -92,6 +96,7 @@ Internal admin page (`app/admin/pipeline/page.tsx`) for monitoring data pipeline
 - [ ] #46 — Scan failure rate by error type (timeout, URI malformed, blocked, empty content)
 
 ### Targeting Readiness
+
 - [ ] #47 — Tier distribution by state (Tier 1/2/3/4 counts)
 - [ ] #48 — Disciplinary overlap counts (practices with flagged providers by state)
 - [ ] #49 — mismatch_count freshness (last SQL update timestamp)
@@ -102,6 +107,7 @@ Internal admin page (`app/admin/pipeline/page.tsx`) for monitoring data pipeline
 Cross-reference provider data against major payer directories to surface mismatches. Phase 1 is detect-only: show the practice where their data is out of sync with payers. No auto-fix, no API integrations. National scope from day one.
 
 ### Data Sources to Monitor
+
 - [ ] #51 — CAQH ProView public provider search (name + NPI → listed address, phone, specialty)
 - [ ] #52 — UnitedHealthcare provider finder scraper (uhc.com/find-a-doctor)
 - [ ] #53 — Blue Cross Blue Shield provider directory (varies by state plan, start with BCBS TX + BCBS CA)
@@ -110,12 +116,14 @@ Cross-reference provider data against major payer directories to surface mismatc
 - [ ] #56 — Humana provider search (humana.com/find-a-doctor)
 
 ### Infrastructure
+
 - [ ] #57 — `payer_directory_snapshots` table (npi, payer, address, phone, specialty, listed_name, snapshot_date)
 - [ ] #58 — Payer directory scraper framework (rate-limited, per-payer adapter pattern)
 - [ ] #59 — Cross-source mismatch engine: compare NPPES vs website vs payer directory per provider
 - [ ] #60 — Dashboard view: "Your data across sources" — side-by-side comparison grid per provider
 
 ### Mismatch Types to Detect
+
 - [ ] #61 — Address mismatch (NPPES says X, Aetna says Y, website says Z)
 - [ ] #62 — Phone mismatch across sources
 - [ ] #63 — Provider not listed in payer directory (credentialing gap or dropped network)
@@ -123,6 +131,7 @@ Cross-reference provider data against major payer directories to surface mismatc
 - [ ] #65 — Specialty mismatch between payer listing and board certification
 
 ### Phase 1 Deliverable
+
 - [ ] #66 — Practice Intelligence Dashboard panel: "Payer Directory Sync Status" — shows per-provider, per-payer match/mismatch with source links
 - [ ] #67 — Alert email: "3 of your providers have address mismatches in UHC and Aetna directories"
 
@@ -140,9 +149,11 @@ Cross-reference provider data against major payer directories to surface mismatc
 Multi-attribute matching engine for resolving healthcare entities across data sources. Needed for: URL discovery, payer directory matching, ongoing NPPES/PECOS/state board ingestion, and cross-source mismatch detection. Target: 95%+ match rate.
 
 ### The Problem
+
 NPPES legal names ("BEVERLY HILLS DERMATOLOGY GROUP INC") don't match public-facing names ("Dermatology Associates Medical Group" at derm90210.com). Single-attribute search (name only) fails 30-40% of the time. Same problem exists across every data source.
 
 ### Multi-Signal Matching Approach
+
 - [ ] #74 — Address matching: normalize + geocode NPPES address, compare to Google Places / payer directory address (strongest signal)
 - [ ] #75 — Phone matching: NPPES phone → Google Business listing reverse lookup
 - [ ] #76 — Name fuzzy matching: strip legal suffixes (MD, PA, Inc, LLC, PLLC, Corp), Jaro-Winkler on core name tokens
@@ -151,18 +162,21 @@ NPPES legal names ("BEVERLY HILLS DERMATOLOGY GROUP INC") don't match public-fac
 - [ ] #79 — Website content verification: confirm matched URL contains provider name or NPI on the page
 
 ### Confidence Scoring
+
 - [ ] #80 — Weighted scoring: address match (40%) + phone match (25%) + name similarity (20%) + specialty match (15%)
 - [ ] #81 — Auto-accept threshold: combined score >= 0.90 → link automatically
 - [ ] #82 — Review queue: score 0.70-0.89 → flag for manual verification
 - [ ] #83 — Reject threshold: score < 0.70 → skip, log for future retry with new data
 
 ### Infrastructure
+
 - [ ] #84 — `entity_resolution_log` table: tracks every match attempt with scores per signal, enables tuning
 - [ ] #85 — Reusable resolver module (`lib/entity/entity-resolver.ts`): shared across URL finder, payer directory scraper, NPI resolver, and any future data source
 - [ ] #86 — Batch mode: process 10K+ entities per run with rate limiting and progress tracking
 - [ ] #87 — Incremental mode: resolve new/changed entities on each weekly sync cycle
 
 ### Impact
+
 - Fixes the ~10K silently rejected CA URLs from Serper (27K providers still without URLs)
 - Enables payer directory matching (Category 4 signals) without manual mapping
 - Improves NPI resolver v2 (direct name+address match for 55K unresolved TX licenses)
@@ -173,6 +187,7 @@ NPPES legal names ("BEVERLY HILLS DERMATOLOGY GROUP INC") don't match public-fac
 Current: Help content is embedded directly in the Claude system prompt (option A). This works well for the initial feature set but the system prompt grows with each new topic.
 
 ### Phase 2: Supabase help_articles Table (option B)
+
 - [ ] #88 — Create `help_articles` table: id, title, category, content (markdown), keywords (text[]), embedding (vector), created_at, updated_at
 - [ ] #89 — Seed help_articles with current system prompt knowledge base content (dashboard, workflows, alerts, NPPES, payer directories, health score, settings, common terms)
 - [ ] #90 — Add pgvector extension + embeddings column for semantic search
@@ -182,6 +197,7 @@ Current: Help content is embedded directly in the Claude system prompt (option A
 - [ ] #94 — Auto-suggest: when a help query has no strong match, flag it for content creation
 
 ### Benefits of Migration
+
 - System prompt stays lean (fewer tokens per API call = faster + cheaper)
 - Help content can be updated without code deploys
 - Semantic search catches paraphrased questions better than keyword matching
@@ -206,20 +222,23 @@ Current: Help content is embedded directly in the Claude system prompt (option A
 ## Targeting Data Summary
 
 ### TX Tier 0 — Highest Value Targets
+
 - 1,258 practices with disciplinary-flagged providers on their website
 - 16 practices listing deceased providers
 - 69 practices listing cancelled-license providers
 - 1,093 practices with active-but-disciplined providers
 
 ### Tier Classification (scan-500-practices.ts)
-| Tier | Criteria |
-|---|---|
-| Tier 1 — High signal | 2+ mismatches AND 6+ providers |
+
+| Tier                     | Criteria                       |
+| ------------------------ | ------------------------------ |
+| Tier 1 — High signal     | 2+ mismatches AND 6+ providers |
 | Tier 2 — Movement signal | 2+ mismatches AND 4+ providers |
-| Tier 3 — Single mismatch | 1+ mismatch AND 4+ providers |
-| Tier 4 — Low signal | Everything else |
+| Tier 3 — Single mismatch | 1+ mismatch AND 4+ providers   |
+| Tier 4 — Low signal      | Everything else                |
 
 ### Outreach Hook
+
 > "We scanned 25,000 Texas practices. The average 8-provider group has 60 data discrepancies across NPPES, PECOS, and license records right now. Most practice managers don't find these until a claim is denied. We surface them on day one, help you fix them, then monitor so they never pile up again. $79/month."
 
 ---
@@ -229,49 +248,53 @@ Current: Help content is embedded directly in the Claude system prompt (option A
 Every finding surfaced in the dashboard, organized by category. No scores — just facts with source links. The practice manager sees what's wrong, where, and gets tools to fix it.
 
 ### Category 1: NPPES Data Mismatches
-| Signal | Description |
-|---|---|
-| Address mismatch | Practice address on website doesn't match NPPES address of record |
-| Phone mismatch | Phone on website doesn't match NPPES phone |
-| Provider moved | Provider listed on website but NPPES shows different address (provider relocated) |
-| Departed provider | Provider no longer at NPPES address but still displayed on website |
-| Name mismatch | Organization name on website doesn't match NPPES registered name |
-| Specialty mismatch | Specialty shown on website doesn't match NPPES taxonomy code |
+
+| Signal             | Description                                                                       |
+| ------------------ | --------------------------------------------------------------------------------- |
+| Address mismatch   | Practice address on website doesn't match NPPES address of record                 |
+| Phone mismatch     | Phone on website doesn't match NPPES phone                                        |
+| Provider moved     | Provider listed on website but NPPES shows different address (provider relocated) |
+| Departed provider  | Provider no longer at NPPES address but still displayed on website                |
+| Name mismatch      | Organization name on website doesn't match NPPES registered name                  |
+| Specialty mismatch | Specialty shown on website doesn't match NPPES taxonomy code                      |
 
 ### Category 2: License & Credentialing Alerts
-| Signal | Description |
-|---|---|
-| Disciplinary action | Provider on website has active disciplinary action (TMB or CA MB) |
-| Suspended license | Provider on website has a suspended license — cannot practice |
-| Revoked license | Provider on website has a revoked license |
-| Deceased provider | Provider on website is deceased per state board records |
-| Cancelled license | Provider on website has cancelled license (non-payment or voluntary) |
-| Delinquent license | Provider license renewal is overdue — no practice permitted |
-| Malpractice judgment | Provider on website has malpractice judgment on record |
-| Felony conviction | Provider on website has felony conviction on record |
-| Voluntary surrender | Provider surrendered license to resolve disciplinary action |
-| License expiring | Provider license expiring within 90 days (proactive alert) |
+
+| Signal               | Description                                                          |
+| -------------------- | -------------------------------------------------------------------- |
+| Disciplinary action  | Provider on website has active disciplinary action (TMB or CA MB)    |
+| Suspended license    | Provider on website has a suspended license — cannot practice        |
+| Revoked license      | Provider on website has a revoked license                            |
+| Deceased provider    | Provider on website is deceased per state board records              |
+| Cancelled license    | Provider on website has cancelled license (non-payment or voluntary) |
+| Delinquent license   | Provider license renewal is overdue — no practice permitted          |
+| Malpractice judgment | Provider on website has malpractice judgment on record               |
+| Felony conviction    | Provider on website has felony conviction on record                  |
+| Voluntary surrender  | Provider surrendered license to resolve disciplinary action          |
+| License expiring     | Provider license expiring within 90 days (proactive alert)           |
 
 ### Category 3: PECOS / Medicare Enrollment Gaps
-| Signal | Description |
-|---|---|
-| Not in PECOS | Provider listed on website but has no Medicare enrollment |
-| PECOS address mismatch | PECOS enrollment shows different practice address than website |
-| Reassignment mismatch | Provider PECOS reassignment doesn't match the practice they're listed under |
-| Enrollment expired | Provider PECOS enrollment expired or terminated |
+
+| Signal                 | Description                                                                 |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Not in PECOS           | Provider listed on website but has no Medicare enrollment                   |
+| PECOS address mismatch | PECOS enrollment shows different practice address than website              |
+| Reassignment mismatch  | Provider PECOS reassignment doesn't match the practice they're listed under |
+| Enrollment expired     | Provider PECOS enrollment expired or terminated                             |
 
 ### Category 4: Payer Directory Mismatches (detect only, manual fix)
-| Signal | Description |
-|---|---|
-| Address mismatch | Payer directory address doesn't match NPPES or website (per payer: UHC, BCBS, Aetna, Cigna, Humana) |
-| Phone mismatch | Phone number differs across payer directories |
-| Not listed | Provider not found in payer directory (possible network drop or credentialing gap) |
-| Wrong location | Provider listed at wrong practice location in payer directory |
-| Specialty mismatch | Payer listing specialty doesn't match board certification |
+
+| Signal             | Description                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| Address mismatch   | Payer directory address doesn't match NPPES or website (per payer: UHC, BCBS, Aetna, Cigna, Humana) |
+| Phone mismatch     | Phone number differs across payer directories                                                       |
+| Not listed         | Provider not found in payer directory (possible network drop or credentialing gap)                  |
+| Wrong location     | Provider listed at wrong practice location in payer directory                                       |
+| Specialty mismatch | Payer listing specialty doesn't match board certification                                           |
 
 ### Category 5: Regulatory Compliance (Website Findings)
 
-*Texas — SB 1188 (Data Sovereignty)*
+_Texas — SB 1188 (Data Sovereignty)_
 | Signal | Description |
 |---|---|
 | Foreign data routing | Website routing data to servers outside the US |
@@ -280,7 +303,7 @@ Every finding surfaced in the dashboard, organized by category. No scores — ju
 | Missing privacy policy | No privacy policy or doesn't address data residency |
 | Missing cookie consent | Cookie consent mechanism absent or insufficient |
 
-*Texas — HB 149 (AI Transparency)*
+_Texas — HB 149 (AI Transparency)_
 | Signal | Description |
 |---|---|
 | Undisclosed AI content | AI-generated content on website without disclosure |
@@ -288,13 +311,13 @@ Every finding surfaced in the dashboard, organized by category. No scores — ju
 | Undisclosed AI tools | AI-powered scheduling or triage without transparency notice |
 | Missing AI policy | No AI usage policy page |
 
-*California — AB 3030 (AI Transparency)*
+_California — AB 3030 (AI Transparency)_
 | Signal | Description |
 |---|---|
 | Undisclosed AI tools | Patient-facing AI tools without required CA notifications |
 | Missing AI disclosure | Required AI disclosure absent per AB 3030 |
 
-*Clinical Integrity (all states)*
+_Clinical Integrity (all states)_
 | Signal | Description |
 |---|---|
 | Outdated credentials | Provider credentials displayed on website don't match current board records |
@@ -303,56 +326,111 @@ Every finding surfaced in the dashboard, organized by category. No scores — ju
 | Certification mismatch | Board certification claims don't match actual board records |
 
 ### Category 6: NPPES Correction Actions
-| Signal | Description |
-|---|---|
-| Address update needed | Pre-filled NPPES update form with corrected address |
-| Phone update needed | Pre-filled NPPES update form with corrected phone |
-| Taxonomy update needed | Pre-filled NPPES update form with corrected specialty code |
-| Authorized official update | Pre-filled form for authorized official changes |
-| PDF ready for submission | Generated PDF for mailing to NPPES if electronic update unavailable |
+
+| Signal                     | Description                                                         |
+| -------------------------- | ------------------------------------------------------------------- |
+| Address update needed      | Pre-filled NPPES update form with corrected address                 |
+| Phone update needed        | Pre-filled NPPES update form with corrected phone                   |
+| Taxonomy update needed     | Pre-filled NPPES update form with corrected specialty code          |
+| Authorized official update | Pre-filled form for authorized official changes                     |
+| PDF ready for submission   | Generated PDF for mailing to NPPES if electronic update unavailable |
 
 ### Signal Count Summary
-| Category | Signals | Data Source |
-|---|---|---|
-| NPPES Mismatches | 6 | NPPES weekly sync + website scan |
-| License & Credentialing | 10 | TMB, CA MB, state board data |
-| PECOS / Medicare | 4 | CMS PECOS monthly sync |
-| Payer Directories | 5 | Payer directory scrapers (per payer) |
-| Regulatory Compliance | 11 | Website scan engine |
-| NPPES Corrections | 5 | Generated from mismatch findings |
-| **Total** | **41** | |
+
+| Category                | Signals | Data Source                                  |
+| ----------------------- | ------- | -------------------------------------------- |
+| NPPES Mismatches        | 6       | NPPES weekly sync + website scan             |
+| License & Credentialing | 10      | TMB, CA MB, state board data                 |
+| PECOS / Medicare        | 4       | CMS PECOS monthly sync                       |
+| Payer Directories       | 5       | Payer directory scrapers (per payer)         |
+| Regulatory Compliance   | 12      | Website scan engine (incl. EHR AI detection) |
+| NPPES Corrections       | 5       | Generated from mismatch findings             |
+| **Total**               | **42**  |                                              |
+
+---
+
+## Section 9: Practice Onboarding — Provider Pre-Seeding + Confirmation
+
+| #   | Task                                                                                  | Owner | Status  |
+| --- | ------------------------------------------------------------------------------------- | ----- | ------- |
+| 115 | Provider extractor: Phase 1 HTTP-based extraction (`lib/crawl/provider-extractor.ts`) | Eng   | ✅ Done |
+| 116 | Schema.org JSON-LD extraction from practice websites                                  | Eng   | ✅ Done |
+| 117 | Structured HTML list extraction (team pages, provider cards)                          | Eng   | ✅ Done |
+| 118 | Regex pattern matching fallback for unstructured pages                                | Eng   | ✅ Done |
+| 119 | NPPES cross-reference scoring (name, credential, phone, city)                         | Eng   | ✅ Done |
+| 120 | Common provider page path detection (`/providers`, `/our-team`, etc.)                 | Eng   | ✅ Done |
+| 121 | Roster onboarding card UI (`RosterOnboardingCard.tsx`)                                | Eng   | ✅ Done |
+| 122 | Onboarding wrapper with router refresh (`RosterOnboardingWrapper.tsx`)                | Eng   | ✅ Done |
+| 123 | Roster page integration — show onboarding card above roster                           | Eng   | ✅ Done |
+| 124 | Confirm roster: set `association_source` to CONFIRMED                                 | Eng   | ✅ Done |
+| 125 | Remove provider: set `roster_status` to departed                                      | Eng   | ✅ Done |
+| 126 | Set `onboarding_confirmed` flag on practice_websites                                  | Eng   | ✅ Done |
+| 127 | Add Missing Provider button → NPI lookup modal dispatch                               | Eng   | ✅ Done |
+
+### Specialty Mismatch Detection
+
+| #   | Task                                                            | Owner | Status  |
+| --- | --------------------------------------------------------------- | ----- | ------- |
+| 128 | Taxonomy normalizer (`lib/scanner/taxonomy-normalizer.ts`)      | Eng   | ✅ Done |
+| 129 | Bidirectional mapping: freeform specialty ↔ NUCC taxonomy codes | Eng   | ✅ Done |
+| 130 | Sub-specialty soft matching (shared prefix = 0.7 confidence)    | Eng   | ✅ Done |
+| 131 | Four-way specialty comparison (web/NPPES/board/payer)           | Eng   | ✅ Done |
+| 132 | Consensus detection (2+ sources agreeing)                       | Eng   | ✅ Done |
+| 133 | Wire into delta-engine.ts `detectDeltas()`                      | Eng   | ✅ Done |
+| 134 | Generate taxonomy_change delta events with corroboration        | Eng   | ✅ Done |
+| 135 | Wire payer_directory_snapshots specialty into 4-way comparison  | Eng   | 🔲 TODO |
+
+### EHR Vendor AI Detection
+
+| #   | Task                                                            | Owner | Status     |
+| --- | --------------------------------------------------------------- | ----- | ---------- |
+| 136 | EHR AI registry — vendor → AI features + confidence mapping     | Eng   | ✅ Done    |
+| 137 | EHR URL pattern detection (portal links in HTML)                | Eng   | ✅ Done    |
+| 138 | checkAI05() — EHR vendor detection + AI disclosure check        | Eng   | ✅ Done    |
+| 139 | Wire checkAI05() into runComplianceChecks() scan chain          | Eng   | ✅ Done    |
+| 140 | Support 13+ EHR vendors (eCW, Epic, athena, Cerner, etc.)       | Eng   | ✅ Done    |
+| 141 | Confidence tiers: confirmed / likely / possible                 | Eng   | ✅ Done    |
+| 142 | Auto-generate recommended AI disclosure text per vendor         | Eng   | ✅ Done    |
+| 143 | Multi-state compliance mapping (HB 149 TX + AB 3030 CA)         | Eng   | ✅ Done    |
+| 144 | EHR registry expansion — add new vendors as discovered          | Eng   | 🔲 Ongoing |
+| 145 | Phase 2: headless browser EHR detection for JS-rendered portals | Eng   | 🔲 TODO    |
 
 ---
 
 ## Key Files
 
-| File | Purpose |
-|---|---|
-| `scripts/scan-500-practices.ts` | Batch scan + delta detection + export |
-| `scripts/run-scan-and-delta.ts` | Scan + delta runner (used by cron) |
-| `scripts/load-ca-medical-board.py` | CA .accdb loader → provider_licenses |
-| `scripts/populate-practice-providers.ts` | Address co-location matching |
-| `scripts/load-pecos-reassignment.py` | PECOS reassignment bridge |
-| `scripts/ca-mb-monthly-sync.ts` | NPI resolver + CA MB sync |
-| `scripts/find-provider-urls.py` | Serper Places API URL finder |
-| `lib/nppes/npi-resolver.ts` | NPI resolution engine |
-| `lib/nppes/pecos-client.ts` | CMS PECOS API client |
-| `lib/scanner/scan-scheduler.ts` | Scan orchestrator |
-| `lib/scanner/delta-engine.ts` | NPPES delta detection |
-| `lib/scanner/name-quality-filter.ts` | Pre-scan name validation |
-| `lib/scanner/domain-blocklist.ts` | Directory/aggregator URL filter |
+| File                                               | Purpose                                    |
+| -------------------------------------------------- | ------------------------------------------ |
+| `scripts/scan-500-practices.ts`                    | Batch scan + delta detection + export      |
+| `scripts/run-scan-and-delta.ts`                    | Scan + delta runner (used by cron)         |
+| `scripts/load-ca-medical-board.py`                 | CA .accdb loader → provider_licenses       |
+| `scripts/populate-practice-providers.ts`           | Address co-location matching               |
+| `scripts/load-pecos-reassignment.py`               | PECOS reassignment bridge                  |
+| `scripts/ca-mb-monthly-sync.ts`                    | NPI resolver + CA MB sync                  |
+| `scripts/find-provider-urls.py`                    | Serper Places API URL finder               |
+| `lib/nppes/npi-resolver.ts`                        | NPI resolution engine                      |
+| `lib/nppes/pecos-client.ts`                        | CMS PECOS API client                       |
+| `lib/scanner/scan-scheduler.ts`                    | Scan orchestrator                          |
+| `lib/scanner/delta-engine.ts`                      | NPPES delta detection                      |
+| `lib/scanner/name-quality-filter.ts`               | Pre-scan name validation                   |
+| `lib/scanner/domain-blocklist.ts`                  | Directory/aggregator URL filter            |
+| `lib/scanner/taxonomy-normalizer.ts`               | Specialty normalization + 4-way comparison |
+| `lib/scanner/compliance-checks.ts`                 | Compliance check library (DR/AI/ER checks) |
+| `lib/crawl/provider-extractor.ts`                  | Phase 1 HTTP-based provider extraction     |
+| `components/dashboard/RosterOnboardingCard.tsx`    | Inline roster confirmation card            |
+| `components/dashboard/RosterOnboardingWrapper.tsx` | Onboarding card client wrapper             |
 
 ---
 
 ## GitHub Actions Workflows
 
-| Workflow | Schedule | Status |
-|---|---|---|
-| `nppes-weekly-sync.yml` | Monday 6am UTC | Needs verification |
-| `pecos-monthly-sync.yml` | 1st of month 7am UTC | Needs verification |
-| `tmb-monthly-sync.yml` | Manual trigger | — |
-| `ca-mb-resolution-sync.yml` | 2nd Tuesday 8am UTC | Needs verification |
-| `scan-and-delta.yml` | Wednesday 5am UTC | Fixed (state filter + limit bump) |
-| `nppes-confirmation-poll.yml` | Daily 10am UTC | Needs verification |
-| `tmb-newsroom-monitor.yml` | Wednesday 4am UTC | Fixed (ts-node → tsx) |
-| `trial-lifecycle.yml` | Daily 11am UTC | Needs verification |
+| Workflow                      | Schedule             | Status                            |
+| ----------------------------- | -------------------- | --------------------------------- |
+| `nppes-weekly-sync.yml`       | Monday 6am UTC       | Needs verification                |
+| `pecos-monthly-sync.yml`      | 1st of month 7am UTC | Needs verification                |
+| `tmb-monthly-sync.yml`        | Manual trigger       | —                                 |
+| `ca-mb-resolution-sync.yml`   | 2nd Tuesday 8am UTC  | Needs verification                |
+| `scan-and-delta.yml`          | Wednesday 5am UTC    | Fixed (state filter + limit bump) |
+| `nppes-confirmation-poll.yml` | Daily 10am UTC       | Needs verification                |
+| `tmb-newsroom-monitor.yml`    | Wednesday 4am UTC    | Fixed (ts-node → tsx)             |
+| `trial-lifecycle.yml`         | Daily 11am UTC       | Needs verification                |

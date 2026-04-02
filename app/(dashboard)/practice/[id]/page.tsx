@@ -13,71 +13,75 @@ import { colors } from '@/lib/design-tokens';
 import { safeQuerySingle, safeQuery } from '@/lib/supabase/safe-query';
 import DashboardHome from '@/components/dashboard/DashboardHome';
 
-export default async function DashboardHomePage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function DashboardHomePage({ params }: { params: { id: string } }) {
   const practiceId = params.id;
   const admin = createAdminSupabaseClient();
 
   // Get authenticated user for personalization
   const auth = await getAuthenticatedUser();
   // Derive display name: prefer metadata name, then capitalize email prefix
-  const rawName = auth?.user?.user_metadata?.name
-    || auth?.user?.email?.split('@')[0]
-    || 'there';
+  const rawName = auth?.user?.user_metadata?.name || auth?.user?.email?.split('@')[0] || 'there';
   const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   // Parallel query 1: practice name + KPI data + compliance (independent queries)
-  const [practiceResult, kpiResult, topIssuesResult, credentialingResult, complianceResult] = await Promise.all([
-    safeQuerySingle(
-      admin
-        .from('practice_websites')
-        .select('name, provider_count')
-        .eq('id', practiceId)
-        .single(),
-      null
-    ),
-    safeQuerySingle(
-      admin
-        .from('v_dashboard_kpis')
-        .select('needs_attention, in_progress, monitoring_count, all_clear, total_providers')
-        .eq('practice_website_id', practiceId)
-        .maybeSingle(),
-      null
-    ),
-    safeQuery(
-      admin
-        .from('v_provider_health')
-        .select('*')
-        .eq('practice_website_id', practiceId)
-        .gt('open_issues', 0)
-        .order('open_issues', { ascending: false })
-        .limit(5),
-      []
-    ),
-    safeQuery(
-      admin
-        .from('v_provider_health')
-        .select('*')
-        .eq('practice_website_id', practiceId)
-        .in('roster_status', ['onboarding', 'departing']),
-      []
-    ),
-    safeQuery(
-      admin
-        .from('compliance_findings')
-        .select('check_id, category, severity, status, title, score')
-        .eq('practice_group_id', practiceId)
-        .eq('is_domain_level', true)
-        .order('created_at', { ascending: true }),
-      []
-    ),
-  ]);
+  const [practiceResult, kpiResult, topIssuesResult, credentialingResult, complianceResult] =
+    await Promise.all([
+      safeQuerySingle(
+        admin
+          .from('practice_websites')
+          .select('name, provider_count')
+          .eq('id', practiceId)
+          .single(),
+        null,
+      ),
+      safeQuerySingle(
+        admin
+          .from('v_dashboard_kpis')
+          .select('needs_attention, in_progress, monitoring_count, all_clear, total_providers')
+          .eq('practice_website_id', practiceId)
+          .maybeSingle(),
+        null,
+      ),
+      safeQuery(
+        admin
+          .from('v_provider_health')
+          .select('*')
+          .eq('practice_website_id', practiceId)
+          .gt('open_issues', 0)
+          .order('open_issues', { ascending: false })
+          .limit(5),
+        [],
+      ),
+      safeQuery(
+        admin
+          .from('v_provider_health')
+          .select('*')
+          .eq('practice_website_id', practiceId)
+          .in('roster_status', ['onboarding', 'departing']),
+        [],
+      ),
+      safeQuery(
+        admin
+          .from('compliance_findings')
+          .select('check_id, category, severity, status, title, score')
+          .eq('practice_group_id', practiceId)
+          .eq('is_domain_level', true)
+          .order('created_at', { ascending: true }),
+        [],
+      ),
+    ]);
 
-  interface PracticeRecord { name: string; provider_count: number }
-  interface KpiRecord { needs_attention: number; in_progress: number; monitoring_count: number; all_clear: number; total_providers: number }
+  interface PracticeRecord {
+    name: string;
+    provider_count: number;
+  }
+  interface KpiRecord {
+    needs_attention: number;
+    in_progress: number;
+    monitoring_count: number;
+    all_clear: number;
+    total_providers: number;
+  }
 
   const practice = practiceResult.data as PracticeRecord | null;
   const kpiData = kpiResult.data as KpiRecord | null;
@@ -90,10 +94,16 @@ export default async function DashboardHomePage({
   const seen = new Set<string>();
   const priorityProviders: typeof topIssues = [];
   for (const p of credentialingProviders) {
-    if (!seen.has(p.npi)) { priorityProviders.push(p); seen.add(p.npi); }
+    if (!seen.has(p.npi)) {
+      priorityProviders.push(p);
+      seen.add(p.npi);
+    }
   }
   for (const p of topIssues) {
-    if (!seen.has(p.npi)) { priorityProviders.push(p); seen.add(p.npi); }
+    if (!seen.has(p.npi)) {
+      priorityProviders.push(p);
+      seen.add(p.npi);
+    }
   }
 
   // 3. Unseen alert count for this user
@@ -101,24 +111,14 @@ export default async function DashboardHomePage({
   if (auth?.user) {
     const [allAlertsResult, readAlertsResult] = await Promise.all([
       safeQuery(
-        admin
-          .from('alerts')
-          .select('id')
-          .eq('practice_id', practiceId)
-          .eq('is_active', true),
-        []
+        admin.from('alerts').select('id').eq('practice_id', practiceId).eq('is_active', true),
+        [],
       ),
-      safeQuery(
-        admin
-          .from('user_alert_reads')
-          .select('alert_id')
-          .eq('user_id', auth.user.id),
-        []
-      ),
+      safeQuery(admin.from('user_alert_reads').select('alert_id').eq('user_id', auth.user.id), []),
     ]);
 
-    const readIds = new Set((readAlertsResult.data || []).map(r => r.alert_id));
-    unseenAlertCount = (allAlertsResult.data || []).filter(a => !readIds.has(a.id)).length;
+    const readIds = new Set((readAlertsResult.data || []).map((r) => r.alert_id));
+    unseenAlertCount = (allAlertsResult.data || []).filter((a) => !readIds.has(a.id)).length;
   }
 
   // 4. Payer sync status (static for now, will be from payer_directory_snapshots later)
@@ -145,14 +145,29 @@ export default async function DashboardHomePage({
   };
 
   const complianceChecks = [
-    { check_id: 'sb_1188_data_sovereignty', label: 'SB 1188 (Data sovereignty)', value: 'Pending', status: 'pending' },
-    { check_id: 'hb_149_ai_transparency', label: 'HB 149 (AI transparency)', value: 'Pending', status: 'pending' },
-    { check_id: 'ab_3030_ca_ai_disclosure', label: 'AB 3030 (CA AI disclosure)', value: 'N/A', status: 'false_positive' },
+    {
+      check_id: 'sb_1188_data_sovereignty',
+      label: 'SB 1188 (Data sovereignty)',
+      value: 'Pending',
+      status: 'pending',
+    },
+    {
+      check_id: 'hb_149_ai_transparency',
+      label: 'HB 149 (AI transparency)',
+      value: 'Pending',
+      status: 'pending',
+    },
+    {
+      check_id: 'ab_3030_ca_ai_disclosure',
+      label: 'AB 3030 (CA AI disclosure)',
+      value: 'N/A',
+      status: 'false_positive',
+    },
   ];
 
   // Override with actual findings
   for (const finding of complianceFindings) {
-    const idx = complianceChecks.findIndex(c => c.check_id === finding.check_id);
+    const idx = complianceChecks.findIndex((c) => c.check_id === finding.check_id);
     if (idx >= 0) {
       complianceChecks[idx].value = complianceStatusMap[finding.status] || finding.status;
       complianceChecks[idx].status = finding.status;
@@ -160,10 +175,16 @@ export default async function DashboardHomePage({
   }
 
   // Calculate overall compliance score
-  const scoredFindings = complianceFindings.filter((f: any) => f.score !== null && f.status !== 'false_positive');
-  const complianceScore = scoredFindings.length > 0
-    ? Math.round(scoredFindings.reduce((sum: number, f: any) => sum + (f.score || 0), 0) / scoredFindings.length)
-    : null;
+  const scoredFindings = complianceFindings.filter(
+    (f: any) => f.score !== null && f.status !== 'false_positive',
+  );
+  const complianceScore =
+    scoredFindings.length > 0
+      ? Math.round(
+          scoredFindings.reduce((sum: number, f: any) => sum + (f.score || 0), 0) /
+            scoredFindings.length,
+        )
+      : null;
 
   const kpis = {
     needs_attention: kpiData?.needs_attention || 0,

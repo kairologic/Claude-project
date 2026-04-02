@@ -11,11 +11,7 @@ import { safeQuery } from '@/lib/supabase/safe-query';
 import ProviderRosterView from '@/components/dashboard/ProviderRosterView';
 import RosterOnboardingWrapper from '@/components/dashboard/RosterOnboardingWrapper';
 
-export default async function RosterPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function RosterPage({ params }: { params: { id: string } }) {
   const practiceId = params.id;
   const admin = createAdminSupabaseClient();
 
@@ -24,26 +20,24 @@ export default async function RosterPage({
     safeQuery(
       admin
         .from('practice_providers')
-        .select('id, npi, provider_name, roster_status, active_mismatch_count, web_specialty, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type, association_source')
+        .select(
+          'id, npi, provider_name, roster_status, active_mismatch_count, web_specialty, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type, association_source',
+        )
         .eq('practice_website_id', practiceId)
         .neq('roster_status', 'onboarding')
         .order('active_mismatch_count', { ascending: false, nullsFirst: false }),
-      []
+      [],
     ),
     safeQuery(
       admin
         .from('v_provider_health')
         .select('npi, health_score, open_issues, specialty')
         .eq('practice_website_id', practiceId),
-      []
+      [],
     ),
     safeQuery(
-      admin
-        .from('practice_websites')
-        .select('onboarding_confirmed')
-        .eq('id', practiceId)
-        .single(),
-      { onboarding_confirmed: false }
+      admin.from('practice_websites').select('onboarding_confirmed').eq('id', practiceId).single(),
+      { onboarding_confirmed: false },
     ),
   ]);
 
@@ -51,9 +45,16 @@ export default async function RosterPage({
   const healthData = healthResult.data;
   const onboardingConfirmed = practiceResult.data?.onboarding_confirmed ?? false;
 
-  const healthMap: Record<string, { health_score: number; open_issues: number; specialty: string | null }> = {};
-  (healthData || []).forEach(h => {
-    healthMap[h.npi] = { health_score: h.health_score, open_issues: h.open_issues, specialty: h.specialty };
+  const healthMap: Record<
+    string,
+    { health_score: number; open_issues: number; specialty: string | null }
+  > = {};
+  (healthData || []).forEach((h) => {
+    healthMap[h.npi] = {
+      health_score: h.health_score,
+      open_issues: h.open_issues,
+      specialty: h.specialty,
+    };
   });
 
   // workflowMap is no longer needed for click-through (we use ProviderDetailPanel now)
@@ -64,7 +65,7 @@ export default async function RosterPage({
     <>
       <RosterOnboardingWrapper
         practiceId={practiceId}
-        providers={(providers || []).map(p => ({
+        providers={(providers || []).map((p) => ({
           npi: p.npi,
           provider_name: p.provider_name,
           web_specialty: p.web_specialty,

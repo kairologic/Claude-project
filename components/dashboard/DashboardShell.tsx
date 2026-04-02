@@ -75,7 +75,9 @@ export default function DashboardShell({
     async function fetchUnseenCount() {
       try {
         const supabase = createBrowserSupabaseClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) return;
 
         // Count alerts for this practice that this user hasn't seen
@@ -90,8 +92,8 @@ export default function DashboardShell({
           .select('alert_id')
           .eq('user_id', user.id);
 
-        const readIds = new Set((reads || []).map(r => r.alert_id));
-        const unseen = (alerts || []).filter(a => !readIds.has(a.id));
+        const readIds = new Set((reads || []).map((r) => r.alert_id));
+        const unseen = (alerts || []).filter((a) => !readIds.has(a.id));
         setUnseenAlertCount(unseen.length);
       } catch (err) {
         console.error('Failed to fetch unseen alerts:', err);
@@ -123,9 +125,7 @@ export default function DashboardShell({
           lastSync="2 hours ago"
           practiceId={currentPracticeId}
         />
-        <div style={styles.content}>
-          {children}
-        </div>
+        <div style={styles.content}>{children}</div>
       </main>
     </div>
   );

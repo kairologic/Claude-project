@@ -17,9 +17,9 @@
 
 export interface TaxonomyEntry {
   code: string;
-  canonical: string;       // normalized display name
-  grouping: string;        // Primary Care, Specialty, etc.
-  aliases: string[];       // all known variations from websites
+  canonical: string; // normalized display name
+  grouping: string; // Primary Care, Specialty, etc.
+  aliases: string[]; // all known variations from websites
 }
 
 const TAXONOMY_MAP: TaxonomyEntry[] = [
@@ -29,10 +29,18 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Family Medicine',
     grouping: 'Primary Care',
     aliases: [
-      'family medicine', 'family practice', 'family physician',
-      'family doctor', 'family med', 'fp', 'fm',
-      'family nurse practitioner', 'fnp', 'family care',
-      'general family medicine', 'family & general practice',
+      'family medicine',
+      'family practice',
+      'family physician',
+      'family doctor',
+      'family med',
+      'fp',
+      'fm',
+      'family nurse practitioner',
+      'fnp',
+      'family care',
+      'general family medicine',
+      'family & general practice',
     ],
   },
   {
@@ -40,8 +48,13 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Internal Medicine',
     grouping: 'Primary Care',
     aliases: [
-      'internal medicine', 'internist', 'general internal medicine',
-      'internal med', 'im', 'general internist', 'adult medicine',
+      'internal medicine',
+      'internist',
+      'general internal medicine',
+      'internal med',
+      'im',
+      'general internist',
+      'adult medicine',
     ],
   },
   {
@@ -49,8 +62,13 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Pediatrics',
     grouping: 'Primary Care',
     aliases: [
-      'pediatrics', 'pediatrician', 'pediatric medicine', 'peds',
-      'child health', 'pediatric care', 'children\'s medicine',
+      'pediatrics',
+      'pediatrician',
+      'pediatric medicine',
+      'peds',
+      'child health',
+      'pediatric care',
+      "children's medicine",
     ],
   },
   {
@@ -58,8 +76,12 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'General Practice',
     grouping: 'Primary Care',
     aliases: [
-      'general practice', 'general practitioner', 'gp',
-      'primary care', 'primary care physician', 'pcp',
+      'general practice',
+      'general practitioner',
+      'gp',
+      'primary care',
+      'primary care physician',
+      'pcp',
     ],
   },
   // ── Combined Specialties (common on websites) ───────
@@ -68,9 +90,14 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Internal Medicine/Pediatrics',
     grouping: 'Primary Care',
     aliases: [
-      'internal medicine/pediatrics', 'internal medicine & pediatrics',
-      'med-peds', 'medicine-pediatrics', 'internal medicine, pediatrics',
-      'internal medicine pediatrics', 'im/peds', 'med/peds',
+      'internal medicine/pediatrics',
+      'internal medicine & pediatrics',
+      'med-peds',
+      'medicine-pediatrics',
+      'internal medicine, pediatrics',
+      'internal medicine pediatrics',
+      'im/peds',
+      'med/peds',
     ],
   },
   // ── Specialties ─────────────────────────────────────
@@ -78,17 +105,19 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     code: '207N00000X',
     canonical: 'Dermatology',
     grouping: 'Specialty',
-    aliases: [
-      'dermatology', 'dermatologist', 'skin care', 'derm',
-    ],
+    aliases: ['dermatology', 'dermatologist', 'skin care', 'derm'],
   },
   {
     code: '207X00000X',
     canonical: 'Orthopedic Surgery',
     grouping: 'Specialty',
     aliases: [
-      'orthopedic surgery', 'orthopaedic surgery', 'orthopedics',
-      'orthopaedics', 'orthopedic', 'ortho',
+      'orthopedic surgery',
+      'orthopaedic surgery',
+      'orthopedics',
+      'orthopaedics',
+      'orthopedic',
+      'ortho',
     ],
   },
   {
@@ -96,8 +125,12 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Otolaryngology',
     grouping: 'Specialty',
     aliases: [
-      'otolaryngology', 'ent', 'ear nose throat', 'ear, nose & throat',
-      'ear nose and throat', 'otorhinolaryngology',
+      'otolaryngology',
+      'ent',
+      'ear nose throat',
+      'ear, nose & throat',
+      'ear nose and throat',
+      'otorhinolaryngology',
     ],
   },
   {
@@ -105,43 +138,45 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Obstetrics & Gynecology',
     grouping: 'Specialty',
     aliases: [
-      'obstetrics & gynecology', 'obstetrics and gynecology',
-      'ob/gyn', 'obgyn', 'ob-gyn', 'obstetrics', 'gynecology',
-      'women\'s health',
+      'obstetrics & gynecology',
+      'obstetrics and gynecology',
+      'ob/gyn',
+      'obgyn',
+      'ob-gyn',
+      'obstetrics',
+      'gynecology',
+      "women's health",
     ],
   },
   {
     code: '207RC0000X',
     canonical: 'Cardiovascular Disease',
     grouping: 'Specialty',
-    aliases: [
-      'cardiovascular disease', 'cardiology', 'cardiologist',
-      'heart', 'cardiovascular',
-    ],
+    aliases: ['cardiovascular disease', 'cardiology', 'cardiologist', 'heart', 'cardiovascular'],
   },
   {
     code: '207RG0100X',
     canonical: 'Gastroenterology',
     grouping: 'Specialty',
-    aliases: [
-      'gastroenterology', 'gastroenterologist', 'gi', 'digestive',
-    ],
+    aliases: ['gastroenterology', 'gastroenterologist', 'gi', 'digestive'],
   },
   {
     code: '207RN0300X',
     canonical: 'Nephrology',
     grouping: 'Specialty',
-    aliases: [
-      'nephrology', 'nephrologist', 'kidney', 'renal',
-    ],
+    aliases: ['nephrology', 'nephrologist', 'kidney', 'renal'],
   },
   {
     code: '207RP1001X',
     canonical: 'Pulmonary Disease',
     grouping: 'Specialty',
     aliases: [
-      'pulmonary disease', 'pulmonology', 'pulmonologist', 'lung',
-      'pulmonary medicine', 'pulmonary',
+      'pulmonary disease',
+      'pulmonology',
+      'pulmonologist',
+      'lung',
+      'pulmonary medicine',
+      'pulmonary',
     ],
   },
   {
@@ -149,7 +184,9 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Endocrinology',
     grouping: 'Specialty',
     aliases: [
-      'endocrinology', 'endocrinologist', 'diabetes',
+      'endocrinology',
+      'endocrinologist',
+      'diabetes',
       'endocrinology, diabetes & metabolism',
     ],
   },
@@ -158,148 +195,131 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Hematology',
     grouping: 'Specialty',
     aliases: [
-      'hematology', 'hematologist', 'blood disorders',
-      'hematology & oncology', 'hematology/oncology',
+      'hematology',
+      'hematologist',
+      'blood disorders',
+      'hematology & oncology',
+      'hematology/oncology',
     ],
   },
   {
     code: '207RR0500X',
     canonical: 'Rheumatology',
     grouping: 'Specialty',
-    aliases: [
-      'rheumatology', 'rheumatologist',
-    ],
+    aliases: ['rheumatology', 'rheumatologist'],
   },
   {
     code: '2084P0800X',
     canonical: 'Psychiatry',
     grouping: 'Specialty',
     aliases: [
-      'psychiatry', 'psychiatrist', 'psychiatry & neurology',
-      'mental health', 'behavioral health',
+      'psychiatry',
+      'psychiatrist',
+      'psychiatry & neurology',
+      'mental health',
+      'behavioral health',
     ],
   },
   {
     code: '2084N0400X',
     canonical: 'Neurology',
     grouping: 'Specialty',
-    aliases: [
-      'neurology', 'neurologist', 'neuro',
-    ],
+    aliases: ['neurology', 'neurologist', 'neuro'],
   },
   {
     code: '208600000X',
     canonical: 'Plastic Surgery',
     grouping: 'Specialty',
     aliases: [
-      'plastic surgery', 'plastic surgeon', 'cosmetic surgery',
-      'reconstructive surgery', 'plastic & reconstructive surgery',
+      'plastic surgery',
+      'plastic surgeon',
+      'cosmetic surgery',
+      'reconstructive surgery',
+      'plastic & reconstructive surgery',
     ],
   },
   {
     code: '208200000X',
     canonical: 'Surgery',
     grouping: 'Specialty',
-    aliases: [
-      'surgery', 'general surgery', 'surgeon', 'general surgeon',
-    ],
+    aliases: ['surgery', 'general surgery', 'surgeon', 'general surgeon'],
   },
   {
     code: '207T00000X',
     canonical: 'Neurological Surgery',
     grouping: 'Specialty',
-    aliases: [
-      'neurological surgery', 'neurosurgery', 'neurosurgeon',
-    ],
+    aliases: ['neurological surgery', 'neurosurgery', 'neurosurgeon'],
   },
   {
     code: '208C00000X',
     canonical: 'Colon & Rectal Surgery',
     grouping: 'Specialty',
-    aliases: [
-      'colon & rectal surgery', 'colorectal surgery', 'proctology',
-    ],
+    aliases: ['colon & rectal surgery', 'colorectal surgery', 'proctology'],
   },
   {
     code: '1835P1300X',
     canonical: 'Pharmacist',
     grouping: 'Pharmacy',
-    aliases: [
-      'pharmacist', 'pharmacy', 'clinical pharmacist',
-    ],
+    aliases: ['pharmacist', 'pharmacy', 'clinical pharmacist'],
   },
   {
     code: '207L00000X',
     canonical: 'Anesthesiology',
     grouping: 'Specialty',
-    aliases: [
-      'anesthesiology', 'anesthesiologist', 'pain management',
-      'pain medicine',
-    ],
+    aliases: ['anesthesiology', 'anesthesiologist', 'pain management', 'pain medicine'],
   },
   {
     code: '2085R0001X',
     canonical: 'Radiation Oncology',
     grouping: 'Specialty',
-    aliases: [
-      'radiation oncology', 'radiation oncologist',
-    ],
+    aliases: ['radiation oncology', 'radiation oncologist'],
   },
   {
     code: '207RX0202X',
     canonical: 'Medical Oncology',
     grouping: 'Specialty',
-    aliases: [
-      'medical oncology', 'oncology', 'oncologist', 'cancer',
-    ],
+    aliases: ['medical oncology', 'oncology', 'oncologist', 'cancer'],
   },
   {
     code: '207W00000X',
     canonical: 'Ophthalmology',
     grouping: 'Specialty',
-    aliases: [
-      'ophthalmology', 'ophthalmologist', 'eye doctor', 'eye care',
-    ],
+    aliases: ['ophthalmology', 'ophthalmologist', 'eye doctor', 'eye care'],
   },
   {
     code: '152W00000X',
     canonical: 'Optometry',
     grouping: 'Specialty',
-    aliases: [
-      'optometry', 'optometrist',
-    ],
+    aliases: ['optometry', 'optometrist'],
   },
   {
     code: '207RU0202X',
     canonical: 'Urology',
     grouping: 'Specialty',
-    aliases: [
-      'urology', 'urologist', 'urological',
-    ],
+    aliases: ['urology', 'urologist', 'urological'],
   },
   {
     code: '111N00000X',
     canonical: 'Chiropractor',
     grouping: 'Rehab',
-    aliases: [
-      'chiropractor', 'chiropractic', 'chiropractic medicine',
-    ],
+    aliases: ['chiropractor', 'chiropractic', 'chiropractic medicine'],
   },
   {
     code: '225100000X',
     canonical: 'Physical Therapy',
     grouping: 'Rehab',
-    aliases: [
-      'physical therapy', 'physical therapist', 'pt', 'physiotherapy',
-    ],
+    aliases: ['physical therapy', 'physical therapist', 'pt', 'physiotherapy'],
   },
   {
     code: '101Y00000X',
     canonical: 'Counselor',
     grouping: 'Mental Health',
     aliases: [
-      'counselor', 'counseling', 'licensed professional counselor',
-      'lpc', 'mental health counselor',
+      'counselor',
+      'counseling',
+      'licensed professional counselor',
+      'lpc',
+      'mental health counselor',
     ],
   },
   // ── Nurse Practitioners / PAs ───────────────────────
@@ -308,28 +328,32 @@ const TAXONOMY_MAP: TaxonomyEntry[] = [
     canonical: 'Nurse Practitioner',
     grouping: 'Primary Care',
     aliases: [
-      'nurse practitioner', 'np', 'aprn', 'fnp', 'fnp-c', 'fnp-bc',
-      'family nurse practitioner', 'adult nurse practitioner',
-      'advanced practice registered nurse', 'arnp',
-      'certified nurse practitioner', 'cnp',
+      'nurse practitioner',
+      'np',
+      'aprn',
+      'fnp',
+      'fnp-c',
+      'fnp-bc',
+      'family nurse practitioner',
+      'adult nurse practitioner',
+      'advanced practice registered nurse',
+      'arnp',
+      'certified nurse practitioner',
+      'cnp',
     ],
   },
   {
     code: '363A00000X',
     canonical: 'Physician Assistant',
     grouping: 'Primary Care',
-    aliases: [
-      'physician assistant', 'pa', 'pa-c', 'physician\'s assistant',
-    ],
+    aliases: ['physician assistant', 'pa', 'pa-c', "physician's assistant"],
   },
   // ── Urgent Care / Clinics ───────────────────────────
   {
     code: '261QU0200X',
     canonical: 'Urgent Care',
     grouping: 'Primary Care',
-    aliases: [
-      'urgent care', 'walk-in clinic', 'immediate care',
-    ],
+    aliases: ['urgent care', 'walk-in clinic', 'immediate care'],
   },
 ];
 
@@ -360,8 +384,10 @@ for (const entry of TAXONOMY_MAP) {
 export function normalizeSpecialty(rawSpecialty: string | null): TaxonomyEntry | null {
   if (!rawSpecialty) return null;
 
-  const cleaned = rawSpecialty.toLowerCase().trim()
-    .replace(/[,\/&]+/g, match => match === '/' ? '/' : match)
+  const cleaned = rawSpecialty
+    .toLowerCase()
+    .trim()
+    .replace(/[,\/&]+/g, (match) => (match === '/' ? '/' : match))
     .replace(/\s+/g, ' ');
 
   // Direct alias match
@@ -405,7 +431,7 @@ export function resolveCode(taxonomyCode: string | null): TaxonomyEntry | null {
  */
 export interface SpecialtyMatchResult {
   match: boolean;
-  confidence: number;      // 0.0 = definite mismatch, 0.5 = soft match, 1.0 = exact
+  confidence: number; // 0.0 = definite mismatch, 0.5 = soft match, 1.0 = exact
   sourceACanonical: string | null;
   sourceBCanonical: string | null;
   sourceACode: string | null;
@@ -444,12 +470,8 @@ export function compareSpecialties(
   }
 
   // Resolve both to taxonomy entries
-  const entryA = options.aIsCode
-    ? resolveCode(specialtyA)
-    : normalizeSpecialty(specialtyA);
-  const entryB = options.bIsCode
-    ? resolveCode(specialtyB)
-    : normalizeSpecialty(specialtyB);
+  const entryA = options.aIsCode ? resolveCode(specialtyA) : normalizeSpecialty(specialtyA);
+  const entryB = options.bIsCode ? resolveCode(specialtyB) : normalizeSpecialty(specialtyB);
 
   result.sourceACanonical = entryA?.canonical || specialtyA;
   result.sourceBCanonical = entryB?.canonical || specialtyB;
@@ -527,7 +549,7 @@ export interface FourWaySpecialtyResult {
     confidence: number;
     reason: string;
   }[];
-  consensusSpecialty: string | null;  // what 2+ sources agree on
+  consensusSpecialty: string | null; // what 2+ sources agree on
   consensusSources: string[];
 }
 
@@ -570,13 +592,12 @@ export function compareFourWaySpecialty(params: {
       const a = sources[i];
       const b = sources[j];
 
-      if (!a.raw || !b.raw) continue;  // skip null sources
+      if (!a.raw || !b.raw) continue; // skip null sources
 
-      const comparison = compareSpecialties(
-        a.raw,
-        b.raw,
-        { aIsCode: a.name === 'nppes', bIsCode: b.name === 'nppes' },
-      );
+      const comparison = compareSpecialties(a.raw, b.raw, {
+        aIsCode: a.name === 'nppes',
+        bIsCode: b.name === 'nppes',
+      });
 
       if (!comparison.match && comparison.confidence < 0.7) {
         result.hasMismatch = true;

@@ -53,7 +53,7 @@ export interface ProviderDataSources {
   board_zip: string | null;
   board_specialty: string | null;
   board_status: string | null;
-  board_source: string | null;     // 'tmb_orssp', 'ca_mb_bulk'
+  board_source: string | null; // 'tmb_orssp', 'ca_mb_bulk'
 
   // Source 3: NPPES (from providers table + latest snapshot)
   nppes_address: string | null;
@@ -80,7 +80,8 @@ export interface DeltaEngineResult {
 // ── Supabase Client ──────────────────────────────────────
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -117,23 +118,23 @@ export async function assembleProviderData(
 
   if (associations.length === 0) return [];
 
-  const npis = associations.map(a => a.npi);
-  const npiList = npis.map(n => `"${n}"`).join(',');
+  const npis = associations.map((a) => a.npi);
+  const npiList = npis.map((n) => `"${n}"`).join(',');
 
   // Fetch NPPES data for these providers
   const nppesData: any[] = await db(
     `providers?npi=in.(${npiList})&select=npi,first_name,last_name,address_line_1,city,state,zip_code,phone,primary_taxonomy_code`,
   );
-  const nppesMap = new Map(nppesData.map(n => [n.npi, n]));
+  const nppesMap = new Map(nppesData.map((n) => [n.npi, n]));
 
   // Fetch state board data (provider_licenses with resolved NPI)
   const boardData: any[] = await db(
     `provider_licenses?npi=in.(${npiList})&select=npi,address_line_1,city,license_state,zip_code,specialty,license_status,source`,
   );
-  const boardMap = new Map(boardData.map(b => [b.npi, b]));
+  const boardMap = new Map(boardData.map((b) => [b.npi, b]));
 
   // Assemble combined records
-  return associations.map(assoc => {
+  return associations.map((assoc) => {
     const nppes = nppesMap.get(assoc.npi) || {};
     const board = boardMap.get(assoc.npi) || {};
 
@@ -145,7 +146,7 @@ export async function assembleProviderData(
       web_address: assoc.web_address || null,
       web_phone: assoc.web_phone || null,
       web_specialty: assoc.web_specialty || null,
-      web_confidence: 0.80, // default, overridden if extraction data available
+      web_confidence: 0.8, // default, overridden if extraction data available
 
       // Board
       board_address: board.address_line_1 || null,
@@ -187,11 +188,13 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
   const webAddr = normalizeAddr(data.web_address);
   const boardAddr = normalizeAddr(
     [data.board_address, data.board_city, data.board_state, data.board_zip]
-      .filter(Boolean).join(', ')
+      .filter(Boolean)
+      .join(', '),
   );
   const nppesAddr = normalizeAddr(
     [data.nppes_address, data.nppes_city, data.nppes_state, data.nppes_zip]
-      .filter(Boolean).join(', ')
+      .filter(Boolean)
+      .join(', '),
   );
 
   if (nppesAddr && webAddr && webAddr !== nppesAddr) {
@@ -205,7 +208,7 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
       new_value: data.web_address,
       detection_source: 'web_scan',
       confidence: webBoardAgree ? 'HIGH' : 'MEDIUM',
-      confidence_score: webBoardAgree ? 0.95 : 0.80,
+      confidence_score: webBoardAgree ? 0.95 : 0.8,
       signal_type: 'address_change',
       corroborated_by: webBoardAgree
         ? ['web_scan', data.board_source || 'state_board']
@@ -217,7 +220,7 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
   if (nppesAddr && boardAddr && boardAddr !== nppesAddr) {
     // Only add if we didn't already create a corroborated event above
     const alreadyCovered = deltas.some(
-      d => d.field_name === 'address_line_1' && d.corroboration_count >= 2
+      (d) => d.field_name === 'address_line_1' && d.corroboration_count >= 2,
     );
 
     if (!alreadyCovered) {
@@ -264,8 +267,8 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
   // Flag non-active board statuses as critical events
   if (data.board_status) {
     const statusLower = data.board_status.toLowerCase();
-    const isCritical = ['revoked', 'suspended', 'cancelled', 'deceased'].some(
-      s => statusLower.includes(s)
+    const isCritical = ['revoked', 'suspended', 'cancelled', 'deceased'].some((s) =>
+      statusLower.includes(s),
     );
 
     if (isCritical) {
@@ -293,7 +296,7 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
     webSpecialty: data.web_specialty,
     nppesCode: data.nppes_taxonomy,
     boardSpecialty: data.board_specialty,
-    payerSpecialty: null,  // TODO #133: wire payer_directory_snapshots specialty
+    payerSpecialty: null, // TODO #133: wire payer_directory_snapshots specialty
   });
 
   if (specialtyResult.hasMismatch) {
@@ -303,8 +306,9 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
 
       // Determine which source disagrees with consensus
       const isCorroborated = specialtyResult.consensusSources.length >= 2;
-      const consensusAgrees = specialtyResult.consensusSources.includes(mismatch.sourceA)
-        || specialtyResult.consensusSources.includes(mismatch.sourceB);
+      const consensusAgrees =
+        specialtyResult.consensusSources.includes(mismatch.sourceA) ||
+        specialtyResult.consensusSources.includes(mismatch.sourceB);
 
       deltas.push({
         npi: data.npi,
@@ -314,14 +318,10 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
         new_value: `${mismatch.sourceB}: ${mismatch.specialtyB}`,
         detection_source: mismatch.sourceA === 'website' ? 'web_scan' : mismatch.sourceA,
         confidence: isCorroborated && consensusAgrees ? 'HIGH' : 'MEDIUM',
-        confidence_score: isCorroborated ? 0.90 : 0.75,
+        confidence_score: isCorroborated ? 0.9 : 0.75,
         signal_type: 'taxonomy_change',
-        corroborated_by: isCorroborated
-          ? specialtyResult.consensusSources
-          : [mismatch.sourceA],
-        corroboration_count: isCorroborated
-          ? specialtyResult.consensusSources.length
-          : 1,
+        corroborated_by: isCorroborated ? specialtyResult.consensusSources : [mismatch.sourceA],
+        corroboration_count: isCorroborated ? specialtyResult.consensusSources.length : 1,
       });
     }
   }
@@ -335,9 +335,7 @@ export function detectDeltas(data: ProviderDataSources): DeltaEvent[] {
  * Run delta detection for all providers at a practice website.
  * Called after each scan cycle completes (from scan-scheduler.ts).
  */
-export async function runDeltaDetection(
-  practiceWebsiteId: string,
-): Promise<DeltaEngineResult> {
+export async function runDeltaDetection(practiceWebsiteId: string): Promise<DeltaEngineResult> {
   const startTime = Date.now();
   const result: DeltaEngineResult = {
     total_providers: 0,
@@ -378,30 +376,32 @@ export async function runDeltaDetection(
     const BATCH_SIZE = 100;
     for (let i = 0; i < allDeltas.length; i += BATCH_SIZE) {
       const batch = allDeltas.slice(i, i + BATCH_SIZE);
-      const rows = await Promise.all(batch.map(async (d) => {
-        const verification = await stampDeltaEventVerification(
-          '',
-          d.detection_source,
-          d.confidence_score,
-        );
+      const rows = await Promise.all(
+        batch.map(async (d) => {
+          const verification = await stampDeltaEventVerification(
+            '',
+            d.detection_source,
+            d.confidence_score,
+          );
 
-        return {
-          npi: d.npi,
-          practice_website_id: d.practice_website_id,
-          field_name: d.field_name,
-          old_value: d.old_value,
-          new_value: d.new_value,
-          detection_source: d.detection_source,
-          confidence: d.confidence,
-          confidence_score: d.confidence_score,
-          signal_type: d.signal_type,
-          corroborated_by: d.corroborated_by,
-          corroboration_count: d.corroboration_count,
-          detected_at: new Date().toISOString(),
-          verification_status: verification.verification_status,
-          gate_status_at_creation: verification.gate_status_at_creation,
-        };
-      }));
+          return {
+            npi: d.npi,
+            practice_website_id: d.practice_website_id,
+            field_name: d.field_name,
+            old_value: d.old_value,
+            new_value: d.new_value,
+            detection_source: d.detection_source,
+            confidence: d.confidence,
+            confidence_score: d.confidence_score,
+            signal_type: d.signal_type,
+            corroborated_by: d.corroborated_by,
+            corroboration_count: d.corroboration_count,
+            detected_at: new Date().toISOString(),
+            verification_status: verification.verification_status,
+            gate_status_at_creation: verification.gate_status_at_creation,
+          };
+        }),
+      );
 
       await db('nppes_delta_events', {
         method: 'POST',
@@ -414,8 +414,8 @@ export async function runDeltaDetection(
 
   // Update mismatch flags on practice_providers
   for (const npi of providersWithDeltas) {
-    const npiDeltas = allDeltas.filter(d => d.npi === npi);
-    const signals = new Set(npiDeltas.map(d => d.signal_type));
+    const npiDeltas = allDeltas.filter((d) => d.npi === npi);
+    const signals = new Set(npiDeltas.map((d) => d.signal_type));
 
     await db(`practice_providers?npi=eq.${npi}&practice_website_id=eq.${practiceWebsiteId}`, {
       method: 'PATCH',
@@ -457,7 +457,7 @@ export async function runDeltaDetection(
  */
 export async function runDeltaDetectionBatch(
   options: {
-    since?: string;     // ISO date, only process sites scanned after this time
+    since?: string; // ISO date, only process sites scanned after this time
     limit?: number;
     onProgress?: (processed: number, total: number) => void;
   } = {},
@@ -506,22 +506,25 @@ export async function runDeltaDetectionBatch(
 
 function normalizeAddr(addr: string | null): string | null {
   if (!addr) return null;
-  return addr.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\bstreet\b/g, 'st')
-    .replace(/\bavenue\b/g, 'ave')
-    .replace(/\bboulevard\b/g, 'blvd')
-    .replace(/\bdrive\b/g, 'dr')
-    .replace(/\blane\b/g, 'ln')
-    .replace(/\broad\b/g, 'rd')
-    .replace(/\bcourt\b/g, 'ct')
-    .replace(/\bsuite\b/g, 'ste')
-    .replace(/\bnorth\b/g, 'n')
-    .replace(/\bsouth\b/g, 's')
-    .replace(/\beast\b/g, 'e')
-    .replace(/\bwest\b/g, 'w')
-    .replace(/\s+/g, ' ')
-    .trim() || null;
+  return (
+    addr
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\bstreet\b/g, 'st')
+      .replace(/\bavenue\b/g, 'ave')
+      .replace(/\bboulevard\b/g, 'blvd')
+      .replace(/\bdrive\b/g, 'dr')
+      .replace(/\blane\b/g, 'ln')
+      .replace(/\broad\b/g, 'rd')
+      .replace(/\bcourt\b/g, 'ct')
+      .replace(/\bsuite\b/g, 'ste')
+      .replace(/\bnorth\b/g, 'n')
+      .replace(/\bsouth\b/g, 's')
+      .replace(/\beast\b/g, 'e')
+      .replace(/\bwest\b/g, 'w')
+      .replace(/\s+/g, ' ')
+      .trim() || null
+  );
 }
 
 function normalizePhone(phone: string | null): string | null {
