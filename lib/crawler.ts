@@ -1,20 +1,22 @@
 /**
- * KairoLogic Adaptive Web Crawler v1.0
+ * KairoLogic Adaptive Web Crawler v2.0
  * =====================================
  * Two-strategy page content fetcher for compliance scanning.
- * 
+ *
  * Strategy 1: Direct fetch (fast, works for server-rendered sites)
  *   - If the HTML has meaningful text content, use it immediately
- * 
- * Strategy 2: Browserless.io REST API (for JS-rendered SPAs)
- *   - Cloud headless Chrome, just an HTTP POST — no npm deps
- *   - Works on Vercel serverless (no binary to install)
- *   - Requires BROWSERLESS_API_KEY env var
- *   - Free tier: 1,000 units/month at https://www.browserless.io
- * 
- * Falls back gracefully: if no API key or service is down,
- * returns whatever the direct fetch got (even if partial).
+ *
+ * Strategy 2: Local headless Chrome via @sparticuz/chromium + puppeteer-core
+ *   - Runs in-process — no external API dependency (replaces Browserless.io)
+ *   - Works on Vercel serverless (binary optimised for Lambda/Vercel)
+ *   - Zero per-unit cost
+ *
+ * Retry logic: each strategy retries once after a short delay on failure.
+ * Falls back gracefully: if headless Chrome fails, returns whatever direct fetch got.
  */
+
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 
 // ─── TYPES ──────────────────────────────────────────────
 
@@ -22,7 +24,7 @@ export interface CrawlResult {
   success: boolean;
   html: string;
   text: string;
-  strategy: 'direct' | 'browserless' | 'none';
+  strategy: 'direct' | 'headless_chrome' | 'none';
   statusCode?: number;
   headers: Record<string, string>;
   duration: number;
@@ -33,12 +35,14 @@ export interface CrawlResult {
 
 // ─── CONSTANTS ──────────────────────────────────────────
 
-const FETCH_TIMEOUT = 15000;
-const BROWSER_TIMEOUT = 30000;
+const FETCH_TIMEOUT = 25_000; // bumped from 15s → 25s for slower practice sites
+const BROWSER_TIMEOUT = 45_000; // bumped from 30s → 45s
+const RETRY_DELAY = 3_000; // 3s delay before retry
 
 const BROWSER_HEADERS: Record<string, string> = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
 };
 
@@ -83,7 +87,7 @@ export function stripHtmlToText(html: string): string {
  */
 function looksLikeJSShell(html: string, text: string): boolean {
   const lowerHtml = html.toLowerCase();
-  const spaHits = SPA_INDICATORS.filter(s => lowerHtml.includes(s.toLowerCase())).length;
+  const spaHits = SPA_INDICATORS.filter((s) => lowerHtml.includes(s.toLowerCase())).length;
 
   // Strong signal: SPA skeleton + almost no readable text
   if (spaHits >= 1 && text.length < MIN_TEXT_LENGTH) return true;
@@ -97,7 +101,7 @@ function looksLikeJSShell(html: string, text: string): boolean {
 async function timedFetch(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<Response | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -111,55 +115,105 @@ async function timedFetch(
   }
 }
 
-// ─── STRATEGY 1: DIRECT FETCH ───────────────────────────
-
-async function directFetch(url: string): Promise<{
-  html: string; text: string; headers: Record<string, string>;
-  statusCode: number; finalUrl?: string;
-} | null> {
-  const res = await timedFetch(url, { headers: BROWSER_HEADERS }, FETCH_TIMEOUT);
-  if (!res || !res.ok) return null;
-
-  const html = await res.text();
-  const text = stripHtmlToText(html);
-  const headers: Record<string, string> = {};
-  res.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
-
-  return { html, text, headers, statusCode: res.status, finalUrl: res.url };
+/** Sleep helper for retry delay */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ─── STRATEGY 2: BROWSERLESS.IO ─────────────────────────
+// ─── STRATEGY 1: DIRECT FETCH (with retry) ─────────────
 
-async function browserlessFetch(url: string): Promise<{
-  html: string; text: string;
+async function directFetch(url: string): Promise<{
+  html: string;
+  text: string;
+  headers: Record<string, string>;
+  statusCode: number;
+  finalUrl?: string;
 } | null> {
-  const apiKey = process.env.BROWSERLESS_API_KEY;
-  if (!apiKey) return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      console.log(`[Crawler] Direct fetch retry (attempt ${attempt + 1}) for ${url}`);
+      await sleep(RETRY_DELAY);
+    }
 
-  // Browserless REST API — /content endpoint returns rendered HTML
-  // Docs: https://docs.browserless.io/rest-apis/content
-  const apiUrl = `https://chrome.browserless.io/content?token=${apiKey}`;
+    const res = await timedFetch(url, { headers: BROWSER_HEADERS }, FETCH_TIMEOUT);
+    if (!res || !res.ok) continue;
 
-  const res = await timedFetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      url,
-      waitForSelector: { selector: 'body', timeout: 10000 },
-      waitForTimeout: 3000,
-      bestAttempt: true,
-      gotoOptions: {
+    const html = await res.text();
+    const text = stripHtmlToText(html);
+    const headers: Record<string, string> = {};
+    res.headers.forEach((v, k) => {
+      headers[k.toLowerCase()] = v;
+    });
+
+    return { html, text, headers, statusCode: res.status, finalUrl: res.url };
+  }
+
+  return null;
+}
+
+// ─── STRATEGY 2: LOCAL HEADLESS CHROME (with retry) ─────
+
+async function headlessChromeFetch(url: string): Promise<{
+  html: string;
+  text: string;
+} | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      console.log(`[Crawler] Headless Chrome retry (attempt ${attempt + 1}) for ${url}`);
+      await sleep(RETRY_DELAY);
+    }
+
+    let browser = null;
+    try {
+      // @sparticuz/chromium provides a pre-built Chromium binary for Lambda/Vercel
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      });
+
+      const page = await browser.newPage();
+      await page.setUserAgent(BROWSER_HEADERS['User-Agent']);
+
+      // Navigate with networkidle2 — waits until ≤2 connections for 500ms
+      await page.goto(url, {
         waitUntil: 'networkidle2',
-        timeout: 20000,
-      },
-    }),
-  }, BROWSER_TIMEOUT);
+        timeout: BROWSER_TIMEOUT,
+      });
 
-  if (!res || !res.ok) return null;
+      // Extra wait for late-loading content (React hydration, lazy components)
+      await page.waitForSelector('body', { timeout: 10_000 }).catch(() => {});
+      await sleep(2_000);
 
-  const html = await res.text();
-  const text = stripHtmlToText(html);
-  return { html, text };
+      const html = await page.content();
+      const text = stripHtmlToText(html);
+
+      await browser.close();
+      browser = null;
+
+      if (text.length >= MIN_TEXT_LENGTH) {
+        return { html, text };
+      }
+
+      // Content too short — try again
+      console.log(
+        `[Crawler] Headless Chrome got ${text.length} chars (min ${MIN_TEXT_LENGTH}), retrying...`,
+      );
+    } catch (err) {
+      console.warn(`[Crawler] Headless Chrome error (attempt ${attempt + 1}):`, err);
+    } finally {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch {
+          /* ignore close errors */
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 // ─── MAIN CRAWL FUNCTION ────────────────────────────────
@@ -177,23 +231,36 @@ async function browserlessFetch(url: string): Promise<{
 export async function crawlPage(url: string): Promise<CrawlResult> {
   const start = Date.now();
   const fail = (error: string): CrawlResult => ({
-    success: false, html: '', text: '', strategy: 'none',
-    headers: {}, duration: Date.now() - start, isJSRendered: false, error,
+    success: false,
+    html: '',
+    text: '',
+    strategy: 'none',
+    headers: {},
+    duration: Date.now() - start,
+    isJSRendered: false,
+    error,
   });
 
-  // ── Strategy 1: Direct fetch ──
+  // ── Strategy 1: Direct fetch (with retry) ──
   const direct = await directFetch(url);
   if (!direct) {
-    // Direct fetch completely failed — try browserless before giving up
-    const rendered = await browserlessFetch(url);
+    // Direct fetch completely failed — try headless Chrome before giving up
+    const rendered = await headlessChromeFetch(url);
     if (rendered && rendered.text.length >= MIN_TEXT_LENGTH) {
       return {
-        success: true, html: rendered.html, text: rendered.text,
-        strategy: 'browserless', headers: {}, duration: Date.now() - start,
-        isJSRendered: true, finalUrl: url,
+        success: true,
+        html: rendered.html,
+        text: rendered.text,
+        strategy: 'headless_chrome',
+        headers: {},
+        duration: Date.now() - start,
+        isJSRendered: true,
+        finalUrl: url,
       };
     }
-    return fail(`Direct fetch failed and browserless ${rendered ? 'returned insufficient content' : 'unavailable or failed'}.`);
+    return fail(
+      `Direct fetch failed and headless Chrome ${rendered ? 'returned insufficient content' : 'failed'}.`,
+    );
   }
 
   // Direct fetch succeeded — check if content is actually rendered
@@ -202,33 +269,47 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
   if (!jsShell && direct.text.length >= MIN_TEXT_LENGTH) {
     // Good content from direct fetch — done
     return {
-      success: true, html: direct.html, text: direct.text,
-      strategy: 'direct', statusCode: direct.statusCode,
-      headers: direct.headers, duration: Date.now() - start,
-      isJSRendered: false, finalUrl: direct.finalUrl,
+      success: true,
+      html: direct.html,
+      text: direct.text,
+      strategy: 'direct',
+      statusCode: direct.statusCode,
+      headers: direct.headers,
+      duration: Date.now() - start,
+      isJSRendered: false,
+      finalUrl: direct.finalUrl,
     };
   }
 
-  // ── Strategy 2: Looks like a JS shell — try Browserless ──
-  const rendered = await browserlessFetch(url);
+  // ── Strategy 2: Looks like a JS shell — try headless Chrome ──
+  const rendered = await headlessChromeFetch(url);
   if (rendered && rendered.text.length >= MIN_TEXT_LENGTH) {
     return {
-      success: true, html: rendered.html, text: rendered.text,
-      strategy: 'browserless', statusCode: direct.statusCode,
-      headers: direct.headers, duration: Date.now() - start,
-      isJSRendered: true, finalUrl: direct.finalUrl || url,
+      success: true,
+      html: rendered.html,
+      text: rendered.text,
+      strategy: 'headless_chrome',
+      statusCode: direct.statusCode,
+      headers: direct.headers,
+      duration: Date.now() - start,
+      isJSRendered: true,
+      finalUrl: direct.finalUrl || url,
     };
   }
 
   // ── Fallback: return whatever direct fetch got (partial > nothing) ──
   if (direct.text.length > 0) {
     return {
-      success: true, html: direct.html, text: direct.text,
-      strategy: 'direct', statusCode: direct.statusCode,
-      headers: direct.headers, duration: Date.now() - start,
+      success: true,
+      html: direct.html,
+      text: direct.text,
+      strategy: 'direct',
+      statusCode: direct.statusCode,
+      headers: direct.headers,
+      duration: Date.now() - start,
       isJSRendered: jsShell,
       error: jsShell
-        ? 'Page appears JS-rendered but browserless unavailable. Content may be incomplete — set BROWSERLESS_API_KEY env var for full rendering.'
+        ? 'Page appears JS-rendered but headless Chrome failed. Content may be incomplete.'
         : undefined,
       finalUrl: direct.finalUrl,
     };
@@ -236,4 +317,3 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
 
   return fail('All strategies returned empty content.');
 }
-
