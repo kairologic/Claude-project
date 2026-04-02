@@ -29,11 +29,12 @@ export const URLS = {
   workflows: (id: string) => `/practice/${id}/workflows`,
   roster: (id: string) => `/practice/${id}/roster`,
   alerts: (id: string) => `/practice/${id}/alerts`,
-  requests: (id: string) => `/practice/${id}/requests`,
   payerDirectory: (id: string) => `/practice/${id}/payer-directory`,
   settings: (id: string) => `/practice/${id}/settings`,
   help: (id: string) => `/practice/${id}/help`,
   search: (id: string) => `/practice/${id}/search`,
+  reports: (id: string) => `/practice/${id}/reports`,
+  compliance: (id: string) => `/practice/${id}/compliance`,
 };
 
 // API endpoints
@@ -46,16 +47,18 @@ export const API = {
   settingsTeam: '/api/settings/team',
   alerts: '/api/alerts/mismatch',
   feedback: '/api/feedback',
-  feedbackStatus: (id: string) => `/api/feedback/${id}/status`,
-  feedbackComments: (id: string) => `/api/feedback/${id}/comments`,
   search: '/api/search/query',
   reports: '/api/reports/generate',
 };
 
 // Valid workflow types
 export const WORKFLOW_TYPES = [
-  'nppes_update', 'payer_directory', 'onboarding',
-  'release', 'license_renewal', 'compliance',
+  'nppes_update',
+  'payer_directory',
+  'onboarding',
+  'release',
+  'license_renewal',
+  'compliance',
 ] as const;
 
 // Status transitions

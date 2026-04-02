@@ -351,6 +351,36 @@ During onboarding, the PECOS check determines whether a "PECOS enrollment" task 
 Data freshness:
 PECOS data is synced monthly from the CMS Data API. The "Last synced" date is shown in the provider detail view.`,
       },
+      {
+        id: 'specialty-comparison',
+        title: 'Specialty Mismatch Detection',
+        description: 'How KairoLogic compares specialty data across multiple sources',
+        content: `KairoLogic performs a four-way specialty comparison to detect mismatches between how a provider's specialty is listed across different sources. This helps ensure consistent, accurate representation.
+
+The four sources compared:
+Website — The specialty listed on your practice website (e.g., "Family Medicine", "Internal Medicine/Pediatrics")
+NPPES — The taxonomy code registered with CMS (e.g., 207Q00000X for Family Medicine)
+Board Certification — Specialty from state medical board records
+Payer Directories — How payers list the provider's specialty in their network directories
+
+How matching works:
+KairoLogic normalizes freeform specialty text from each source into standardized NUCC taxonomy codes, then compares them. The system understands that specialties like "Internal Medicine/Pediatrics" and "Internal Medicine" are related (sub-specialty match) rather than a hard mismatch.
+
+Confidence scoring:
+Exact match — All sources agree on the same taxonomy code (1.0 confidence)
+Sub-specialty match — Codes share the same specialty family but differ in sub-specialty (0.7 confidence)
+Soft mismatch — Related but different specialties (0.3-0.5 confidence)
+Hard mismatch — Completely different specialties (0.0 confidence)
+
+Consensus detection:
+When 2 or more sources agree, that value is treated as the consensus. A single outlier source is flagged for correction rather than raising a general alert.
+
+What to do about mismatches:
+1. Review specialty mismatches in the Provider Roster (look for the "Specialty" badge)
+2. Determine which source is correct
+3. Update the incorrect source (NPPES update workflow, website update, or payer directory correction)
+4. KairoLogic will re-scan and clear the finding once sources align`,
+      },
     ],
   },
   {
@@ -523,6 +553,35 @@ How to improve your score:
 3. Work with your web hosting provider to ensure domestic hosting
 4. Configure CDN settings to restrict edge caching to compliant regions
 5. Re-scan after making changes to see updated score`,
+      },
+      {
+        id: 'ehr-ai-detection',
+        title: 'EHR Vendor AI Detection (AI-05)',
+        description: 'How KairoLogic detects AI-enabled EHR systems at your practice',
+        content: `KairoLogic automatically detects when your practice uses an EHR (Electronic Health Record) system that includes AI-powered features. This is important because regulations like HB 149 (Texas) and AB 3030 (California) require disclosure when AI is used in patient care.
+
+How it works:
+KairoLogic scans your practice website for links and references to known EHR platforms. It cross-references detected vendors against a registry of 13+ EHR systems with documented AI capabilities, including eClinicalWorks/Healow, Epic/MyChart, athenahealth, Cerner, NextGen, Allscripts, ModMed, AdvancedMD, DrChrono, Elation, and Practice Fusion.
+
+Detection confidence levels:
+Confirmed — Vendor has publicly documented AI features (e.g., eClinicalWorks Sunoh.ai ambient listening)
+Likely — Vendor has AI features in product announcements but not yet in regulatory filings
+Possible — Vendor has AI-adjacent features that may trigger disclosure requirements
+
+What happens when AI is detected:
+If your EHR vendor has known AI capabilities but your website lacks an AI disclosure notice, KairoLogic generates a compliance finding (AI-05) with:
+• The specific vendor and AI features detected
+• Severity rating based on confidence level
+• A recommended disclosure template customized to your vendor's AI capabilities
+• Links to the applicable state regulation
+
+What to do:
+1. Review the AI-05 finding in your Compliance dashboard
+2. Verify whether your practice has enabled the AI features in your EHR
+3. If AI features are active, add the recommended disclosure to your website
+4. Re-scan to confirm the finding resolves to "Compliant"
+
+Even if you haven't explicitly enabled AI features, many modern EHR platforms activate them by default. When in doubt, add the disclosure — it protects your practice and builds patient trust.`,
       },
     ],
   },
@@ -732,43 +791,53 @@ Questions about billing? Email info@kairologic.net or reply to any email from us
 const faqItems: FAQItem[] = [
   {
     question: 'How long does an NPPES update take?',
-    answer: 'NPPES updates typically process within 1-2 weeks. KairoLogic automatically monitors your NPPES registration and alerts you when updates are detected. Once you submit changes to NPPES (either directly or through your State Medical Board), they appear in the national system within this timeframe, and we update your dashboard accordingly.',
+    answer:
+      'NPPES updates typically process within 1-2 weeks. KairoLogic automatically monitors your NPPES registration and alerts you when updates are detected. Once you submit changes to NPPES (either directly or through your State Medical Board), they appear in the national system within this timeframe, and we update your dashboard accordingly.',
   },
   {
     question: 'What does "Not Listed" mean in the payer grid?',
-    answer: 'When a provider shows as "Not Listed" for a specific payer, it means that provider does not currently appear in that payer\'s directory. This can happen if the enrollment application is still pending, the provider hasn\'t been enrolled yet, they were terminated, or the application was rejected. Click the cell for details and next steps.',
+    answer:
+      'When a provider shows as "Not Listed" for a specific payer, it means that provider does not currently appear in that payer\'s directory. This can happen if the enrollment application is still pending, the provider hasn\'t been enrolled yet, they were terminated, or the application was rejected. Click the cell for details and next steps.',
   },
   {
     question: 'What triggers a workflow?',
-    answer: 'Workflows are triggered automatically. NPPES workflows fire when a mismatch is detected between NPPES data and your records. Payer directory workflows fire when a provider is not listed or has incorrect data. License renewal workflows trigger 90 days before expiration. Onboarding workflows are created when a new provider is added. All monitoring runs continuously.',
+    answer:
+      'Workflows are triggered automatically. NPPES workflows fire when a mismatch is detected between NPPES data and your records. Payer directory workflows fire when a provider is not listed or has incorrect data. License renewal workflows trigger 90 days before expiration. Onboarding workflows are created when a new provider is added. All monitoring runs continuously.',
   },
   {
     question: 'How does auto-confirmation work?',
-    answer: 'Auto-confirmation uses regular synchronization with external sources like NPPES, payer directories, and state medical boards. When KairoLogic detects that a credential has been successfully updated in an external system, it automatically marks that workflow task as complete. You can always review auto-confirmations in the audit trail.',
+    answer:
+      'Auto-confirmation uses regular synchronization with external sources like NPPES, payer directories, and state medical boards. When KairoLogic detects that a credential has been successfully updated in an external system, it automatically marks that workflow task as complete. You can always review auto-confirmations in the audit trail.',
   },
   {
     question: 'What is CAQH ProView?',
-    answer: 'CAQH ProView is a centralized credentialing database used by many payers. When you update your CAQH profile, payers that pull from CAQH (like UHC and Aetna) receive the update automatically. KairoLogic indicates which mismatches can be fixed via CAQH with a "Fix via CAQH" badge.',
+    answer:
+      'CAQH ProView is a centralized credentialing database used by many payers. When you update your CAQH profile, payers that pull from CAQH (like UHC and Aetna) receive the update automatically. KairoLogic indicates which mismatches can be fixed via CAQH with a "Fix via CAQH" badge.',
   },
   {
     question: 'What is PECOS?',
-    answer: 'PECOS (Provider Enrollment, Chain, and Ownership System) is the CMS system for Medicare enrollment. KairoLogic checks PECOS data to determine if a provider is Medicare-enrolled. This affects credentialing workflows — providers not in PECOS may need to be enrolled for Medicare participation.',
+    answer:
+      'PECOS (Provider Enrollment, Chain, and Ownership System) is the CMS system for Medicare enrollment. KairoLogic checks PECOS data to determine if a provider is Medicare-enrolled. This affects credentialing workflows — providers not in PECOS may need to be enrolled for Medicare participation.',
   },
   {
     question: 'Can I export data?',
-    answer: 'Yes! The Reports section supports CSV and PDF export for all four report types: Workflow Status, Audit Trail, Provider Accuracy, and Compliance Findings. You can select which fields to include, apply filters, and download the results instantly.',
+    answer:
+      'Yes! The Reports section supports CSV and PDF export for all four report types: Workflow Status, Audit Trail, Provider Accuracy, and Compliance Findings. You can select which fields to include, apply filters, and download the results instantly.',
   },
   {
     question: 'How are priorities determined?',
-    answer: 'Alert and task priorities are based on regulatory impact and financial risk. Phone mismatches and critical data differences are Priority 3 (high). Address mismatches are Priority 2 (medium). Missing listings are Priority 1 (lower). License lapses and compliance issues are always high priority.',
+    answer:
+      'Alert and task priorities are based on regulatory impact and financial risk. Phone mismatches and critical data differences are Priority 3 (high). Address mismatches are Priority 2 (medium). Missing listings are Priority 1 (lower). License lapses and compliance issues are always high priority.',
   },
   {
     question: 'What states does KairoLogic cover?',
-    answer: 'KairoLogic currently provides full coverage for Texas (TX) and California (CA). This includes PECOS enrollment data, state medical board license monitoring, and state-specific compliance scanning (SB 1188, HB 149 for TX; AB 3030 for CA). Payer directory monitoring works nationwide.',
+    answer:
+      'KairoLogic currently provides full coverage for Texas (TX) and California (CA). This includes PECOS enrollment data, state medical board license monitoring, and state-specific compliance scanning (SB 1188, HB 149 for TX; AB 3030 for CA). Payer directory monitoring works nationwide.',
   },
   {
     question: 'How do I contact support?',
-    answer: 'Email us at info@kairologic.net or reply to any email from us. We read and respond to everything. For urgent issues, include "URGENT" in the subject line.',
+    answer:
+      'Email us at info@kairologic.net or reply to any email from us. We read and respond to everything. For urgent issues, include "URGENT" in the subject line.',
   },
 ];
 
@@ -790,7 +859,7 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
   // Find the selected topic across all categories
   const selectedTopic = useMemo(() => {
     for (const cat of helpCategories) {
-      const topic = cat.topics.find(t => t.id === selectedTopicId);
+      const topic = cat.topics.find((t) => t.id === selectedTopicId);
       if (topic) return { topic, category: cat };
     }
     return null;
@@ -798,22 +867,27 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
 
   // Filter categories and topics by search query
   const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return helpCategories.filter(c => c.topics.length > 0);
+    if (!searchQuery.trim()) return helpCategories.filter((c) => c.topics.length > 0);
     const q = searchQuery.toLowerCase();
     return helpCategories
-      .map(cat => ({
+      .map((cat) => ({
         ...cat,
         topics: cat.topics.filter(
-          t => t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.content.toLowerCase().includes(q)
+          (t) =>
+            t.title.toLowerCase().includes(q) ||
+            t.description.toLowerCase().includes(q) ||
+            t.content.toLowerCase().includes(q),
         ),
       }))
-      .filter(cat => cat.topics.length > 0);
+      .filter((cat) => cat.topics.length > 0);
   }, [searchQuery]);
 
   const filteredFAQ = useMemo(() => {
     if (!searchQuery.trim()) return faqItems;
     const q = searchQuery.toLowerCase();
-    return faqItems.filter(item => item.question.toLowerCase().includes(q) || item.answer.toLowerCase().includes(q));
+    return faqItems.filter(
+      (item) => item.question.toLowerCase().includes(q) || item.answer.toLowerCase().includes(q),
+    );
   }, [searchQuery]);
 
   const handleTopicClick = (topicId: string) => {
@@ -824,7 +898,8 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
 
   const toggleFAQ = (index: number) => {
     const next = new Set(expandedFAQ);
-    if (next.has(index)) next.delete(index); else next.add(index);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
     setExpandedFAQ(next);
   };
 
@@ -1029,7 +1104,7 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
               type="text"
               placeholder="Search help topics..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               style={s.searchInput}
             />
           </div>
@@ -1037,18 +1112,25 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
 
         <div style={s.indexScroll}>
           {filteredCategories.length === 0 && filteredFAQ.length === 0 ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center', color: colors.gray400, fontSize: 13 }}>
+            <div
+              style={{
+                padding: '24px 16px',
+                textAlign: 'center',
+                color: colors.gray400,
+                fontSize: 13,
+              }}
+            >
               No results for &ldquo;{searchQuery}&rdquo;
             </div>
           ) : (
             <>
-              {filteredCategories.map(cat => (
+              {filteredCategories.map((cat) => (
                 <div key={cat.id}>
                   <div style={s.catLabel}>
                     <span>{cat.icon}</span>
                     <span>{cat.name}</span>
                   </div>
-                  {cat.topics.map(topic => (
+                  {cat.topics.map((topic) => (
                     <div
                       key={topic.id}
                       style={{
@@ -1056,12 +1138,12 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
                         ...(selectedTopicId === topic.id && !showFAQ ? s.topicItemActive : {}),
                       }}
                       onClick={() => handleTopicClick(topic.id)}
-                      onMouseEnter={e => {
+                      onMouseEnter={(e) => {
                         if (selectedTopicId !== topic.id || showFAQ) {
                           (e.currentTarget as HTMLDivElement).style.backgroundColor = colors.gray50;
                         }
                       }}
-                      onMouseLeave={e => {
+                      onMouseLeave={(e) => {
                         if (selectedTopicId !== topic.id || showFAQ) {
                           (e.currentTarget as HTMLDivElement).style.backgroundColor = '';
                         }
@@ -1098,7 +1180,14 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
           <>
             <div style={s.contentHeader}>
               <div style={s.contentBreadcrumb}>
-                <span style={s.contentBreadcrumbLink} onClick={() => { setShowFAQ(false); }}>Help</span>
+                <span
+                  style={s.contentBreadcrumbLink}
+                  onClick={() => {
+                    setShowFAQ(false);
+                  }}
+                >
+                  Help
+                </span>
                 {' / '}
                 <span>Common Questions</span>
               </div>
@@ -1107,7 +1196,9 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
             <div style={s.contentScroll} ref={contentRef}>
               {filteredFAQ.length === 0 ? (
                 <div style={s.emptyState}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: colors.navy, marginBottom: 8 }}>
+                  <div
+                    style={{ fontSize: 16, fontWeight: 600, color: colors.navy, marginBottom: 8 }}
+                  >
                     No matching questions
                   </div>
                   <p>Try a different search term</p>
@@ -1118,15 +1209,17 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
                     <div
                       style={s.faqQuestion}
                       onClick={() => toggleFAQ(idx)}
-                      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.backgroundColor = colors.gray50; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.backgroundColor = ''; }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.backgroundColor = colors.gray50;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.backgroundColor = '';
+                      }}
                     >
                       <span style={{ flex: 1 }}>{item.question}</span>
                       <span style={s.faqToggle}>{expandedFAQ.has(idx) ? '−' : '+'}</span>
                     </div>
-                    {expandedFAQ.has(idx) && (
-                      <div style={s.faqAnswer}>{item.answer}</div>
-                    )}
+                    {expandedFAQ.has(idx) && <div style={s.faqAnswer}>{item.answer}</div>}
                   </div>
                 ))
               )}
@@ -1145,9 +1238,7 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
               <h1 style={s.contentTitle}>{selectedTopic.topic.title}</h1>
             </div>
             <div style={s.contentScroll} ref={contentRef}>
-              <div style={s.contentBody}>
-                {selectedTopic.topic.content}
-              </div>
+              <div style={s.contentBody}>{selectedTopic.topic.content}</div>
 
               {/* Feedback */}
               <div style={s.feedbackSection}>
@@ -1155,30 +1246,44 @@ export default function HelpCenter({ practiceId, initialSection }: HelpCenterPro
                 <div style={s.feedbackBtnGroup}>
                   <button
                     style={feedbackBtn(topicFeedback[selectedTopic.topic.id] === 'yes')}
-                    onClick={() => setTopicFeedback({ ...topicFeedback, [selectedTopic.topic.id]: 'yes' })}
+                    onClick={() =>
+                      setTopicFeedback({ ...topicFeedback, [selectedTopic.topic.id]: 'yes' })
+                    }
                   >
                     👍 Yes
                   </button>
                   <button
                     style={feedbackBtn(topicFeedback[selectedTopic.topic.id] === 'no')}
-                    onClick={() => setTopicFeedback({ ...topicFeedback, [selectedTopic.topic.id]: 'no' })}
+                    onClick={() =>
+                      setTopicFeedback({ ...topicFeedback, [selectedTopic.topic.id]: 'no' })
+                    }
                   >
                     👎 No
                   </button>
                 </div>
                 {topicFeedback[selectedTopic.topic.id] === 'yes' && (
-                  <p style={{ fontSize: 12, color: colors.green, marginTop: 8 }}>Thanks for the feedback!</p>
+                  <p style={{ fontSize: 12, color: colors.green, marginTop: 8 }}>
+                    Thanks for the feedback!
+                  </p>
                 )}
                 {topicFeedback[selectedTopic.topic.id] === 'no' && (
                   <p style={{ fontSize: 12, color: colors.gray400, marginTop: 8 }}>
-                    Thanks for letting us know. Email us at info@kairologic.net if you need more help.
+                    Thanks for letting us know. Email us at info@kairologic.net if you need more
+                    help.
                   </p>
                 )}
               </div>
             </div>
           </>
         ) : (
-          <div style={{ ...s.contentScroll, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            style={{
+              ...s.contentScroll,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <div style={s.emptyState}>
               <div style={{ fontSize: 16, fontWeight: 600, color: colors.navy, marginBottom: 8 }}>
                 Select a topic

@@ -97,6 +97,28 @@ const statutes: Record<Exclude<StatuteKey, 'all'>, StatuteInfo> = {
   <p>
     Contact our Privacy Officer: [CONTACT_INFO]
   </p>
+</section>
+
+<!-- EHR Vendor AI Disclosure (AI-05) -->
+<section class="ehr-ai-disclosure" style="border: 2px solid #2196f3; padding: 20px; border-radius: 8px; margin: 20px 0;">
+  <h3 style="color: #2196f3;">EHR Technology & AI Features</h3>
+  <p>
+    Our practice uses [EHR_VENDOR_NAME] as our electronic health records system.
+    This platform includes AI-powered features such as:
+  </p>
+  <ul>
+    <li>Ambient clinical documentation (AI-assisted note-taking during visits)</li>
+    <li>Clinical decision support suggestions</li>
+    <li>Automated coding and billing assistance</li>
+  </ul>
+  <p>
+    All AI-assisted outputs are reviewed and approved by your treating provider
+    before being incorporated into your medical record.
+  </p>
+  <p>
+    You have the right to ask questions about how AI technology is used in your care.
+    Contact our office at [PHONE] for more information.
+  </p>
 </section>`,
   },
   ab3030: {
@@ -134,7 +156,7 @@ const statuteLabels: Record<string, string> = Object.values(statutes).reduce(
     acc[statute.label] = statute.label;
     return acc;
   },
-  {} as Record<string, string>
+  {} as Record<string, string>,
 );
 
 const priorityConfig: Record<number, { color: string; label: string; bg: string }> = {
@@ -153,7 +175,11 @@ function detectStatute(workflow: ComplianceWorkflow): Exclude<StatuteKey, 'all'>
 
   if (combined.includes('sb 1188') || combined.includes('ai disclosure')) return 'sb1188';
   if (combined.includes('hb 149') || combined.includes('patient data')) return 'hb149';
-  if (combined.includes('ab 3030') || combined.includes('generative ai') || combined.includes('genai'))
+  if (
+    combined.includes('ab 3030') ||
+    combined.includes('generative ai') ||
+    combined.includes('genai')
+  )
     return 'ab3030';
 
   // Default based on summary keyword matching
@@ -206,32 +232,36 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
     // Calculate avg resolution time (simplified: resolved workflows created in last 30 days)
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const recentResolved = workflows.filter(
-      (w) =>
-        w.status === 'resolved' &&
-        new Date(w.created_at).getTime() > thirtyDaysAgo
+      (w) => w.status === 'resolved' && new Date(w.created_at).getTime() > thirtyDaysAgo,
     );
-    const avgResolutionTime = recentResolved.length > 0
-      ? Math.round(
-          recentResolved.reduce((sum, w) => {
-            // Mock calculation: assume resolution took 7 days on average
-            return sum + 7;
-          }, 0) / recentResolved.length
-        )
-      : 0;
+    const avgResolutionTime =
+      recentResolved.length > 0
+        ? Math.round(
+            recentResolved.reduce((sum, w) => {
+              // Mock calculation: assume resolution took 7 days on average
+              return sum + 7;
+            }, 0) / recentResolved.length,
+          )
+        : 0;
 
     return { total, critical, resolved, avgResolutionTime };
   }, [workflows]);
 
   // Active findings count
-  const activeFindingsCount = filteredWorkflows.filter(
-    (w) => w.status !== 'resolved'
-  ).length;
+  const activeFindingsCount = filteredWorkflows.filter((w) => w.status !== 'resolved').length;
 
   return (
     <div style={{ padding: '20px 24px', background: colors.gray50, minHeight: '100vh' }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+          }}
+        >
           <h1 style={{ fontSize: 24, fontWeight: 800, color: colors.navy, margin: 0 }}>
             Compliance Remediation
           </h1>
@@ -280,7 +310,14 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
               <div style={{ fontSize: 18, fontWeight: 800, color: colors.navy, marginBottom: 4 }}>
                 {stat.value}
               </div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: colors.gray600, textTransform: 'uppercase' }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: colors.gray600,
+                  textTransform: 'uppercase',
+                }}
+              >
                 {stat.label}
               </div>
             </div>
@@ -296,7 +333,10 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
               fontWeight: 700,
               padding: '6px 14px',
               borderRadius: 20,
-              border: selectedStatute === 'all' ? `2px solid ${colors.navy}` : `1px solid ${colors.gray200}`,
+              border:
+                selectedStatute === 'all'
+                  ? `2px solid ${colors.navy}`
+                  : `1px solid ${colors.gray200}`,
               background: selectedStatute === 'all' ? colors.navy : '#fff',
               color: selectedStatute === 'all' ? '#fff' : colors.navy,
               cursor: 'pointer',
@@ -335,7 +375,9 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
                   padding: '6px 14px',
                   borderRadius: 20,
                   border:
-                    selectedStatute === statute ? `2px solid ${colors.gold}` : `1px solid ${colors.gray200}`,
+                    selectedStatute === statute
+                      ? `2px solid ${colors.gold}`
+                      : `1px solid ${colors.gray200}`,
                   background: selectedStatute === statute ? colors.goldPale : '#fff',
                   color: selectedStatute === statute ? colors.navy : colors.navy,
                   cursor: 'pointer',
@@ -426,7 +468,15 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 6,
+                        flexWrap: 'wrap',
+                      }}
+                    >
                       <span
                         style={{
                           fontSize: 10,
@@ -475,7 +525,9 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
                         <span style={{ fontWeight: 500 }}>{workflow.provider_name}</span>
                       )}
                       {workflow.provider_name && workflow.provider_npi && <span> • </span>}
-                      {workflow.provider_npi && <span style={{ fontFamily: 'monospace' }}>NPI {workflow.provider_npi}</span>}
+                      {workflow.provider_npi && (
+                        <span style={{ fontFamily: 'monospace' }}>NPI {workflow.provider_npi}</span>
+                      )}
                       {(!workflow.provider_name || !workflow.provider_npi) && (
                         <span>Created {formatDate(workflow.created_at)}</span>
                       )}
@@ -558,7 +610,8 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
                           margin: 0,
                         }}
                       >
-                        {workflow.finding_summary || 'Compliance issue detected during regulatory scan.'}
+                        {workflow.finding_summary ||
+                          'Compliance issue detected during regulatory scan.'}
                       </p>
                     </div>
 
@@ -633,7 +686,8 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
                               (e.currentTarget as HTMLElement).style.color = colors.navy;
                             }}
                             onMouseOut={(e) => {
-                              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.2)';
+                              (e.currentTarget as HTMLElement).style.background =
+                                'rgba(255,255,255,.2)';
                               (e.currentTarget as HTMLElement).style.color = '#fff';
                             }}
                           >
@@ -671,7 +725,13 @@ export default function ComplianceView({ practiceId, workflows }: Props) {
                             Resolved on {formatDate(workflow.created_at)}
                           </span>
                         ) : (
-                          <span>Next compliance scan: {formatDate(workflow.overdue_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())}</span>
+                          <span>
+                            Next compliance scan:{' '}
+                            {formatDate(
+                              workflow.overdue_at ||
+                                new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                            )}
+                          </span>
                         )}
                       </p>
                     </div>

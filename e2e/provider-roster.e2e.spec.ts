@@ -30,22 +30,16 @@ test.describe('UC-ROST: Provider Roster', () => {
     await expect(tableHeader).toBeVisible();
 
     // Verify expected column headers exist
-    const requiredColumns = [
-      'Provider',
-      'Specialty',
-      'NPI',
-      'Health',
-      'Issues',
-      'Status',
-    ];
+    const requiredColumns = ['Provider', 'Specialty', 'NPI', 'Health', 'Issues', 'Status'];
 
     for (const columnName of requiredColumns) {
       const columnHeader = page.locator(
-        `[data-testid="column-header-${columnName.toLowerCase().replace(/\s+/g, '-')}"]`
+        `[data-testid="column-header-${columnName.toLowerCase().replace(/\s+/g, '-')}"]`,
       );
       // Try to find by text as fallback
       const headerText = tableHeader.locator('text=' + columnName);
-      const exists = (await columnHeader.isVisible().catch(() => false)) ||
+      const exists =
+        (await columnHeader.isVisible().catch(() => false)) ||
         (await headerText.isVisible().catch(() => false));
       expect(exists).toBeTruthy();
     }
@@ -59,13 +53,9 @@ test.describe('UC-ROST: Provider Roster', () => {
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  test('UC-ROST-02: Provider rows are clickable and open detail panel', async ({
-    page,
-  }) => {
+  test('UC-ROST-02: Provider rows are clickable and open detail panel', async ({ page }) => {
     // Get first provider row
-    const firstRow = page
-      .locator('[data-testid="provider-row"]')
-      .first();
+    const firstRow = page.locator('[data-testid="provider-row"]').first();
     await expect(firstRow).toBeVisible();
 
     // Verify row is clickable (has cursor pointer or role)
@@ -84,15 +74,11 @@ test.describe('UC-ROST: Provider Roster', () => {
     await expect(detailPanel).toBeVisible({ timeout: 2000 });
 
     // Verify provider name is shown in panel
-    const providerName = detailPanel.locator(
-      '[data-testid="provider-detail-name"]'
-    );
+    const providerName = detailPanel.locator('[data-testid="provider-detail-name"]');
     await expect(providerName).toBeVisible();
   });
 
-  test('UC-ROST-03: Health score bars display with color coding', async ({
-    page,
-  }) => {
+  test('UC-ROST-03: Health score bars display with color coding', async ({ page }) => {
     // Get provider rows
     const providerRows = page.locator('[data-testid="provider-row"]');
     const rowCount = await providerRows.count();
@@ -132,9 +118,7 @@ test.describe('UC-ROST: Provider Roster', () => {
     for (let i = 0; i < rowCount; i++) {
       const row = providerRows.nth(i);
       const issueCell = row.locator('[data-testid="provider-issues-cell"]');
-      const issueCount = await issueCell
-        .locator('[data-testid="issue-badge"]')
-        .count();
+      const issueCount = await issueCell.locator('[data-testid="issue-badge"]').count();
       if (issueCount > 0) {
         rowWithIssues = row;
         break;
@@ -143,9 +127,7 @@ test.describe('UC-ROST: Provider Roster', () => {
 
     if (rowWithIssues) {
       // Verify issue badges are visible
-      const issueCell = rowWithIssues.locator(
-        '[data-testid="provider-issues-cell"]'
-      );
+      const issueCell = rowWithIssues.locator('[data-testid="provider-issues-cell"]');
       const issueBadges = issueCell.locator('[data-testid="issue-badge"]');
       const badgeCount = await issueBadges.count();
       expect(badgeCount).toBeGreaterThan(0);
@@ -158,14 +140,24 @@ test.describe('UC-ROST: Provider Roster', () => {
       // Verify badge has color/style indicating issue type
       const badgeClass = await firstBadge.getAttribute('class');
       expect(badgeClass).toContain('badge');
+
+      // Collect all badge texts to verify known badge types
+      const allBadgeTexts: string[] = [];
+      for (let b = 0; b < badgeCount; b++) {
+        const text = await issueBadges.nth(b).textContent();
+        if (text) allBadgeTexts.push(text.toLowerCase());
+      }
+      // Known issue badge types include: address, phone, taxonomy/specialty, name, license
+      const knownBadgeTypes = ['address', 'phone', 'taxonomy', 'specialty', 'name', 'license'];
+      const hasKnownType = allBadgeTexts.some((t) => knownBadgeTypes.some((k) => t.includes(k)));
+      // At least one badge should match a known type
+      expect(hasKnownType).toBeTruthy();
     }
   });
 
   test('UC-ROST-05: Action menu appears with options', async ({ page }) => {
     // Get first provider row
-    const firstRow = page
-      .locator('[data-testid="provider-row"]')
-      .first();
+    const firstRow = page.locator('[data-testid="provider-row"]').first();
     await expect(firstRow).toBeVisible();
 
     // Hover over row to reveal action menu (if hidden)
@@ -173,9 +165,7 @@ test.describe('UC-ROST: Provider Roster', () => {
 
     // Look for action menu button/icon
     const actionMenu = firstRow.locator('[data-testid="provider-action-menu"]');
-    const actionButton = firstRow.locator(
-      '[data-testid="provider-action-button"]'
-    );
+    const actionButton = firstRow.locator('[data-testid="provider-action-button"]');
 
     const hasMenu = await actionMenu.isVisible().catch(() => false);
     const hasButton = await actionButton.isVisible().catch(() => false);
@@ -188,17 +178,11 @@ test.describe('UC-ROST: Provider Roster', () => {
     }
 
     // Verify menu is open with options
-    const menuDropdown = page.locator(
-      '[data-testid="provider-action-dropdown"]'
-    );
+    const menuDropdown = page.locator('[data-testid="provider-action-dropdown"]');
     await expect(menuDropdown).toBeVisible({ timeout: 2000 });
 
     // Verify expected menu options exist
-    const expectedOptions = [
-      'view details',
-      'view workflows',
-      'departing',
-    ];
+    const expectedOptions = ['view details', 'view workflows', 'departing'];
 
     const menuItems = menuDropdown.locator('[data-testid="menu-item"]');
     const itemCount = await menuItems.count();
