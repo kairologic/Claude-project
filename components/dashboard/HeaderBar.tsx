@@ -12,7 +12,12 @@ import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/design-tokens';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 import NLSearchModal from './NLSearchModal';
-import { runCredentialingAssessment, type AssessmentOutput, type AssessmentResult, type SourceStatus } from '@/lib/credentialing/assessment-engine';
+import {
+  runCredentialingAssessment,
+  type AssessmentOutput,
+  type AssessmentResult,
+  type SourceStatus,
+} from '@/lib/credentialing/assessment-engine';
 
 interface HeaderBarProps {
   title: string;
@@ -36,7 +41,14 @@ interface NPPESResult {
   phone: string;
 }
 
-export default function HeaderBar({ title, practiceName, providerCount, lastSync, practiceId, onSelectWorkflow }: HeaderBarProps) {
+export default function HeaderBar({
+  title,
+  practiceName,
+  providerCount,
+  lastSync,
+  practiceId,
+  onSelectWorkflow,
+}: HeaderBarProps) {
   const router = useRouter();
   const [dateStr, setDateStr] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -52,9 +64,14 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
 
   useEffect(() => {
     const now = new Date();
-    setDateStr(now.toLocaleDateString('en-US', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    }));
+    setDateStr(
+      now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+    );
   }, []);
 
   function resetModal() {
@@ -121,7 +138,9 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
       // Look up provider in our NPPES table
       const { data: provider } = await supabase
         .from('providers')
-        .select('npi, first_name, last_name, credential, taxonomy_desc, address_line_1, city, state, zip_code, phone')
+        .select(
+          'npi, first_name, last_name, credential, taxonomy_desc, address_line_1, city, state, zip_code, phone',
+        )
         .eq('npi', npiInput)
         .maybeSingle();
 
@@ -163,31 +182,36 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
       const taskCount = assessmentTasks.length || 1;
 
       // 1. Create credentialing_onboarding workflow with assessment metadata
-      const { data: wf } = await supabase.from('workflow_instances').insert({
-        practice_id: practiceId,
-        workflow_type: 'credentialing_onboarding',
-        status: 'action_needed',
-        provider_npi: result.npi,
-        provider_name: `${result.first_name} ${result.last_name}`.trim(),
-        finding_summary: assessmentOutput?.summary || `New provider onboarding — ${taskCount} tasks generated`,
-        finding_details: {
-          field: 'credentialing',
-          taxonomy: result.taxonomy_desc,
-          address: result.address_line_1,
-          city: result.city,
-          state: result.state,
-          assessment: assessmentOutput?.assessment || null,
-          estimated_completion_weeks: assessmentOutput?.estimated_completion_weeks || null,
-          bottleneck: assessmentOutput?.bottleneck || null,
-        },
-        priority: 3,
-      }).select('id').single();
+      const { data: wf } = await supabase
+        .from('workflow_instances')
+        .insert({
+          practice_id: practiceId,
+          workflow_type: 'credentialing_onboarding',
+          status: 'action_needed',
+          provider_npi: result.npi,
+          provider_name: `${result.first_name} ${result.last_name}`.trim(),
+          finding_summary:
+            assessmentOutput?.summary || `New provider onboarding — ${taskCount} tasks generated`,
+          finding_details: {
+            field: 'credentialing',
+            taxonomy: result.taxonomy_desc,
+            address: result.address_line_1,
+            city: result.city,
+            state: result.state,
+            assessment: assessmentOutput?.assessment || null,
+            estimated_completion_weeks: assessmentOutput?.estimated_completion_weeks || null,
+            bottleneck: assessmentOutput?.bottleneck || null,
+          },
+          priority: 3,
+        })
+        .select('id')
+        .single();
 
       if (wf) {
         // 2. Insert assessment-generated tasks (or fallback)
         if (assessmentTasks.length > 0) {
           await supabase.from('workflow_tasks').insert(
-            assessmentTasks.map(t => ({
+            assessmentTasks.map((t) => ({
               workflow_id: wf.id,
               task_order: t.task_order,
               task_type: t.task_type,
@@ -195,14 +219,37 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
               description: t.description,
               status: t.status,
               metadata: t.metadata,
-            }))
+            })),
           );
         } else {
           // Fallback: minimal tasks if assessment didn't run
           await supabase.from('workflow_tasks').insert([
-            { workflow_id: wf.id, task_order: 1, task_type: 'data_snapshot', title: 'Day-one data snapshot', description: 'Review NPPES, PECOS, and license data for this provider.', status: 'active' },
-            { workflow_id: wf.id, task_order: 2, task_type: 'correction_caqh', title: 'Update CAQH ProView', description: 'Add/update provider profile in CAQH with new practice info.', status: 'pending', metadata: { group: 'immediate', portal_url: 'https://proview.caqh.org/' } },
-            { workflow_id: wf.id, task_order: 3, task_type: 'update_website', title: 'Add provider to practice website', description: 'List provider with bio, photo, and specialty info.', status: 'pending', metadata: { group: 'immediate' } },
+            {
+              workflow_id: wf.id,
+              task_order: 1,
+              task_type: 'data_snapshot',
+              title: 'Day-one data snapshot',
+              description: 'Review NPPES, PECOS, and license data for this provider.',
+              status: 'active',
+            },
+            {
+              workflow_id: wf.id,
+              task_order: 2,
+              task_type: 'correction_caqh',
+              title: 'Update CAQH ProView',
+              description: 'Add/update provider profile in CAQH with new practice info.',
+              status: 'pending',
+              metadata: { group: 'immediate', portal_url: 'https://proview.caqh.org/' },
+            },
+            {
+              workflow_id: wf.id,
+              task_order: 3,
+              task_type: 'update_website',
+              title: 'Add provider to practice website',
+              description: 'List provider with bio, photo, and specialty info.',
+              status: 'pending',
+              metadata: { group: 'immediate' },
+            },
           ]);
         }
 
@@ -215,7 +262,8 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
           .maybeSingle();
 
         if (existingPP) {
-          await supabase.from('practice_providers')
+          await supabase
+            .from('practice_providers')
             .update({ roster_status: 'onboarding' })
             .eq('id', existingPP.id);
         } else {
@@ -296,15 +344,14 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
     <>
       <div style={styles.bar}>
         <div>
-          <div style={styles.title}>{title}</div>
+          <div style={styles.title}>{practiceName}</div>
           <div style={styles.meta}>
-            {practiceName} · {providerCount} providers{lastSync ? ` · Last sync: ${lastSync}` : ''}
+            {providerCount} provider{providerCount !== 1 ? 's' : ''}
+            {lastSync ? ` · Last sync: ${lastSync}` : ''}
           </div>
         </div>
         <div style={styles.right}>
-          {practiceId && (
-            <NLSearchModal practiceId={practiceId} />
-          )}
+          {practiceId && <NLSearchModal practiceId={practiceId} />}
           <span style={styles.date}>{dateStr}</span>
           <button onClick={() => setShowAddModal(true)} style={styles.addBtn}>
             <span style={{ fontSize: 14 }}>+</span> Add provider
@@ -319,30 +366,60 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
       {/* ── Add Provider Modal ──────────────────────────────── */}
       {showAddModal && (
         <>
-          <div onClick={closeModal} style={{
-            position: 'fixed', inset: 0, background: 'rgba(15,30,46,.5)', zIndex: 300,
-            backdropFilter: 'blur(2px)',
-          }} />
-          <div style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-            width: 460, background: '#fff', borderRadius: 14, zIndex: 301,
-            boxShadow: '0 20px 60px rgba(0,0,0,.2)', overflow: 'hidden',
-          }}>
+          <div
+            onClick={closeModal}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,30,46,.5)',
+              zIndex: 300,
+              backdropFilter: 'blur(2px)',
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 460,
+              background: '#fff',
+              borderRadius: 14,
+              zIndex: 301,
+              boxShadow: '0 20px 60px rgba(0,0,0,.2)',
+              overflow: 'hidden',
+            }}
+          >
             {/* Modal header */}
-            <div style={{
-              padding: '18px 20px', background: colors.navy, color: '#fff',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
+            <div
+              style={{
+                padding: '18px 20px',
+                background: colors.navy,
+                color: '#fff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>Add a provider</div>
                 <div style={{ fontSize: 11, color: colors.navyLight, marginTop: 2 }}>
                   Enter the provider's NPI to pull their data from NPPES
                 </div>
               </div>
-              <button onClick={closeModal} style={{
-                background: 'none', border: 'none', color: colors.navyLight, fontSize: 20,
-                cursor: 'pointer', padding: '4px 8px',
-              }}>×</button>
+              <button
+                onClick={closeModal}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.navyLight,
+                  fontSize: 20,
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                }}
+              >
+                ×
+              </button>
             </div>
 
             {/* Modal body */}
@@ -354,23 +431,39 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                     <input
                       type="text"
                       value={npiInput}
-                      onChange={e => { setNpiInput(e.target.value.replace(/\D/g, '').slice(0, 10)); setError(''); }}
-                      onKeyDown={e => e.key === 'Enter' && handleNPISearch()}
+                      onChange={(e) => {
+                        setNpiInput(e.target.value.replace(/\D/g, '').slice(0, 10));
+                        setError('');
+                      }}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNPISearch()}
                       placeholder="Enter 10-digit NPI..."
                       autoFocus
                       style={{
-                        flex: 1, padding: '10px 14px', border: `1.5px solid ${error ? colors.red : colors.gray200}`,
-                        borderRadius: 8, fontSize: 14, fontFamily: 'inherit', color: colors.navy,
-                        outline: 'none', letterSpacing: '0.5px',
+                        flex: 1,
+                        padding: '10px 14px',
+                        border: `1.5px solid ${error ? colors.red : colors.gray200}`,
+                        borderRadius: 8,
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        color: colors.navy,
+                        outline: 'none',
+                        letterSpacing: '0.5px',
                       }}
                     />
                     <button
                       onClick={handleNPISearch}
                       disabled={searching || npiInput.length !== 10}
                       style={{
-                        padding: '10px 18px', background: colors.navy, color: '#fff', border: 'none',
-                        borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: searching || npiInput.length !== 10 ? 'not-allowed' : 'pointer',
-                        fontFamily: 'inherit', opacity: searching || npiInput.length !== 10 ? 0.5 : 1,
+                        padding: '10px 18px',
+                        background: colors.navy,
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: searching || npiInput.length !== 10 ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit',
+                        opacity: searching || npiInput.length !== 10 ? 0.5 : 1,
                       }}
                     >
                       {searching ? 'Looking up...' : 'Look up'}
@@ -379,31 +472,60 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
 
                   {/* Error */}
                   {error && (
-                    <div style={{ fontSize: 12, color: colors.red, marginBottom: 12, padding: '8px 12px', background: colors.redPale, borderRadius: 6 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: colors.red,
+                        marginBottom: 12,
+                        padding: '8px 12px',
+                        background: colors.redPale,
+                        borderRadius: 6,
+                      }}
+                    >
                       {error}
                     </div>
                   )}
 
                   {/* Result card with assessment snapshot */}
                   {result && (
-                    <div style={{
-                      border: `1.5px solid ${colors.green}`, borderRadius: 10, overflow: 'hidden',
-                    }}>
+                    <div
+                      style={{
+                        border: `1.5px solid ${colors.green}`,
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                      }}
+                    >
                       {/* Provider info */}
-                      <div style={{
-                        padding: '12px 16px', background: colors.greenPale,
-                        display: 'flex', alignItems: 'center', gap: 10,
-                      }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: '50%', background: colors.navy,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#fff', fontSize: 13, fontWeight: 800,
-                        }}>
-                          {result.first_name?.[0]}{result.last_name?.[0]}
+                      <div
+                        style={{
+                          padding: '12px 16px',
+                          background: colors.greenPale,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            background: colors.navy,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: 13,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {result.first_name?.[0]}
+                          {result.last_name?.[0]}
                         </div>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
-                            {result.first_name} {result.last_name}{result.credential ? `, ${result.credential}` : ''}
+                            {result.first_name} {result.last_name}
+                            {result.credential ? `, ${result.credential}` : ''}
                           </div>
                           <div style={{ fontSize: 11, color: colors.gray600 }}>
                             NPI: {result.npi} · {result.taxonomy_desc || 'Healthcare provider'}
@@ -411,7 +533,9 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                         </div>
                       </div>
                       <div style={{ padding: '12px 16px' }}>
-                        <div style={{ fontSize: 11, color: colors.gray400, marginBottom: 6 }}>NPPES record</div>
+                        <div style={{ fontSize: 11, color: colors.gray400, marginBottom: 6 }}>
+                          NPPES record
+                        </div>
                         {result.address_line_1 && (
                           <div style={{ fontSize: 12, color: colors.navy, marginBottom: 3 }}>
                             {result.address_line_1}, {result.city}, {result.state} {result.zip_code}
@@ -426,42 +550,90 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
 
                       {/* Assessment snapshot */}
                       {assessing && (
-                        <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}`, textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: colors.gray400, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            <div style={{
-                              width: 12, height: 12, border: `2px solid ${colors.blue}`,
-                              borderTopColor: 'transparent', borderRadius: '50%',
-                              animation: 'spin 0.8s linear infinite',
-                            }} />
+                        <div
+                          style={{
+                            padding: '12px 16px',
+                            borderTop: `1px solid ${colors.gray200}`,
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: colors.gray400,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 12,
+                                height: 12,
+                                border: `2px solid ${colors.blue}`,
+                                borderTopColor: 'transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 0.8s linear infinite',
+                              }}
+                            />
                             Running credentialing assessment...
                           </div>
                         </div>
                       )}
 
                       {assessmentOutput && !assessing && (
-                        <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}` }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: colors.gray400, marginBottom: 8 }}>
+                        <div
+                          style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}` }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                              color: colors.gray400,
+                              marginBottom: 8,
+                            }}
+                          >
                             Readiness assessment
                           </div>
                           {/* Source status badges */}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                            {assessmentOutput.assessment && Object.entries(assessmentOutput.assessment).map(([key, status]) => {
-                              const label = key === 'caqh_inferred' ? 'CAQH' : key.toUpperCase();
-                              const { bg, fg } = getStatusBadgeColors(status as SourceStatus);
-                              return (
-                                <span key={key} style={{
-                                  fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                                  background: bg, color: fg,
-                                }}>
-                                  {label}: {formatSourceStatus(status as SourceStatus)}
-                                </span>
-                              );
-                            })}
+                          <div
+                            style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}
+                          >
+                            {assessmentOutput.assessment &&
+                              Object.entries(assessmentOutput.assessment).map(([key, status]) => {
+                                const label = key === 'caqh_inferred' ? 'CAQH' : key.toUpperCase();
+                                const { bg, fg } = getStatusBadgeColors(status as SourceStatus);
+                                return (
+                                  <span
+                                    key={key}
+                                    style={{
+                                      fontSize: 9,
+                                      fontWeight: 600,
+                                      padding: '2px 6px',
+                                      borderRadius: 4,
+                                      background: bg,
+                                      color: fg,
+                                    }}
+                                  >
+                                    {label}: {formatSourceStatus(status as SourceStatus)}
+                                  </span>
+                                );
+                              })}
                           </div>
                           {/* Summary line */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
                             <span style={{ fontSize: 11, color: colors.gray600 }}>
-                              {assessmentOutput.tasks.length} tasks · ~{assessmentOutput.estimated_completion_weeks} weeks
+                              {assessmentOutput.tasks.length} tasks · ~
+                              {assessmentOutput.estimated_completion_weeks} weeks
                             </span>
                             {assessmentOutput.bottleneck && (
                               <span style={{ fontSize: 10, fontWeight: 600, color: colors.gold }}>
@@ -473,18 +645,31 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
                       )}
 
                       {/* Action button */}
-                      <div style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}` }}>
+                      <div
+                        style={{ padding: '12px 16px', borderTop: `1px solid ${colors.gray200}` }}
+                      >
                         <button
                           onClick={handleAddProvider}
                           disabled={adding || assessing}
                           style={{
-                            width: '100%', padding: '10px', background: colors.navy, color: '#fff',
-                            border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700,
-                            cursor: adding || assessing ? 'wait' : 'pointer', fontFamily: 'inherit',
+                            width: '100%',
+                            padding: '10px',
+                            background: colors.navy,
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: adding || assessing ? 'wait' : 'pointer',
+                            fontFamily: 'inherit',
                             opacity: adding || assessing ? 0.6 : 1,
                           }}
                         >
-                          {adding ? 'Starting credentialing...' : assessing ? 'Running assessment...' : `Start credentialing (${assessmentOutput?.tasks.length || 0} tasks)`}
+                          {adding
+                            ? 'Starting credentialing...'
+                            : assessing
+                              ? 'Running assessment...'
+                              : `Start credentialing (${assessmentOutput?.tasks.length || 0} tasks)`}
                         </button>
                       </div>
                     </div>
@@ -492,31 +677,65 @@ export default function HeaderBar({ title, practiceName, providerCount, lastSync
 
                   {/* Hint */}
                   {!result && !error && (
-                    <div style={{ fontSize: 11, color: colors.gray400, textAlign: 'center', padding: '8px 0' }}>
-                      We'll pull their NPPES data, run a multi-source assessment, and auto-generate a credentialing checklist.
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: colors.gray400,
+                        textAlign: 'center',
+                        padding: '8px 0',
+                      }}
+                    >
+                      We'll pull their NPPES data, run a multi-source assessment, and auto-generate
+                      a credentialing checklist.
                     </div>
                   )}
                 </>
               ) : (
                 /* Success state — auto-redirects to workflow detail */
                 <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: '50%', background: colors.greenPale,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    margin: '0 auto 12px', fontSize: 22, color: colors.green,
-                  }}>✓</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: colors.navy, marginBottom: 4 }}>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      background: colors.greenPale,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 12px',
+                      fontSize: 22,
+                      color: colors.green,
+                    }}
+                  >
+                    ✓
+                  </div>
+                  <div
+                    style={{ fontSize: 15, fontWeight: 700, color: colors.navy, marginBottom: 4 }}
+                  >
                     {result?.first_name} {result?.last_name} — credentialing started
                   </div>
                   <div style={{ fontSize: 12, color: colors.gray400, marginBottom: 16 }}>
-                    {assessmentOutput?.tasks.length || 0} tasks generated. Taking you to the dashboard...
+                    {assessmentOutput?.tasks.length || 0} tasks generated. Taking you to the
+                    dashboard...
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    <div style={{
-                      width: 16, height: 16, border: `2px solid ${colors.navy}`,
-                      borderTopColor: 'transparent', borderRadius: '50%',
-                      animation: 'spin 0.8s linear infinite',
-                    }} />
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        border: `2px solid ${colors.navy}`,
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }}
+                    />
                     <span style={{ fontSize: 12, color: colors.gray400 }}>Redirecting...</span>
                   </div>
                   <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -555,37 +774,66 @@ function getStatusBadgeColors(status: SourceStatus): { bg: string; fg: string } 
 
 function formatSourceStatus(status: SourceStatus): string {
   switch (status) {
-    case 'listed_correct': return 'OK';
-    case 'wrong_address': return 'Wrong addr';
-    case 'wrong_phone': return 'Wrong phone';
-    case 'needs_update': return 'Needs update';
-    case 'not_listed': return 'Not listed';
-    case 'not_checked': return 'N/A';
-    case 'active': return 'Active';
-    case 'expired': return 'Expired';
-    case 'needs_reassignment': return 'Needs reassign';
-    case 'enrolled': return 'Enrolled';
-    case 'possibly_stale': return 'May be stale';
-    default: return status;
+    case 'listed_correct':
+      return 'OK';
+    case 'wrong_address':
+      return 'Wrong addr';
+    case 'wrong_phone':
+      return 'Wrong phone';
+    case 'needs_update':
+      return 'Needs update';
+    case 'not_listed':
+      return 'Not listed';
+    case 'not_checked':
+      return 'N/A';
+    case 'active':
+      return 'Active';
+    case 'expired':
+      return 'Expired';
+    case 'needs_reassignment':
+      return 'Needs reassign';
+    case 'enrolled':
+      return 'Enrolled';
+    case 'possibly_stale':
+      return 'May be stale';
+    default:
+      return status;
   }
 }
 
 const styles: Record<string, React.CSSProperties> = {
   bar: {
-    padding: '14px 20px', borderBottom: `1px solid ${colors.gray200}`, background: '#fff',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0,
+    padding: '14px 20px',
+    borderBottom: `1px solid ${colors.gray200}`,
+    background: '#fff',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   title: { fontSize: 16, fontWeight: 800, color: colors.navy },
   meta: { fontSize: 11, color: colors.gray400 },
   right: { display: 'flex', alignItems: 'center', gap: 12 },
   date: {
-    fontSize: 12, fontWeight: 500, color: colors.gray600,
-    paddingRight: 4, borderRight: `1px solid ${colors.gray200}`,
+    fontSize: 12,
+    fontWeight: 500,
+    color: colors.gray600,
+    paddingRight: 4,
+    borderRight: `1px solid ${colors.gray200}`,
   },
   addBtn: {
-    background: colors.navy, color: '#fff', border: 'none', borderRadius: 8,
-    padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-    fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+    background: colors.navy,
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    padding: '7px 14px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
   },
   status: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.green },
   statusDot: { width: 7, height: 7, borderRadius: '50%', background: colors.green },

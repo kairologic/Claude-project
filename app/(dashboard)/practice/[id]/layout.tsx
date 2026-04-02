@@ -27,9 +27,7 @@ export default async function PracticeLayout({
   }
 
   // Verify user has access to this practice
-  const practiceAccess = auth.practices?.find(
-    (p: any) => p.practice_id === practiceId
-  );
+  const practiceAccess = auth.practices?.find((p: any) => p.practice_id === practiceId);
 
   if (!practiceAccess) {
     // User is authenticated but doesn't have access to this practice
@@ -47,13 +45,24 @@ export default async function PracticeLayout({
     city: p.practice_websites?.city || '',
     state: p.practice_websites?.state || '',
     provider_count: p.practice_websites?.provider_count || 0,
+    last_scan_at: p.practice_websites?.last_scan_at || null,
   }));
 
   const currentPractice = practices.find((p: any) => p.practice_id === practiceId);
   const rawName = auth.user.user_metadata?.name || auth.user.email?.split('@')[0] || 'User';
   const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-  const userRole = practiceAccess.role === 'admin' ? 'Practice Manager' : practiceAccess.role === 'viewer' ? 'Viewer' : 'Editor';
-  const initials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  const userRole =
+    practiceAccess.role === 'admin'
+      ? 'Practice Manager'
+      : practiceAccess.role === 'viewer'
+        ? 'Viewer'
+        : 'Editor';
+  const initials = userName
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <DashboardShell
@@ -61,6 +70,7 @@ export default async function PracticeLayout({
       currentPracticeId={practiceId}
       currentPracticeName={currentPractice?.practice_name || 'Practice'}
       currentProviderCount={currentPractice?.provider_count || 0}
+      lastScanAt={currentPractice?.last_scan_at || null}
       userName={userName}
       userRole={userRole}
       userInitials={initials}
