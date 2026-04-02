@@ -31,6 +31,8 @@ import {
   triggerWorkflowsForPractice,
   triggerDepartureWorkflow,
   triggerComplianceWorkflows,
+  triggerPayerDirectoryWorkflows,
+  triggerLicenseRenewalWorkflows,
 } from './trigger-workflows';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
 import {
@@ -38,7 +40,6 @@ import {
   getActionableFindings,
   type ComplianceScanResult,
 } from './compliance-checks';
-import { extractProvidersFromWebsite, type ExtractedProvider } from '../crawl/provider-extractor';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -67,7 +68,6 @@ export interface ScanResult {
   extraction: ExtractionSummary | null;
   providers_detected: string[]; // provider names found on site
   providers_matched: MatchedProvider[];
-  providers_extracted: ExtractedProvider[]; // Phase 1 extraction results
   payer_extraction: PayerExtractionResult | null; // #111: insurance accepted on website
   compliance_scan: ComplianceScanResult | null; // WF6: compliance check results
   scan_duration_ms: number;
@@ -374,7 +374,6 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
     extraction: null,
     providers_detected: [],
     providers_matched: [],
-    providers_extracted: [],
     payer_extraction: null,
     compliance_scan: null,
     scan_duration_ms: 0,
@@ -416,45 +415,6 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
     // 3. Match detected providers against providers table
     const matched = await matchProviders(extraction.provider_names, crawl.html, site.state);
     result.providers_matched = matched;
-
-    // 3a. Phase 1 provider extraction — populate web_specialty from website
-    try {
-      const extraction_phase1 = await extractProvidersFromWebsite(site.url, {
-        timeout: 15000,
-        maxPages: 3,
-      });
-      result.providers_extracted = extraction_phase1.providers;
-
-      if (extraction_phase1.providers.length > 0) {
-        console.log(
-          `[Scanner] Phase 1 extraction: ${extraction_phase1.providers.length} providers with specialties`,
-        );
-
-        // Update web_specialty for matched providers in practice_providers
-        for (const extracted of extraction_phase1.providers) {
-          if (extracted.specialty) {
-            // Try to match by name against existing practice_providers
-            const matchedNpi = result.providers_matched.find((m) =>
-              m.name.toLowerCase().includes(extracted.name.split(' ').pop()?.toLowerCase() || ''),
-            );
-            if (matchedNpi) {
-              await db(
-                `practice_providers?practice_website_id=eq.${site.id}&npi=eq.${matchedNpi.npi}`,
-                {
-                  method: 'PATCH',
-                  body: JSON.stringify({
-                    web_specialty: extracted.specialty,
-                    updated_at: new Date().toISOString(),
-                  }),
-                },
-              );
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`[Scanner] Phase 1 extraction failed for ${site.url}:`, err);
-    }
 
     // 3b. Extract accepted payers from website (#111)
     try {
@@ -688,6 +648,36 @@ async function updateScanMetadata(site: PracticeWebsite, result: ScanResult): Pr
           err,
         );
       }
+    }
+
+    // 8. Trigger payer directory workflows from acceptance gap mismatches
+    try {
+      const payerWfResult = await triggerPayerDirectoryWorkflows(site.id);
+      if (payerWfResult.workflows_created > 0) {
+        console.log(
+          `[Scanner] Created ${payerWfResult.workflows_created} payer directory workflows for practice ${site.id}`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[Scanner] Failed to trigger payer directory workflows for practice ${site.id}:`,
+        err,
+      );
+    }
+
+    // 9. Trigger license renewal workflows for providers with license issues
+    try {
+      const licWfResult = await triggerLicenseRenewalWorkflows(site.id);
+      if (licWfResult.workflows_created > 0) {
+        console.log(
+          `[Scanner] Created ${licWfResult.workflows_created} license renewal workflows for practice ${site.id}`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[Scanner] Failed to trigger license renewal workflows for practice ${site.id}:`,
+        err,
+      );
     }
   }
 }
