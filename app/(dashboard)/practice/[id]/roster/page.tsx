@@ -24,7 +24,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
           'id, npi, provider_name, roster_status, active_mismatch_count, web_specialty, has_address_mismatch, has_phone_mismatch, has_taxonomy_mismatch, has_name_mismatch, has_license_issue, license_issue_type, association_source',
         )
         .eq('practice_website_id', practiceId)
-        .neq('roster_status', 'onboarding')
+        .eq('roster_status', 'active')
         .order('active_mismatch_count', { ascending: false, nullsFirst: false }),
       [],
     ),
