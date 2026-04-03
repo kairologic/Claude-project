@@ -32,9 +32,17 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY!;
 
-// ── Stripe recurring price IDs ──
+// ── Stripe recurring price IDs (old product line) ──
 const STRIPE_SHIELD_PRICE_ID = process.env.STRIPE_SHIELD_PRICE_ID || ''; // $79/mo recurring price
 const STRIPE_WATCH_PRICE_ID = process.env.STRIPE_WATCH_PRICE_ID || '';   // $39/mo recurring price (downgrade)
+
+// ── Stripe new pricing tier price IDs (practice-based) ──
+const STRIPE_SMALL_MONTHLY_PRICE_ID = 'price_1TI8I6Gg3oiiGF7ggGMO0z1i';  // $149/mo
+const STRIPE_SMALL_ANNUAL_PRICE_ID = 'price_1TI8I8Gg3oiiGF7gAmKNYWCV';  // $1490/yr
+const STRIPE_MEDIUM_MONTHLY_PRICE_ID = 'price_1TI8I9Gg3oiiGF7gFv08tpdV'; // $349/mo
+const STRIPE_MEDIUM_ANNUAL_PRICE_ID = 'price_1TI8IAGg3oiiGF7gLfHsZep4';   // $3490/yr
+const STRIPE_LARGE_MONTHLY_PRICE_ID = 'price_1TI8IBGg3oiiGF7gA0Pii00P';  // $549/mo
+const STRIPE_LARGE_ANNUAL_PRICE_ID = 'price_1TI8IBGg3oiiGF7gaorEvrnK';   // $5490/yr
 
 // ── Shield trial duration ──
 const SHIELD_TRIAL_DAYS = 90; // 3 months free with Report or Safe Harbor
@@ -45,6 +53,9 @@ type ProductType =
   | 'safe-harbor'
   | 'sentry-shield'
   | 'sentry-watch'
+  | 'small-practice'
+  | 'medium-practice'
+  | 'large-practice'
   | 'unknown';
 
 interface ProductInfo {
@@ -54,7 +65,7 @@ interface ProductInfo {
   includesReport: boolean;
   includesSafeHarbor: boolean;
   includesShieldTrial: boolean;    // 90-day free Shield for report/safe-harbor
-  includesMonitoring: false | 'shield' | 'watch';
+  includesMonitoring: false | 'shield' | 'watch' | 'small' | 'medium' | 'large';
 }
 
 // ── Product Config ──
@@ -91,6 +102,30 @@ const PRODUCTS: Record<ProductType, Omit<ProductInfo, 'type'>> = {
     includesShieldTrial: false,
     includesMonitoring: 'watch',
   },
+  'small-practice': {
+    displayName: 'Small Practice ($149/mo)',
+    templateSlug: 'subscription-trial-start',
+    includesReport: false,
+    includesSafeHarbor: false,
+    includesShieldTrial: false,
+    includesMonitoring: 'small',
+  },
+  'medium-practice': {
+    displayName: 'Medium Practice ($349/mo)',
+    templateSlug: 'subscription-trial-start',
+    includesReport: false,
+    includesSafeHarbor: false,
+    includesShieldTrial: false,
+    includesMonitoring: 'medium',
+  },
+  'large-practice': {
+    displayName: 'Large Practice ($549/mo)',
+    templateSlug: 'subscription-trial-start',
+    includesReport: false,
+    includesSafeHarbor: false,
+    includesShieldTrial: false,
+    includesMonitoring: 'large',
+  },
   'unknown': {
     displayName: 'KairoLogic Product',
     templateSlug: 'purchase-success',
@@ -100,6 +135,38 @@ const PRODUCTS: Record<ProductType, Omit<ProductInfo, 'type'>> = {
     includesMonitoring: false,
   },
 };
+
+// ── Get features by tier ──
+function getFeaturesByTier(tier: string): string[] {
+  const features: Record<string, string[]> = {
+    'small-practice': [
+      'Up to 10 providers',
+      'Daily payer scans (UHC, Aetna, Cigna, Humana)',
+      'Real-time mismatch alerts',
+      'Full compliance scanning + alerts',
+      'Confidence scoring + review queue',
+      'Unlimited PDF reports',
+      'Email support (24h)',
+    ],
+    'medium-practice': [
+      'Up to 25 providers',
+      'Everything in Small Practice',
+      'Workflow automation (create, assign, escalate, resolve)',
+      'Credential & license tracking',
+      'Team roles (admin, manager, viewer)',
+      'Priority email support',
+    ],
+    'large-practice': [
+      'Up to 50 providers',
+      'Everything in Medium Practice',
+      'License renewal workflows',
+      'Bulk batch operations',
+      'Custom email notification rules',
+      'Dedicated onboarding call',
+    ],
+  };
+  return features[tier] || [];
+}
 
 // ── Identify product from Stripe session ──
 function identifyProduct(session: Record<string, unknown>): ProductInfo {
@@ -124,10 +191,23 @@ function identifyProduct(session: Record<string, unknown>): ProductInfo {
     }
   }
 
-  // 3. Check line items
+  // 3. Check line items (also check for new pricing tier price IDs)
   const lineItems = session.line_items as Record<string, unknown> | undefined;
   if (lineItems && Array.isArray((lineItems as Record<string, unknown>).data)) {
     for (const item of (lineItems as Record<string, unknown>).data as Record<string, unknown>[]) {
+      const priceId = item.price && typeof item.price === 'object' ? (item.price as Record<string, unknown>).id : null;
+
+      // Check for new practice tier price IDs first
+      if (priceId === STRIPE_SMALL_MONTHLY_PRICE_ID || priceId === STRIPE_SMALL_ANNUAL_PRICE_ID) {
+        return { type: 'small-practice', ...PRODUCTS['small-practice'] };
+      }
+      if (priceId === STRIPE_MEDIUM_MONTHLY_PRICE_ID || priceId === STRIPE_MEDIUM_ANNUAL_PRICE_ID) {
+        return { type: 'medium-practice', ...PRODUCTS['medium-practice'] };
+      }
+      if (priceId === STRIPE_LARGE_MONTHLY_PRICE_ID || priceId === STRIPE_LARGE_ANNUAL_PRICE_ID) {
+        return { type: 'large-practice', ...PRODUCTS['large-practice'] };
+      }
+
       if (item.description) candidates.push(String(item.description).toLowerCase());
       if (item.price && typeof item.price === 'object') {
         const price = item.price as Record<string, unknown>;
@@ -423,6 +503,73 @@ export async function POST(request: NextRequest) {
           }
         } catch (emailErr) {
           console.warn(`[Stripe Webhook] Confirmation email error:`, emailErr);
+        }
+      }
+
+      // ── 3c. Handle new practice tier subscriptions (small/medium/large) ──
+      // These are subscription-based products with 21-day trial, not Shield trials
+      if (
+        product.type === 'small-practice' ||
+        product.type === 'medium-practice' ||
+        product.type === 'large-practice'
+      ) {
+        try {
+          // Get subscription details from the session
+          const subscriptionId = session.subscription || '';
+
+          if (subscriptionId) {
+            // Fetch subscription to get trial end date
+            const stripe = await import('stripe').then(m => new m.default(STRIPE_SECRET_KEY));
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const trialEndDate = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
+
+            // Determine plan tier name and price
+            let planName = 'Practice Plan';
+            let planPrice = 0;
+            if (product.type === 'small-practice') {
+              planName = 'Small Practice';
+              planPrice = 149;
+            } else if (product.type === 'medium-practice') {
+              planName = 'Medium Practice';
+              planPrice = 349;
+            } else if (product.type === 'large-practice') {
+              planName = 'Large Practice';
+              planPrice = 549;
+            }
+
+            // Get billing interval from session metadata
+            const sessionMetadata = session.metadata as Record<string, string> | undefined;
+            const billingInterval = (sessionMetadata?.billingInterval as 'month' | 'year') || 'month';
+
+            // Adjust price for annual
+            if (billingInterval === 'year') {
+              // Note: Annual prices are already in the price IDs but we store monthly equivalent
+              // Prices: $1490/yr, $3490/yr, $5490/yr
+            }
+
+            // Send subscription confirmation email
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net';
+            await fetch(`${baseUrl}/api/email/subscription-confirmation`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: customerEmail,
+                practiceName: customerName || 'Practice',
+                planName,
+                planPrice,
+                billingInterval,
+                trialEndDate: trialEndDate || new Date(Date.now() + 21 * 86400000).toISOString(),
+                features: getFeaturesByTier(product.type),
+              }),
+            });
+
+            console.log(`[Stripe Webhook] Subscription confirmation sent for ${product.type}: ${customerEmail}`);
+
+            // For practice tier products, we'll handle organization/practice creation in the success page callback
+            // The /api/trial/signup endpoint will be called from the success page
+          }
+        } catch (practiceErr) {
+          console.error('[Stripe Webhook] Practice tier subscription error:', practiceErr);
         }
       }
 
