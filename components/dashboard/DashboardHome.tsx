@@ -71,6 +71,13 @@ interface ComplianceCheck {
   status: string;
 }
 
+interface ReviewMatch {
+  npi: string;
+  provider_name: string;
+  confidence_score: number;
+  confidence_tier: 'review' | 'unverified';
+}
+
 interface DashboardHomeProps {
   kpis: KPIs;
   priorityProviders: ProviderHealth[];
@@ -80,6 +87,7 @@ interface DashboardHomeProps {
   userName: string;
   complianceChecks?: ComplianceCheck[];
   complianceScore?: number | null;
+  reviewMatches?: ReviewMatch[];
 }
 
 export default function DashboardHome({
@@ -91,6 +99,7 @@ export default function DashboardHome({
   userName,
   complianceChecks,
   complianceScore,
+  reviewMatches = [],
 }: DashboardHomeProps) {
   const router = useRouter();
   const [showWelcome, setShowWelcome] = useState(true);
@@ -817,6 +826,156 @@ export default function DashboardHome({
               )}
             </div>
           </div>
+
+          {/* Review matches — low-confidence provider associations */}
+          {reviewMatches.length > 0 && (
+            <div style={{ marginTop: spacing.md }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: spacing.sm,
+                }}
+              >
+                <span
+                  style={{
+                    ...typography.label,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: colors.gray400,
+                  }}
+                >
+                  Review matches
+                </span>
+                <span
+                  style={{
+                    ...typography.caption,
+                    color: colors.gray400,
+                  }}
+                >
+                  {reviewMatches.length} pending
+                </span>
+              </div>
+              <div
+                style={{
+                  background: '#fff',
+                  border: `1px solid ${colors.gray200}`,
+                  borderRadius: radii.lg,
+                  padding: spacing.md,
+                  boxShadow: shadows.xs,
+                  transition: `all ${transitions.base}`,
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.boxShadow = shadows.md)}
+                onMouseOut={(e) => (e.currentTarget.style.boxShadow = shadows.xs)}
+              >
+                <div
+                  style={{
+                    ...typography.bodySmall,
+                    color: colors.gray400,
+                    marginBottom: spacing.sm,
+                  }}
+                >
+                  These providers were detected on your website but have low match confidence.
+                  Review to confirm or dismiss.
+                </div>
+                {reviewMatches.map((m) => {
+                  const scoreColor =
+                    m.confidence_score >= 0.50
+                      ? colors.gold
+                      : m.confidence_score >= 0.20
+                        ? '#E65100'
+                        : colors.red;
+                  const tierLabel =
+                    m.confidence_tier === 'unverified' ? 'Unverified' : 'Needs Review';
+                  const tierBg =
+                    m.confidence_tier === 'unverified' ? '#FFF8E1' : '#FFF3E0';
+
+                  return (
+                    <div
+                      key={m.npi}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        padding: `${spacing.xs}px 0`,
+                        borderBottom: `1px solid ${colors.gray100}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: radii.full,
+                          background: tierBg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          ...typography.caption,
+                          fontWeight: 700,
+                          color: scoreColor,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {Math.round(m.confidence_score * 100)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            ...typography.bodySmall,
+                            fontWeight: 600,
+                            color: colors.gray600,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {titleCase(m.provider_name)}
+                        </div>
+                        <div style={{ ...typography.caption, color: colors.gray400 }}>
+                          NPI {m.npi}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          ...typography.caption,
+                          padding: `1px ${spacing.xs}px`,
+                          borderRadius: radii.sm,
+                          background: tierBg,
+                          color: scoreColor,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {tierLabel}
+                      </span>
+                    </div>
+                  );
+                })}
+                <button
+                  onClick={() => navigateTo('/roster?filter=review')}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'center',
+                    marginTop: spacing.sm,
+                    padding: `${spacing.xs}px ${spacing.sm}px`,
+                    background: colors.navy,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: radii.md,
+                    ...typography.label,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    transition: `opacity ${transitions.base}`,
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.opacity = '0.9')}
+                  onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  Review all matches
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -24,7 +24,7 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
   const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   // Parallel query 1: practice name + KPI data (independent queries)
-  const [practiceResult, kpiResult, topIssuesResult, credentialingResult] = await Promise.all([
+  const [practiceResult, kpiResult, topIssuesResult, credentialingResult, reviewMatchesResult] = await Promise.all([
     safeQuerySingle(
       admin.from('practice_websites').select('name, provider_count').eq('id', practiceId).single(),
       null,
@@ -55,6 +55,18 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
         .in('roster_status', ['onboarding', 'departing']),
       [],
     ),
+    // 5. Review matches: providers with low confidence scores needing manual review
+    safeQuery(
+      admin
+        .from('practice_providers')
+        .select('npi, provider_name, confidence_score, confidence_tier, confidence_scored_at')
+        .eq('practice_website_id', practiceId)
+        .not('confidence_tier', 'is', null)
+        .in('confidence_tier', ['review', 'unverified'])
+        .order('confidence_score', { ascending: true })
+        .limit(20),
+      [],
+    ),
   ]);
 
   interface PracticeRecord {
@@ -74,6 +86,12 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
   // v_provider_health returns all fields expected by DashboardHome's ProviderHealth interface
   const topIssues = topIssuesResult.data || [];
   const credentialingProviders = credentialingResult.data || [];
+  const reviewMatches = (reviewMatchesResult.data || []).map((r: any) => ({
+    npi: r.npi,
+    provider_name: r.provider_name,
+    confidence_score: parseFloat(r.confidence_score) || 0,
+    confidence_tier: r.confidence_tier as 'review' | 'unverified',
+  }));
 
   // Merge: credentialing providers first, then top issues (deduplicated)
   const seen = new Set<string>();
@@ -221,6 +239,7 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
       practiceId={practiceId}
       practiceName={practice?.name || 'Practice'}
       userName={userName}
+      reviewMatches={reviewMatches}
     />
   );
 }
