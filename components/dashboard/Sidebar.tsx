@@ -86,9 +86,7 @@ export default function Sidebar({
     { id: 'alerts', path: '/alerts', icon: '🔔', label: 'Alerts', badge: unseenAlertCount },
     { id: 'documents', path: '/documents', icon: '📄', label: 'Documents' },
     { id: 'payer-directory', path: '/payer-directory', icon: '🏥', label: 'Payer directories' },
-    { id: 'search', path: '/search', icon: '🔍', label: 'NL Search' },
     { id: 'reports', path: '/reports', icon: '📊', label: 'Reports' },
-    { id: 'blog', path: '/blog', icon: '📝', label: 'Blog' },
     { id: 'settings', path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
@@ -105,7 +103,6 @@ export default function Sidebar({
     if (sub.startsWith('/payer-directory')) return 'payer-directory';
     if (sub.startsWith('/search')) return 'search';
     if (sub.startsWith('/reports')) return 'reports';
-    if (sub.startsWith('/blog')) return 'blog';
     if (sub.startsWith('/settings')) return 'settings';
     return 'dashboard';
   }
@@ -176,6 +173,31 @@ export default function Sidebar({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Ask anything — NL search bar */}
+      <div style={styles.askBarWrap}>
+        <button
+          onClick={() => navigate('/search')}
+          style={{
+            ...styles.askBar,
+            ...(activeId === 'search'
+              ? { background: colors.navyMid, borderColor: colors.gold }
+              : {}),
+          }}
+          onMouseOver={(e) => {
+            if (activeId !== 'search')
+              (e.currentTarget as HTMLElement).style.background = `${colors.navyMid}80`;
+          }}
+          onMouseOut={(e) => {
+            if (activeId !== 'search')
+              (e.currentTarget as HTMLElement).style.background = `${colors.navyMid}60`;
+          }}
+        >
+          <span style={{ fontSize: 14 }}>🔍</span>
+          <span style={{ opacity: 0.7 }}>Ask anything…</span>
+          <span style={styles.askKbd}>⌘K</span>
+        </button>
       </div>
 
       {/* Navigation */}
@@ -412,6 +434,32 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'left' as const,
     fontFamily: 'inherit',
     transition: `background ${transitions.fast}`,
+  },
+  askBarWrap: {
+    padding: `0 ${spacing.sm}px ${spacing.sm}px`,
+  },
+  askBar: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '8px 10px',
+    background: `${colors.navyMid}60`,
+    border: `1px solid rgba(139,163,184,.2)`,
+    borderRadius: radii.md,
+    color: colors.navyLight,
+    cursor: 'pointer',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    transition: `all ${transitions.fast}`,
+  },
+  askKbd: {
+    marginLeft: 'auto',
+    fontSize: 10,
+    padding: '1px 5px',
+    borderRadius: 3,
+    background: 'rgba(139,163,184,.15)',
+    color: colors.navyLight,
   },
   nav: { flex: 1, padding: `${spacing.xs}px 0` },
   navItem: {

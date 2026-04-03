@@ -106,16 +106,61 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     unseenAlertCount = (allAlertsResult.data || []).filter((a) => !readIds.has(a.id)).length;
   }
 
-  // 4. Payer sync status from payer_directory_mismatches (PRACTICE-level acceptance gaps)
-  const payerMismatchResult = await safeQuery(
-    admin
-      .from('payer_directory_mismatches')
-      .select('payer_code, status, last_detected_at, mismatch_type')
-      .eq('practice_website_id', practiceId)
-      .eq('npi', 'PRACTICE')
-      .order('payer_code'),
+  // 4. Payer sync status — aggregate from provider-level payer_directory_snapshots
+  //    Shows which payers have directory listings for this practice's providers,
+  //    with provider counts and last sync dates.
+  const payerSnapshotResult = await safeQuery(
+    admin.rpc('get_practice_payer_sync_status', { p_practice_id: practiceId }),
     [],
   );
+
+  // Fallback: if the RPC doesn't exist yet, query directly
+  let payerSyncRows = payerSnapshotResult.data || [];
+  if (payerSnapshotResult.error || payerSyncRows.length === 0) {
+    // Direct aggregation query via raw join
+    const directResult = await safeQuery(
+      admin
+        .from('payer_directory_snapshots')
+        .select('payer_code, npi, snapshot_date')
+        .in(
+          'npi',
+          (
+            await safeQuery(
+              admin
+                .from('practice_providers')
+                .select('npi')
+                .eq('practice_website_id', practiceId),
+              [],
+            )
+          ).data?.map((p: any) => p.npi) || [],
+        ),
+      [],
+    );
+
+    // Aggregate by payer_code
+    const payerMap = new Map<
+      string,
+      { provider_count: number; latest_snapshot: string; npis: Set<string> }
+    >();
+    for (const row of directResult.data || []) {
+      const entry = payerMap.get(row.payer_code) || {
+        provider_count: 0,
+        latest_snapshot: '',
+        npis: new Set<string>(),
+      };
+      if (!entry.npis.has(row.npi)) {
+        entry.npis.add(row.npi);
+        entry.provider_count = entry.npis.size;
+      }
+      if (row.snapshot_date > entry.latest_snapshot) entry.latest_snapshot = row.snapshot_date;
+      payerMap.set(row.payer_code, entry);
+    }
+    payerSyncRows = Array.from(payerMap.entries()).map(([code, data]) => ({
+      payer_code: code,
+      provider_count: data.provider_count,
+      latest_snapshot: data.latest_snapshot,
+    }));
+  }
 
   const getRelativeTime = (dateString: string): string => {
     const diff = Date.now() - new Date(dateString).getTime();
@@ -126,21 +171,6 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     if (days < 14) return '1 week ago';
     if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
     return `${Math.floor(days / 30)} month(s) ago`;
-  };
-
-  const getPayerColor = (status: string): string => {
-    if (status === 'open') return colors.red;
-    if (status === 'resolved') return colors.green;
-    if (status === 'accepted_risk') return colors.gold;
-    return colors.gray400;
-  };
-
-  const getPayerStatusText = (status: string, lastDetected: string | null): string => {
-    if (status === 'open')
-      return lastDetected ? `Not listed · ${getRelativeTime(lastDetected)}` : 'Not listed';
-    if (status === 'resolved') return 'Listed';
-    if (status === 'accepted_risk') return 'Accepted risk';
-    return 'Pending';
   };
 
   // Friendly payer display names
@@ -157,11 +187,22 @@ export default async function DashboardHomePage({ params }: { params: { id: stri
     uhc: 'UnitedHealthcare',
   };
 
-  const payers = (payerMismatchResult.data || []).map((m: any) => ({
-    payer: PAYER_DISPLAY_NAMES[m.payer_code] || m.payer_code,
-    status: getPayerStatusText(m.status, m.last_detected_at),
-    color: getPayerColor(m.status),
-  }));
+  const totalProviders = kpiData?.total_providers || practice?.provider_count || 0;
+
+  const payers = payerSyncRows.map((row: any) => {
+    const listed = row.provider_count || 0;
+    const synced = listed >= totalProviders;
+    const partial = listed > 0 && listed < totalProviders;
+    return {
+      payer: PAYER_DISPLAY_NAMES[row.payer_code] || row.payer_code,
+      status: synced
+        ? `All listed · ${getRelativeTime(row.latest_snapshot)}`
+        : partial
+          ? `${listed}/${totalProviders} listed · ${getRelativeTime(row.latest_snapshot)}`
+          : 'Not listed',
+      color: synced ? colors.green : partial ? colors.gold : colors.red,
+    };
+  });
 
   const kpis = {
     needs_attention: kpiData?.needs_attention || 0,
