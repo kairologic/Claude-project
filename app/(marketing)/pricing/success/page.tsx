@@ -239,7 +239,7 @@ function CheckoutSuccessContent() {
             margin: '0 0 32px',
             lineHeight: 1.6,
           }}>
-            Your {planName} plan is ready. Your 21-day free trial starts now.
+            Your {planName} plan is ready. Your 14-day free trial starts now.
           </p>
 
           {/* Trial Info Box */}
@@ -296,7 +296,7 @@ function CheckoutSuccessContent() {
               }}>
                 <span style={{ color: '#5A6472', fontSize: 14 }}>Trial Ends</span>
                 <span style={{ fontWeight: 600, color: '#1A9E6D', fontSize: 14 }}>
-                  {trialEndDate || 'In 21 days'}
+                  {trialEndDate || 'In 14 days'}
                 </span>
               </div>
             </div>

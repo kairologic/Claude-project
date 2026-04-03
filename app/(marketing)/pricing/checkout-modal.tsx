@@ -120,7 +120,7 @@ export default function CheckoutModal({ tier, billingInterval, onClose }: Checko
             color: '#5A6472',
             margin: 0,
           }}>
-            21-day free trial. Credit card required.
+            14-day free trial. Credit card required.
           </p>
         </div>
 

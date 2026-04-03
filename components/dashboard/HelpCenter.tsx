@@ -100,8 +100,8 @@ Workflows run continuously in the background and are triggered automatically whe
       {
         id: 'trial-overview',
         title: 'Your Free Trial',
-        description: 'What your 21-day trial includes and what happens after',
-        content: `Your 21-day free trial includes full access to every feature on the platform:
+        description: 'What your 14-day trial includes and what happens after',
+        content: `Your 14-day free trial includes full access to every feature on the platform:
 
 • Provider data monitoring across NPPES, payer directories, and state boards
 • Compliance scanning (SB 1188, HB 149)
@@ -760,7 +760,7 @@ Data Management:
         content: `Billing information is accessible from Settings > Billing.
 
 Trial Period:
-Your 21-day trial includes full access to all features. No credit card is required to start. After 21 days, your dashboard switches to read-only mode for 7 additional days.
+Your 14-day trial includes full access to all features. No credit card is required to start. After 14 days, your dashboard switches to read-only mode for 7 additional days.
 
 Founders Rate:
 The first 10 customers who upgrade get a locked-in founders rate for the first year. Check Settings > Billing to see if founders rate slots are still available.

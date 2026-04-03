@@ -208,12 +208,12 @@ export async function POST(request: NextRequest) {
         <div class="plan-box-title">Your Subscription</div>
         <div class="plan-name">${planName}</div>
         <div class="plan-details">
-          \$${planPrice}/${billingText} after your 21-day free trial
+          \$${planPrice}/${billingText} after your 14-day free trial
         </div>
       </div>
 
       <div class="trial-banner">
-        ✓ Your 21-day free trial starts today. No charges during this period.
+        ✓ Your 14-day free trial starts today. No charges during this period.
       </div>
 
       <div>
@@ -280,7 +280,7 @@ Your ${planName} plan is now active.
 
 TRIAL PERIOD
 ============
-Your 21-day free trial starts today. No charges during this period.
+Your 14-day free trial starts today. No charges during this period.
 Trial Ends: ${formattedTrialEnd}
 
 After your trial, your subscription will automatically renew at $${planPrice}/${billingText}.

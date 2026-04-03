@@ -7,7 +7,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net';
 /**
  * POST /api/checkout
  *
- * Creates a Stripe Checkout Session in embedded mode with a 21-day trial.
+ * Creates a Stripe Checkout Session in embedded mode with a 14-day trial.
  *
  * Request body:
  *   - priceId: string (Stripe price ID)
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         billingInterval,
       },
       subscription_data: {
-        trial_period_days: 21,
+        trial_period_days: 14,
         metadata: {
           planName,
           billingInterval,

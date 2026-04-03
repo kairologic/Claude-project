@@ -98,24 +98,27 @@ const pricingTiers: PricingTier[] = [
     cta: 'Start Free Trial',
   },
   {
-    id: 'large',
-    name: 'Large Practice',
-    providers: 50,
-    monthlyPrice: 549,
-    annualPrice: 5490,
-    monthlyPriceId: 'price_1TI8IBGg3oiiGF7gA0Pii00P',
-    annualPriceId: 'price_1TI8IBGg3oiiGF7gaorEvrnK',
+    id: 'enterprise',
+    name: 'Enterprise',
+    providers: 0,
+    monthlyPrice: 0,
+    annualPrice: 0,
+    monthlyPriceId: '',
+    annualPriceId: '',
     highlighted: false,
-    description: 'For large practices and health systems',
+    badge: 'Custom',
+    description: 'For large practices, MSOs, and health systems',
     features: [
-      'Up to 50 providers',
+      'Unlimited providers + locations',
       'Everything in Medium Practice, plus:',
-      'License renewal workflows',
-      'Bulk batch operations',
-      'Custom email notification rules',
-      'Dedicated onboarding call',
+      'Dedicated account manager + SLA',
+      'Custom compliance frameworks',
+      'API access (REST + webhooks)',
+      'EHR/PM system integrations',
+      'White-label reporting',
+      'SOC 2 Type II & BAA included',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Contact Sales',
   },
 ];
 
@@ -135,17 +138,17 @@ const allFeatures = [
   { name: 'Team roles (admin, manager, viewer)', free: false },
   { name: 'Email support', free: true, freeTime: '24h' },
   { name: 'Priority email support', free: false },
-  { name: 'License renewal workflows', free: false },
-  { name: 'Bulk batch operations', free: false },
-  { name: 'Custom email notification rules', free: false },
-  { name: 'Dedicated onboarding', free: false },
-  { name: '21-day free trial', free: false },
+  { name: 'API access (REST + webhooks)', free: false },
+  { name: 'EHR/PM integrations', free: false },
+  { name: 'White-label reporting', free: false },
+  { name: 'Dedicated account manager + SLA', free: false },
+  { name: '14-day free trial', free: false },
 ];
 
 const faqs = [
   {
     q: 'How does the free trial work?',
-    a: 'All paid plans include a 21-day free trial. Credit card required at signup (you won\'t be charged during the trial). Cancel anytime before the trial ends to avoid charges.',
+    a: 'All paid plans include a 14-day free trial. Credit card required at signup (you won\'t be charged during the trial). Cancel anytime before the trial ends to avoid charges.',
   },
   {
     q: 'What happens after the trial?',
@@ -184,7 +187,7 @@ export default function PricingPage() {
   const [expandedFaqs, setExpandedFaqs] = useState<Record<number, boolean>>({});
 
   const handleStartTrial = (tier: PricingTier) => {
-    if (tier.id === 'free') {
+    if (tier.id === 'free' || tier.id === 'enterprise') {
       window.location.href = '/contact';
       return;
     }
@@ -250,7 +253,7 @@ export default function PricingPage() {
             margin: '0 auto',
             lineHeight: 1.6,
           }}>
-            Start free with up to 5 providers. Upgrade when you're ready. All paid plans include a 21-day free trial.
+            Start free with up to 5 providers. Upgrade when you're ready. All paid plans include a 14-day free trial.
           </p>
 
           {/* Billing Toggle */}
@@ -381,7 +384,16 @@ export default function PricingPage() {
                   </p>
 
                   <div style={{ marginBottom: 16 }}>
-                    {tier.monthlyPrice === 0 ? (
+                    {tier.id === 'enterprise' ? (
+                      <span style={{
+                        fontSize: 36,
+                        fontWeight: 800,
+                        color: '#0F1E2E',
+                        lineHeight: 1,
+                      }}>
+                        Custom
+                      </span>
+                    ) : tier.monthlyPrice === 0 ? (
                       <span style={{
                         fontSize: 48,
                         fontWeight: 800,
@@ -411,14 +423,24 @@ export default function PricingPage() {
                     )}
                   </div>
 
-                  {tier.monthlyPrice === 0 && (
+                  {tier.id === 'free' && (
                     <p style={{
                       fontSize: 14,
-                      color: tier.highlighted ? '#8BA3B8' : '#5A6472',
+                      color: '#5A6472',
                       margin: '0 0 20px',
                       fontStyle: 'italic',
                     }}>
-                      Forever free
+                      Forever free — no credit card required
+                    </p>
+                  )}
+                  {tier.id === 'enterprise' && (
+                    <p style={{
+                      fontSize: 14,
+                      color: '#5A6472',
+                      margin: '0 0 20px',
+                      fontStyle: 'italic',
+                    }}>
+                      For MSOs, health systems, and 50+ providers
                     </p>
                   )}
 
@@ -806,7 +828,7 @@ export default function PricingPage() {
             Start monitoring your provider data today
           </h2>
           <p style={{ fontSize: 16, color: '#8BA3B8', margin: '0 0 24px' }}>
-            All paid plans include a 21-day free trial. No credit card required for Free tier.
+            All paid plans include a 14-day free trial. No credit card required for Free tier.
           </p>
           <button
             onClick={() => {
