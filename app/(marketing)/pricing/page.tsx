@@ -380,7 +380,7 @@ export default function PricingPage() {
                     fontWeight: 600,
                     margin: '0 0 20px',
                   }}>
-                    Up to {tier.providers} providers
+                    {tier.id === 'enterprise' ? 'Unlimited providers' : `Up to ${tier.providers} providers`}
                   </p>
 
                   <div style={{ marginBottom: 16 }}>
