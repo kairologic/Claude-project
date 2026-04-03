@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -17,7 +17,34 @@ interface SessionData {
   trial_end: string | null;
 }
 
+function LoadingFallback() {
+  return (
+    <section style={{
+      padding: '80px 24px',
+      textAlign: 'center',
+      minHeight: '60vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <div className="m-container">
+        <p style={{ fontSize: 16, color: '#5A6472', margin: 0 }}>
+          Loading your confirmation...
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CheckoutSuccessContent />
+    </Suspense>
+  );
+}
+
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
 
