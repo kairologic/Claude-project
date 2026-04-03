@@ -41,6 +41,13 @@ import {
   getActionableFindings,
   type ComplianceScanResult,
 } from './compliance-checks';
+import {
+  scoreProviderConfidence,
+  type ProviderData,
+  type NppesData,
+  type PracticeContext,
+  type ConfidenceResult,
+} from './confidence-scorer';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -254,15 +261,146 @@ async function matchProviders(
   return matched;
 }
 
+// ── Confidence Scoring Integration ──────────────────────
+
+/**
+ * Fetch NPPES data for a list of NPIs to use in confidence scoring.
+ */
+async function fetchNppesDataBatch(npis: string[]): Promise<Map<string, NppesData>> {
+  const map = new Map<string, NppesData>();
+  if (npis.length === 0) return map;
+
+  const npiList = npis.map((n) => `"${n}"`).join(',');
+  try {
+    const rows: any[] = await db(
+      `providers?npi=in.(${npiList})&select=npi,first_name,last_name,organization_name,entity_type_code,phone,city,state,primary_taxonomy_code,taxonomy_desc`,
+    );
+    for (const r of rows) {
+      map.set(r.npi, {
+        npi: r.npi,
+        first_name: r.first_name || '',
+        last_name: r.last_name || '',
+        organization_name: r.organization_name || '',
+        entity_type_code: r.entity_type_code || '1',
+        phone: r.phone || '',
+        city: r.city || '',
+        state: r.state || '',
+        primary_taxonomy_code: r.primary_taxonomy_code || '',
+        taxonomy_desc: r.taxonomy_desc || '',
+      });
+    }
+  } catch (err) {
+    console.warn('[Scanner] Failed to fetch NPPES data for confidence scoring:', err);
+  }
+  return map;
+}
+
+/**
+ * Build PracticeContext from the practice_websites record and current associations.
+ */
+async function buildPracticeContext(
+  practiceWebsiteId: string,
+  site: { name: string | null; state: string | null },
+): Promise<PracticeContext> {
+  // Fetch current associations to count confirmed providers
+  let totalProviders = 0;
+  let confirmedCount = 0;
+  let practiceCity: string | undefined;
+  let practicePhone: string | undefined;
+  let practiceSpecialties: string[] = [];
+
+  try {
+    const assocs: any[] = await db(
+      `practice_providers?practice_website_id=eq.${practiceWebsiteId}&select=npi,status,confidence_tier,web_phone,web_specialty`,
+    );
+    totalProviders = assocs.length;
+    confirmedCount = assocs.filter(
+      (a) => a.confidence_tier === 'confirmed' || a.status === 'VERIFIED',
+    ).length;
+
+    // Collect unique specialties from existing providers
+    const specSet = new Set<string>();
+    for (const a of assocs) {
+      if (a.web_specialty) specSet.add(a.web_specialty);
+    }
+    practiceSpecialties = [...specSet];
+
+    // Get practice-level phone/city from the first provider with data
+    const withPhone = assocs.find((a: any) => a.web_phone);
+    if (withPhone) practicePhone = withPhone.web_phone;
+  } catch (err) {
+    console.warn('[Scanner] Failed to fetch practice context:', err);
+  }
+
+  // Try to get city from practice_websites or first NPPES record
+  try {
+    const pw: any[] = await db(
+      `practice_websites?id=eq.${practiceWebsiteId}&select=city`,
+    );
+    if (pw[0]?.city) practiceCity = pw[0].city;
+  } catch {
+    // city column may not exist yet — ignore
+  }
+
+  return {
+    practice_name: site.name || '',
+    practice_state: site.state || '',
+    practice_city: practiceCity,
+    practice_phone: practicePhone,
+    practice_specialties: practiceSpecialties,
+    total_providers: totalProviders,
+    confirmed_provider_count: confirmedCount,
+  };
+}
+
+/**
+ * Score all matched providers and return a map of NPI → ConfidenceResult.
+ */
+async function scoreMatchedProviders(
+  matchedProviders: MatchedProvider[],
+  practiceWebsiteId: string,
+  site: { name: string | null; state: string | null },
+): Promise<Map<string, ConfidenceResult>> {
+  const scores = new Map<string, ConfidenceResult>();
+  if (matchedProviders.length === 0) return scores;
+
+  const npis = matchedProviders.map((m) => m.npi);
+  const [nppesMap, practiceCtx] = await Promise.all([
+    fetchNppesDataBatch(npis),
+    buildPracticeContext(practiceWebsiteId, site),
+  ]);
+
+  for (const provider of matchedProviders) {
+    const nppes = nppesMap.get(provider.npi) || null;
+    const providerData: ProviderData = {
+      npi: provider.npi,
+      provider_name: provider.name,
+      association_source: 'DETECTED',
+    };
+
+    const result = scoreProviderConfidence(providerData, nppes, practiceCtx);
+    scores.set(provider.npi, result);
+
+    console.log(
+      `[Scanner] Confidence: NPI ${provider.npi} (${provider.name}) → ` +
+        `${result.score} (${result.tier}) [${result.signals.map((s) => s.signal).join(', ')}]`,
+    );
+  }
+
+  return scores;
+}
+
 // ── practice_providers Management (Task 1.12) ────────────
 
 /**
  * Auto-populate practice_providers from scan results.
  * Handles new detections, confirmations, and departures.
+ * Now includes confidence scoring for each provider association.
  */
 async function updatePracticeProviders(
   practiceWebsiteId: string,
   matchedProviders: MatchedProvider[],
+  confidenceScores?: Map<string, ConfidenceResult>,
 ): Promise<{ newAssociations: number; departures: number }> {
   let newAssociations = 0;
   let departures = 0;
@@ -278,8 +416,31 @@ async function updatePracticeProviders(
 
   // 1. New detections: provider found on site but not in practice_providers
   for (const provider of matchedProviders) {
+    const confidence = confidenceScores?.get(provider.npi);
+
+    // Determine initial status based on confidence tier
+    // confirmed → ACTIVE (auto-insert, high confidence)
+    // unverified → UNVERIFIED (insert but flagged for review)
+    // review → REVIEW (queued, not shown on roster until approved)
+    const initialStatus = confidence
+      ? confidence.tier === 'confirmed'
+        ? 'ACTIVE'
+        : confidence.tier === 'unverified'
+          ? 'UNVERIFIED'
+          : 'REVIEW'
+      : 'UNVERIFIED';
+
+    const confidenceFields = confidence
+      ? {
+          confidence_score: confidence.score,
+          confidence_tier: confidence.tier,
+          confidence_signals: confidence.signals,
+          confidence_scored_at: now,
+        }
+      : {};
+
     if (!currentNpis.has(provider.npi)) {
-      // Insert new association
+      // Insert new association with confidence data
       await db('practice_providers', {
         method: 'POST',
         body: JSON.stringify({
@@ -287,15 +448,23 @@ async function updatePracticeProviders(
           npi: provider.npi,
           provider_name: provider.name,
           association_source: 'DETECTED',
-          status: 'UNVERIFIED',
+          status: initialStatus,
           first_detected_at: now,
           last_seen_at: now,
+          ...confidenceFields,
         }),
         headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
       });
       newAssociations++;
+
+      if (confidence && confidence.tier === 'review') {
+        console.log(
+          `[Scanner] Low-confidence detection: NPI ${provider.npi} (${provider.name}) → ` +
+            `score ${confidence.score}, queued for manual review`,
+        );
+      }
     } else {
-      // Update last_seen_at for existing associations
+      // Update last_seen_at and refresh confidence for existing associations
       const existing = current.find((c) => c.npi === provider.npi);
       if (existing) {
         await db(`practice_providers?id=eq.${existing.id}`, {
@@ -303,6 +472,7 @@ async function updatePracticeProviders(
           body: JSON.stringify({
             last_seen_at: now,
             status: existing.status === 'DEPARTED' ? 'ACTIVE' : existing.status,
+            ...confidenceFields,
           }),
         });
       }
@@ -471,8 +641,17 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
       console.warn(`[Scanner] Compliance checks failed for ${site.url}:`, err);
     }
 
-    // 4. Update practice_providers (Task 1.12)
-    await updatePracticeProviders(site.id, matched);
+    // 4. Confidence scoring + update practice_providers (Task 1.12)
+    let confidenceScores: Map<string, ConfidenceResult> | undefined;
+    try {
+      confidenceScores = await scoreMatchedProviders(matched, site.id, {
+        name: site.name,
+        state: site.state,
+      });
+    } catch (err) {
+      console.warn(`[Scanner] Confidence scoring failed for ${site.url}, proceeding without scores:`, err);
+    }
+    await updatePracticeProviders(site.id, matched, confidenceScores);
 
     // 5. Save extraction to provider_sites (for each matched NPI)
     for (const provider of matched) {
