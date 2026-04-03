@@ -186,8 +186,12 @@ export default function PricingPage() {
   const [expandedFaqs, setExpandedFaqs] = useState<Record<number, boolean>>({});
 
   const handleStartTrial = (tier: PricingTier) => {
-    if (tier.id === 'free' || tier.id === 'enterprise') {
-      window.location.href = '/contact';
+    if (tier.id === 'free') {
+      window.location.href = '/contact?type=free';
+      return;
+    }
+    if (tier.id === 'enterprise') {
+      window.location.href = '/contact?type=enterprise';
       return;
     }
     setSelectedTier(tier);

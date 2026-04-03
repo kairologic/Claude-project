@@ -54,7 +54,8 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { firstName, lastName, email, practiceName, npi } = body;
+    const { firstName, lastName, email, practiceName, npi, tier } = body;
+    const isFreeSignup = tier === 'free';
 
     // ── Validate ─────────────────────────────────────────────────────────────
     if (!firstName || !lastName || !email || !practiceName || !npi) {
@@ -178,11 +179,11 @@ export async function POST(request: NextRequest) {
         org_type: 'PRACTICE',
         contact_email: normalizedEmail,
         contact_name: contactName,
-        plan_tier: 'trial_protect',
+        plan_tier: isFreeSignup ? 'free' : 'trial_protect',
         max_practices: 1,
-        max_providers: 10,
-        is_founders_rate: foundersSlotAvailable,
-        founders_rate_locked_until: foundersSlotAvailable
+        max_providers: isFreeSignup ? 5 : 10,
+        is_founders_rate: isFreeSignup ? false : foundersSlotAvailable,
+        founders_rate_locked_until: !isFreeSignup && foundersSlotAvailable
           ? new Date(Date.now() + 365 * 86400000).toISOString()
           : null,
         signup_npi: npi,
@@ -194,8 +195,10 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create organization');
     }
 
-    // ── Start trial ──────────────────────────────────────────────────────────
-    await startTrial(orgId);
+    // ── Start trial (only for non-free signups) ─────────────────────────────
+    if (!isFreeSignup) {
+      await startTrial(orgId);
+    }
 
     // ── Link organization to practice ────────────────────────────────────────
     await db(`practice_websites?id=eq.${practiceId}`, {
@@ -244,11 +247,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'trial_created',
+      message: isFreeSignup ? 'free_account_created' : 'trial_created',
       organization_id: orgId,
       practice_id: practiceId,
-      trial_days: TRIAL_DURATION_DAYS,
-      founders_rate: foundersSlotAvailable,
+      trial_days: isFreeSignup ? null : TRIAL_DURATION_DAYS,
+      founders_rate: isFreeSignup ? false : foundersSlotAvailable,
+      tier: isFreeSignup ? 'free' : 'trial_protect',
     });
 
   } catch (err) {
