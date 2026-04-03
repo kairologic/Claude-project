@@ -3,7 +3,7 @@
 KairoLogic AI Evaluator Node
 =============================
 Principal Software Architect review gate for pull requests.
-Sends the git diff to Claude Opus 4.6 with a strict system prompt,
+Sends the git diff to Claude with a strict system prompt,
 parses the structured response, and exits non-zero on FAIL to block merge.
 
 Usage:
