@@ -61,6 +61,14 @@ export default function HeaderBar({
   const [createdWorkflowId, setCreatedWorkflowId] = useState<string | null>(null);
   const [assessmentOutput, setAssessmentOutput] = useState<AssessmentOutput | null>(null);
   const [assessing, setAssessing] = useState(false);
+  const [providerLimit, setProviderLimit] = useState<{
+    currentCount: number;
+    maxProviders: number;
+    canAdd: boolean;
+    remaining: number;
+    planTier: string;
+  } | null>(null);
+  const [limitChecking, setLimitChecking] = useState(false);
 
   useEffect(() => {
     const now = new Date();
@@ -73,6 +81,24 @@ export default function HeaderBar({
       }),
     );
   }, []);
+
+  // Fetch provider limit when modal opens
+  const checkProviderLimit = useCallback(async () => {
+    if (!practiceId) return;
+    setLimitChecking(true);
+    try {
+      const res = await fetch(`/api/providers/check-limit?practiceId=${practiceId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProviderLimit(data);
+      }
+    } catch {
+      // Non-blocking — allow add if check fails
+      setProviderLimit(null);
+    } finally {
+      setLimitChecking(false);
+    }
+  }, [practiceId]);
 
   function resetModal() {
     setNpiInput('');
@@ -175,6 +201,17 @@ export default function HeaderBar({
     setAdding(true);
 
     try {
+      // Server-side provider limit check (safety net)
+      const limitRes = await fetch(`/api/providers/check-limit?practiceId=${practiceId}`);
+      if (limitRes.ok) {
+        const limitData = await limitRes.json();
+        if (!limitData.canAdd) {
+          setError(`Provider limit reached (${limitData.currentCount}/${limitData.maxProviders}). Upgrade your plan to add more providers.`);
+          setAdding(false);
+          return;
+        }
+      }
+
       const supabase = createBrowserSupabaseClient();
 
       // Use assessment-generated tasks, or fallback to minimal tasks if assessment failed
@@ -353,7 +390,7 @@ export default function HeaderBar({
         <div style={styles.right}>
           {practiceId && <NLSearchModal practiceId={practiceId} />}
           <span style={styles.date}>{dateStr}</span>
-          <button onClick={() => setShowAddModal(true)} style={styles.addBtn}>
+          <button onClick={() => { setShowAddModal(true); checkProviderLimit(); }} style={styles.addBtn}>
             <span style={{ fontSize: 14 }}>+</span> Add provider
           </button>
           <div style={styles.status}>
@@ -424,6 +461,56 @@ export default function HeaderBar({
 
             {/* Modal body */}
             <div style={{ padding: 20 }}>
+              {/* Provider limit warning/block */}
+              {providerLimit && !providerLimit.canAdd && (
+                <div style={{
+                  padding: '14px 16px',
+                  background: '#FEF3C7',
+                  border: '1px solid #F59E0B',
+                  borderRadius: 10,
+                  marginBottom: 16,
+                }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#92400E', marginBottom: 4 }}>
+                    Provider limit reached
+                  </div>
+                  <div style={{ fontSize: 13, color: '#92400E', lineHeight: 1.5 }}>
+                    Your {providerLimit.planTier === 'free' ? 'Free' : providerLimit.planTier === 'trial_protect' ? 'Trial' : providerLimit.planTier.charAt(0).toUpperCase() + providerLimit.planTier.slice(1)} plan
+                    supports up to {providerLimit.maxProviders} providers.
+                    You currently have {providerLimit.currentCount} active provider{providerLimit.currentCount !== 1 ? 's' : ''}.
+                  </div>
+                  <a
+                    href="/pricing"
+                    style={{
+                      display: 'inline-block',
+                      marginTop: 10,
+                      padding: '8px 16px',
+                      background: '#D4A017',
+                      color: '#fff',
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Upgrade Plan
+                  </a>
+                </div>
+              )}
+              {providerLimit && providerLimit.canAdd && providerLimit.remaining <= 2 && providerLimit.remaining > 0 && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: '#FEF9E7',
+                  border: '1px solid #FBBF24',
+                  borderRadius: 8,
+                  marginBottom: 12,
+                  fontSize: 12,
+                  color: '#92400E',
+                }}>
+                  {providerLimit.remaining} provider slot{providerLimit.remaining !== 1 ? 's' : ''} remaining on your plan.{' '}
+                  <a href="/pricing" style={{ color: '#D4A017', fontWeight: 600 }}>Upgrade</a>
+                </div>
+              )}
+
               {!addSuccess ? (
                 <>
                   {/* NPI input */}
@@ -650,19 +737,19 @@ export default function HeaderBar({
                       >
                         <button
                           onClick={handleAddProvider}
-                          disabled={adding || assessing}
+                          disabled={adding || assessing || (providerLimit !== null && !providerLimit.canAdd)}
                           style={{
                             width: '100%',
                             padding: '10px',
-                            background: colors.navy,
+                            background: (providerLimit !== null && !providerLimit.canAdd) ? colors.gray300 : colors.navy,
                             color: '#fff',
                             border: 'none',
                             borderRadius: 8,
                             fontSize: 13,
                             fontWeight: 700,
-                            cursor: adding || assessing ? 'wait' : 'pointer',
+                            cursor: adding || assessing || (providerLimit !== null && !providerLimit.canAdd) ? 'not-allowed' : 'pointer',
                             fontFamily: 'inherit',
-                            opacity: adding || assessing ? 0.6 : 1,
+                            opacity: adding || assessing || (providerLimit !== null && !providerLimit.canAdd) ? 0.6 : 1,
                           }}
                         >
                           {adding

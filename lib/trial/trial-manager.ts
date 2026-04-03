@@ -38,7 +38,7 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
 
 // ── Plan Tiers ───────────────────────────────────────────
 
-export type PlanTier = 'free' | 'trial_protect' | 'monitor' | 'protect' | 'command';
+export type PlanTier = 'free' | 'trial_protect' | 'monitor' | 'protect' | 'command' | 'small' | 'medium' | 'enterprise';
 export type TrialStatus = 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'CONVERTED' | 'CHURNED' | 'NONE';
 
 export const TRIAL_DURATION_DAYS = 21;
@@ -370,6 +370,58 @@ const TIER_GATES: Record<PlanTier, FeatureGates> = {
     api_access: true,
     max_locations: 999,
   },
+  // ── New pricing tiers (practice-size bands) ──
+  small: {
+    dashboard_view: true,
+    findings_visible: true,
+    field_diffs: true,
+    forms_single: true,
+    forms_bulk: true,
+    forms_first_free: true,
+    auto_confirmation: true,
+    alert_emails: true,
+    roster_surveillance: true,
+    state_regulatory: true,
+    license_monitoring: false,
+    sanctions_screening: false,
+    multi_location: true,
+    api_access: false,
+    max_locations: 3,
+  },
+  medium: {
+    dashboard_view: true,
+    findings_visible: true,
+    field_diffs: true,
+    forms_single: true,
+    forms_bulk: true,
+    forms_first_free: true,
+    auto_confirmation: true,
+    alert_emails: true,
+    roster_surveillance: true,
+    state_regulatory: true,
+    license_monitoring: true,
+    sanctions_screening: false,
+    multi_location: true,
+    api_access: false,
+    max_locations: 10,
+  },
+  enterprise: {
+    dashboard_view: true,
+    findings_visible: true,
+    field_diffs: true,
+    forms_single: true,
+    forms_bulk: true,
+    forms_first_free: true,
+    auto_confirmation: true,
+    alert_emails: true,
+    roster_surveillance: true,
+    state_regulatory: true,
+    license_monitoring: true,
+    sanctions_screening: true,
+    multi_location: true,
+    api_access: true,
+    max_locations: 999,
+  },
 };
 
 export function getFeatureGates(tier: PlanTier): FeatureGates {
@@ -406,13 +458,21 @@ export async function checkFeatureAccess(
     return { allowed: true };
   }
 
-  // Determine minimum tier needed
-  const tierOrder: PlanTier[] = ['monitor', 'protect', 'command'];
+  // Determine minimum tier needed (check new pricing tiers first, then legacy)
+  const tierOrder: PlanTier[] = ['small', 'medium', 'enterprise', 'monitor', 'protect', 'command'];
+  const tierNames: Record<string, string> = {
+    small: 'Small Practice',
+    medium: 'Medium Practice',
+    enterprise: 'Enterprise',
+    monitor: 'Monitor',
+    protect: 'Protect',
+    command: 'Command',
+  };
   for (const tier of tierOrder) {
     if ((TIER_GATES[tier] as any)[feature]) {
       return {
         allowed: false,
-        reason: `This feature requires the ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan.`,
+        reason: `This feature requires the ${tierNames[tier] || tier} plan.`,
         upgrade_tier: tier,
       };
     }

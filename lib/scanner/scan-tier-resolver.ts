@@ -11,6 +11,13 @@ export type ScanTier = 'monthly' | 'weekly' | 'daily';
  */
 export function resolveScanTier(subscriptionTier: string | null): ScanTier {
   switch (subscriptionTier) {
+    // New pricing tiers
+    case 'small':
+    case 'medium':
+    case 'enterprise':
+    case 'trial_protect':
+      return 'daily';
+    // Legacy tiers
     case 'shield-enterprise':
       return 'daily';
     case 'shield-practice':
@@ -18,10 +25,13 @@ export function resolveScanTier(subscriptionTier: string | null): ScanTier {
     case 'safe-harbor':
     case 'report':
     case 'snapshot':
+    case 'command':
+    case 'protect':
+    case 'monitor':
       return 'weekly';
     case 'free':
     default:
-      return 'monthly';
+      return 'weekly'; // free tier gets weekly scans (Medicare + 2 payers)
   }
 }
 
