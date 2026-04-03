@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
   Users,
@@ -13,6 +13,14 @@ import {
   X,
   Download,
   Eye,
+  ChevronRight,
+  ChevronLeft,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  Search,
+  Save,
+  Clock,
 } from 'lucide-react';
 import { colors } from '@/lib/design-tokens';
 
@@ -46,6 +54,55 @@ interface PreviewData {
   rows: Array<Record<string, unknown>>;
   totalRows: number;
 }
+
+/* ── Data Explorer field definitions ── */
+interface FieldDef {
+  id: string;
+  label: string;
+  category: string;
+  description: string;
+}
+
+const FIELD_CATEGORIES = [
+  { id: 'provider', label: 'Provider Info', icon: '👤' },
+  { id: 'payer', label: 'Payer Directory', icon: '🏥' },
+  { id: 'compliance', label: 'Compliance', icon: '✓' },
+  { id: 'workflow', label: 'Workflows', icon: '⚡' },
+  { id: 'alert', label: 'Alerts', icon: '🔔' },
+];
+
+const AVAILABLE_FIELDS: FieldDef[] = [
+  // Provider Info
+  { id: 'provider_name', label: 'Provider Name', category: 'provider', description: 'Full name of the provider' },
+  { id: 'npi', label: 'NPI', category: 'provider', description: 'National Provider Identifier' },
+  { id: 'specialty', label: 'Specialty', category: 'provider', description: 'Primary specialty or taxonomy' },
+  { id: 'phone', label: 'Phone', category: 'provider', description: 'Practice phone number' },
+  { id: 'address', label: 'Address', category: 'provider', description: 'Practice address' },
+  { id: 'roster_status', label: 'Roster Status', category: 'provider', description: 'Active, onboarding, or departed' },
+  { id: 'credential', label: 'Credential', category: 'provider', description: 'Credential suffix (MD, DO, etc.)' },
+  { id: 'last_seen_at', label: 'Last Seen', category: 'provider', description: 'Last time detected on website' },
+  // Payer Directory
+  { id: 'payer_name', label: 'Payer Name', category: 'payer', description: 'Insurance company name' },
+  { id: 'listed_status', label: 'Listed Status', category: 'payer', description: 'Whether provider is listed in directory' },
+  { id: 'listed_address', label: 'Payer Listed Address', category: 'payer', description: 'Address shown in payer directory' },
+  { id: 'listed_phone', label: 'Payer Listed Phone', category: 'payer', description: 'Phone shown in payer directory' },
+  { id: 'listed_specialty', label: 'Payer Listed Specialty', category: 'payer', description: 'Specialty shown in payer directory' },
+  { id: 'last_synced', label: 'Last Payer Sync', category: 'payer', description: 'When directory was last checked' },
+  // Compliance
+  { id: 'compliance_finding', label: 'Finding', category: 'compliance', description: 'Compliance requirement or finding' },
+  { id: 'compliance_status', label: 'Compliance Status', category: 'compliance', description: 'Open, remediated, or N/A' },
+  { id: 'compliance_severity', label: 'Severity', category: 'compliance', description: 'Critical, high, medium, or low' },
+  // Workflows
+  { id: 'workflow_type', label: 'Workflow Type', category: 'workflow', description: 'Type of workflow (onboarding, payer, etc.)' },
+  { id: 'workflow_status', label: 'Workflow Status', category: 'workflow', description: 'Active, completed, or cancelled' },
+  { id: 'workflow_created', label: 'Workflow Created', category: 'workflow', description: 'When workflow was started' },
+  { id: 'task_count', label: 'Task Count', category: 'workflow', description: 'Number of tasks in workflow' },
+  // Alerts
+  { id: 'alert_title', label: 'Alert Title', category: 'alert', description: 'Summary of the alert' },
+  { id: 'alert_severity', label: 'Alert Severity', category: 'alert', description: 'Critical, warning, or info' },
+  { id: 'alert_source', label: 'Alert Source', category: 'alert', description: 'What triggered the alert' },
+  { id: 'alert_created', label: 'Alert Date', category: 'alert', description: 'When alert was created' },
+];
 
 const REPORT_TYPES: ReportType[] = [
   {
@@ -208,16 +265,17 @@ export default function ReportsPage() {
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([]);
 
-  // Data Explorer state
-  const [filters, setFilters] = useState<
-    Array<{ source: string; field: string; operator: string; value: unknown }>
-  >([]);
-  const [filterLogic, setFilterLogic] = useState<'AND' | 'OR'>('AND');
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  // Data Explorer state — two-column field picker
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [fieldSearch, setFieldSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [groupBy, setGroupBy] = useState<string>('');
   const [explorerResults, setExplorerResults] = useState<unknown[]>([]);
   const [explorerLoading, setExplorerLoading] = useState(false);
+  const [reportName, setReportName] = useState('');
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   useEffect(() => {
     loadScheduledReports();
@@ -301,7 +359,52 @@ export default function ReportsPage() {
     }
   }
 
+  // Field picker helpers
+  function addField(fieldId: string) {
+    if (!selectedFields.includes(fieldId)) {
+      setSelectedFields(prev => [...prev, fieldId]);
+    }
+  }
+
+  function removeField(fieldId: string) {
+    setSelectedFields(prev => prev.filter(f => f !== fieldId));
+    if (sortBy === fieldId) setSortBy('');
+    if (groupBy === fieldId) setGroupBy('');
+  }
+
+  function moveField(fieldId: string, direction: 'up' | 'down') {
+    setSelectedFields(prev => {
+      const idx = prev.indexOf(fieldId);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= next.length) return prev;
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }
+
+  function addAllInCategory(categoryId: string) {
+    const catFields = AVAILABLE_FIELDS.filter(f => f.category === categoryId).map(f => f.id);
+    setSelectedFields(prev => [...prev, ...catFields.filter(id => !prev.includes(id))]);
+  }
+
+  const filteredAvailableFields = AVAILABLE_FIELDS.filter(f => {
+    if (selectedFields.includes(f.id)) return false;
+    if (activeCategory !== 'all' && f.category !== activeCategory) return false;
+    if (fieldSearch) {
+      const q = fieldSearch.toLowerCase();
+      return f.label.toLowerCase().includes(q) || f.description.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const selectedFieldDefs = selectedFields
+    .map(id => AVAILABLE_FIELDS.find(f => f.id === id))
+    .filter(Boolean) as FieldDef[];
+
   async function handleExplorerSearch() {
+    if (selectedFields.length === 0) return;
     setExplorerLoading(true);
     try {
       const response = await fetch('/api/reports/data-explorer', {
@@ -309,10 +412,9 @@ export default function ReportsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           practice_id: practiceId,
-          filters,
-          filterLogic,
-          columns: selectedColumns,
+          columns: selectedFields,
           sortBy,
+          sortDir,
           groupBy,
         }),
       });
@@ -329,14 +431,15 @@ export default function ReportsPage() {
 
   function downloadExplorerCSV() {
     if (!explorerResults.length) return;
-    const headers = Object.keys(explorerResults[0] as Record<string, unknown>);
+    const headers = selectedFieldDefs.map(f => f.label);
+    const fieldIds = selectedFields;
     const csv = [
       headers.join(','),
       ...explorerResults.map((row) =>
-        headers
+        fieldIds
           .map((h) => {
             const val = (row as Record<string, unknown>)[h];
-            const str = typeof val === 'string' ? val : JSON.stringify(val);
+            const str = val == null ? '' : typeof val === 'string' ? val : JSON.stringify(val);
             return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
           })
           .join(','),
@@ -346,7 +449,7 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `data-explorer-${Date.now()}.csv`;
+    a.download = `${reportName || 'custom-report'}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -422,230 +525,305 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Data Explorer Tab */}
+      {/* Data Explorer Tab — two-column field picker */}
       {activeTab === 'explorer' && (
         <div style={styles.tabContent}>
-          <div style={styles.explorerSection}>
-            <div style={styles.explorerPanel}>
-              <div style={styles.panelTitle}>Filters</div>
+          {/* Instruction hint */}
+          <div style={ex.hint}>
+            Pick the fields you want in your report from the left, then click <strong>Run Report</strong>.
+          </div>
 
-              {filters.map((filter, idx) => (
-                <div key={idx} style={styles.filterRow}>
-                  <input
-                    type="text"
-                    placeholder="Source"
-                    value={filter.source}
-                    onChange={(e) =>
-                      setFilters((prev) => {
-                        const updated = [...prev];
-                        updated[idx].source = e.target.value;
-                        return updated;
-                      })
-                    }
-                    style={styles.filterInput}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Field"
-                    value={filter.field}
-                    onChange={(e) =>
-                      setFilters((prev) => {
-                        const updated = [...prev];
-                        updated[idx].field = e.target.value;
-                        return updated;
-                      })
-                    }
-                    style={styles.filterInput}
-                  />
-                  <select
-                    value={filter.operator}
-                    onChange={(e) =>
-                      setFilters((prev) => {
-                        const updated = [...prev];
-                        updated[idx].operator = e.target.value;
-                        return updated;
-                      })
-                    }
-                    style={styles.filterInput}
-                  >
-                    <option>equals</option>
-                    <option>contains</option>
-                    <option>starts with</option>
-                    <option>greater than</option>
-                    <option>less than</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Value"
-                    value={String(filter.value)}
-                    onChange={(e) =>
-                      setFilters((prev) => {
-                        const updated = [...prev];
-                        updated[idx].value = e.target.value;
-                        return updated;
-                      })
-                    }
-                    style={styles.filterInput}
-                  />
-                  <button
-                    onClick={() => setFilters((prev) => prev.filter((_, i) => i !== idx))}
-                    style={styles.removeFilterBtn}
-                  >
-                    ✕
+          <div style={ex.twoCol}>
+            {/* ── LEFT: Available Fields ── */}
+            <div style={ex.panel}>
+              <div style={ex.panelHeader}>
+                <span style={ex.panelLabel}>Available Fields</span>
+                <span style={ex.fieldCount}>{filteredAvailableFields.length}</span>
+              </div>
+
+              {/* Search */}
+              <div style={ex.searchWrap}>
+                <Search size={14} style={{ color: colors.gray400, flexShrink: 0 }} />
+                <input
+                  type="text"
+                  placeholder="Search fields..."
+                  value={fieldSearch}
+                  onChange={(e) => setFieldSearch(e.target.value)}
+                  style={ex.searchInput}
+                />
+                {fieldSearch && (
+                  <button onClick={() => setFieldSearch('')} style={ex.clearSearch}>
+                    <X size={12} />
                   </button>
-                </div>
-              ))}
-
-              <button
-                onClick={() =>
-                  setFilters((prev) => [
-                    ...prev,
-                    { source: '', field: '', operator: 'equals', value: '' },
-                  ])
-                }
-                style={styles.addFilterBtn}
-              >
-                + Add Filter
-              </button>
-
-              {filters.length > 0 && (
-                <div style={styles.filterLogicToggle}>
-                  <button
-                    onClick={() => setFilterLogic('AND')}
-                    style={{
-                      ...styles.logicBtn,
-                      background: filterLogic === 'AND' ? colors.gold : colors.gray100,
-                      color: filterLogic === 'AND' ? colors.navy : colors.gray400,
-                    }}
-                  >
-                    AND
-                  </button>
-                  <button
-                    onClick={() => setFilterLogic('OR')}
-                    style={{
-                      ...styles.logicBtn,
-                      background: filterLogic === 'OR' ? colors.gold : colors.gray100,
-                      color: filterLogic === 'OR' ? colors.navy : colors.gray400,
-                    }}
-                  >
-                    OR
-                  </button>
-                </div>
-              )}
-
-              <div style={styles.divider} />
-
-              <div style={styles.panelTitle}>Columns</div>
-              <div style={styles.columnCheckboxes}>
-                {['provider_id', 'provider_name', 'specialty', 'status', 'last_updated'].map(
-                  (col) => (
-                    <label key={col} style={styles.checkbox}>
-                      <input
-                        type="checkbox"
-                        checked={selectedColumns.includes(col)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedColumns((prev) => [...prev, col]);
-                          } else {
-                            setSelectedColumns((prev) => prev.filter((c) => c !== col));
-                          }
-                        }}
-                      />
-                      {col}
-                    </label>
-                  ),
                 )}
               </div>
 
-              <div style={styles.divider} />
+              {/* Category filter pills */}
+              <div style={ex.catPills}>
+                <button
+                  onClick={() => setActiveCategory('all')}
+                  style={{
+                    ...ex.catPill,
+                    background: activeCategory === 'all' ? colors.navy : colors.gray100,
+                    color: activeCategory === 'all' ? '#fff' : colors.navy,
+                  }}
+                >
+                  All
+                </button>
+                {FIELD_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    style={{
+                      ...ex.catPill,
+                      background: activeCategory === cat.id ? colors.navy : colors.gray100,
+                      color: activeCategory === cat.id ? '#fff' : colors.navy,
+                    }}
+                  >
+                    <span style={{ fontSize: 12 }}>{cat.icon}</span> {cat.label}
+                  </button>
+                ))}
+              </div>
 
-              <div style={styles.panelTitle}>Sort & Group</div>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                style={styles.filterInput}
-              >
-                <option value="">Sort by...</option>
-                <option value="provider_name">Provider Name</option>
-                <option value="status">Status</option>
-                <option value="last_updated">Last Updated</option>
-              </select>
-
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
-                style={styles.filterInput}
-              >
-                <option value="">Group by...</option>
-                <option value="specialty">Specialty</option>
-                <option value="status">Status</option>
-              </select>
-
-              <button onClick={handleExplorerSearch} style={styles.searchBtn}>
-                {explorerLoading ? (
-                  <>
-                    <Loader2 size={14} style={{ marginRight: 6 }} />
-                    Searching...
-                  </>
-                ) : (
-                  'Search'
+              {/* Field list — grouped by category */}
+              <div style={ex.fieldList}>
+                {(activeCategory === 'all' ? FIELD_CATEGORIES : FIELD_CATEGORIES.filter(c => c.id === activeCategory)).map(cat => {
+                  const catFields = filteredAvailableFields.filter(f => f.category === cat.id);
+                  if (catFields.length === 0) return null;
+                  return (
+                    <div key={cat.id}>
+                      <div style={ex.catHeader}>
+                        <span>{cat.icon} {cat.label}</span>
+                        <button
+                          onClick={() => addAllInCategory(cat.id)}
+                          style={ex.addAllBtn}
+                        >
+                          Add all
+                        </button>
+                      </div>
+                      {catFields.map(field => (
+                        <button
+                          key={field.id}
+                          onClick={() => addField(field.id)}
+                          style={ex.fieldItem}
+                          title={field.description}
+                        >
+                          <div>
+                            <div style={ex.fieldName}>{field.label}</div>
+                            <div style={ex.fieldDesc}>{field.description}</div>
+                          </div>
+                          <ChevronRight size={14} style={{ color: colors.gray400, flexShrink: 0 }} />
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+                {filteredAvailableFields.length === 0 && (
+                  <div style={ex.emptyFields}>
+                    {selectedFields.length === AVAILABLE_FIELDS.length
+                      ? 'All fields selected'
+                      : 'No fields match your search'}
+                  </div>
                 )}
-              </button>
+              </div>
             </div>
 
-            {/* Results */}
-            {explorerResults.length > 0 && (
-              <div style={styles.explorerResults}>
-                <div style={styles.resultCount}>{explorerResults.length} results</div>
-                <div style={styles.tableWrapper}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr style={styles.tableHeader}>
-                        {Object.keys(explorerResults[0] as Record<string, unknown>).map((col) => (
-                          <th key={col} style={styles.tableHeaderCell}>
-                            {col}
-                          </th>
+            {/* ── RIGHT: Selected Fields + Options ── */}
+            <div style={ex.panel}>
+              <div style={ex.panelHeader}>
+                <span style={ex.panelLabel}>Your Report Columns</span>
+                <span style={ex.fieldCount}>{selectedFields.length}</span>
+              </div>
+
+              {selectedFields.length === 0 ? (
+                <div style={ex.emptySelected}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>←</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: colors.navy }}>
+                    Click fields on the left to add them
+                  </div>
+                  <div style={{ fontSize: 11, color: colors.gray400, marginTop: 4 }}>
+                    Fields appear as columns in your report
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Selected field list with reorder */}
+                  <div style={ex.selectedList}>
+                    {selectedFieldDefs.map((field, idx) => (
+                      <div key={field.id} style={ex.selectedItem}>
+                        <div style={ex.selectedGrip}>
+                          <GripVertical size={14} style={{ color: colors.gray400 }} />
+                        </div>
+                        <div style={ex.selectedInfo}>
+                          <span style={ex.selectedName}>{field.label}</span>
+                          <span style={ex.selectedCat}>
+                            {FIELD_CATEGORIES.find(c => c.id === field.category)?.icon}{' '}
+                            {FIELD_CATEGORIES.find(c => c.id === field.category)?.label}
+                          </span>
+                        </div>
+                        <div style={ex.selectedActions}>
+                          <button
+                            onClick={() => moveField(field.id, 'up')}
+                            disabled={idx === 0}
+                            style={{
+                              ...ex.moveBtn,
+                              opacity: idx === 0 ? 0.3 : 1,
+                            }}
+                            title="Move up"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            onClick={() => moveField(field.id, 'down')}
+                            disabled={idx === selectedFieldDefs.length - 1}
+                            style={{
+                              ...ex.moveBtn,
+                              opacity: idx === selectedFieldDefs.length - 1 ? 0.3 : 1,
+                            }}
+                            title="Move down"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                          <button
+                            onClick={() => removeField(field.id)}
+                            style={ex.removeBtn}
+                            title="Remove field"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Sort & Group */}
+                  <div style={ex.optionsBar}>
+                    <div style={ex.optionGroup}>
+                      <label style={ex.optionLabel}>Sort by</label>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          style={ex.optionSelect}
+                        >
+                          <option value="">None</option>
+                          {selectedFieldDefs.map(f => (
+                            <option key={f.id} value={f.id}>{f.label}</option>
+                          ))}
+                        </select>
+                        {sortBy && (
+                          <button
+                            onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                            style={ex.sortDirBtn}
+                            title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+                          >
+                            {sortDir === 'asc' ? '↑ A-Z' : '↓ Z-A'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div style={ex.optionGroup}>
+                      <label style={ex.optionLabel}>Group by</label>
+                      <select
+                        value={groupBy}
+                        onChange={(e) => setGroupBy(e.target.value)}
+                        style={ex.optionSelect}
+                      >
+                        <option value="">None</option>
+                        {selectedFieldDefs.map(f => (
+                          <option key={f.id} value={f.id}>{f.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={ex.actionBar}>
+                    <button
+                      onClick={handleExplorerSearch}
+                      disabled={explorerLoading}
+                      style={ex.runBtn}
+                    >
+                      {explorerLoading ? (
+                        <><Loader2 size={14} style={{ marginRight: 6 }} /> Running...</>
+                      ) : (
+                        <><Eye size={14} style={{ marginRight: 6 }} /> Run Report</>
+                      )}
+                    </button>
+                    <button onClick={downloadExplorerCSV} style={ex.exportBtn} disabled={explorerResults.length === 0}>
+                      <Download size={14} style={{ marginRight: 4 }} /> Export CSV
+                    </button>
+                    <button
+                      onClick={() => setShowSaveModal(true)}
+                      style={ex.saveBtn}
+                    >
+                      <Save size={14} style={{ marginRight: 4 }} /> Save
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Clear all */}
+              {selectedFields.length > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedFields([]);
+                    setExplorerResults([]);
+                    setSortBy('');
+                    setGroupBy('');
+                  }}
+                  style={ex.clearAllBtn}
+                >
+                  Clear all fields
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Results table */}
+          {explorerResults.length > 0 && (
+            <div style={ex.resultsPanel}>
+              <div style={ex.resultsHeader}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>
+                  Results
+                </span>
+                <span style={ex.resultsBadge}>{explorerResults.length} rows</span>
+              </div>
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.tableHeader}>
+                      {selectedFieldDefs.map(f => (
+                        <th key={f.id} style={styles.tableHeaderCell}>{f.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {explorerResults.slice(0, 50).map((row, i) => (
+                      <tr
+                        key={i}
+                        style={i % 2 === 0 ? styles.tableRow : { ...styles.tableRow, background: colors.gray100 }}
+                      >
+                        {selectedFields.map(fId => (
+                          <td key={fId} style={styles.tableCell}>
+                            {(() => {
+                              const val = (row as Record<string, unknown>)[fId];
+                              return val == null ? '—' : typeof val === 'object' ? JSON.stringify(val) : String(val);
+                            })()}
+                          </td>
                         ))}
                       </tr>
-                    </thead>
-                    <tbody>
-                      {explorerResults.map((row, i) => (
-                        <tr
-                          key={i}
-                          style={
-                            i % 2 === 0
-                              ? styles.tableRow
-                              : { ...styles.tableRow, background: colors.gray100 }
-                          }
-                        >
-                          {Object.values(row as Record<string, unknown>).map((val, j) => (
-                            <td key={j} style={styles.tableCell}>
-                              {typeof val === 'object' ? JSON.stringify(val) : String(val)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div style={styles.actionButtons}>
-                  <button onClick={downloadExplorerCSV} style={styles.button}>
-                    Download CSV
-                  </button>
-                  <button
-                    style={{
-                      ...styles.button,
-                      background: colors.gold,
-                      color: colors.navy,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Save as Report
-                  </button>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
+              {explorerResults.length > 50 && (
+                <div style={{ fontSize: 11, color: colors.gray400, padding: '8px 0' }}>
+                  Showing first 50 of {explorerResults.length} rows. Export CSV for full data.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -938,122 +1116,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
     transition: 'background .15s',
   },
-  explorerSection: {
-    display: 'grid',
-    gridTemplateColumns: '280px 1fr',
-    gap: 20,
-  },
-  explorerPanel: {
-    background: colors.white,
-    borderRadius: 12,
-    padding: 16,
-    border: `1px solid ${colors.gray200}`,
-    height: 'fit-content',
-  },
-  panelTitle: {
-    fontSize: 12,
-    fontWeight: 700,
-    color: colors.navy,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  filterRow: {
-    display: 'flex',
-    gap: 6,
-    marginBottom: 8,
-  },
-  filterInput: {
-    flex: 1,
-    padding: '6px 8px',
-    border: `1px solid ${colors.gray300}`,
-    borderRadius: 4,
-    fontSize: 11,
-    fontFamily: 'inherit',
-  },
-  removeFilterBtn: {
-    padding: '6px',
-    background: 'none',
-    border: 'none',
-    color: colors.red,
-    cursor: 'pointer',
-    fontSize: 14,
-  },
-  addFilterBtn: {
-    width: '100%',
-    padding: '6px 8px',
-    background: colors.gray100,
-    border: `1px solid ${colors.gray300}`,
-    borderRadius: 4,
-    color: colors.navy,
-    fontSize: 11,
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    marginBottom: 12,
-  },
-  filterLogicToggle: {
-    display: 'flex',
-    gap: 6,
-    marginBottom: 12,
-  },
-  logicBtn: {
-    flex: 1,
-    padding: '6px 8px',
-    border: `1px solid ${colors.gray300}`,
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'background .15s',
-  },
-  divider: {
-    height: 1,
-    background: colors.gray200,
-    margin: '12px 0',
-  },
-  columnCheckboxes: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    marginBottom: 12,
-  },
-  checkbox: {
-    display: 'flex',
-    alignItems: 'center',
-    fontSize: 12,
-    color: colors.navy,
-    cursor: 'pointer',
-  },
-  searchBtn: {
-    width: '100%',
-    padding: '8px 12px',
-    background: colors.green,
-    color: colors.white,
-    border: 'none',
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    marginTop: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  explorerResults: {
-    background: colors.white,
-    borderRadius: 12,
-    border: `1px solid ${colors.gray200}`,
-    padding: 16,
-  },
-  resultCount: {
-    fontSize: 11,
-    color: colors.gray400,
-    fontWeight: 600,
-    marginBottom: 12,
-  },
+  /* old explorer styles removed — now in ex object */
   tableWrapper: {
     overflowX: 'auto',
     marginBottom: 12,
@@ -1278,5 +1341,342 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'background .15s',
+  },
+};
+
+/* ── Data Explorer styles ── */
+const ex: Record<string, React.CSSProperties> = {
+  hint: {
+    fontSize: 13,
+    color: colors.gray400,
+    marginBottom: 16,
+    lineHeight: 1.5,
+  },
+  twoCol: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 16,
+    marginBottom: 16,
+  },
+  panel: {
+    background: colors.white,
+    borderRadius: 12,
+    border: `1px solid ${colors.gray200}`,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 400,
+    maxHeight: 600,
+  },
+  panelHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '14px 16px 10px',
+    borderBottom: `1px solid ${colors.gray200}`,
+  },
+  panelLabel: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: colors.navy,
+  },
+  fieldCount: {
+    fontSize: 11,
+    fontWeight: 600,
+    background: colors.gray100,
+    color: colors.gray400,
+    padding: '2px 8px',
+    borderRadius: 10,
+  },
+  searchWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    margin: '10px 12px 6px',
+    padding: '6px 10px',
+    border: `1px solid ${colors.gray300}`,
+    borderRadius: 6,
+    background: colors.gray100,
+  },
+  searchInput: {
+    flex: 1,
+    border: 'none',
+    background: 'none',
+    fontSize: 12,
+    fontFamily: 'inherit',
+    outline: 'none',
+    color: colors.navy,
+  },
+  clearSearch: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: colors.gray400,
+    padding: 0,
+    display: 'flex',
+  },
+  catPills: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 4,
+    padding: '6px 12px 8px',
+  },
+  catPill: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '4px 10px',
+    borderRadius: 14,
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 11,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    transition: 'all .15s',
+  },
+  fieldList: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '0 6px 8px',
+  },
+  catHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 10px 4px',
+    fontSize: 11,
+    fontWeight: 700,
+    color: colors.gray400,
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
+  },
+  addAllBtn: {
+    fontSize: 10,
+    color: colors.gold,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 700,
+    fontFamily: 'inherit',
+  },
+  fieldItem: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 10px',
+    background: 'none',
+    border: 'none',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textAlign: 'left' as const,
+    transition: 'background .12s',
+  },
+  fieldName: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: colors.navy,
+  },
+  fieldDesc: {
+    fontSize: 10,
+    color: colors.gray400,
+    marginTop: 1,
+  },
+  emptyFields: {
+    padding: 24,
+    textAlign: 'center' as const,
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  emptySelected: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    textAlign: 'center' as const,
+  },
+  selectedList: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '8px 6px',
+  },
+  selectedItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '7px 8px',
+    marginBottom: 2,
+    borderRadius: 6,
+    background: colors.gray100,
+    border: `1px solid ${colors.gray200}`,
+  },
+  selectedGrip: {
+    cursor: 'grab',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  selectedInfo: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedName: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: colors.navy,
+  },
+  selectedCat: {
+    fontSize: 10,
+    color: colors.gray400,
+  },
+  selectedActions: {
+    display: 'flex',
+    gap: 2,
+    alignItems: 'center',
+  },
+  moveBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: colors.navy,
+    padding: 2,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  removeBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: colors.red,
+    padding: 2,
+    display: 'flex',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  optionsBar: {
+    display: 'flex',
+    gap: 12,
+    padding: '10px 12px',
+    borderTop: `1px solid ${colors.gray200}`,
+  },
+  optionGroup: {
+    flex: 1,
+  },
+  optionLabel: {
+    display: 'block',
+    fontSize: 10,
+    fontWeight: 700,
+    color: colors.gray400,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    marginBottom: 4,
+  },
+  optionSelect: {
+    width: '100%',
+    padding: '6px 8px',
+    border: `1px solid ${colors.gray300}`,
+    borderRadius: 4,
+    fontSize: 11,
+    fontFamily: 'inherit',
+    color: colors.navy,
+  },
+  sortDirBtn: {
+    padding: '4px 8px',
+    border: `1px solid ${colors.gray300}`,
+    borderRadius: 4,
+    background: colors.gray100,
+    fontSize: 10,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    color: colors.navy,
+    whiteSpace: 'nowrap',
+  },
+  actionBar: {
+    display: 'flex',
+    gap: 6,
+    padding: '10px 12px',
+    borderTop: `1px solid ${colors.gray200}`,
+  },
+  runBtn: {
+    flex: 2,
+    padding: '9px 12px',
+    background: colors.green,
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background .15s',
+  },
+  exportBtn: {
+    flex: 1,
+    padding: '9px 8px',
+    background: colors.gray100,
+    color: colors.navy,
+    border: `1px solid ${colors.gray300}`,
+    borderRadius: 6,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtn: {
+    flex: 1,
+    padding: '9px 8px',
+    background: colors.gold,
+    color: colors.navy,
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearAllBtn: {
+    width: '100%',
+    padding: '8px',
+    background: 'none',
+    border: 'none',
+    color: colors.red,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    borderTop: `1px solid ${colors.gray200}`,
+  },
+  resultsPanel: {
+    background: colors.white,
+    borderRadius: 12,
+    border: `1px solid ${colors.gray200}`,
+    padding: 16,
+  },
+  resultsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  resultsBadge: {
+    fontSize: 10,
+    fontWeight: 600,
+    background: `${colors.green}15`,
+    color: colors.green,
+    padding: '2px 8px',
+    borderRadius: 10,
   },
 };
