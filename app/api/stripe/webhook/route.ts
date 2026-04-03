@@ -39,8 +39,8 @@ const STRIPE_WATCH_PRICE_ID = process.env.STRIPE_WATCH_PRICE_ID || '';   // $39/
 // ── Stripe new pricing tier price IDs (practice-based) ──
 const STRIPE_SMALL_MONTHLY_PRICE_ID = 'price_1TI8I6Gg3oiiGF7ggGMO0z1i';  // $149/mo
 const STRIPE_SMALL_ANNUAL_PRICE_ID = 'price_1TI8I8Gg3oiiGF7gAmKNYWCV';  // $1490/yr
-const STRIPE_MEDIUM_MONTHLY_PRICE_ID = 'price_1TI8I9Gg3oiiGF7gFv08tpdV'; // $349/mo
-const STRIPE_MEDIUM_ANNUAL_PRICE_ID = 'price_1TI8IAGg3oiiGF7gLfHsZep4';   // $3490/yr
+const STRIPE_MEDIUM_MONTHLY_PRICE_ID = 'price_1TIH6qGg3oiiGF7gUjKWRfUG'; // $299/mo
+const STRIPE_MEDIUM_ANNUAL_PRICE_ID = 'price_1TIH6rGg3oiiGF7gC60HdQtT';   // $2990/yr
 const STRIPE_LARGE_MONTHLY_PRICE_ID = 'price_1TI8IBGg3oiiGF7gA0Pii00P';  // $549/mo
 const STRIPE_LARGE_ANNUAL_PRICE_ID = 'price_1TI8IBGg3oiiGF7gaorEvrnK';   // $5490/yr
 

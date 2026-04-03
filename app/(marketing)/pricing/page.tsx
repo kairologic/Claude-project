@@ -58,7 +58,7 @@ const pricingTiers: PricingTier[] = [
   {
     id: 'small',
     name: 'Small Practice',
-    providers: 10,
+    providers: 15,
     monthlyPrice: 149,
     annualPrice: 1490,
     monthlyPriceId: 'price_1TI8I6Gg3oiiGF7ggGMO0z1i',
@@ -66,7 +66,7 @@ const pricingTiers: PricingTier[] = [
     highlighted: false,
     description: 'For growing practices',
     features: [
-      'Up to 10 providers',
+      'Up to 15 providers',
       'Daily payer scans (UHC, Aetna, Cigna, Humana)',
       'Real-time mismatch alerts',
       'Full compliance scanning + alerts',
@@ -80,17 +80,16 @@ const pricingTiers: PricingTier[] = [
     id: 'medium',
     name: 'Medium Practice',
     providers: 25,
-    monthlyPrice: 349,
-    annualPrice: 3490,
-    monthlyPriceId: 'price_1TI8I9Gg3oiiGF7gFv08tpdV',
-    annualPriceId: 'price_1TI8IAGg3oiiGF7gLfHsZep4',
+    monthlyPrice: 299,
+    annualPrice: 2990,
+    monthlyPriceId: 'price_1TIH6qGg3oiiGF7gUjKWRfUG',
+    annualPriceId: 'price_1TIH6rGg3oiiGF7gC60HdQtT',
     highlighted: true,
     badge: 'Most Popular',
     description: 'Most practices start here',
     features: [
       'Up to 25 providers',
       'Everything in Small Practice, plus:',
-      'Workflow automation (create, assign, escalate, resolve)',
       'Credential & license tracking',
       'Team roles (admin, manager, viewer)',
       'Priority email support',
@@ -176,7 +175,7 @@ const faqs = [
   },
   {
     q: 'What payment methods do you accept?',
-    a: 'We accept all major credit cards via Stripe. For practices with 50+ providers, we also offer invoicing.',
+    a: 'We accept all major credit cards via Stripe. For practices with 25+ providers, we also offer invoicing.',
   },
 ];
 
@@ -440,7 +439,7 @@ export default function PricingPage() {
                       margin: '0 0 20px',
                       fontStyle: 'italic',
                     }}>
-                      For MSOs, health systems, and 50+ providers
+                      For MSOs, health systems, and 25+ providers
                     </p>
                   )}
 
@@ -514,7 +513,7 @@ export default function PricingPage() {
             })}
           </div>
 
-          {/* 50+ Providers CTA */}
+          {/* 25+ Providers CTA */}
           <div style={{
             marginTop: 40,
             padding: 24,
@@ -527,7 +526,7 @@ export default function PricingPage() {
               color: '#0F1E2E',
               margin: 0,
             }}>
-              Need more than 50 providers?{' '}
+              Need more than 25 providers?{' '}
               <Link
                 href="/contact"
                 style={{
@@ -724,7 +723,7 @@ export default function PricingPage() {
                       padding: '16px 12px',
                       color: '#5A6472',
                     }}>
-                      {feature.name === 'Providers' ? '10' : <CheckIcon />}
+                      {feature.name === 'Providers' ? '15' : <CheckIcon />}
                     </td>
                     <td style={{
                       textAlign: 'center',
@@ -739,7 +738,7 @@ export default function PricingPage() {
                       padding: '16px 12px',
                       color: '#5A6472',
                     }}>
-                      {feature.name === 'Providers' ? '50' : <CheckIcon />}
+                      {feature.name === 'Providers' ? 'Unlimited' : <CheckIcon />}
                     </td>
                   </tr>
                 ))}
