@@ -1,0 +1,307 @@
+name: AI Evaluator — Code Review Gate
+
+# ──────────────────────────────────────────────────────────────
+# Four-gate merge protection:
+#   Gate 1: Regression tests must pass (deterministic)
+#   Gate 2: Test suite must be updated when source changes (deterministic)
+#   Gate 3: Feature Code Documentation must be updated when source changes (deterministic)
+#   Gate 4: AI code review by Claude (architectural quality)
+#
+# All four gates must pass for the PR to be mergeable.
+# Set this workflow as a Required Status Check in branch protection.
+# ──────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: ai-evaluator-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Gate 1: Regression Tests (pipeline wiring smoke tests)
+  # Runs the 19 pipeline wiring assertions that verify
+  # critical imports and call patterns in source code.
+  # Zero DB dependency, runs in <30s.
+  # ──────────────────────────────────────────────
+  regression-tests:
+    name: 'Gate 1: Regression Tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run pipeline wiring smoke tests
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const ROOT = process.cwd();
+          function readSource(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf-8'); }
+          let passed = 0, failed = 0, errors = [];
+          function test(name, fn) {
+            try { fn(); passed++; }
+            catch(e) { failed++; errors.push(name + ': ' + e.message.split('\n')[0]); }
+          }
+          function expectMatch(src, re) { if (!re.test(src)) throw new Error('no match for ' + re); }
+          function expectNoMatch(src, re) { if (re.test(src)) throw new Error('unexpected match for ' + re); }
+
+          const ss = readSource('lib/scanner/scan-scheduler.ts');
+          test('scan-scheduler imports runDeltaDetection', () => expectMatch(ss, /import.*runDeltaDetection.*from.*delta-engine/));
+          test('scan-scheduler calls runDeltaDetection(site.id)', () => expectMatch(ss, /runDeltaDetection\s*\(\s*site\.id\s*\)/));
+          test('scan-scheduler imports workflow triggers', () => { expectMatch(ss, /triggerWorkflowsForPractice/); expectMatch(ss, /triggerPayerDirectoryWorkflows/); expectMatch(ss, /triggerLicenseRenewalWorkflows/); expectMatch(ss, /triggerComplianceWorkflows/); });
+          test('scan-scheduler delta_count from result', () => { expectMatch(ss, /delta_count:\s*result\.delta_count/); });
+
+          const ps = readSource('app/api/admin/practice-scan/route.ts');
+          test('practice-scan passes refresh:true', () => expectMatch(ps, /refresh:\s*true/));
+          test('practice-scan supports action both', () => expectMatch(ps, /action.*===.*'both'/));
+
+          const pps = readSource('app/api/admin/practice-payer-sync/route.ts');
+          test('payer-sync imports PayerDirectoryLookup', () => expectMatch(pps, /import.*PayerDirectoryLookup.*from/));
+          test('payer-sync routes SCRAPE', () => expectMatch(pps, /fhir_base_url\.startsWith\s*\(\s*'SCRAPE:'\s*\)/));
+          test('payer-sync has PAYER_ALIASES', () => { expectMatch(pps, /PAYER_ALIASES/); expectMatch(pps, /bcbs.*bcbs_tx/); });
+          test('payer-sync uses expandedAcceptedPayers', () => expectMatch(pps, /expandedAcceptedPayers/));
+
+          const dp = readSource('app/(dashboard)/practice/[id]/page.tsx');
+          test('dashboard queries payer_directory_mismatches', () => { expectMatch(dp, /payer_directory_mismatches/); });
+          test('dashboard filters PRACTICE-level', () => expectMatch(dp, /npi.*PRACTICE/));
+
+          const tw = readSource('lib/scanner/trigger-workflows.ts');
+          test('trigger-workflows optional mismatches', () => expectMatch(tw, /mismatches\?\s*:/));
+          test('trigger-workflows has triggerLicenseRenewalWorkflows', () => expectMatch(tw, /export async function triggerLicenseRenewalWorkflows/));
+          test('trigger-workflows has payer_code', () => expectMatch(tw, /payer_code:\s*string/));
+
+          const de = readSource('lib/scanner/delta-engine.ts');
+          test('delta-engine exports runDeltaDetection', () => expectMatch(de, /export async function runDeltaDetection/));
+          test('delta-engine specialty data', () => { expectMatch(de, /web_specialty/); expectMatch(de, /nppes_taxonomy/); });
+          test('delta-engine has_taxonomy_mismatch', () => expectMatch(de, /has_taxonomy_mismatch/));
+          test('delta-engine verification', () => { expectMatch(de, /verification_status/); expectMatch(de, /stampDeltaEventVerification/); });
+
+          console.log(passed + ' passed, ' + failed + ' failed');
+          if (errors.length) { console.log('FAILURES:'); errors.forEach(e => console.log('  - ' + e)); }
+          process.exit(failed > 0 ? 1 : 0);
+          "
+
+  # ──────────────────────────────────────────────
+  # Gate 2: Test Coverage Check (deterministic)
+  # Verifies that when source files change, the
+  # test suite was also updated in the same PR.
+  # ──────────────────────────────────────────────
+  test-coverage-check:
+    name: 'Gate 2: Test Suite Updated'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check test files updated with source changes
+        run: |
+          # Get changed files in this PR vs base branch
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          # Check if source files changed
+          SOURCE_CHANGED=$(echo "$CHANGED_FILES" | grep -E '^(lib/|app/|components/)' | grep -v '\.test\.' | grep -v '__tests__' || true)
+          TEST_CHANGED=$(echo "$CHANGED_FILES" | grep -E '(\.test\.|\.spec\.|tests/|__tests__/)' || true)
+
+          # Check specifically for pipeline-critical files
+          PIPELINE_FILES_CHANGED=$(echo "$SOURCE_CHANGED" | grep -E '(scan-scheduler|delta-engine|trigger-workflows|practice-scan|practice-payer-sync|payer-lookup)' || true)
+          WIRING_TEST_CHANGED=$(echo "$TEST_CHANGED" | grep -E 'pipeline-wiring' || true)
+
+          echo "=== Changed source files ==="
+          echo "$SOURCE_CHANGED"
+          echo ""
+          echo "=== Changed test files ==="
+          echo "$TEST_CHANGED"
+          echo ""
+          echo "=== Pipeline-critical files changed ==="
+          echo "$PIPELINE_FILES_CHANGED"
+
+          # Gate logic
+          if [ -n "$PIPELINE_FILES_CHANGED" ] && [ -z "$WIRING_TEST_CHANGED" ]; then
+            echo ""
+            echo "*** FAIL: Pipeline-critical source files changed but tests/regression/pipeline-wiring.test.ts was not updated ***"
+            echo "Changed pipeline files:"
+            echo "$PIPELINE_FILES_CHANGED"
+            echo ""
+            echo "Please update the pipeline wiring tests to cover your changes."
+            exit 1
+          fi
+
+          if [ -n "$SOURCE_CHANGED" ] && [ -z "$TEST_CHANGED" ]; then
+            echo ""
+            echo "*** WARNING: Source files changed but no test files were updated ***"
+            echo "This is allowed but flagged for the AI reviewer."
+            echo "TEST_COVERAGE_FLAG=warn" >> $GITHUB_ENV
+          fi
+
+          echo ""
+          echo "*** PASS: Test coverage check passed ***"
+
+  # ──────────────────────────────────────────────
+  # Gate 3: Documentation Check (deterministic)
+  # Verifies that when source files are added or
+  # modified, the Feature Code Documentation was
+  # also updated in the same PR.
+  # ──────────────────────────────────────────────
+  doc-coverage-check:
+    name: 'Gate 3: Documentation Updated'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check documentation updated with source changes
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          # Check if new features were added (new files in lib/ or app/api/)
+          NEW_SOURCE_FILES=$(git diff --diff-filter=A --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^(lib/|app/api/)' || true)
+
+          # Check if feature doc was updated
+          DOC_CHANGED=$(echo "$CHANGED_FILES" | grep -iE '(Feature.*Code.*Documentation|feature.*doc|ADDENDUM)' || true)
+
+          # Also check for any .md doc updates
+          MD_CHANGED=$(echo "$CHANGED_FILES" | grep -E '\.(md|docx)$' | grep -viE '(README|CHANGELOG|node_modules)' || true)
+
+          echo "=== New source files ==="
+          echo "$NEW_SOURCE_FILES"
+          echo ""
+          echo "=== Documentation changes ==="
+          echo "$DOC_CHANGED"
+          echo "$MD_CHANGED"
+
+          # Gate: new lib/api files require doc update
+          if [ -n "$NEW_SOURCE_FILES" ] && [ -z "$DOC_CHANGED" ] && [ -z "$MD_CHANGED" ]; then
+            NEW_COUNT=$(echo "$NEW_SOURCE_FILES" | wc -l)
+            if [ "$NEW_COUNT" -ge 2 ]; then
+              echo ""
+              echo "*** FAIL: $NEW_COUNT new source files added but Feature Code Documentation was not updated ***"
+              echo "New files:"
+              echo "$NEW_SOURCE_FILES"
+              echo ""
+              echo "Please update the Feature Code Documentation Addendum for the new feature."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "*** PASS: Documentation check passed ***"
+
+  # ──────────────────────────────────────────────
+  # Gate 4: AI Code Review (Claude)
+  # Sends the full PR diff to Claude for
+  # architectural review. Blocks on HIGH/BLOCKER.
+  # ──────────────────────────────────────────────
+  ai-review:
+    name: 'Gate 4: AI Code Review'
+    runs-on: ubuntu-latest
+    needs: [regression-tests, test-coverage-check, doc-coverage-check]
+    timeout-minutes: 10
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install anthropic SDK
+        run: pip install anthropic
+
+      - name: Generate diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > diff.txt
+          echo "Diff size: $(wc -c < diff.txt) bytes, $(wc -l < diff.txt) lines"
+
+      - name: Run AI Evaluator
+        run: |
+          python scripts/evaluator_node.py diff.txt \
+            --context-files DESIGN_PRINCIPLES.md API_ROUTES_INDEX.md
+
+      - name: Upload evaluator results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluator-result
+          path: evaluator-result.json
+          retention-days: 30
+
+      - name: Post review summary as PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let result;
+            try {
+              result = JSON.parse(fs.readFileSync('evaluator-result.json', 'utf-8'));
+            } catch (e) {
+              result = { status: 'ERROR', summary: 'Failed to parse evaluator output' };
+            }
+
+            const icon = result.status === 'PASS' ? ':white_check_mark:' : result.status === 'FAIL' ? ':x:' : ':warning:';
+            const severity = result.severity || 'UNKNOWN';
+            const issues = (result.issues || []).map(i => `- ${i}`).join('\n') || '_None_';
+            const remediation = (result.remediation || []).map(r => `- ${r}`).join('\n') || '_None_';
+
+            const body = `## ${icon} AI Evaluator: ${result.status}
+
+            **Severity:** ${severity}
+            **Summary:** ${result.summary || 'No summary'}
+            **Test Coverage:** ${result.test_coverage || 'N/A'}
+            **Doc Coverage:** ${result.doc_coverage || 'N/A'}
+
+            ### Issues
+            ${issues}
+
+            ### Remediation
+            ${remediation}
+
+            ---
+            _Reviewed by Claude ${process.env.EVALUATOR_MODEL || 'claude-sonnet-4-20250514'} | KairoLogic AI Evaluator_`;
+
+            // Find existing comment to update (avoid spam)
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const botComment = comments.find(c =>
+              c.body.includes('AI Evaluator:') && c.user.type === 'Bot'
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }

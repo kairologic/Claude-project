@@ -125,3 +125,20 @@ test.describe('Pipeline Wiring: delta-engine.ts', () => {
     expect(src).toMatch(/stampDeltaEventVerification/);
   });
 });
+
+test.describe('Pipeline Wiring: AI Evaluator', () => {
+  test('evaluator_node.py script exists', () => {
+    expect(fs.existsSync(path.join(ROOT, 'scripts/evaluator_node.py'))).toBe(true);
+  });
+
+  test('ai-evaluator workflow exists', () => {
+    expect(fs.existsSync(path.join(ROOT, '.github/workflows/ai-evaluator.yml'))).toBe(true);
+  });
+
+  test('evaluator has structured output parsing', () => {
+    const src = readSource('scripts/evaluator_node.py');
+    expect(src).toMatch(/STATUS:\s*\[PASS\|FAIL\]/);
+    expect(src).toMatch(/SEVERITY:/);
+    expect(src).toMatch(/parse_response/);
+  });
+});
