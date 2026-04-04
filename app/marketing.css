@@ -3949,7 +3949,35 @@ a.m-resource-card:hover {
   }
 }
 
-/* ── Hero Question Engine ─────────────────── */
+/* ── Hero Interactive Dashboard (unified hero) ── */
+.m-hero-interactive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  gap: 16px;
+}
+.m-dashboard-interactive {
+  width: 100%;
+  max-width: 920px;
+  margin: 24px auto 0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: #fff;
+}
+@media (max-width: 768px) {
+  .m-dashboard-interactive {
+    margin: 16px auto 0;
+    border-radius: 12px;
+  }
+}
+
+/* ── Hero Question Engine (legacy, kept for shared classes) ── */
 .m-hero-question-engine {
   display: flex;
   flex-direction: column;
@@ -3981,8 +4009,9 @@ a.m-resource-card:hover {
   padding: 12px 16px;
   border: none;
   font-size: 16px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Helvetica Neue', sans-serif;
   color: var(--m-navy);
   outline: none;
   background: transparent;
@@ -4171,8 +4200,9 @@ a.m-resource-card:hover {
   line-height: 1.6;
   color: var(--m-navy);
   margin-bottom: 24px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Helvetica Neue', sans-serif;
 }
 
 .m-hero-answer-stat {

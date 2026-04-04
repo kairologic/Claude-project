@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import DashboardHero from '@/components/marketing/DashboardHero';
-import HeroQuestionEngine from '@/components/marketing/HeroQuestionEngine';
+import HeroInteractiveDashboard from '@/components/marketing/HeroInteractiveDashboard';
 
 const ArrowIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -60,17 +59,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ═══ Interactive Question Engine ═══ */}
+        {/* ═══ Interactive Question Engine + Dashboard ═══ */}
         <div className="m-hero-dashboard-wrap">
           <div className="m-container m-container-wide">
-            <HeroQuestionEngine />
-          </div>
-        </div>
-
-        {/* Animated product dashboard (below question engine) */}
-        <div className="m-hero-dashboard-wrap" style={{ marginTop: '24px' }}>
-          <div className="m-container m-container-wide">
-            <DashboardHero />
+            <HeroInteractiveDashboard />
           </div>
         </div>
       </section>
