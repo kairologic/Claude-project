@@ -17,10 +17,11 @@ const ArrowIcon = () => (
 export default function HomePage() {
   return (
     <>
-      {/* ═══ HERO — Centered headline + animated dashboard ═══ */}
-      <section className="m-hero m-hero-v2">
-        <div className="m-container">
-          <div className="m-hero-centered">
+      {/* ═══ HERO — Side-by-side: text left, dashboard right ═══ */}
+      <section className="m-hero m-hero-split">
+        <div className="m-hero-split-inner">
+          {/* Left column — hero copy */}
+          <div className="m-hero-split-text">
             <span className="m-tag">
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.5" />
@@ -58,11 +59,9 @@ export default function HomePage() {
               infrastructure
             </div>
           </div>
-        </div>
 
-        {/* ═══ Interactive Question Engine + Dashboard ═══ */}
-        <div className="m-hero-dashboard-wrap">
-          <div className="m-container m-container-wide">
+          {/* Right column — dashboard, overflows right edge */}
+          <div className="m-hero-split-dashboard">
             <HeroInteractiveDashboard />
           </div>
         </div>
