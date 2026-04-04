@@ -23,6 +23,7 @@ import {
 } from '@/lib/design-tokens';
 import { Tooltip, EmptyState } from './ui';
 import ProviderDetailPanel from './ProviderDetailPanel';
+import { UpgradePrompt } from './TrialBanner';
 import { titleCase } from '@/lib/format-helpers';
 import { createBrowserSupabaseClient } from '@/lib/auth/auth-client';
 import { runDepartureAssessment } from '@/lib/credentialing/departure-engine';
@@ -50,6 +51,8 @@ interface ProviderRosterViewProps {
     string,
     { health_score: number; open_issues: number; specialty: string | null }
   >;
+  /** Number of providers allowed on free tier. 0 = unlimited (paid plan). */
+  providerLimit?: number;
 }
 
 export default function ProviderRosterView({
@@ -57,6 +60,7 @@ export default function ProviderRosterView({
   practiceId,
   workflowMap,
   healthMap = {},
+  providerLimit = 0,
 }: ProviderRosterViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,6 +69,7 @@ export default function ProviderRosterView({
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [selectedNpi, setSelectedNpi] = useState<string | null>(highlightNpi);
   const [departingNpi, setDepartingNpi] = useState<string | null>(null);
+  const [showUpgradeFor, setShowUpgradeFor] = useState<string | null>(null);
 
   // Scroll highlighted provider into view on mount
   useEffect(() => {
@@ -235,6 +240,14 @@ export default function ProviderRosterView({
         }}
       >
         <span>{providers.length} providers</span>
+        {providerLimit > 0 && providers.length > providerLimit && (
+          <>
+            <span>·</span>
+            <span style={{ color: colors.gold, fontWeight: 600 }}>
+              {providerLimit} managed (free plan)
+            </span>
+          </>
+        )}
         <span>·</span>
         <span>
           {providers.filter((p) => (p.active_mismatch_count || 0) > 0).length} with issues
@@ -278,7 +291,7 @@ export default function ProviderRosterView({
         </div>
 
         {/* Rows */}
-        {sorted.map((p) => {
+        {sorted.map((p, idx) => {
           const status = p.roster_status || 'active';
           const statusInfo = rosterStatusMap[status] || rosterStatusMap.active;
           const issueCount = p.active_mismatch_count || 0;
@@ -286,6 +299,7 @@ export default function ProviderRosterView({
           const avatarBg = avatarColors[status] || colors.navy;
 
           const isHighlighted = highlightNpi === p.npi;
+          const isGated = providerLimit > 0 && idx >= providerLimit;
 
           return (
             <div
@@ -304,6 +318,7 @@ export default function ProviderRosterView({
                   transition: `background ${transitions.fast}, box-shadow ${transitions.fast}`,
                   boxShadow: isHighlighted ? `inset 3px 0 0 ${colors.gold}` : 'none',
                   background: isHighlighted ? colors.goldPale : 'transparent',
+                  opacity: isGated ? 0.6 : 1,
                 }}
                 onMouseOver={(e) => {
                   (e.currentTarget as HTMLElement).style.background = colors.gray50;
@@ -313,7 +328,13 @@ export default function ProviderRosterView({
                   (e.currentTarget as HTMLElement).style.background = 'transparent';
                   (e.currentTarget as HTMLElement).style.boxShadow = 'none';
                 }}
-                onClick={() => setSelectedNpi(p.npi)}
+                onClick={() => {
+                  if (isGated) {
+                    setShowUpgradeFor(p.npi);
+                  } else {
+                    setSelectedNpi(p.npi);
+                  }
+                }}
                 role="row"
               >
                 {/* Provider name + avatar */}
@@ -432,23 +453,27 @@ export default function ProviderRosterView({
                   {statusInfo.badge}
                 </span>
 
-                {/* Action menu trigger */}
+                {/* Action menu trigger / lock icon for gated providers */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setOpenMenu(openMenu === p.id ? null : p.id);
+                    if (isGated) {
+                      setShowUpgradeFor(p.npi);
+                    } else {
+                      setOpenMenu(openMenu === p.id ? null : p.id);
+                    }
                   }}
                   style={{
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: 16,
-                    color: colors.gray400,
+                    color: isGated ? colors.gold : colors.gray400,
                     padding: `0 ${spacing.xs}px`,
                     fontFamily: 'inherit',
                   }}
                 >
-                  ⋮
+                  {isGated ? '🔒' : '⋮'}
                 </button>
               </div>
 
@@ -531,12 +556,63 @@ export default function ProviderRosterView({
         )}
       </div>
 
+      {/* Free tier cap banner */}
+      {providerLimit > 0 && sorted.length > providerLimit && (
+        <div
+          style={{
+            background: '#fffbeb',
+            border: `1px solid #fde68a`,
+            borderRadius: radii.md,
+            padding: `${spacing.sm}px ${spacing.md}px`,
+            marginTop: spacing.md,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <span style={{ ...typography.bodySmall, fontWeight: 600, color: '#92400e' }}>
+              Free plan: managing {providerLimit} of {sorted.length} providers
+            </span>
+            <span style={{ ...typography.caption, color: '#a16207', marginLeft: spacing.sm }}>
+              Upgrade to manage all providers with full access.
+            </span>
+          </div>
+          <button
+            onClick={() => setShowUpgradeFor('__plan__')}
+            style={{
+              background: colors.gold,
+              color: colors.navy,
+              border: 'none',
+              borderRadius: radii.md,
+              padding: `${spacing.xs}px ${spacing.md}px`,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Upgrade Plan
+          </button>
+        </div>
+      )}
+
       {/* Provider detail panel */}
       {selectedNpi && (
         <ProviderDetailPanel
           npi={selectedNpi}
           practiceId={practiceId}
           onClose={() => setSelectedNpi(null)}
+        />
+      )}
+
+      {/* Upgrade prompt for gated providers */}
+      {showUpgradeFor && (
+        <UpgradePrompt
+          feature="full provider management"
+          requiredTier="starter"
+          practiceId={practiceId}
+          onClose={() => setShowUpgradeFor(null)}
         />
       )}
     </div>

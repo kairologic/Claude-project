@@ -13,8 +13,8 @@ export default async function RosterPage({ params }: { params: { id: string } })
   const practiceId = params.id;
   const admin = createAdminSupabaseClient();
 
-  // Parallel queries: providers + health data
-  const [providersResult, healthResult] = await Promise.all([
+  // Parallel queries: providers + health data + org plan info
+  const [providersResult, healthResult, practiceResult] = await Promise.all([
     safeQuery(
       admin
         .from('practice_providers')
@@ -33,7 +33,25 @@ export default async function RosterPage({ params }: { params: { id: string } })
         .eq('practice_website_id', practiceId),
       [],
     ),
+    safeQuery(
+      admin.from('practice_websites').select('organization_id').eq('id', practiceId).limit(1),
+      [],
+    ),
   ]);
+
+  // Determine provider cap from org plan
+  let providerLimit = 0; // 0 = unlimited
+  const orgId = practiceResult.data?.[0]?.organization_id;
+  if (orgId) {
+    const orgResult = await safeQuery(
+      admin.from('organizations').select('plan_tier, max_providers').eq('id', orgId).limit(1),
+      [],
+    );
+    const org = orgResult.data?.[0];
+    if (org?.plan_tier === 'free' || org?.plan_tier === 'expired') {
+      providerLimit = org.max_providers || 5;
+    }
+  }
 
   const providers = providersResult.data;
   const healthData = healthResult.data;
@@ -60,6 +78,7 @@ export default async function RosterPage({ params }: { params: { id: string } })
       practiceId={practiceId}
       workflowMap={workflowMap}
       healthMap={healthMap}
+      providerLimit={providerLimit}
     />
   );
 }
