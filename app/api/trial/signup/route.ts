@@ -9,7 +9,7 @@
  *   2. Look up NPI in providers table for cross-reference
  *   3. Find or create practice_websites record
  *   4. Create organization with trial_protect tier
- *   5. Start 21-day trial via trial-manager
+ *   5. Start 14-day trial via trial-manager
  *   6. Generate dashboard access token (magic link)
  *   7. Send welcome email with dashboard link
  *   8. Queue initial scan + payer sync
@@ -18,7 +18,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as crypto from 'crypto';
-import { startTrial, FOUNDERS_RATE, TRIAL_DURATION_DAYS } from '@/lib/trial/trial-manager';
+import { startTrial, TRIAL_DURATION_DAYS } from '@/lib/trial/trial-manager';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -162,11 +162,6 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create or find practice record');
     }
 
-    // ── Check founders rate availability ─────────────────────────────────────
-    const foundersOrgs = await db(`organizations?is_founders_rate=eq.true&select=id`);
-    const foundersSlotAvailable =
-      FOUNDERS_RATE.enabled && (!foundersOrgs || foundersOrgs.length < FOUNDERS_RATE.slots_total);
-
     // ── Create organization ──────────────────────────────────────────────────
     const orgs = await db('organizations', {
       method: 'POST',
@@ -178,10 +173,6 @@ export async function POST(request: NextRequest) {
         plan_tier: 'trial_protect',
         max_practices: 1,
         max_providers: 10,
-        is_founders_rate: foundersSlotAvailable,
-        founders_rate_locked_until: foundersSlotAvailable
-          ? new Date(Date.now() + 365 * 86400000).toISOString()
-          : null,
         signup_npi: npi,
       }),
     });
@@ -245,7 +236,6 @@ export async function POST(request: NextRequest) {
       organization_id: orgId,
       practice_id: practiceId,
       trial_days: TRIAL_DURATION_DAYS,
-      founders_rate: foundersSlotAvailable,
     });
   } catch (err) {
     console.error('[Trial Signup]', err);

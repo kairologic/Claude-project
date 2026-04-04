@@ -10,7 +10,7 @@ export {
   TRIAL_DURATION_DAYS,
   TRIAL_TIER,
   FREE_TIER,
-  FOUNDERS_RATE,
+  PLAN_PRICING,
   type PlanTier,
   type TrialStatus,
   type TrialState,

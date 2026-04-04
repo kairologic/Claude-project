@@ -39,7 +39,7 @@ export default function HomePage() {
               confidence in their provider data.
             </p>
             <div className="m-hero-actions">
-              <Link href="/contact" className="m-btn-primary m-gold">
+              <Link href="/signup" className="m-btn-primary m-gold">
                 Get Started
                 <ArrowIcon />
               </Link>
@@ -54,7 +54,7 @@ export default function HomePage() {
                   fill="currentColor"
                 />
               </svg>
-              21-day free trial &middot; No credit card required &middot; HIPAA-aligned
+              14-day free trial &middot; No credit card required &middot; HIPAA-aligned
               infrastructure
             </div>
           </div>
@@ -493,11 +493,11 @@ export default function HomePage() {
               Your provider data is <em>drifting right now.</em>
             </h2>
             <p>
-              Start monitoring your provider roster in minutes — full platform access for 21 days,
+              Start monitoring your provider roster in minutes — full platform access for 14 days,
               no credit card required.
             </p>
             <div className="m-cta-actions">
-              <Link href="/contact" className="m-btn-primary m-gold">
+              <Link href="/signup" className="m-btn-primary m-gold">
                 Get Started
                 <ArrowIcon />
               </Link>
