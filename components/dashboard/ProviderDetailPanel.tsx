@@ -211,7 +211,9 @@ export default function ProviderDetailPanel({
     // Fetch practice_providers record for website data
     const { data: pp } = await supabase
       .from('practice_providers')
-      .select('web_address, web_phone, web_specialty, has_license_issue, license_issue_type, provider_name, roster_status, active_mismatch_count')
+      .select(
+        'web_address, web_phone, web_specialty, has_license_issue, license_issue_type, provider_name, roster_status, active_mismatch_count',
+      )
       .eq('npi', npi)
       .eq('practice_website_id', practiceId)
       .maybeSingle();
@@ -221,8 +223,9 @@ export default function ProviderDetailPanel({
       setProvider(ph);
     } else if (pp) {
       // Fallback for departed/filtered-out providers: build from practice_providers + NPPES
-      const fallbackName = (pp as any).provider_name
-        || (np ? `${np.first_name || ''} ${np.last_name || ''}`.trim() : `NPI ${npi}`);
+      const fallbackName =
+        (pp as any).provider_name ||
+        (np ? `${np.first_name || ''} ${np.last_name || ''}`.trim() : `NPI ${npi}`);
       setProvider({
         npi,
         practice_website_id: practiceId,
@@ -242,7 +245,7 @@ export default function ProviderDetailPanel({
     const { data: snaps } = await supabase
       .from('payer_directory_snapshots')
       .select(
-        'payer_code, listed_address_line1, listed_city, listed_state, listed_phone, listed_specialty_display, snapshot_date',
+        'payer_code, listed_address_line1, listed_city, listed_state, listed_phone, listed_specialty_display, listed_accepting_patients, snapshot_date',
       )
       .eq('npi', npi)
       .order('snapshot_date', { ascending: false });
@@ -379,7 +382,10 @@ export default function ProviderDetailPanel({
   ];
 
   // Build per-source values for each field row
-  function getPayerValue(code: string, field: 'address' | 'phone' | 'specialty'): string | null {
+  function getPayerValue(
+    code: string,
+    field: 'address' | 'phone' | 'specialty' | 'accepting_patients',
+  ): string | null {
     if (code === 'nppes') {
       if (field === 'address') return nppesAddress;
       if (field === 'phone') return formatPhone(nppes?.phone);
@@ -401,13 +407,22 @@ export default function ProviderDetailPanel({
     if (field === 'phone') return formatPhone(snap.listed_phone);
     if (field === 'specialty')
       return snap.listed_specialty_display ? titleCase(snap.listed_specialty_display) : null;
+    if (field === 'accepting_patients') {
+      if (snap.listed_accepting_patients === true) return 'Yes';
+      if (snap.listed_accepting_patients === false) return 'No';
+      return null;
+    }
     return null;
   }
 
-  const comparisonRows: { field: string; key: 'address' | 'phone' | 'specialty' }[] = [
+  const comparisonRows: {
+    field: string;
+    key: 'address' | 'phone' | 'specialty' | 'accepting_patients';
+  }[] = [
     { field: 'Address', key: 'address' },
     { field: 'Phone', key: 'phone' },
     { field: 'Specialty', key: 'specialty' },
+    { field: 'Accepting Patients', key: 'accepting_patients' },
   ];
 
   // ── Styles ────────────────────────────────────────────────────────────────

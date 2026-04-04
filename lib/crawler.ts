@@ -1,18 +1,21 @@
 /**
- * KairoLogic Adaptive Web Crawler v1.0
+ * KairoLogic Adaptive Web Crawler v1.1
  * =====================================
- * Two-strategy page content fetcher for compliance scanning.
+ * Three-strategy page content fetcher for compliance scanning.
  *
  * Strategy 1: Direct fetch (fast, works for server-rendered sites)
  *   - If the HTML has meaningful text content, use it immediately
  *
- * Strategy 2: Browserless.io REST API (for JS-rendered SPAs)
- *   - Cloud headless Chrome, just an HTTP POST — no npm deps
- *   - Works on Vercel serverless (no binary to install)
- *   - Requires BROWSERLESS_API_KEY env var
- *   - Free tier: 1,000 units/month at https://www.browserless.io
+ * Strategy 2: Playwright (for JS-rendered SPAs in GitHub Actions)
+ *   - Free, local headless Chromium — no external service needed
+ *   - Requires `npx playwright install chromium` in CI environment
+ *   - Dynamically imported — gracefully skipped if not installed
  *
- * Falls back gracefully: if no API key or service is down,
+ * Strategy 3: Browserless.io REST API (legacy fallback)
+ *   - Cloud headless Chrome via HTTP POST
+ *   - Requires BROWSERLESS_API_KEY env var
+ *
+ * Falls back gracefully: if no browser runtime is available,
  * returns whatever the direct fetch got (even if partial).
  */
 
@@ -22,7 +25,7 @@ export interface CrawlResult {
   success: boolean;
   html: string;
   text: string;
-  strategy: 'direct' | 'browserless' | 'none';
+  strategy: 'direct' | 'playwright' | 'browserless' | 'none';
   statusCode?: number;
   headers: Record<string, string>;
   duration: number;
@@ -134,7 +137,80 @@ async function directFetch(url: string): Promise<{
   return { html, text, headers, statusCode: res.status, finalUrl: res.url };
 }
 
-// ─── STRATEGY 2: BROWSERLESS.IO ─────────────────────────
+// ─── STRATEGY 2: PLAYWRIGHT (local headless Chromium) ───
+
+/** Cache Playwright availability so we only check once per process */
+let playwrightAvailable: boolean | null = null;
+
+async function playwrightFetch(url: string): Promise<{
+  html: string;
+  text: string;
+} | null> {
+  // Fast exit if we already know Playwright isn't available
+  if (playwrightAvailable === false) return null;
+
+  try {
+    // Dynamic import — try playwright-core (from @playwright/test dep), then playwright
+    let chromium;
+    try {
+      ({ chromium } = await import('playwright-core'));
+    } catch {
+      ({ chromium } = await import('playwright'));
+    }
+    playwrightAvailable = true;
+
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+
+    try {
+      const context = await browser.newContext({
+        userAgent: BROWSER_HEADERS['User-Agent'],
+        ignoreHTTPSErrors: true,
+      });
+      const page = await context.newPage();
+
+      // Block heavy resources to speed up rendering
+      await page.route('**/*', (route) => {
+        const type = route.request().resourceType();
+        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+          return route.abort();
+        }
+        return route.continue();
+      });
+
+      await page.goto(url, {
+        waitUntil: 'networkidle',
+        timeout: BROWSER_TIMEOUT,
+      });
+
+      // Wait a bit for any late-loading JS content
+      await page.waitForTimeout(2000);
+
+      const html = await page.content();
+      const text = stripHtmlToText(html);
+      await context.close();
+
+      return { html, text };
+    } finally {
+      await browser.close();
+    }
+  } catch (err) {
+    // Playwright not installed or launch failed
+    if (playwrightAvailable === null) {
+      playwrightAvailable = false;
+      console.log(
+        '[Crawler] Playwright not available, will use Browserless fallback or direct fetch only.',
+      );
+    } else {
+      console.warn(`[Crawler] Playwright fetch failed for ${url}:`, err);
+    }
+    return null;
+  }
+}
+
+// ─── STRATEGY 3: BROWSERLESS.IO (legacy) ────────────────
 
 async function browserlessFetch(url: string): Promise<{
   html: string;
@@ -173,6 +249,32 @@ async function browserlessFetch(url: string): Promise<{
   return { html, text };
 }
 
+// ─── BROWSER FALLBACK HELPER ────────────────────────────
+
+/**
+ * Try Playwright first (free, local), then Browserless (cloud, paid).
+ * Returns rendered HTML+text or null if neither is available.
+ */
+async function browserRender(url: string): Promise<{
+  html: string;
+  text: string;
+  strategy: 'playwright' | 'browserless';
+} | null> {
+  // Try Playwright first (free, works in GitHub Actions)
+  const pw = await playwrightFetch(url);
+  if (pw && pw.text.length >= MIN_TEXT_LENGTH) {
+    return { ...pw, strategy: 'playwright' };
+  }
+
+  // Fall back to Browserless (cloud service, needs API key)
+  const bl = await browserlessFetch(url);
+  if (bl && bl.text.length >= MIN_TEXT_LENGTH) {
+    return { ...bl, strategy: 'browserless' };
+  }
+
+  return null;
+}
+
 // ─── MAIN CRAWL FUNCTION ────────────────────────────────
 
 /**
@@ -201,23 +303,21 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
   // ── Strategy 1: Direct fetch ──
   const direct = await directFetch(url);
   if (!direct) {
-    // Direct fetch completely failed — try browserless before giving up
-    const rendered = await browserlessFetch(url);
-    if (rendered && rendered.text.length >= MIN_TEXT_LENGTH) {
+    // Direct fetch completely failed — try browser rendering before giving up
+    const rendered = await browserRender(url);
+    if (rendered) {
       return {
         success: true,
         html: rendered.html,
         text: rendered.text,
-        strategy: 'browserless',
+        strategy: rendered.strategy,
         headers: {},
         duration: Date.now() - start,
         isJSRendered: true,
         finalUrl: url,
       };
     }
-    return fail(
-      `Direct fetch failed and browserless ${rendered ? 'returned insufficient content' : 'unavailable or failed'}.`,
-    );
+    return fail('Direct fetch failed and no browser runtime available.');
   }
 
   // Direct fetch succeeded — check if content is actually rendered
@@ -238,14 +338,14 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
     };
   }
 
-  // ── Strategy 2: Looks like a JS shell — try Browserless ──
-  const rendered = await browserlessFetch(url);
-  if (rendered && rendered.text.length >= MIN_TEXT_LENGTH) {
+  // ── Strategy 2/3: Looks like a JS shell — try browser rendering ──
+  const rendered = await browserRender(url);
+  if (rendered) {
     return {
       success: true,
       html: rendered.html,
       text: rendered.text,
-      strategy: 'browserless',
+      strategy: rendered.strategy,
       statusCode: direct.statusCode,
       headers: direct.headers,
       duration: Date.now() - start,
@@ -266,7 +366,7 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
       duration: Date.now() - start,
       isJSRendered: jsShell,
       error: jsShell
-        ? 'Page appears JS-rendered but browserless unavailable. Content may be incomplete — set BROWSERLESS_API_KEY env var for full rendering.'
+        ? 'Page appears JS-rendered but no browser runtime available. Content may be incomplete. Install Playwright: npx playwright install chromium'
         : undefined,
       finalUrl: direct.finalUrl,
     };

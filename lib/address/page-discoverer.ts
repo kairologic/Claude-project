@@ -8,7 +8,14 @@ import { crawlPage, type CrawlResult } from '../crawler';
 
 export interface DiscoveredPage {
   url: string;
-  type: 'contact' | 'about' | 'locations' | 'providers' | 'footer_link';
+  type:
+    | 'contact'
+    | 'about'
+    | 'locations'
+    | 'providers'
+    | 'insurance'
+    | 'patient_info'
+    | 'footer_link';
   priority: number; // 1 = highest (contact/locations), 3 = lowest (generic about)
   crawlResult?: CrawlResult;
 }
@@ -177,6 +184,162 @@ export async function discoverAndCrawlAddressPages(
       page.crawlResult = result;
     } catch (err) {
       console.warn(`[PageDiscoverer] Failed to crawl ${page.url}:`, err);
+    }
+    return page;
+  });
+
+  await Promise.all(crawlPromises);
+
+  return subPages.filter((p) => p.crawlResult?.success);
+}
+
+// ─── Payer/Insurance Page Discovery ─────────────────────
+
+const PAYER_PAGE_PATTERNS: Array<{
+  regex: RegExp;
+  textRegex?: RegExp;
+  type: DiscoveredPage['type'];
+  priority: number;
+}> = [
+  // Insurance/payer pages — highest priority
+  {
+    regex: /\/(insurance|insurances?-accepted|accepted-insurance|insurance-plans?)(\/|$|\?|#)/i,
+    type: 'insurance',
+    priority: 1,
+  },
+  {
+    regex: /\/(billing|billing-insurance|payment|financial)(\/|$|\?|#)/i,
+    type: 'insurance',
+    priority: 2,
+  },
+  {
+    textRegex: /^(insurance|accepted\s+insurance|insurance\s+(plans?|accepted|we\s+accept))$/i,
+    regex: /./,
+    type: 'insurance',
+    priority: 1,
+  },
+  {
+    textRegex: /^(billing|billing\s+(&|and)\s+insurance|financial\s+info)$/i,
+    regex: /./,
+    type: 'insurance',
+    priority: 2,
+  },
+
+  // Patient info pages — often list insurance
+  {
+    regex: /\/(patient-info|patient-information|patients?|new-patients?|for-patients?)(\/|$|\?|#)/i,
+    type: 'patient_info',
+    priority: 2,
+  },
+  {
+    regex: /\/(patient-resources?|patient-center|patient-forms?)(\/|$|\?|#)/i,
+    type: 'patient_info',
+    priority: 2,
+  },
+  {
+    textRegex:
+      /^(patient\s+(info|information|resources?|center)|new\s+patients?|for\s+patients?)$/i,
+    regex: /./,
+    type: 'patient_info',
+    priority: 2,
+  },
+
+  // About pages sometimes list accepted insurance
+  {
+    regex: /\/(about|about-us|about-our-practice)(\/|$|\?|#)/i,
+    type: 'about',
+    priority: 3,
+  },
+];
+
+/**
+ * Discover sub-pages likely to contain insurance/payer acceptance info.
+ */
+export function discoverPayerPageLinks(
+  html: string,
+  baseUrl: string,
+  maxPages: number = 3,
+): DiscoveredPage[] {
+  const discovered: DiscoveredPage[] = [];
+  const seen = new Set<string>();
+
+  let origin: string;
+  try {
+    const parsed = new URL(baseUrl);
+    origin = parsed.origin;
+  } catch {
+    return [];
+  }
+
+  const linkRegex = /<a\s[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = linkRegex.exec(html)) !== null) {
+    const rawHref = match[1].trim();
+    const linkText = match[2].replace(/<[^>]+>/g, '').trim();
+
+    let absoluteUrl: string;
+    try {
+      absoluteUrl = new URL(rawHref, baseUrl).href;
+    } catch {
+      continue;
+    }
+
+    try {
+      if (new URL(absoluteUrl).origin !== origin) continue;
+    } catch {
+      continue;
+    }
+
+    if (rawHref.startsWith('#')) continue;
+    if (/\.(pdf|jpg|jpeg|png|gif|svg|css|js|zip|doc)(\?|$)/i.test(absoluteUrl)) continue;
+    if (/^(mailto|tel|fax|sms):/i.test(rawHref)) continue;
+
+    const normalized = absoluteUrl.replace(/[/#]+$/, '').toLowerCase();
+    if (seen.has(normalized)) continue;
+
+    for (const pattern of PAYER_PAGE_PATTERNS) {
+      const hrefMatch = pattern.regex.test(absoluteUrl);
+      const textMatch = pattern.textRegex ? pattern.textRegex.test(linkText) : false;
+
+      if (hrefMatch || textMatch) {
+        seen.add(normalized);
+        discovered.push({
+          url: absoluteUrl,
+          type: pattern.type,
+          priority: pattern.priority,
+        });
+        break;
+      }
+    }
+  }
+
+  discovered.sort((a, b) => a.priority - b.priority);
+  return discovered.slice(0, maxPages);
+}
+
+/**
+ * Discover and crawl sub-pages likely to contain payer/insurance data.
+ */
+export async function discoverPayerPages(
+  mainUrl: string,
+  mainHtml: string,
+  maxSubPages: number = 2,
+): Promise<DiscoveredPage[]> {
+  const subPages = discoverPayerPageLinks(mainHtml, mainUrl, maxSubPages);
+
+  if (subPages.length === 0) return [];
+
+  console.log(
+    `[PayerDiscovery] Found ${subPages.length} potential payer pages: ${subPages.map((p) => p.url).join(', ')}`,
+  );
+
+  const crawlPromises = subPages.map(async (page) => {
+    try {
+      const result = await crawlPage(page.url);
+      page.crawlResult = result;
+    } catch (err) {
+      console.warn(`[PayerDiscovery] Failed to crawl ${page.url}:`, err);
     }
     return page;
   });

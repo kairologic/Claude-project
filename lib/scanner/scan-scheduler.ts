@@ -421,7 +421,37 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
 
     // 3b. Extract accepted payers from website (#111)
     try {
-      const payerResult = extractAcceptedPayers(crawl.html, crawl.text, site.state);
+      let payerResult = extractAcceptedPayers(crawl.html, crawl.text, site.state);
+
+      // Sub-page fallback: if main page found few/no payers, discover insurance sub-pages
+      if (payerResult.accepted_payers.length < 3) {
+        try {
+          const { discoverPayerPages } = await import('../address/page-discoverer');
+          const subPages = await discoverPayerPages(site.url, crawl.html, 2);
+
+          for (const subPage of subPages) {
+            if (!subPage.crawlResult?.success) continue;
+            const subResult = extractAcceptedPayers(
+              subPage.crawlResult.html,
+              subPage.crawlResult.text,
+              site.state,
+            );
+            if (subResult.accepted_payers.length > payerResult.accepted_payers.length) {
+              payerResult = {
+                ...subResult,
+                extraction_source: 'section' as const, // found on sub-page
+              };
+              console.log(
+                `[Scanner] Sub-page payer discovery: found ${subResult.accepted_payers.length} payers on ${subPage.url}`,
+              );
+            }
+          }
+        } catch (subErr) {
+          // Non-critical — sub-page discovery is best-effort
+          console.warn(`[Scanner] Sub-page payer discovery failed:`, subErr);
+        }
+      }
+
       result.payer_extraction = payerResult;
 
       if (payerResult.accepted_payers.length > 0) {
@@ -473,6 +503,63 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
 
     // 4. Update practice_providers (Task 1.12)
     await updatePracticeProviders(site.id, matched);
+
+    // 4a. Aggregate practice-level specialties from matched providers
+    // Uses web_specialty when available, falls back to NPPES taxonomy_desc
+    try {
+      if (matched.length > 0) {
+        // Fetch NPPES taxonomy for matched providers as fallback
+        const npis = matched.map((m) => m.npi);
+        const npiList = npis.map((n) => `"${n}"`).join(',');
+        const npiProviders = await db(`providers?npi=in.(${npiList})&select=npi,taxonomy_desc`);
+        const taxonomyMap: Record<string, string> = {};
+        for (const p of npiProviders || []) {
+          if (p.taxonomy_desc) taxonomyMap[p.npi] = p.taxonomy_desc;
+        }
+
+        // Also check web_specialty from practice_providers
+        const ppRows = await db(
+          `practice_providers?practice_website_id=eq.${site.id}&npi=in.(${npiList})&select=npi,web_specialty`,
+        );
+        const webSpecMap: Record<string, string> = {};
+        for (const pp of ppRows || []) {
+          if (pp.web_specialty) webSpecMap[pp.npi] = pp.web_specialty;
+        }
+
+        // Build specialty list: prefer web_specialty, fall back to NPPES taxonomy
+        const specialtyCounts: Record<string, number> = {};
+        for (const npi of npis) {
+          const spec = webSpecMap[npi] || taxonomyMap[npi];
+          if (spec) {
+            // Clean up schema.org URLs and normalize
+            const cleaned = spec
+              .replace(/^https?:\/\/(schema\.org|www\.productontology\.org\/id)\//i, '')
+              .replace(/([a-z])([A-Z])/g, '$1 $2'); // CamelCase to spaces
+            specialtyCounts[cleaned] = (specialtyCounts[cleaned] || 0) + 1;
+          }
+        }
+
+        const specialties = Object.entries(specialtyCounts).map(([specialty, count]) => ({
+          specialty,
+          provider_count: count,
+        }));
+
+        if (specialties.length > 0) {
+          await db(`practice_websites?id=eq.${site.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              practice_specialties: specialties,
+              updated_at: new Date().toISOString(),
+            }),
+          });
+          console.log(
+            `[Scanner] Practice specialties: ${specialties.map((s) => `${s.specialty} (${s.provider_count})`).join(', ')}`,
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Failed to aggregate specialties for ${site.url}:`, err);
+    }
 
     // 5. Save extraction to provider_sites (for each matched NPI)
     for (const provider of matched) {
