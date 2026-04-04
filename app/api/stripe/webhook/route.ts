@@ -638,18 +638,101 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, action: event.type, status: subStatus });
     }
 
-    // ── Handle trial ending (subscription goes from trialing to active or past_due) ──
+    // ── Handle trial ending (Stripe sends this 3 days before trial ends) ──
     if (event.type === 'customer.subscription.trial_will_end') {
-      // Stripe sends this 3 days before trial ends
       const subscription = event.data?.object;
-      const subNpi = subscription?.metadata?.npi;
-      const custEmail = subscription?.metadata?.email || '';
+      const orgId = subscription?.metadata?.organization_id;
+      const practiceId = subscription?.metadata?.practice_website_id;
 
-      console.log(`[Stripe Webhook] Trial ending soon: NPI=${subNpi}, email=${custEmail}`);
+      console.log(`[Stripe Webhook] Trial ending soon: org=${orgId}, practice=${practiceId}`);
 
-      // Could send a "trial ending" email here
-      // For now, just log it
-      return NextResponse.json({ received: true, action: 'trial_will_end', npi: subNpi });
+      if (orgId) {
+        try {
+          // Look up org + practice details for the email
+          const orgRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/organizations?id=eq.${orgId}&select=id,contact_email,contact_name,plan_tier`,
+            {
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+              },
+            },
+          );
+          const orgs = orgRes.ok ? await orgRes.json() : [];
+
+          if (orgs?.length > 0) {
+            const org = orgs[0];
+            const planTier = org.plan_tier || '';
+
+            // Derive plan name and price from plan tier or subscription items
+            let planName = 'Starter';
+            let amount = '$149';
+            let interval = 'month';
+
+            if (planTier.includes('professional') || planTier === 'professional') {
+              planName = 'Professional';
+              amount = '$249';
+            }
+
+            // Try to get more accurate pricing from the subscription
+            const items = subscription?.items?.data;
+            if (items?.length > 0) {
+              const price = items[0]?.price;
+              if (price?.unit_amount) {
+                amount = `$${(price.unit_amount / 100).toFixed(0)}`;
+              }
+              if (price?.recurring?.interval === 'year') {
+                interval = 'year';
+              }
+            }
+
+            // Get card last 4 digits if available
+            let cardLast4: string | undefined;
+            try {
+              const pmId = subscription?.default_payment_method;
+              if (pmId && STRIPE_SECRET_KEY) {
+                const Stripe = (await import('stripe')).default;
+                const stripe = new Stripe(STRIPE_SECRET_KEY);
+                const pm = await stripe.paymentMethods.retrieve(pmId as string);
+                cardLast4 = pm.card?.last4;
+              }
+            } catch {
+              // Non-critical — skip card info
+            }
+
+            // Calculate charge date (trial_end on subscription)
+            const chargeDate = subscription?.trial_end
+              ? new Date(subscription.trial_end * 1000).toISOString()
+              : new Date(Date.now() + 3 * 86400000).toISOString();
+
+            const dashboardUrl = practiceId
+              ? `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net'}/practice/${practiceId}`
+              : `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net'}`;
+
+            const { sendChargeComingEmail } = await import('@/lib/trial/trial-emails');
+            await sendChargeComingEmail({
+              email: org.contact_email,
+              contactName: org.contact_name || 'there',
+              planName,
+              amount,
+              interval,
+              chargeDate,
+              cardLast4,
+              dashboardUrl,
+              organizationId: orgId,
+            });
+
+            console.log(
+              `[Stripe Webhook] Charge coming email sent to ${org.contact_email} for ${planName} plan`,
+            );
+          }
+        } catch (emailErr) {
+          console.error('[Stripe Webhook] Failed to send charge coming email:', emailErr);
+        }
+      }
+
+      return NextResponse.json({ received: true, action: 'trial_will_end' });
     }
 
     // ── Handle payment failures ──

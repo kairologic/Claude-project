@@ -264,6 +264,105 @@ export async function sendDay21Email(orgId: string, email: string): Promise<void
   });
 }
 
+// ── Paid Trial: Charge Coming (Stripe trial_will_end) ───
+
+/**
+ * Sent to paid plan customers ~3 days before their Stripe trial ends
+ * and their card will be charged. Triggered by Stripe's
+ * `customer.subscription.trial_will_end` webhook event.
+ */
+export async function sendChargeComingEmail(opts: {
+  email: string;
+  contactName: string;
+  planName: string; // e.g. "Starter" or "Professional"
+  amount: string; // e.g. "$149" or "$249"
+  interval: string; // e.g. "month" or "year"
+  chargeDate: string; // ISO date string
+  cardLast4?: string; // last 4 digits of card, if available
+  dashboardUrl: string;
+  organizationId: string;
+}): Promise<void> {
+  const {
+    email,
+    contactName,
+    planName,
+    amount,
+    interval,
+    chargeDate,
+    cardLast4,
+    dashboardUrl,
+    organizationId,
+  } = opts;
+
+  const formattedDate = new Date(chargeDate).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const cardText = cardLast4
+    ? `Your card ending in <strong>••••${cardLast4}</strong>`
+    : 'Your payment method';
+
+  const subject = `Your ${planName} plan starts ${formattedDate}`;
+
+  const html = wrap(`
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px;margin-bottom:24px;">
+      <div style="color:#166534;font-size:16px;font-weight:700;margin-bottom:8px;">Your free trial is ending soon</div>
+      <div style="color:#15803d;font-size:14px;line-height:1.6;">
+        Your 14-day trial of the <strong>${planName}</strong> plan ends in 3 days. Your dashboard access continues uninterrupted.
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
+      <div style="font-size:13px;color:#64748b;font-weight:600;margin-bottom:12px;">UPCOMING CHARGE</div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <span style="color:#334155;font-size:14px;">Plan</span>
+        <span style="color:#0f172a;font-size:14px;font-weight:600;">${planName}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <span style="color:#334155;font-size:14px;">Amount</span>
+        <span style="color:#0f172a;font-size:14px;font-weight:600;">${amount}/${interval}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <span style="color:#334155;font-size:14px;">Charge date</span>
+        <span style="color:#0f172a;font-size:14px;font-weight:600;">${formattedDate}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;">
+        <span style="color:#334155;font-size:14px;">Payment</span>
+        <span style="color:#0f172a;font-size:14px;font-weight:600;">${cardText}</span>
+      </div>
+    </div>
+
+    <p style="color:#334155;font-size:14px;line-height:1.6;">
+      ${cardText} will be charged <strong>${amount}</strong> on <strong>${formattedDate}</strong>. After that, you'll be billed ${amount}/${interval} automatically.
+    </p>
+
+    <p style="color:#64748b;font-size:13px;line-height:1.6;">
+      If you'd like to cancel or change your plan, you can do so from your dashboard before the charge date. No questions asked.
+    </p>
+
+    ${cta(dashboardUrl, 'View Your Dashboard')}
+
+    <p style="color:#94a3b8;font-size:12px;text-align:center;">
+      Questions about billing? Reply to this email &mdash; we read everything.
+    </p>
+  `);
+
+  await sendEmail(email, subject, html);
+
+  // Track that we sent this email
+  try {
+    await db(`organizations?id=eq.${organizationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ trial_charge_coming_email_sent: true }),
+    });
+  } catch {
+    // Non-critical — don't fail if tracking column doesn't exist yet
+  }
+}
+
 // ── Sequence Runner ──────────────────────────────────────
 
 export interface SequenceResult {

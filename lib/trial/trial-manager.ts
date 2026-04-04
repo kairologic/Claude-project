@@ -215,12 +215,13 @@ export async function downgradeExpiredTrials(): Promise<{
       continue;
     }
 
-    // Downgrade to free
+    // Downgrade to free (5 provider cap)
     await db(`organizations?id=eq.${org.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         plan_tier: FREE_TIER,
         trial_status: 'EXPIRED',
+        max_providers: PLAN_PRICING.free.max_providers,
       }),
     });
 
