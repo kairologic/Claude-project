@@ -3,19 +3,38 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── Types ──
-interface Question {
+interface TickerEvent {
   id: string;
-  question_text: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  click_count: number;
-  is_active: boolean;
+  icon: string;
+  text: string;
+  category: string;
+  timestamp: string;
 }
 
-interface Answer {
-  summary: string;
-  stat_highlight: { value: string; label: string };
-  gated: boolean;
-  followUp?: string;
+interface ProviderLookupResult {
+  tier: 1 | 2 | 3;
+  provider?: {
+    name: string;
+    npi: string;
+    specialty?: string;
+    state?: string;
+    practice_name?: string;
+    practice_url?: string;
+  };
+  indicators?: {
+    address_verified: boolean | null;
+    license_current: boolean | null;
+    payer_directories: { matched: number; total: number } | null;
+    ehr_detected: string | null;
+    accepting_patients: boolean | null;
+    specialty_listed: boolean | null;
+    compliance_score: number | null;
+  };
+  aggregate_stats?: {
+    total_providers: number;
+    states_covered: string[];
+  };
+  message: string;
 }
 
 interface Alert {
@@ -30,51 +49,142 @@ interface Alert {
   relatedTopics: string[];
 }
 
-// ── Fallback answers (used when API fails) ──
-const FALLBACK_ANSWERS: Record<string, Answer> = {};
+// ── Fallback ticker events (used when API fails) ──
+const FALLBACK_TICKER: TickerEvent[] = [
+  {
+    id: 'f1',
+    icon: '\u{1f50d}',
+    text: '1,847 provider websites scanned today',
+    category: 'scan',
+    timestamp: 'today',
+  },
+  {
+    id: 'f2',
+    icon: '\u{1f4cd}',
+    text: '12 address mismatches detected in TX this week',
+    category: 'delta',
+    timestamp: 'this week',
+  },
+  {
+    id: 'f3',
+    icon: '\u{1f504}',
+    text: '20,575 payer directory records synced across 6 payers',
+    category: 'payer',
+    timestamp: 'latest sync',
+  },
+  {
+    id: 'f4',
+    icon: '\u{1f6e1}\ufe0f',
+    text: '8 compliance findings generated this week',
+    category: 'compliance',
+    timestamp: 'this week',
+  },
+  {
+    id: 'f5',
+    icon: '\u{1f4cb}',
+    text: '47 provider licenses expiring within 30 days',
+    category: 'license',
+    timestamp: 'active',
+  },
+  {
+    id: 'f6',
+    icon: '\u{1f916}',
+    text: '36 EHR/AI tools detected across provider websites',
+    category: 'ai_tool',
+    timestamp: 'cumulative',
+  },
+  {
+    id: 'f7',
+    icon: '\u26a0\ufe0f',
+    text: '23 payer directory mismatches awaiting resolution',
+    category: 'payer',
+    timestamp: 'active',
+  },
+  {
+    id: 'f8',
+    icon: '\u{1f4de}',
+    text: '5 phone number discrepancies flagged',
+    category: 'delta',
+    timestamp: 'this week',
+  },
+];
 
-function getFallbackAnswer(questionText: string): Answer {
-  const q = questionText.toLowerCase();
-  if (q.includes('mismatch') || q.includes('payer') || q.includes('directory')) {
-    return {
-      summary:
-        'Our analysis shows 23% of TX providers have at least one payer directory mismatch, with address discrepancies being the most common. Aetna and Cigna directories show the highest drift rates.',
-      stat_highlight: { value: '23%', label: 'of TX providers with payer mismatches' },
-      gated: false,
-    };
-  }
-  if (q.includes('license') || q.includes('expir') || q.includes('credential')) {
-    return {
-      summary:
-        'Currently tracking 47 TX providers with medical licenses expiring within 30 days. 12 have not yet initiated renewal, creating potential compliance gaps across 3 payer networks.',
-      stat_highlight: { value: '47', label: 'licenses expiring within 30 days' },
-      gated: false,
-    };
-  }
-  if (q.includes('pecos') || q.includes('medicare') || q.includes('enrollment')) {
-    return {
-      summary:
-        'Cross-referencing NPPES and PECOS data reveals 156 TX providers who appear active in NPPES but are not enrolled in Medicare PECOS, potentially missing Medicare reimbursements.',
-      stat_highlight: { value: '156', label: 'TX providers missing from PECOS' },
-      gated: false,
-    };
-  }
-  if (q.includes('oig') || q.includes('exclusion') || q.includes('sanction')) {
-    return {
-      summary:
-        'KairoLogic monitors the OIG exclusion list daily. In the past 90 days, 3 new exclusion matches were detected for TX-based providers, flagged within 24 hours of publication.',
-      stat_highlight: { value: '3', label: 'new OIG matches in 90 days' },
-      gated: false,
-    };
-  }
-  // Generic fallback
-  return {
-    summary:
-      'KairoLogic continuously monitors 1.8M+ provider records across NPPES, OIG, state boards, and payer directories. Our scans detect data discrepancies within hours, not weeks.',
-    stat_highlight: { value: '1.8M+', label: 'provider records monitored' },
-    gated: false,
-  };
-}
+// ── Indicator display config ──
+const INDICATOR_CONFIG: {
+  key: string;
+  label: string;
+  getStatus: (ind: ProviderLookupResult['indicators']) => 'pass' | 'fail' | 'unknown' | 'info';
+  getValue: (ind: ProviderLookupResult['indicators']) => string;
+}[] = [
+  {
+    key: 'address',
+    label: 'Address Verified',
+    getStatus: (ind) =>
+      ind?.address_verified === true
+        ? 'pass'
+        : ind?.address_verified === false
+          ? 'fail'
+          : 'unknown',
+    getValue: (ind) =>
+      ind?.address_verified === true
+        ? 'Verified'
+        : ind?.address_verified === false
+          ? 'Mismatch'
+          : '\u2014',
+  },
+  {
+    key: 'license',
+    label: 'License Current',
+    getStatus: (ind) =>
+      ind?.license_current === true ? 'pass' : ind?.license_current === false ? 'fail' : 'unknown',
+    getValue: (ind) =>
+      ind?.license_current === true
+        ? 'Current'
+        : ind?.license_current === false
+          ? 'Expired/Issue'
+          : '\u2014',
+  },
+  {
+    key: 'payer',
+    label: 'Payer Directories',
+    getStatus: (ind) => {
+      if (!ind?.payer_directories) return 'unknown';
+      return ind.payer_directories.matched >= ind.payer_directories.total ? 'pass' : 'fail';
+    },
+    getValue: (ind) =>
+      ind?.payer_directories
+        ? `${ind.payer_directories.matched}/${ind.payer_directories.total} matched`
+        : '\u2014',
+  },
+  {
+    key: 'ehr',
+    label: 'EHR Detected',
+    getStatus: (ind) => (ind?.ehr_detected ? 'info' : 'unknown'),
+    getValue: (ind) => ind?.ehr_detected || '\u2014',
+  },
+  {
+    key: 'accepting',
+    label: 'Accepting Patients',
+    getStatus: (ind) =>
+      ind?.accepting_patients === true
+        ? 'pass'
+        : ind?.accepting_patients === false
+          ? 'fail'
+          : 'unknown',
+    getValue: (ind) =>
+      ind?.accepting_patients === true
+        ? 'Yes'
+        : ind?.accepting_patients === false
+          ? 'No'
+          : '\u2014',
+  },
+  {
+    key: 'specialty',
+    label: 'Specialty Listed',
+    getStatus: (ind) => (ind?.specialty_listed ? 'pass' : 'unknown'),
+    getValue: (ind) => (ind?.specialty_listed ? 'Yes' : '\u2014'),
+  },
+];
 
 // ── Simulated dashboard data ──
 const ALERTS: Alert[] = [
@@ -238,55 +348,66 @@ const useCounter = (target: number, duration: number = 800) => {
 
 // ── Main Component ──
 export default function HeroInteractiveDashboard() {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [answer, setAnswer] = useState<Answer | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [questionsUsed, setQuestionsUsed] = useState(0);
-  const [showGating, setShowGating] = useState(false);
+  // ── Ticker state ──
+  const [tickerEvents, setTickerEvents] = useState<TickerEvent[]>(FALLBACK_TICKER);
+  const [activeTickerIdx, setActiveTickerIdx] = useState(0);
+
+  // ── Provider lookup state ──
+  const [searchInput, setSearchInput] = useState('');
+  const [lookupResult, setLookupResult] = useState<ProviderLookupResult | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
+
+  // ── Dashboard state (unchanged) ──
   const [activeTab, setActiveTab] = useState<'alerts' | 'providers' | 'payer'>('alerts');
   const [resolvedAlerts, setResolvedAlerts] = useState<Set<number>>(new Set());
   const [highlightedAlerts, setHighlightedAlerts] = useState<Set<number>>(new Set());
   const [resolvingAlert, setResolvingAlert] = useState<number | null>(null);
-  const [searchInput, setSearchInput] = useState('');
   const [hasInteracted, setHasInteracted] = useState(false);
-  const highlightTimeoutRef = useRef<NodeJS.Timeout>();
 
   const providersCount = useCounter(1847, 800);
   const complianceScore = useCounter(94, 800);
 
-  // Fetch questions
+  // Fetch ticker events on mount
   useEffect(() => {
-    const fetchQuestions = async () => {
+    const fetchTicker = async () => {
       try {
-        const res = await fetch('/api/public/hero-questions');
+        const res = await fetch('/api/public/ticker-events');
         const data = await res.json();
-        setQuestions(data.questions || []);
-      } catch (error) {
-        console.error('Failed to fetch questions:', error);
+        if (data.events && data.events.length > 0) {
+          setTickerEvents(data.events);
+        }
+      } catch {
+        // Keep fallback events
       }
     };
-    fetchQuestions();
+    fetchTicker();
   }, []);
 
-  // Handle question click (from chip or search submit)
-  const handleQuestionClick = useCallback(
-    async (question: Question) => {
-      if (questionsUsed >= 3) {
-        setShowGating(true);
-        return;
-      }
+  // Auto-rotate ticker every 3 seconds (only when no lookup result shown)
+  useEffect(() => {
+    if (lookupResult) return;
+    const interval = setInterval(() => {
+      setActiveTickerIdx((prev) => (prev + 1) % tickerEvents.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [tickerEvents.length, lookupResult]);
+
+  // Handle provider lookup submission
+  const handleSearchSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!searchInput.trim()) return;
 
       setHasInteracted(true);
-      setSelectedQuestion(question);
-      setLoading(true);
+      setLookupLoading(true);
+      setLookupResult(null);
       setScanning(true);
       setScanProgress(0);
-      setAnswer(null);
 
-      const scanDuration = 2500;
+      // Scan animation
+      const scanDuration = 1800;
       const scanStart = Date.now();
       const scanInterval = setInterval(() => {
         const elapsed = Date.now() - scanStart;
@@ -299,81 +420,32 @@ export default function HeroInteractiveDashboard() {
           clearInterval(scanInterval);
           setScanning(false);
         }
-      }, 100);
+      }, 80);
 
       try {
-        const res = await fetch('/api/public/answer-preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: question.question_text }),
+        const res = await fetch(
+          `/api/public/provider-lookup?q=${encodeURIComponent(searchInput.trim())}`,
+        );
+        const data: ProviderLookupResult = await res.json();
+        setLookupResult(data);
+      } catch {
+        setLookupResult({
+          tier: 3,
+          aggregate_stats: { total_providers: 57503, states_covered: ['TX', 'CA'] },
+          message: 'Lookup temporarily unavailable. We monitor 57,503+ providers across TX and CA.',
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data: any = await res.json();
-
-        // API returns { gated, answer: { summary, stat_highlight }, questions_remaining }
-        // Extract the nested answer object, or use data directly if flat
-        let parsed: Answer;
-        if (data.answer && data.answer.summary) {
-          parsed = {
-            summary: data.answer.summary,
-            stat_highlight: data.answer.stat_highlight,
-            gated: data.gated ?? false,
-          };
-        } else if (data.summary) {
-          parsed = data as Answer;
-        } else {
-          // API failed or returned unexpected shape — use fallback
-          parsed = getFallbackAnswer(question.question_text);
-        }
-
-        setAnswer(parsed);
-        setQuestionsUsed((prev) => prev + 1);
-
-        // Highlight related alerts
-        const relatedIds = new Set<number>();
-        ALERTS.forEach((alert) => {
-          if (
-            question.question_text.toLowerCase().includes('alert') ||
-            alert.relatedTopics.some((topic) =>
-              question.question_text.toLowerCase().includes(topic),
-            )
-          ) {
-            relatedIds.add(alert.id);
-          }
-        });
-        setHighlightedAlerts(relatedIds);
-        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-        highlightTimeoutRef.current = setTimeout(() => setHighlightedAlerts(new Set()), 2000);
-      } catch (error) {
-        console.error('Failed to fetch answer:', error);
-        // Use fallback answer so the demo always works
-        setAnswer(getFallbackAnswer(question.question_text));
-        setQuestionsUsed((prev) => prev + 1);
       } finally {
-        setLoading(false);
+        setLookupLoading(false);
       }
     },
-    [questionsUsed],
+    [searchInput],
   );
 
-  // Handle custom search submission
-  const handleSearchSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!searchInput.trim()) return;
-
-      const customQuestion: Question = {
-        id: `custom-${Date.now()}`,
-        question_text: searchInput.trim(),
-        difficulty: 'easy',
-        click_count: 0,
-        is_active: true,
-      };
-      setSearchInput('');
-      handleQuestionClick(customQuestion);
-    },
-    [searchInput, handleQuestionClick],
-  );
+  // Clear lookup to return to ticker
+  const handleClearLookup = useCallback(() => {
+    setLookupResult(null);
+    setSearchInput('');
+  }, []);
 
   const handleResolveAlert = (alertId: number) => {
     setResolvingAlert(alertId);
@@ -413,59 +485,57 @@ export default function HeroInteractiveDashboard() {
         </div>
       </div>
 
-      {/* ── Embedded question bar (toolbar) ── */}
+      {/* ── Provider lookup bar (toolbar) ── */}
       <div className="m-dash-toolbar">
         <form className="m-dash-search-row" onSubmit={handleSearchSubmit}>
           <span className="m-dash-search-icon">{'\u{1f50d}'}</span>
           <input
             type="text"
             className="m-dash-search-input"
-            placeholder="Ask about provider compliance, data discrepancies, or regulations"
+            placeholder="Look up any provider — enter name or NPI"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <span className="m-dash-questions-badge">{3 - questionsUsed} free</span>
+          {lookupResult ? (
+            <button
+              type="button"
+              onClick={handleClearLookup}
+              className="m-dash-questions-badge"
+              style={{ cursor: 'pointer', border: 'none', background: '#f3f4f6' }}
+            >
+              {'\u2715'} Clear
+            </button>
+          ) : (
+            <span className="m-dash-questions-badge">Free lookup</span>
+          )}
         </form>
-        <div className="m-dash-chips-row">
-          {!hasInteracted && <span className="m-dash-try-hint">Try one:</span>}
-          <div className="m-dash-chips">
-            {questions.slice(0, 3).map((q) => (
-              <button
-                key={q.id}
-                onClick={() => handleQuestionClick(q)}
-                className={`m-dash-chip ${selectedQuestion?.id === q.id ? 'm-dash-chip-active' : ''} ${!hasInteracted ? 'm-dash-chip-pulse' : ''}`}
-              >
-                {q.question_text}
-              </button>
-            ))}
-            {questions.length === 0 && (
-              <>
-                <span className="m-dash-chip m-dash-chip-skeleton" />
-                <span className="m-dash-chip m-dash-chip-skeleton" />
-                <span className="m-dash-chip m-dash-chip-skeleton" />
-              </>
-            )}
+        {!hasInteracted && (
+          <div className="m-dash-chips-row">
+            <span className="m-dash-try-hint">Try:</span>
+            <div className="m-dash-chips">
+              {['Rekha Kalidindi', 'Sarah Chen', '1234567890'].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => {
+                    setSearchInput(example);
+                    // Auto-submit after setting
+                    setTimeout(() => {
+                      const form = document.querySelector('.m-dash-search-row') as HTMLFormElement;
+                      form?.requestSubmit();
+                    }, 50);
+                  }}
+                  className="m-dash-chip m-dash-chip-pulse"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── Dashboard content ── */}
       <div className="m-dash-content" style={{ position: 'relative' }}>
-        {/* Gating overlay */}
-        {showGating && (
-          <div className="m-dash-gating">
-            <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
-              You&apos;ve used your 3 free questions.
-            </div>
-            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              Sign up for a free trial to unlock unlimited provider intelligence.
-            </div>
-            <a href="/signup" className="m-dash-gating-btn">
-              Start Free Trial
-            </a>
-          </div>
-        )}
-
         {/* Scan progress */}
         {scanning && (
           <div className="m-dash-scan-bar">
@@ -485,17 +555,235 @@ export default function HeroInteractiveDashboard() {
           </div>
         )}
 
-        {/* AI Insight card */}
-        {answer && !loading && (
-          <div className="m-dash-insight">
-            <div className="m-dash-insight-label">{'\u2728'} AI Insight</div>
-            <div className="m-dash-insight-question">{selectedQuestion?.question_text}</div>
-            <div className="m-dash-insight-answer">{answer.summary}</div>
-            {answer.stat_highlight && (
-              <div className="m-dash-insight-stat">
-                <strong>{answer.stat_highlight.value}</strong> {answer.stat_highlight.label}
+        {/* ── Provider Lookup Result Card (Tier 1 or 2) ── */}
+        {lookupResult && !lookupLoading && lookupResult.tier <= 2 && lookupResult.provider && (
+          <div
+            className="m-dash-insight"
+            style={{
+              background: lookupResult.tier === 1 ? '#f0fdf4' : '#fffbeb',
+              border: lookupResult.tier === 1 ? '1px solid #bbf7d0' : '1px solid #fde68a',
+            }}
+          >
+            <div
+              className="m-dash-insight-label"
+              style={{ color: lookupResult.tier === 1 ? '#166534' : '#92400e' }}
+            >
+              {lookupResult.tier === 1 ? '\u2705 Actively Monitored' : '\u{1f4cb} Found in NPPES'}
+            </div>
+            <div className="m-dash-insight-question">
+              {lookupResult.provider.name}
+              {lookupResult.provider.npi && (
+                <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 8, fontSize: 12 }}>
+                  NPI: {lookupResult.provider.npi}
+                </span>
+              )}
+            </div>
+            {lookupResult.provider.practice_name && (
+              <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 6 }}>
+                {lookupResult.provider.practice_name}
+                {lookupResult.provider.state && ` \u00b7 ${lookupResult.provider.state}`}
               </div>
             )}
+            {lookupResult.provider.specialty && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                {lookupResult.provider.specialty}
+              </div>
+            )}
+
+            {/* Tier 1: Indicator checklist */}
+            {lookupResult.tier === 1 && lookupResult.indicators && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '4px 16px',
+                  marginTop: 4,
+                }}
+              >
+                {INDICATOR_CONFIG.map((cfg) => {
+                  const status = cfg.getStatus(lookupResult.indicators!);
+                  const value = cfg.getValue(lookupResult.indicators!);
+                  const icon =
+                    status === 'pass'
+                      ? '\u2705'
+                      : status === 'fail'
+                        ? '\u274c'
+                        : status === 'info'
+                          ? '\u{1f4a1}'
+                          : '\u2014';
+                  return (
+                    <div
+                      key={cfg.key}
+                      style={{
+                        fontSize: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '2px 0',
+                        color: status === 'unknown' ? '#9ca3af' : '#374151',
+                      }}
+                    >
+                      <span style={{ width: 16, textAlign: 'center' }}>{icon}</span>
+                      <span style={{ fontWeight: 500 }}>{cfg.label}:</span>
+                      <span
+                        style={{
+                          color:
+                            status === 'pass'
+                              ? '#16a34a'
+                              : status === 'fail'
+                                ? '#dc2626'
+                                : status === 'info'
+                                  ? '#2563eb'
+                                  : '#9ca3af',
+                          filter: status === 'unknown' ? 'blur(3px)' : 'none',
+                        }}
+                      >
+                        {status === 'unknown' ? 'Hidden' : value}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tier 2: Limited data notice */}
+            {lookupResult.tier === 2 && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '4px 16px',
+                  marginTop: 4,
+                }}
+              >
+                {INDICATOR_CONFIG.map((cfg) => (
+                  <div
+                    key={cfg.key}
+                    style={{
+                      fontSize: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '2px 0',
+                      color: '#9ca3af',
+                    }}
+                  >
+                    <span style={{ width: 16, textAlign: 'center' }}>{'\u2014'}</span>
+                    <span style={{ fontWeight: 500 }}>{cfg.label}:</span>
+                    <span style={{ filter: 'blur(3px)' }}>Hidden</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: 10, fontSize: 12, color: '#6b7280' }}>
+              {lookupResult.message}
+            </div>
+            <a
+              href="/signup"
+              style={{
+                display: 'inline-block',
+                marginTop: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                background: '#2563eb',
+                padding: '6px 14px',
+                borderRadius: 6,
+                textDecoration: 'none',
+              }}
+            >
+              Get Full Report {'\u2192'}
+            </a>
+          </div>
+        )}
+
+        {/* ── Tier 3: No match card ── */}
+        {lookupResult && !lookupLoading && lookupResult.tier === 3 && (
+          <div
+            className="m-dash-insight"
+            style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}
+          >
+            <div className="m-dash-insight-label" style={{ color: '#6b7280' }}>
+              {'\u{1f50d}'} Provider Not Found
+            </div>
+            <div className="m-dash-insight-answer">{lookupResult.message}</div>
+            <a
+              href="/signup"
+              style={{
+                display: 'inline-block',
+                marginTop: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                background: '#2563eb',
+                padding: '6px 14px',
+                borderRadius: 6,
+                textDecoration: 'none',
+              }}
+            >
+              Start Free Trial {'\u2192'}
+            </a>
+          </div>
+        )}
+
+        {/* ── Live Activity Ticker (default state, hidden when lookup result shown) ── */}
+        {!lookupResult && !scanning && (
+          <div
+            className="m-dash-insight"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              minHeight: 60,
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div className="m-dash-insight-label" style={{ color: '#475569' }}>
+              {'\u{26a1}'} Live Activity
+            </div>
+            <div style={{ position: 'relative', height: 24 }}>
+              {tickerEvents.map((evt, idx) => (
+                <div
+                  key={evt.id}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    fontSize: 13,
+                    color: '#1e293b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    opacity: idx === activeTickerIdx ? 1 : 0,
+                    transform: idx === activeTickerIdx ? 'translateY(0)' : 'translateY(8px)',
+                    transition: 'opacity 0.4s ease, transform 0.4s ease',
+                  }}
+                >
+                  <span>{evt.icon}</span>
+                  <span>{evt.text}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8' }}>
+                    {evt.timestamp}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {/* Ticker dots */}
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 8 }}>
+              {tickerEvents.slice(0, 8).map((_, idx) => (
+                <span
+                  key={idx}
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: idx === activeTickerIdx % 8 ? '#2563eb' : '#cbd5e1',
+                    transition: 'background 0.3s',
+                  }}
+                />
+              ))}
+            </div>
           </div>
         )}
 
