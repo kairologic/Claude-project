@@ -36,6 +36,7 @@ import {
 } from './trigger-workflows';
 import { runDeltaDetection } from './delta-engine';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
+import { discoverRelevantPages } from '../address/page-discoverer';
 import {
   runComplianceChecks,
   getActionableFindings,
@@ -420,8 +421,36 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
     result.providers_matched = matched;
 
     // 3b. Extract accepted payers from website (#111)
+    // Strategy: try main page first, then discover + crawl insurance sub-pages
     try {
-      const payerResult = extractAcceptedPayers(crawl.html, crawl.text, site.state);
+      let payerResult = extractAcceptedPayers(crawl.html, crawl.text, site.state);
+
+      // If main page yielded nothing or low confidence, try sub-pages
+      if (payerResult.accepted_payers.length === 0 || payerResult.confidence === 'low') {
+        const subPages = discoverRelevantPages(crawl.html, site.url, 6);
+        const insurancePages = subPages.filter(
+          (p) => p.type === 'insurance' || p.type === 'patient_center',
+        );
+
+        for (const page of insurancePages) {
+          try {
+            const subCrawl = await crawlPage(page.url);
+            if (subCrawl.success) {
+              const subResult = extractAcceptedPayers(subCrawl.html, subCrawl.text, site.state);
+              if (subResult.accepted_payers.length > payerResult.accepted_payers.length) {
+                payerResult = subResult;
+                console.log(
+                  `[Scanner] Payer extraction improved from sub-page ${page.url}: ` +
+                    `${subResult.accepted_payers.length} payers (${subResult.confidence})`,
+                );
+              }
+            }
+          } catch (subErr) {
+            console.warn(`[Scanner] Failed to crawl sub-page ${page.url}:`, subErr);
+          }
+        }
+      }
+
       result.payer_extraction = payerResult;
 
       if (payerResult.accepted_payers.length > 0) {
@@ -441,6 +470,23 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
       }
     } catch (err) {
       console.warn(`[Scanner] Payer extraction failed for ${site.url}:`, err);
+    }
+
+    // 3b-ii. Extract "accepting new patients" status from website
+    try {
+      const acceptingStatus = extractAcceptingPatients(crawl.text);
+      if (acceptingStatus !== null) {
+        console.log(`[Scanner] Accepting patients: ${acceptingStatus} for ${site.url}`);
+        await db(`practice_websites?id=eq.${site.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            website_accepting_patients: acceptingStatus,
+            website_accepting_patients_extracted_at: new Date().toISOString(),
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Accepting patients extraction failed for ${site.url}:`, err);
     }
 
     // 3c. Run compliance checks (WF6: DR/AI/ER scans)
@@ -469,6 +515,75 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
       }
     } catch (err) {
       console.warn(`[Scanner] Compliance checks failed for ${site.url}:`, err);
+    }
+
+    // 3d. Store AI-05 EHR vendor detections in ai_tools_detected table
+    if (result.compliance_scan) {
+      try {
+        const ai05 = result.compliance_scan.findings.find((f) => f.id === 'AI-05');
+        const ai05Vendors = (ai05?.evidence as any)?.vendors as any[] | undefined;
+
+        if (ai05 && ai05Vendors && ai05Vendors.length > 0) {
+          for (const vendor of ai05Vendors) {
+            // Check if already recorded for this NPI
+            const npi = site.npi || 'PRACTICE';
+            const existing = await db(
+              `ai_tools_detected?npi=eq.${npi}&tool_name=eq.${encodeURIComponent(vendor.name || vendor.key)}&select=id`,
+            );
+
+            if (!existing || !Array.isArray(existing) || existing.length === 0) {
+              await db('ai_tools_detected', {
+                method: 'POST',
+                body: JSON.stringify({
+                  npi,
+                  tool_name: vendor.name || vendor.key,
+                  tool_vendor: vendor.key,
+                  tool_category: 'EHR',
+                  detection_method: 'website_scan',
+                  confidence_score: vendor.confidence || 0.85,
+                  crawl_url: site.url,
+                  evidence: { matched_pattern: vendor.matched, source: 'AI-05 compliance check' },
+                }),
+                headers: { Prefer: 'return=minimal' },
+              });
+              console.log(
+                `[Scanner] Stored AI tool detection: ${vendor.name || vendor.key} for NPI ${npi}`,
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[Scanner] Failed to store AI-05 detections for ${site.url}:`, err);
+      }
+    }
+
+    // 3e. Aggregate practice-level specialties from matched providers
+    if (matched.length > 0) {
+      try {
+        const providerRows: any[] = await db(
+          `practice_providers?practice_website_id=eq.${site.id}&web_specialty=neq.&web_specialty=not.is.null&status=neq.DEPARTED&select=web_specialty`,
+        );
+        if (providerRows.length > 0) {
+          const uniqueSpecialties = [
+            ...new Set(providerRows.map((r) => r.web_specialty).filter(Boolean)),
+          ];
+          const specialtiesJson = uniqueSpecialties.map((s) => ({
+            specialty: s,
+            provider_count: providerRows.filter((r) => r.web_specialty === s).length,
+          }));
+          await db(`practice_websites?id=eq.${site.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              practice_specialties: specialtiesJson,
+            }),
+          });
+          console.log(
+            `[Scanner] Aggregated ${uniqueSpecialties.length} specialties for practice ${site.id}`,
+          );
+        }
+      } catch (err) {
+        console.warn(`[Scanner] Failed to aggregate specialties for practice ${site.id}:`, err);
+      }
     }
 
     // 4. Update practice_providers (Task 1.12)
@@ -840,4 +955,39 @@ function jaroWinklerSimple(s1: string, s2: string): number {
     else break;
   }
   return jaro + prefix * 0.1 * (1 - jaro);
+}
+
+// ── Accepting New Patients Extractor ────────────────────
+
+const ACCEPTING_PATIENTS_POSITIVE = [
+  /accepting\s+new\s+patients?/i,
+  /welcoming\s+new\s+patients?/i,
+  /now\s+(?:seeing|accepting|welcoming)\s+new\s+patients?/i,
+  /new\s+patients?\s+(?:welcome|accepted)/i,
+  /(?:we\s+are|we're)\s+accepting\s+new\s+patients?/i,
+  /open\s+(?:to|for)\s+new\s+patients?/i,
+  /taking\s+new\s+patients?/i,
+  /schedule\s+(?:a|your)\s+(?:new\s+patient|first)\s+(?:appointment|visit)/i,
+  /new\s+patient\s+(?:appointments?|registration|intake)\s+(?:available|open)/i,
+  /book\s+(?:a|your)\s+(?:new\s+patient|first)\s+(?:appointment|visit)/i,
+];
+
+const ACCEPTING_PATIENTS_NEGATIVE = [
+  /not\s+(?:currently\s+)?accepting\s+new\s+patients?/i,
+  /no\s+longer\s+accepting\s+new\s+patients?/i,
+  /(?:we\s+are|we're)\s+not\s+accepting\s+new\s+patients?/i,
+  /closed\s+to\s+new\s+patients?/i,
+  /(?:waitlist|wait\s+list)\s+(?:for\s+)?new\s+patients?/i,
+  /new\s+patient\s+(?:waitlist|wait\s+list)/i,
+];
+
+function extractAcceptingPatients(text: string): boolean | null {
+  // Check negative patterns first (more specific)
+  for (const pattern of ACCEPTING_PATIENTS_NEGATIVE) {
+    if (pattern.test(text)) return false;
+  }
+  for (const pattern of ACCEPTING_PATIENTS_POSITIVE) {
+    if (pattern.test(text)) return true;
+  }
+  return null;
 }
