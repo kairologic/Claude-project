@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ExternalLink, Copy, Check } from 'lucide-react';
 import { colors, typography, spacing, radii, transitions, shadows } from '@/lib/design-tokens';
-import { resolveUrl, getMissingPlaceholders } from '@/lib/corrections/deep-links';
+import { resolveUrl, getMissingPlaceholders } from '@/lib/corrections/deep-link-utils';
 import { getSystemIcon } from '@/lib/corrections/icons';
 import { InstructionCard } from './InstructionCard';
 
