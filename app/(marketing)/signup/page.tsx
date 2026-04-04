@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -34,6 +34,27 @@ const PLAN_CONFIG: Record<
 };
 
 export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="m-trial-page">
+          <div className="m-trial-layout">
+            <div
+              className="m-trial-form-card"
+              style={{ textAlign: 'center', padding: '80px 40px' }}
+            >
+              <p style={{ color: '#94a3b8' }}>Loading...</p>
+            </div>
+          </div>
+        </section>
+      }
+    >
+      <SignupPageInner />
+    </Suspense>
+  );
+}
+
+function SignupPageInner() {
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan'); // null = free, 'starter', 'professional'
   const planConfig = plan ? PLAN_CONFIG[plan] : null;
