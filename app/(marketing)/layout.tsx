@@ -20,7 +20,7 @@ export default function MarketingLayout({
       {/* Announcement Bar */}
       <div className="m-announce-bar">
         <span className="m-announce-dot"></span>
-        Now live in Texas &amp; California — 1.8M+ provider records indexed.
+        Now live in Texas — 1.8M+ provider records indexed.
         <Link href="/compliance">See state coverage &rarr;</Link>
       </div>
 
