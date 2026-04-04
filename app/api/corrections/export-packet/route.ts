@@ -75,7 +75,7 @@ const POST_HANDLER = withPracticeAccess(async (request: NextRequest, ctx: Practi
     });
 
     // Return PDF with appropriate headers
-    return new NextResponse(result.pdf, {
+    return new NextResponse(new Uint8Array(result.pdf), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
