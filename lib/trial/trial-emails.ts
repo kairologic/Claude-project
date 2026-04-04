@@ -5,7 +5,7 @@
 // Day 7:  Value summary — "Here's what we found this week"
 // Day 12: Expiry warning — "Your premium access expires in 2 days"
 // Day 14: Downgrade notice — "Your trial ended, here's what you're missing"
-// Day 21: Nudge — "Your 3 unresolved mismatches are still open"
+// Day 21: Nudge — "Your unresolved mismatches are still open"
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -155,7 +155,7 @@ export async function sendDay7Email(orgId: string, email: string): Promise<void>
       <div style="color:#94a3b8;font-size:13px;margin-top:4px;">${stats.total_providers} providers monitored \u00B7 7 days remaining on trial</div>
     </div>
     <div style="margin-bottom:24px;">${findingsHtml}</div>
-    <p style="color:#64748b;font-size:13px;">Your premium access includes unlimited form generation, real-time alerts, and auto-confirmation monitoring. These features are active for 7 more days.</p>
+    <p style="color:#64748b;font-size:13px;">Your trial includes daily monitoring, real-time alerts, and correction workflows. These features are active for 7 more days.</p>
     ${cta(stats.dashboard_url, 'View Your Dashboard')}
   `);
 
@@ -189,8 +189,8 @@ export async function sendDay12Email(orgId: string, email: string): Promise<void
       <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;">\u274C Roster surveillance (departed provider alerts)</div>
     </div>
     ${stats.mismatch_count > 0 ? `<p style="color:#ef4444;font-size:14px;font-weight:600;">You currently have ${stats.mismatch_count} unresolved mismatches.</p>` : ''}
-    ${cta(stats.dashboard_url + '?upgrade=true', 'Keep Premium Access \u2192 $99/mo')}
-    <p style="color:#94a3b8;font-size:12px;text-align:center;">Founder's rate. Locked for 12 months. First 10 customers only.</p>
+    ${cta(stats.dashboard_url + '?upgrade=true', 'Keep Premium Access \u2192 from $149/mo')}
+    <p style="color:#94a3b8;font-size:12px;text-align:center;">Simple flat pricing. Starter from $149/mo, Professional from $249/mo.</p>
   `);
 
   await sendEmail(email, subject, html);
@@ -226,8 +226,8 @@ export async function sendDay14Email(orgId: string, email: string): Promise<void
     <p style="color:#334155;font-size:14px;line-height:1.6;">
       During your trial, we monitored ${stats.total_providers} providers${stats.forms_generated > 0 ? `, generated ${stats.forms_generated} correction forms` : ''}${stats.forms_confirmed > 0 ? `, and confirmed ${stats.forms_confirmed} NPPES updates` : ''}. That monitoring is now paused.
     </p>
-    ${cta(stats.dashboard_url + '?upgrade=true', 'Reactivate for $99/mo')}
-    <p style="color:#94a3b8;font-size:12px;text-align:center;">Founder's rate. Cancel anytime. No long-term commitment.</p>
+    ${cta(stats.dashboard_url + '?upgrade=true', 'Reactivate \u2192 from $149/mo')}
+    <p style="color:#94a3b8;font-size:12px;text-align:center;">Plans start at $149/mo. Cancel anytime. No long-term commitment.</p>
   `);
 
   await sendEmail(email, subject, html);
@@ -253,7 +253,7 @@ export async function sendDay21Email(orgId: string, email: string): Promise<void
     <p style="color:#334155;font-size:14px;line-height:1.6;">
       Each unresolved mismatch increases the risk of pended claims, delayed credentialing, and audit findings. The correction forms we generated during your trial are still available \u2014 you just need to reactivate access to download them.
     </p>
-    ${cta(stats.dashboard_url + '?upgrade=true', 'Fix These Mismatches \u2192 $99/mo')}
+    ${cta(stats.dashboard_url + '?upgrade=true', 'Fix These Mismatches \u2192 from $149/mo')}
     <p style="color:#94a3b8;font-size:12px;text-align:center;">This is the last email about your trial. Your dashboard stays accessible.</p>
   `);
 

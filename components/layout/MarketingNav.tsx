@@ -80,7 +80,7 @@ export default function MarketingNav() {
             </ul>
 
             <div className="m-nav-actions">
-              <Link href="/contact" className="m-btn-primary">
+              <Link href="/signup" className="m-btn-primary">
                 Get Free Trial
                 <ArrowIcon />
               </Link>

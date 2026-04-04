@@ -2,14 +2,14 @@
 // ═══ Reverse Trial Lifecycle Manager ═══
 //
 // Flow:
-//   1. Practice claims dashboard → 21-day Protect-tier trial starts (no CC)
-//   2. Day 10 → value summary email
-//   3. Day 18 → expiry warning email
-//   4. Day 21 → auto-downgrade to free tier, downgrade email
-//   5. Day 28 → "mismatches still open" nudge email
+//   1. Practice claims dashboard → 14-day trial starts (no CC)
+//   2. Day 7 → value summary email
+//   3. Day 12 → expiry warning email
+//   4. Day 14 → auto-downgrade to free tier, downgrade email
+//   5. Day 21 → "mismatches still open" nudge email
 //   6. Any time → user upgrades via Stripe → trial ends, paid tier activates
 //
-// Trial state: ACTIVE → EXPIRING (day 12+) → EXPIRED → CONVERTED | CHURNED
+// Trial state: ACTIVE → EXPIRING (day 2 remaining) → EXPIRED → CONVERTED | CHURNED
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
 const SUPABASE_KEY =
@@ -39,16 +39,16 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
 export type PlanTier = 'free' | 'trial_protect' | 'monitor' | 'protect' | 'command';
 export type TrialStatus = 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'CONVERTED' | 'CHURNED' | 'NONE';
 
-export const TRIAL_DURATION_DAYS = 21;
+export const TRIAL_DURATION_DAYS = 14;
 export const TRIAL_TIER: PlanTier = 'trial_protect'; // full Protect access during trial
 export const FREE_TIER: PlanTier = 'free';
 
-export const FOUNDERS_RATE = {
-  enabled: true,
-  price_monthly: 99,
-  label: "Founder's Rate",
-  note: 'Locked at $99/mo for 12 months. First 10 customers only.',
-  slots_total: 10,
+// Plan pricing (flat monthly rates)
+export const PLAN_PRICING = {
+  free: { price_monthly: 0, label: 'Free', max_providers: 5 },
+  starter: { price_monthly: 149, label: 'Starter', max_providers: 10 },
+  professional: { price_monthly: 249, label: 'Professional', max_providers: 25 },
+  enterprise: { price_monthly: null, label: 'Enterprise', max_providers: null },
 };
 
 // ── Trial Lifecycle ──────────────────────────────────────

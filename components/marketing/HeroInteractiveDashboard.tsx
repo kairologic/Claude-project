@@ -593,7 +593,7 @@ export default function HeroInteractiveDashboard() {
                 Sign up for a free trial to unlock unlimited provider intelligence.
               </div>
               <a
-                href="/contact"
+                href="/signup"
                 style={{
                   padding: '10px 20px',
                   borderRadius: '6px',

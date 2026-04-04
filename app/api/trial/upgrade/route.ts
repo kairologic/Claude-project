@@ -14,13 +14,16 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://kairologic.net';
 
-// Founders' rate price IDs (create these in Stripe Dashboard)
-// For launch: single $99/mo price, no per-provider metering yet
-const PRICE_IDS: Record<string, string> = {
-  founders: process.env.STRIPE_FOUNDERS_PRICE_ID || '',
-  monitor: process.env.STRIPE_MONITOR_PRICE_ID || '',
-  protect: process.env.STRIPE_PROTECT_PRICE_ID || '',
-  command: process.env.STRIPE_COMMAND_PRICE_ID || '',
+// Stripe price IDs for each plan tier
+const PRICE_IDS: Record<string, { monthly: string; annual: string }> = {
+  starter: {
+    monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || 'price_1TIYIEGg3oiiGF7gkr81Zj4z',
+    annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || 'price_1TIYIFGg3oiiGF7gIoHxe3Bd',
+  },
+  professional: {
+    monthly: process.env.STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID || 'price_1TIYIHGg3oiiGF7ge3eppidd',
+    annual: process.env.STRIPE_PROFESSIONAL_ANNUAL_PRICE_ID || 'price_1TIYIIGg3oiiGF7g4CMiFxIQ',
+  },
 };
 
 async function db(path: string, options: RequestInit = {}): Promise<any> {
@@ -40,11 +43,14 @@ async function db(path: string, options: RequestInit = {}): Promise<any> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { practice_website_id, plan } = await request.json();
+    const { practice_website_id, plan, billing } = await request.json();
 
     if (!practice_website_id) {
       return NextResponse.json({ error: 'practice_website_id required' }, { status: 400 });
     }
+
+    const selectedPlan = plan || 'starter';
+    const billingCycle = billing || 'monthly';
 
     // Get practice and org info
     const practices = await db(
@@ -60,8 +66,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
-    // For founders' rate: use single price
-    const priceId = PRICE_IDS.founders || PRICE_IDS[plan || 'protect'];
+    // Look up price ID for selected plan and billing cycle
+    const planPrices = PRICE_IDS[selectedPlan];
+    if (!planPrices) {
+      return NextResponse.json(
+        { error: `Invalid plan: ${selectedPlan}. Choose starter or professional.` },
+        { status: 400 },
+      );
+    }
+    const priceId = billingCycle === 'annual' ? planPrices.annual : planPrices.monthly;
     if (!priceId) {
       return NextResponse.json(
         { error: 'Price not configured. Contact support.' },
@@ -83,7 +96,8 @@ export async function POST(request: NextRequest) {
       metadata: {
         organization_id: orgId,
         practice_website_id,
-        plan: plan || 'founders',
+        plan: selectedPlan,
+        billing: billingCycle,
       },
       subscription_data: {
         metadata: {
