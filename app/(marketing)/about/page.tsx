@@ -98,9 +98,9 @@ export default function AboutPage() {
             >
               {[
                 { num: '1.8M+', label: 'U.S. provider records indexed' },
-                { num: '50', label: 'State compliance rules tracked' },
+                { num: '57K+', label: 'Practice websites monitored' },
                 { num: '24/7', label: 'Continuous data monitoring' },
-                { num: '<4hrs', label: 'Average drift detection time' },
+                { num: '6', label: 'Major payer directories synced' },
               ].map((stat, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
                   <span

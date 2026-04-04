@@ -52,7 +52,7 @@ export default function ResourcesPage() {
               <h2>Pricing</h2>
               <p>
                 Simple plans for every organization size — from solo practices to enterprise health
-                systems. See the Founders Rate and all available tiers.
+                systems. Free, Starter, Professional, and Enterprise tiers.
               </p>
               <span className="m-resource-link">
                 View pricing <ArrowIcon />
@@ -97,11 +97,11 @@ export default function ResourcesPage() {
             </Link>
 
             {/* Get Started */}
-            <Link href="/contact" className="m-resource-card m-resource-cta">
+            <Link href="/signup" className="m-resource-card m-resource-cta">
               <div className="m-resource-tag">Free Trial</div>
               <h2>Get Started</h2>
               <p>
-                Start your 21-day free trial today. Full platform access, no credit card required.
+                Start your 14-day free trial today. Full platform access, no credit card required.
               </p>
               <span className="m-resource-link">
                 Start free trial <ArrowIcon />

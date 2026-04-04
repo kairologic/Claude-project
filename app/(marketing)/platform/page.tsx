@@ -79,7 +79,7 @@ export default function PlatformPage() {
                   <div>
                     <strong>Practice website monitoring</strong>
                     <span>
-                      34K+ practice websites scanned to detect roster changes and address
+                      57K+ practice websites scanned to detect roster changes and address
                       discrepancies
                     </span>
                   </div>
@@ -417,7 +417,7 @@ export default function PlatformPage() {
             <h2>
               See your provider data <em>clearly.</em>
             </h2>
-            <p>21-day free trial — full platform access, no credit card required.</p>
+            <p>14-day free trial — full platform access, no credit card required.</p>
             <div className="m-cta-actions">
               <Link href="/contact" className="m-btn-primary m-gold">
                 Get Started

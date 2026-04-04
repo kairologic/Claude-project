@@ -222,7 +222,7 @@ export default function SolutionsPage() {
             <h2>
               Ready to see what KairoLogic <em>finds?</em>
             </h2>
-            <p>21-day free trial — full platform access, no credit card required.</p>
+            <p>14-day free trial — full platform access, no credit card required.</p>
             <div className="m-cta-actions">
               <Link href="/contact" className="m-btn-primary m-gold">
                 Get Started

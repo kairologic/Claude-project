@@ -100,8 +100,8 @@ Workflows run continuously in the background and are triggered automatically whe
       {
         id: 'trial-overview',
         title: 'Your Free Trial',
-        description: 'What your 21-day trial includes and what happens after',
-        content: `Your 21-day free trial includes full access to every feature on the platform:
+        description: 'What your 14-day trial includes and what happens after',
+        content: `Your 14-day free trial includes full access to every feature on the platform:
 
 • Provider data monitoring across NPPES, payer directories, and state boards
 • Compliance scanning (SB 1188, HB 149)
@@ -114,15 +114,11 @@ What happens during your trial:
 
 Day 1 — Your first provider data scan runs automatically. Results appear within a few minutes.
 
-Day 10 — You'll receive an email with a summary of findings and recommendations.
+Day 7 — You'll receive an email with a summary of findings and recommendations.
 
-Day 18 — A reminder that your trial is ending soon, with an upgrade link.
+Day 11 — A reminder that your trial is ending soon, with an upgrade link.
 
-Day 21 — Trial ends. Your dashboard switches to read-only mode.
-
-Day 21–28 — Read-only access continues for 7 additional days so you can review data and export reports before deciding.
-
-Founders Rate: The first 10 customers who upgrade from trial get a locked-in founders rate for the first year.
+Day 14 — Trial ends. Your account downgrades to the Free plan (5 providers).
 
 To upgrade at any time, go to Settings > Billing or contact us at info@kairologic.net.`,
       },
@@ -701,21 +697,20 @@ Data Management:
         content: `Billing information is accessible from Settings > Billing.
 
 Trial Period:
-Your 21-day trial includes full access to all features. No credit card is required to start. After 21 days, your dashboard switches to read-only mode for 7 additional days.
-
-Founders Rate:
-The first 10 customers who upgrade get a locked-in founders rate for the first year. Check Settings > Billing to see if founders rate slots are still available.
+Your 14-day trial includes full access to all features. No credit card is required to start. After 14 days, your account downgrades to the Free plan (5 providers).
 
 Upgrading:
-To upgrade from trial to a paid plan:
+To upgrade from trial or free to a paid plan:
 1. Go to Settings > Billing
-2. Select your plan (Protect or Scale)
+2. Select your plan (Starter, Professional, or Enterprise)
 3. Enter payment information
-4. Your dashboard immediately returns to full access
+4. Your dashboard immediately unlocks full access
 
 Plans:
-PROTECT — Single practice, up to 10 providers, weekly scans
-SCALE — Multiple practices, unlimited providers, daily scans, API access
+FREE — Up to 5 providers, weekly scans, 3 payers
+STARTER ($149/mo) — Up to 10 providers, daily scans, all major payers
+PROFESSIONAL ($249/mo) — Up to 25 providers, compliance scanning, team access
+ENTERPRISE — Unlimited providers, custom integrations, dedicated support
 
 Questions about billing? Email info@kairologic.net or reply to any email from us.`,
       },

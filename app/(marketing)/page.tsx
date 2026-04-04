@@ -160,7 +160,7 @@ export default function HomePage() {
                 <div className="m-scenario-response-label">KairoLogic detects</div>
                 <h3>Address Drift</h3>
                 <p>
-                  Cross-references NPPES, payer directories, and 34K+ practice websites to flag
+                  Cross-references NPPES, payer directories, and 57K+ practice websites to flag
                   mismatches. Surfaces the correct address and generates a resolution workflow —
                   before patients show up at the wrong location.
                 </p>
@@ -396,7 +396,7 @@ export default function HomePage() {
                   <div className="m-cov-stat-label">Integrity checks per provider</div>
                 </div>
                 <div className="m-cov-stat">
-                  <div className="m-cov-stat-num">34K+</div>
+                  <div className="m-cov-stat-num">57K+</div>
                   <div className="m-cov-stat-label">Practice websites monitored</div>
                 </div>
                 <div className="m-cov-stat">

@@ -62,12 +62,12 @@ export default function GetStartedPage() {
             access your dashboard.
           </p>
           <p className="m-trial-success-note">
-            Your 21-day free trial includes full access to all features — compliance monitoring,
+            Your 14-day free trial includes full access to all features — compliance monitoring,
             credentialing workflows, and payer directory tracking. We&apos;re running your first
             provider data scan now, so you&apos;ll see results within a few minutes of logging in.
           </p>
           <p className="m-trial-success-note" style={{ marginTop: '8px' }}>
-            After 21 days, your dashboard switches to read-only mode for 7 additional days.
+            After 14 days, your dashboard switches to read-only mode for 7 additional days.
           </p>
           <Link
             href="/"
@@ -134,7 +134,7 @@ export default function GetStartedPage() {
         <div className="m-trial-form-wrap">
           <div className="m-trial-form-card">
             <div className="m-trial-form-header">
-              <h2>21-day free trial</h2>
+              <h2>14-day free trial</h2>
               <p>Full platform access. Read-only for 7 more days after.</p>
             </div>
 

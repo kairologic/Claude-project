@@ -289,7 +289,7 @@ export default function CompliancePage() {
               See where your providers stand <em>today.</em>
             </h2>
             <p>
-              Start your 21-day free trial and get compliance visibility across your entire roster —
+              Start your 14-day free trial and get compliance visibility across your entire roster —
               TX and CA coverage included.
             </p>
             <div className="m-cta-actions">
