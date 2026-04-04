@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Playwright is only used in GitHub Actions (scan engine), never in Vercel.
+  // Externalize it so webpack doesn't try to bundle native dependencies.
+  serverExternalPackages: ['playwright-core', 'playwright'],
+  experimental: {
+    serverComponentsExternalPackages: ['playwright-core', 'playwright'],
+  },
   images: {
     domains: ['kairologic.net'],
   },
