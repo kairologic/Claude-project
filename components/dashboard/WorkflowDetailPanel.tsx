@@ -331,10 +331,12 @@ export default function WorkflowDetailPanel({
     // Build a deep link data structure from finding details metadata
     const deepLink: DeepLinkData | null = fd?.deep_link
       ? {
-          url_template: fd.deep_link.url_template || '',
-          display_label: fd.deep_link.display_label || `Open ${systemName}`,
-          instructions: fd.deep_link.instructions || [],
-          icon: fd.deep_link.icon || '',
+          url_template: ((fd.deep_link as Record<string, unknown>).url_template as string) || '',
+          display_label:
+            ((fd.deep_link as Record<string, unknown>).display_label as string) ||
+            `Open ${systemName}`,
+          instructions: ((fd.deep_link as Record<string, unknown>).instructions as string[]) || [],
+          icon: ((fd.deep_link as Record<string, unknown>).icon as string) || '',
         }
       : null;
 
@@ -655,10 +657,10 @@ export default function WorkflowDetailPanel({
                     Correction Details
                   </div>
                   <CorrectionValuePair
-                    fieldLabel={workflow.finding_details.field || 'Field'}
+                    fieldLabel={(workflow.finding_details.field as string | undefined) || 'Field'}
                     incorrectValue={
-                      workflow.finding_details.nppes_value ||
-                      workflow.finding_details.current_value ||
+                      (workflow.finding_details.nppes_value as string | undefined) ||
+                      (workflow.finding_details.current_value as string | undefined) ||
                       '—'
                     }
                     correctValue={workflow.approved_value}

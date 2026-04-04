@@ -19,14 +19,14 @@
 //   weekly   → 7 days (practice plan)
 //   daily    → 1 day (CVO/network plan)
 
-import { isValidProviderName } from './name-quality-filter';
-import { isBlockedDomain } from './domain-blocklist';
-import { crawlPage, type CrawlResult } from '../crawler';
-import { extractAddressFromSite, type ExtractionSummary } from '../address/index';
+import { isValidProviderName } from './scanner/name-quality-filter';
+import { isBlockedDomain } from './scanner/domain-blocklist';
+import { crawlPage, type CrawlResult } from './crawler';
+import { extractAddressFromSite, type ExtractionSummary } from './address/index';
 import {
   saveExtractionToProviderSites,
   saveExtractionToPracticeProviders,
-} from '../address/scan-plugin';
+} from './address/scan-plugin';
 
 // ── Types ────────────────────────────────────────────────
 

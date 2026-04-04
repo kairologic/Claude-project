@@ -76,7 +76,9 @@ export function getSystemIcon(systemName: string): string {
  * Get a Lucide icon name for a correction type.
  * Can be used with: import { [IconName] } from 'lucide-react'
  */
-export function getCorrectionTypeIcon(correctionType: string): keyof typeof iconNameMap {
+export function getCorrectionTypeIcon(
+  correctionType: string,
+): 'MapPin' | 'Phone' | 'Mail' | 'FileEdit' | 'Tag' | 'ShieldCheck' | 'UserCog' | 'CheckCircle' {
   const iconNameMap = {
     address: 'MapPin',
     phone: 'Phone',
@@ -98,7 +100,7 @@ export function getCorrectionTypeIcon(correctionType: string): keyof typeof icon
     (key) => key.toLowerCase().includes(lowerType) || lowerType.includes(key.toLowerCase()),
   ) as keyof typeof iconNameMap | undefined;
 
-  return matchedKey || 'Tag';
+  return matchedKey ? iconNameMap[matchedKey] : 'Tag';
 }
 
 /**
