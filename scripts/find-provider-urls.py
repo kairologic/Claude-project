@@ -28,20 +28,26 @@ SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
 SERPER_API_KEY = os.environ.get('SERPER_API_KEY', '')
 BATCH_SIZE = 100
 
-# URLs to skip (directories, not real practice sites)
-SKIP_DOMAINS = [
-    'facebook.com', 'yelp.com', 'healthgrades.com', 'zocdoc.com',
-    'vitals.com', 'doximity.com', 'npidb.org', 'webmd.com',
-    'yellowpages.com', 'bbb.org', 'linkedin.com', 'twitter.com',
-    'instagram.com', 'tiktok.com', 'youtube.com', 'google.com',
-    'apple.com', 'bing.com', 'mapquest.com', 'superpages.com',
-    'whitepages.com', 'manta.com', 'chamberofcommerce.com',
-    'psychologytoday.com', 'sharecare.com', 'wellness.com',
-    'ratemds.com', 'usnews.com', 'npi.io', 'npino.com',
-    'medicare.gov', 'medicaid.gov', 'cms.gov',
-    'walmart.com', 'cvs.com', 'walgreens.com', 'costco.com',
-    'kroger.com', 'heb.com', 'target.com', 'amazon.com',
-]
+# Load blocked domains from shared JSON (single source of truth with TS blocklist).
+# Falls back to a minimal hardcoded list if the JSON hasn't been generated yet.
+def _load_blocked_domains():
+    json_path = os.path.join(os.path.dirname(__file__), '..', 'shared', 'blocked-domains.json')
+    try:
+        with open(json_path, 'r') as f:
+            domains = json.load(f)
+            print(f"  Loaded {len(domains)} blocked domains from shared/blocked-domains.json")
+            return domains
+    except FileNotFoundError:
+        print("  [WARN] shared/blocked-domains.json not found — run: npm run export-blocklist")
+        print("  Using minimal fallback blocklist.")
+        return [
+            'facebook.com', 'yelp.com', 'healthgrades.com', 'zocdoc.com',
+            'vitals.com', 'doximity.com', 'npidb.org', 'webmd.com',
+            'yellowpages.com', 'linkedin.com', 'twitter.com', 'instagram.com',
+            'google.com', 'walmart.com', 'cvs.com', 'walgreens.com',
+        ]
+
+SKIP_DOMAINS = _load_blocked_domains()
 
 def db_get(path):
     url = f"{SUPABASE_URL}/rest/v1/{path}"
@@ -71,15 +77,22 @@ def db_upsert(rows):
     return resp.status_code
 
 def is_valid_url(url):
-    """Filter out directory listings and non-practice URLs."""
+    """Filter out directory listings and non-practice URLs.
+    Uses exact domain + subdomain matching (same logic as TS isBlockedDomain)."""
     if not url:
         return False
     url_lower = url.lower()
-    for domain in SKIP_DOMAINS:
-        if domain in url_lower:
-            return False
     if not url_lower.startswith('http'):
         return False
+    try:
+        from urllib.parse import urlparse
+        hostname = urlparse(url_lower).hostname or ''
+        hostname = hostname.lstrip('www.')
+        for domain in SKIP_DOMAINS:
+            if hostname == domain or hostname.endswith('.' + domain):
+                return False
+    except Exception:
+        pass
     return True
 
 def search_serper_places(query):

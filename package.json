@@ -18,7 +18,8 @@
     "test:audit": "npx tsx scripts/generate-test-stub.ts",
     "test:audit:generate": "npx tsx scripts/generate-test-stub.ts --generate",
     "test:report": "npx playwright show-report",
-    "build:extension": "node chrome-extension/generate-icons.mjs && node chrome-extension/build.mjs"
+    "build:extension": "node chrome-extension/generate-icons.mjs && node chrome-extension/build.mjs",
+    "export-blocklist": "npx tsx scripts/export-blocklist.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
