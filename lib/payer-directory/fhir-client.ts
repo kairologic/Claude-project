@@ -1,0 +1,1114 @@
+// ═══════════════════════════════════════════════════════════════
+// KairoLogic: FHIR PDex Plan-Net Client
+// Queries payer Provider Directory APIs by NPI
+// Adapter pattern: one client, per-payer config
+// ═══════════════════════════════════════════════════════════════
+
+import type {
+  PayerEndpoint,
+  DirectorySnapshot,
+  FhirBundle,
+  FhirBundleEntry,
+  FhirPractitioner,
+  FhirPractitionerRole,
+  FhirLocation,
+  FhirOrganization,
+  FhirIdentifier,
+  FhirHumanName,
+  FhirContactPoint,
+  FhirAddress,
+  FhirCodeableConcept,
+  FhirExtension,
+} from './types';
+
+const NPI_SYSTEM = 'http://hl7.org/fhir/sid/us-npi';
+const NUCC_SYSTEM_PATTERNS = ['nucc.org', 'taxonomy', 'provider-taxonomy'];
+
+// ── Rate limiter ──────────────────────────────────────────────
+
+class RateLimiter {
+  private timestamps: number[] = [];
+  constructor(private rpm: number) {}
+
+  async wait(): Promise<void> {
+    const now = Date.now();
+    const windowStart = now - 60_000;
+    this.timestamps = this.timestamps.filter((t) => t > windowStart);
+
+    if (this.timestamps.length >= this.rpm) {
+      const waitUntil = this.timestamps[0] + 60_000;
+      const delay = waitUntil - now;
+      if (delay > 0) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+    this.timestamps.push(Date.now());
+  }
+}
+
+// ── FHIR Client ───────────────────────────────────────────────
+
+export class FhirDirectoryClient {
+  private rateLimiters = new Map<string, RateLimiter>();
+  private authTokens = new Map<string, { token: string; expires: number }>();
+
+  /**
+   * Look up a provider by NPI across a single payer directory.
+   * Returns a flattened DirectorySnapshot or null if not found.
+   */
+  async lookupByNpi(
+    npi: string,
+    endpoint: PayerEndpoint,
+    batchId?: string,
+    providerName?: string | null,
+  ): Promise<DirectorySnapshot | null> {
+    if (!endpoint.is_active || endpoint.fhir_base_url === 'TBD') {
+      return null;
+    }
+
+    const limiter = this.getRateLimiter(endpoint);
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      // URL-encode the pipe: some FHIR servers reject raw | in query strings
+      const identifierParam = `${encodeURIComponent(NPI_SYSTEM + '|' + npi)}`;
+      const searchMode = (endpoint as any).search_mode || 'npi';
+
+      // ── Step 1: Find Practitioner by NPI ──
+      // Strategy A: Search by NPI identifier (standard FHIR, works on most payers)
+      // Strategy B: Search by family+given name (for payers like Cigna whose
+      //             CapabilityStatement only supports name/family/given params)
+      // The endpoint's search_mode drives which strategy to use first:
+      //   'npi'  → try identifier first, fall back to name
+      //   'name' → skip identifier entirely, go straight to name search
+      let practitionerBundle: FhirBundle;
+      let practitioner: FhirPractitioner | null = null;
+      let usedNameFallback = false;
+
+      if (searchMode !== 'name') {
+        // Strategy A: identifier-based search (default for most payers)
+        try {
+          await limiter.wait();
+          practitionerBundle = await this.fhirGet<FhirBundle>(
+            endpoint,
+            `/Practitioner?identifier=${identifierParam}`,
+          );
+          practitioner = this.findResourceInBundle<FhirPractitioner>(
+            practitionerBundle,
+            'Practitioner',
+          );
+        } catch (identifierErr: unknown) {
+          const errMsg =
+            identifierErr instanceof Error ? identifierErr.message : String(identifierErr);
+          // If identifier search fails (e.g. Cigna returns 400 "param not valid"),
+          // fall back to name-based search
+          if (errMsg.includes('400') && providerName) {
+            console.log(
+              `    [${endpoint.payer_code}] Identifier search failed (400), trying name-based fallback for ${npi}...`,
+            );
+            practitionerBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
+          } else {
+            throw identifierErr; // Re-throw if not a 400 or no name available
+          }
+        }
+      } else {
+        // Name-mode: skip identifier search entirely (saves a wasted API call)
+        console.log(
+          `    [${endpoint.payer_code}] search_mode=name — skipping identifier search for ${npi}`,
+        );
+        practitionerBundle = { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] };
+      }
+
+      // Strategy B: Name-based search when identifier returned nothing or was skipped
+      if (!practitioner && providerName) {
+        const nameParts = providerName
+          .replace(/^Dr\.?\s*/i, '')
+          .replace(/,?\s*(MD|DO|NP|PA|DPM|DDS|DMD|OD|PhD|APRN|FNP|DNP)$/i, '')
+          .trim()
+          .split(/\s+/);
+
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts[nameParts.length - 1];
+
+          if (firstName.length >= 2 && lastName.length >= 2) {
+            try {
+              await limiter.wait();
+              const nameBundle = await this.fhirGet<FhirBundle>(
+                endpoint,
+                `/Practitioner?family=${encodeURIComponent(lastName)}&given=${encodeURIComponent(firstName)}`,
+              );
+
+              // Verify NPI match in returned results to avoid false positives
+              for (const entry of nameBundle.entry || []) {
+                const resource = entry.resource as FhirPractitioner;
+                if (resource?.resourceType !== 'Practitioner') continue;
+
+                const hasMatchingNpi = (resource.identifier || []).some(
+                  (id) => id.system === NPI_SYSTEM && id.value === npi,
+                );
+
+                if (hasMatchingNpi) {
+                  practitioner = resource;
+                  practitionerBundle = nameBundle;
+                  usedNameFallback = true;
+                  console.log(
+                    `    [${endpoint.payer_code}] Found ${npi} via name search (${firstName} ${lastName})`,
+                  );
+                  break;
+                }
+              }
+
+              if (!practitioner && (nameBundle.entry?.length || 0) > 0) {
+                console.log(
+                  `    [${endpoint.payer_code}] Name search for ${firstName} ${lastName} returned ` +
+                    `${nameBundle.entry?.length} results but none matched NPI ${npi}`,
+                );
+              }
+            } catch (nameErr) {
+              console.warn(
+                `    [${endpoint.payer_code}] Name-based search failed for ${npi}:`,
+                nameErr instanceof Error ? nameErr.message : nameErr,
+              );
+            }
+          }
+        }
+      }
+
+      if (!practitioner) {
+        // Provider not listed in this payer directory
+        return this.buildNotListedSnapshot(
+          npi,
+          endpoint.payer_code,
+          today,
+          practitionerBundle,
+          batchId,
+        );
+      }
+
+      // ── Step 2: Find PractitionerRole (links to Location, Org, Network) ──
+      // Two query strategies:
+      // A) Reference-based: PractitionerRole?practitioner=Practitioner/{id} (works on UHC/Optum)
+      // B) Chained identifier: PractitionerRole?practitioner.identifier=NPI (works on Aetna, Cigna)
+      // Try reference-based first (more reliable), fall back to chained if no results.
+      //
+      // GRACEFUL DEGRADATION: If PractitionerRole query fails (e.g. UHC intermittent 500s),
+      // we still build a partial snapshot from the Practitioner data we already have.
+      // This recovers name, phone, specialty, and credentials even when role/location/org
+      // are unavailable — still useful for mismatch detection.
+      let role: FhirPractitionerRole | null = null;
+      let roleBundle: FhirBundle = {
+        resourceType: 'Bundle',
+        type: 'searchset',
+        total: 0,
+        entry: [],
+      };
+      let location: FhirLocation | null = null;
+      let organization: FhirOrganization | null = null;
+      let partialSnapshot = false;
+
+      try {
+        await limiter.wait();
+
+        const practitionerRef = `Practitioner/${practitioner.id}`;
+        roleBundle = await this.fhirGet<FhirBundle>(
+          endpoint,
+          `/PractitionerRole?practitioner=${encodeURIComponent(practitionerRef)}` +
+            `&_include=PractitionerRole:location` +
+            `&_include=PractitionerRole:organization` +
+            `&_include=PractitionerRole:network`,
+        );
+
+        role = this.findResourceInBundle<FhirPractitionerRole>(roleBundle, 'PractitionerRole');
+
+        // Fallback: try chained identifier search if reference-based returned nothing.
+        // Skip for name-mode payers (e.g. Cigna) — they don't support practitioner.identifier
+        // and return OperationOutcome error CRD16-005.
+        if (!role && !roleBundle.entry?.length && searchMode !== 'name') {
+          console.log(
+            `    [${endpoint.payer_code}] Reference query returned 0 roles, trying chained identifier...`,
+          );
+          await limiter.wait();
+          roleBundle = await this.fhirGet<FhirBundle>(
+            endpoint,
+            `/PractitionerRole?practitioner.identifier=${identifierParam}` +
+              `&_include=PractitionerRole:location` +
+              `&_include=PractitionerRole:organization` +
+              `&_include=PractitionerRole:network`,
+          );
+          role = this.findResourceInBundle<FhirPractitionerRole>(roleBundle, 'PractitionerRole');
+        } else if (!role && !roleBundle.entry?.length && searchMode === 'name') {
+          console.log(
+            `    [${endpoint.payer_code}] Reference query returned 0 roles — skipping chained identifier (name-mode payer)`,
+          );
+        }
+
+        // Extract included resources from the role bundle
+        location = this.findResourceInBundle<FhirLocation>(roleBundle, 'Location');
+        organization = this.findResourceInBundle<FhirOrganization>(roleBundle, 'Organization');
+
+        // ── Fix #42b: Fallback for Location when _include fails ──
+        // Some payers (Humana, HCSC) don't support _include, so Location
+        // comes back null. Extract the reference from PractitionerRole
+        // and fetch Location directly.
+        if (!location && role) {
+          const locationRef = this.extractLocationReference(role);
+          if (locationRef) {
+            try {
+              await limiter.wait();
+              const locationBundle = await this.fhirGet<FhirBundle>(
+                endpoint,
+                `/Location?_id=${locationRef}`,
+              );
+              location = this.findResourceInBundle<FhirLocation>(locationBundle, 'Location');
+              if (!location) {
+                // Try direct read by ID (some servers prefer /Location/{id} over search)
+                try {
+                  await limiter.wait();
+                  location = await this.fhirGet<FhirLocation>(endpoint, `/Location/${locationRef}`);
+                } catch {
+                  // Location not available via direct read either
+                }
+              }
+            } catch (err) {
+              console.log(
+                `    [${endpoint.payer_code}] Location fallback failed: ${err instanceof Error ? err.message : err}`,
+              );
+            }
+          }
+        }
+      } catch (roleErr: unknown) {
+        // GRACEFUL DEGRADATION: PractitionerRole query failed (e.g. UHC 500).
+        // Continue with just Practitioner data — we still get name, phone, specialty, credentials.
+        const roleMsg = roleErr instanceof Error ? roleErr.message : String(roleErr);
+        const is500 = roleMsg.includes('500') || roleMsg.includes('Internal Server Error');
+        if (is500) {
+          console.warn(
+            `    [${endpoint.payer_code}] PractitionerRole query returned 500 for ${npi} — building partial snapshot from Practitioner data`,
+          );
+          partialSnapshot = true;
+          // role, location, organization remain null — snapshot will have Practitioner fields only
+        } else {
+          // Non-500 errors (auth, config, etc.) should still propagate
+          throw roleErr;
+        }
+      }
+
+      // Also check contained resources inside PractitionerRole
+      const containedPractitioner = this.findContained<FhirPractitioner>(
+        role as unknown as Record<string, unknown>,
+        'Practitioner',
+      );
+      const containedOrg = this.findContained<FhirOrganization>(
+        role as unknown as Record<string, unknown>,
+        'Organization',
+      );
+
+      // Merge: prefer top-level, fall back to contained
+      const finalPractitioner = practitioner || containedPractitioner;
+      const finalOrg = organization || containedOrg;
+
+      // Collect ALL Practitioner entries (UHC returns multiple with different data)
+      const allPractitioners = this.findAllResourcesInBundle<FhirPractitioner>(
+        practitionerBundle,
+        'Practitioner',
+      );
+
+      // ── Step 3: Build snapshot ──
+      const snapshot = this.buildSnapshot(
+        npi,
+        endpoint.payer_code,
+        today,
+        finalPractitioner,
+        role,
+        location,
+        finalOrg,
+        { practitioner: practitionerBundle, role: roleBundle },
+        batchId,
+        allPractitioners,
+      );
+
+      if (partialSnapshot) {
+        console.log(
+          `    [${endpoint.payer_code}] Partial snapshot for ${npi}: name=${snapshot.listed_name_full || 'N/A'}, phone=${snapshot.listed_phone || 'N/A'}, specialty=${snapshot.listed_specialty_display || 'N/A'}`,
+        );
+      }
+
+      return snapshot;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`  [${endpoint.payer_code}] Error looking up NPI ${npi}: ${msg}`);
+      throw err; // Re-throw so callers can count/handle errors
+    }
+  }
+
+  /**
+   * Look up a provider across ALL active payer endpoints.
+   */
+  async lookupAllPayers(
+    npi: string,
+    endpoints: PayerEndpoint[],
+    batchId?: string,
+    providerName?: string | null,
+  ): Promise<DirectorySnapshot[]> {
+    const results: DirectorySnapshot[] = [];
+
+    for (const endpoint of endpoints) {
+      if (!endpoint.is_active || endpoint.fhir_base_url === 'TBD') {
+        console.log(`  [${endpoint.payer_code}] Skipped (inactive or TBD endpoint)`);
+        continue;
+      }
+
+      console.log(`  [${endpoint.payer_code}] Querying ${endpoint.payer_name}...`);
+      try {
+        const snapshot = await this.lookupByNpi(npi, endpoint, batchId, providerName);
+
+        if (snapshot) {
+          results.push(snapshot);
+          const listed = snapshot.listed_name_full || snapshot.listed_name_last || '(no name)';
+          const addr = snapshot.listed_city
+            ? `${snapshot.listed_city}, ${snapshot.listed_state}`
+            : '(no address)';
+          console.log(`    → Found: ${listed} at ${addr}`);
+        } else {
+          console.log(`    → Not found or endpoint unavailable`);
+        }
+      } catch (err) {
+        console.warn(
+          `  [${endpoint.payer_code}] Error for NPI ${npi}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    return results;
+  }
+
+  // ── FHIR HTTP ─────────────────────────────────────────────
+
+  private async fhirGet<T>(endpoint: PayerEndpoint, path: string): Promise<T> {
+    const url = `${endpoint.fhir_base_url}${path}`;
+    const headers: Record<string, string> = {
+      Accept: 'application/fhir+json',
+    };
+
+    // Add auth headers if needed
+    if (endpoint.auth_type === 'api_key' && endpoint.auth_config?.api_key) {
+      headers['x-api-key'] = endpoint.auth_config.api_key;
+    } else if (endpoint.auth_type === 'oauth2_client_credentials') {
+      const token = await this.getOAuthToken(endpoint);
+      if (!token) {
+        throw new Error(
+          `[${endpoint.payer_code}] OAuth token acquisition failed — cannot query without auth`,
+        );
+      }
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Timeout: 60s for Humana (slow responses), 30s for others
+    const timeoutMs = endpoint.payer_code === 'humana' ? 60_000 : 30_000;
+
+    const res = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    // 404 is the standard "not found" response in FHIR
+    if (res.status === 404) {
+      console.log(`    [${endpoint.payer_code}] 404 — provider not in directory`);
+      return { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] } as T;
+    }
+
+    // 400 can mean "not found" on some FHIR servers, but also auth/format errors.
+    // Read the body to distinguish.
+    if (res.status === 400) {
+      const bodyText = await res.text();
+      const lowerBody = bodyText.toLowerCase();
+      const isNotFound =
+        lowerBody.includes('no resources match') ||
+        lowerBody.includes('not found') ||
+        lowerBody.includes('no results') ||
+        lowerBody.includes('unknown resource');
+      if (isNotFound) {
+        console.log(`    [${endpoint.payer_code}] 400 (not found) — provider not in directory`);
+        return { resourceType: 'Bundle', type: 'searchset', total: 0, entry: [] } as T;
+      }
+      // 400 that isn't "not found" → likely auth or request format error
+      console.error(`    [${endpoint.payer_code}] FHIR 400 error body: ${bodyText.slice(0, 300)}`);
+      throw new Error(
+        `[${endpoint.payer_code}] FHIR 400 (possible auth/config error): ${bodyText.slice(0, 200)}`,
+      );
+    }
+
+    // 401/403 are always auth errors — invalidate cached token and throw
+    if (res.status === 401 || res.status === 403) {
+      this.authTokens.delete(endpoint.payer_code); // force token refresh on next call
+      throw new Error(
+        `[${endpoint.payer_code}] FHIR ${res.status} auth error — check credentials: ${res.statusText}`,
+      );
+    }
+
+    // 429 = rate limited — retry once after Retry-After header or 5s default
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('Retry-After') || '', 10);
+      const delay = retryAfter > 0 ? retryAfter * 1000 : 5000;
+      console.warn(
+        `    [${endpoint.payer_code}] FHIR 429 rate limited, waiting ${delay}ms before retry...`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+
+      // Single retry after rate limit wait
+      const retryRes = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!retryRes.ok) {
+        throw new Error(
+          `[${endpoint.payer_code}] FHIR ${retryRes.status} after 429 retry: ${retryRes.statusText} — ${url}`,
+        );
+      }
+      return retryRes.json() as Promise<T>;
+    }
+
+    // 500+ = server error — throw with clear message
+    if (!res.ok) {
+      throw new Error(`[${endpoint.payer_code}] FHIR ${res.status}: ${res.statusText} — ${url}`);
+    }
+
+    return res.json() as Promise<T>;
+  }
+
+  /**
+   * OAuth token fetch with retry + exponential backoff.
+   * Retries up to 2 times on transient failures (network errors, 500/502/503).
+   * Returns null only when config is missing; throws on persistent auth failures
+   * so callers can distinguish "no config" from "auth broken."
+   */
+  private async getOAuthToken(endpoint: PayerEndpoint): Promise<string | null> {
+    const cached = this.authTokens.get(endpoint.payer_code);
+    if (cached && cached.expires > Date.now()) return cached.token;
+
+    const config = endpoint.auth_config;
+    if (!config?.token_url || !config.client_id || !config.client_secret) return null;
+
+    // Some payers (Aetna) require Basic Auth header + scope param
+    // Others (Humana, BCBS) send credentials in the body
+    const useBasicAuth = config.auth_method === 'basic_header';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+    const bodyParams: Record<string, string> = {
+      grant_type: 'client_credentials',
+    };
+
+    if (useBasicAuth) {
+      const basicAuth = Buffer.from(`${config.client_id}:${config.client_secret}`).toString(
+        'base64',
+      );
+      headers['Authorization'] = `Basic ${basicAuth}`;
+    } else {
+      bodyParams.client_id = config.client_id;
+      bodyParams.client_secret = config.client_secret;
+    }
+
+    if (config.scope) {
+      bodyParams.scope = config.scope;
+    }
+
+    const MAX_RETRIES = 2;
+    const OAUTH_TIMEOUT_MS = 15_000; // 15s timeout for token fetch
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const res = await fetch(config.token_url, {
+          method: 'POST',
+          headers,
+          body: new URLSearchParams(bodyParams),
+          signal: AbortSignal.timeout(OAUTH_TIMEOUT_MS),
+        });
+
+        // 401/403 = bad credentials, don't retry
+        if (res.status === 401 || res.status === 403) {
+          const errBody = await res.text().catch(() => '');
+          throw new Error(
+            `[${endpoint.payer_code}] OAuth ${res.status}: credentials rejected — ${errBody.slice(0, 200)}`,
+          );
+        }
+
+        // 429 = rate limited, retry with longer backoff
+        if (res.status === 429) {
+          const retryAfter = parseInt(res.headers.get('Retry-After') || '', 10);
+          const delay = (retryAfter > 0 ? retryAfter * 1000 : 5000) * (attempt + 1);
+          console.warn(
+            `  [${endpoint.payer_code}] OAuth 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+
+        // 500/502/503 = transient server error, retry with backoff
+        if (res.status >= 500) {
+          const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+          console.warn(
+            `  [${endpoint.payer_code}] OAuth ${res.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+          );
+          lastError = new Error(
+            `[${endpoint.payer_code}] OAuth token server error: ${res.status} ${res.statusText}`,
+          );
+          if (attempt < MAX_RETRIES) {
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          throw lastError;
+        }
+
+        if (!res.ok) {
+          const errBody = await res.text().catch(() => '');
+          throw new Error(
+            `[${endpoint.payer_code}] OAuth token failed: ${res.status} ${res.statusText} — ${errBody.slice(0, 200)}`,
+          );
+        }
+
+        const data = (await res.json()) as { access_token: string; expires_in: number };
+
+        if (!data.access_token) {
+          throw new Error(`[${endpoint.payer_code}] OAuth response missing access_token`);
+        }
+
+        this.authTokens.set(endpoint.payer_code, {
+          token: data.access_token,
+          expires: Date.now() + (data.expires_in - 60) * 1000,
+        });
+
+        return data.access_token;
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+
+        // Timeout or network errors are retryable
+        const isRetryable =
+          lastError.name === 'AbortError' ||
+          lastError.name === 'TimeoutError' ||
+          lastError.message.includes('fetch failed') ||
+          lastError.message.includes('ECONNREFUSED') ||
+          lastError.message.includes('ETIMEDOUT');
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          const delay = 1000 * Math.pow(2, attempt);
+          console.warn(
+            `  [${endpoint.payer_code}] OAuth network error (${lastError.message}), retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+
+        // Non-retryable or exhausted retries — throw
+        throw lastError;
+      }
+    }
+
+    // Should not reach here, but safety net
+    throw (
+      lastError ||
+      new Error(`[${endpoint.payer_code}] OAuth failed after ${MAX_RETRIES + 1} attempts`)
+    );
+  }
+
+  // ── Resource extraction ───────────────────────────────────
+
+  private findResourceInBundle<T extends { resourceType: string }>(
+    bundle: FhirBundle | null,
+    resourceType: string,
+  ): T | null {
+    if (!bundle?.entry) return null;
+    const entry = bundle.entry.find(
+      (e: FhirBundleEntry) => e.resource?.resourceType === resourceType,
+    );
+    return (entry?.resource as T) || null;
+  }
+
+  private findAllResourcesInBundle<T extends { resourceType: string }>(
+    bundle: FhirBundle | null,
+    resourceType: string,
+  ): T[] {
+    if (!bundle?.entry) return [];
+    return bundle.entry
+      .filter((e: FhirBundleEntry) => e.resource?.resourceType === resourceType)
+      .map((e: FhirBundleEntry) => e.resource as T);
+  }
+
+  private findContained<T extends { resourceType: string }>(
+    resource: Record<string, unknown> | null,
+    resourceType: string,
+  ): T | null {
+    if (!resource) return null;
+    const contained = resource['contained'] as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(contained)) return null;
+    return (contained.find((c) => c.resourceType === resourceType) as T) || null;
+  }
+
+  // ── Field extraction helpers ──────────────────────────────
+
+  private extractNpi(identifiers?: FhirIdentifier[]): string | null {
+    if (!identifiers) return null;
+    const npiId = identifiers.find((id) => id.system === NPI_SYSTEM);
+    return npiId?.value || null;
+  }
+
+  private extractName(names?: FhirHumanName[]): {
+    first: string | null;
+    last: string | null;
+    full: string | null;
+    credentials: string | null;
+  } {
+    if (!names || names.length === 0)
+      return { first: null, last: null, full: null, credentials: null };
+
+    // Prefer 'usual' or 'official', fall back to first entry
+    const name =
+      names.find((n) => n.use === 'usual') || names.find((n) => n.use === 'official') || names[0];
+
+    return {
+      first: name.given?.[0] || null,
+      last: name.family || null,
+      full: name.text || [name.given?.join(' '), name.family].filter(Boolean).join(' ') || null,
+      credentials: name.suffix?.join(', ') || null,
+    };
+  }
+
+  private extractPhone(telecoms?: FhirContactPoint[]): string | null {
+    if (!telecoms) return null;
+    const phone = telecoms.find((t) => t.system === 'phone');
+    return phone?.value ? this.normalizePhone(phone.value) : null;
+  }
+
+  private extractFax(telecoms?: FhirContactPoint[]): string | null {
+    if (!telecoms) return null;
+    const fax = telecoms.find((t) => t.system === 'fax');
+    return fax?.value ? this.normalizePhone(fax.value) : null;
+  }
+
+  private extractAddress(address?: FhirAddress | FhirAddress[]): {
+    line1: string | null;
+    line2: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+  } {
+    const addr = Array.isArray(address) ? address[0] : address;
+    if (!addr) return { line1: null, line2: null, city: null, state: null, zip: null };
+
+    return {
+      line1: addr.line?.[0] || null,
+      line2: addr.line?.[1] || null,
+      city: addr.city || null,
+      state: addr.state || null,
+      zip: addr.postalCode?.substring(0, 5) || null,
+    };
+  }
+
+  private extractSpecialty(specialties?: FhirCodeableConcept[]): {
+    code: string | null;
+    display: string | null;
+  } {
+    if (!specialties || specialties.length === 0) return { code: null, display: null };
+
+    const spec = specialties[0];
+    // Try to find NUCC taxonomy coding
+    const nuccCoding = spec.coding?.find((c) =>
+      NUCC_SYSTEM_PATTERNS.some((p) => c.system?.toLowerCase().includes(p)),
+    );
+    const anyCoding = nuccCoding || spec.coding?.[0];
+
+    return {
+      code: anyCoding?.code || null,
+      display: anyCoding?.display || spec.text || null,
+    };
+  }
+
+  /**
+   * Fix #42: Also extract specialty from PractitionerRole.code
+   * Some payers (Cigna, Humana) put specialty in role.code instead of role.specialty
+   */
+  private extractSpecialtyFromRoleCode(
+    role: FhirPractitionerRole | null,
+  ): { code: string | null; display: string | null } | null {
+    if (!role) return null;
+    const codes = (role as unknown as Record<string, unknown>)['code'] as
+      | FhirCodeableConcept[]
+      | undefined;
+    if (!codes || codes.length === 0) return null;
+
+    for (const codeableConcept of codes) {
+      const coding = codeableConcept.coding;
+      if (!coding) continue;
+      for (const c of coding) {
+        if (c.system && NUCC_SYSTEM_PATTERNS.some((p) => c.system!.toLowerCase().includes(p))) {
+          return { code: c.code || null, display: c.display || codeableConcept.text || null };
+        }
+      }
+    }
+    // If no NUCC match, return the first code's display (some payers use plain text specialty)
+    const firstCoding = codes[0]?.coding?.[0];
+    if (firstCoding?.display) {
+      return { code: firstCoding.code || null, display: firstCoding.display };
+    }
+    return null;
+  }
+
+  /**
+   * Fix #42b: Extract Location reference ID from PractitionerRole.location
+   * Used as fallback when _include doesn't return Location resources
+   */
+  private extractLocationReference(role: FhirPractitionerRole): string | null {
+    const locations = (role as unknown as Record<string, unknown>)['location'] as
+      | Array<{ reference?: string; display?: string }>
+      | undefined;
+    if (!locations || locations.length === 0) return null;
+
+    const ref = locations[0].reference;
+    if (!ref) return null;
+
+    // Extract ID from "Location/12345" format
+    if (ref.startsWith('Location/')) {
+      return ref.replace('Location/', '');
+    }
+    // Some payers use full URL: "https://fhir.example.com/Location/12345"
+    const match = ref.match(/Location\/([^/]+)$/);
+    return match ? match[1] : ref;
+  }
+
+  /**
+   * Fallback: Extract specialty from Practitioner.qualification.
+   * UHC/Optum puts the NUCC taxonomy code in qualification[].code.coding
+   * instead of PractitionerRole.specialty.
+   */
+  private extractSpecialtyFromQualification(
+    practitioner: FhirPractitioner,
+  ): { code: string | null; display: string | null } | null {
+    const quals = (practitioner as unknown as Record<string, unknown>)['qualification'] as
+      | Array<{ code?: FhirCodeableConcept; extension?: FhirExtension[] }>
+      | undefined;
+    if (!quals) return null;
+
+    for (const qual of quals) {
+      const coding = qual.code?.coding;
+      if (!coding) continue;
+      for (const c of coding) {
+        if (c.system && NUCC_SYSTEM_PATTERNS.some((p) => c.system!.toLowerCase().includes(p))) {
+          return { code: c.code || null, display: c.display || qual.code?.text || null };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extract credentials (MD, DO, NP, etc.) from Practitioner.qualification.
+   */
+  private extractCredentialsFromQualification(practitioner: FhirPractitioner): string | null {
+    const quals = (practitioner as unknown as Record<string, unknown>)['qualification'] as
+      | Array<{ code?: FhirCodeableConcept }>
+      | undefined;
+    if (!quals) return null;
+
+    for (const qual of quals) {
+      const coding = qual.code?.coding;
+      if (!coding) continue;
+      for (const c of coding) {
+        // Look for degree codes like MD, DO, DDS, NP, PA
+        if (
+          c.display?.startsWith('Degree-') ||
+          /^(MD|DO|DDS|DMD|NP|PA|DPM|DC|OD|PhD|PharmD)$/.test(c.code || '')
+        ) {
+          return c.code || c.display?.replace('Degree-', '') || null;
+        }
+      }
+    }
+    return null;
+  }
+
+  private extractAcceptingPatients(extensions?: FhirExtension[]): boolean | null {
+    if (!extensions) return null;
+
+    // PDex Plan-Net newpatients extension
+    const npExt = extensions.find(
+      (e) => e.url?.includes('newpatients') || e.url?.includes('new-patients'),
+    );
+    if (!npExt) return null;
+
+    // The extension has sub-extensions: acceptingPatients (boolean), fromNetwork (reference)
+    if (npExt.valueBoolean !== undefined) return npExt.valueBoolean;
+
+    const subExt = npExt.extension?.find(
+      (e) => e.url === 'acceptingPatients' || e.url?.endsWith('/acceptingPatients'),
+    );
+    return subExt?.valueBoolean ?? null;
+  }
+
+  private extractLanguages(communication?: FhirCodeableConcept[]): string[] | null {
+    if (!communication || communication.length === 0) return null;
+    return communication
+      .map((c) => c.coding?.[0]?.display || c.text || null)
+      .filter(Boolean) as string[];
+  }
+
+  private normalizePhone(phone: string): string {
+    // Strip to digits only
+    const digits = phone.replace(/\D/g, '');
+    // Remove leading 1 for US numbers
+    if (digits.length === 11 && digits.startsWith('1')) return digits.substring(1);
+    return digits;
+  }
+
+  // ── Snapshot builders ─────────────────────────────────────
+
+  private buildSnapshot(
+    npi: string,
+    payerCode: string,
+    date: string,
+    practitioner: FhirPractitioner | null,
+    role: FhirPractitionerRole | null,
+    location: FhirLocation | null,
+    organization: FhirOrganization | null,
+    rawBundles: Record<string, unknown>,
+    batchId?: string,
+    allPractitioners?: FhirPractitioner[],
+  ): DirectorySnapshot {
+    const name = this.extractName(practitioner?.name);
+    const addr = this.extractAddress(location?.address || practitioner?.address);
+    const phone = this.extractPhone(location?.telecom) || this.extractPhone(practitioner?.telecom);
+    const fax = this.extractFax(location?.telecom) || this.extractFax(practitioner?.telecom);
+    const specialty = this.extractSpecialty(role?.specialty);
+    // Specialty fallback chain:
+    // 1. PractitionerRole.specialty (standard FHIR)
+    // 2. PractitionerRole.code (Cigna, Humana put NUCC here)
+    // 3. Practitioner.qualification (UHC/Optum puts taxonomy here)
+    let roleCodeSpecialty: { code: string | null; display: string | null } | null = null;
+    let qualSpecialty: { code: string | null; display: string | null } | null = null;
+    let qualCredentials: string | null = null;
+    const practitionersToCheck = allPractitioners?.length
+      ? allPractitioners
+      : practitioner
+        ? [practitioner]
+        : [];
+
+    if (!specialty.code) {
+      // Fallback 2: PractitionerRole.code
+      roleCodeSpecialty = this.extractSpecialtyFromRoleCode(role);
+    }
+    if (!specialty.code && !roleCodeSpecialty) {
+      // Fallback 3: Practitioner.qualification
+      for (const p of practitionersToCheck) {
+        qualSpecialty = this.extractSpecialtyFromQualification(p);
+        if (qualSpecialty) break;
+      }
+    }
+    for (const p of practitionersToCheck) {
+      qualCredentials = this.extractCredentialsFromQualification(p);
+      if (qualCredentials) break;
+    }
+
+    const finalSpecialty = specialty.code
+      ? specialty
+      : roleCodeSpecialty || qualSpecialty || specialty;
+
+    const accepting = this.extractAcceptingPatients(role?.extension);
+    const languages = this.extractLanguages(practitioner?.communication);
+    const orgNpi = this.extractNpi(organization?.identifier);
+
+    // Network name from role.network reference display
+    const networkName = role?.network?.[0]?.display || null;
+
+    return {
+      npi,
+      payer_code: payerCode,
+      snapshot_date: date,
+
+      listed_name_first: name.first,
+      listed_name_last: name.last,
+      listed_name_full: name.full,
+      listed_credentials: name.credentials || qualCredentials,
+      listed_gender: practitioner?.gender || null,
+
+      listed_address_line1: addr.line1,
+      listed_address_line2: addr.line2,
+      listed_city: addr.city,
+      listed_state: addr.state,
+      listed_zip: addr.zip,
+
+      listed_phone: phone,
+      listed_fax: fax,
+
+      listed_specialty_code: finalSpecialty.code,
+      listed_specialty_display: finalSpecialty.display,
+      listed_accepting_patients: accepting,
+
+      listed_org_name: organization?.name || null,
+      listed_org_npi: orgNpi,
+
+      listed_network_name: networkName,
+      listed_plan_names: null, // Requires separate InsurancePlan query
+
+      listed_languages: languages,
+      listed_telehealth_available: null, // Requires HealthcareService query
+      listed_office_hours: (location?.hoursOfOperation?.[0] as Record<string, unknown>) || null,
+      listed_disability_access: null, // Requires Location.extension parse
+
+      fhir_practitioner_id: practitioner?.id || null,
+      fhir_practitioner_role_id: role?.id || null,
+      fhir_location_id: location?.id || null,
+      fhir_organization_id: organization?.id || null,
+      fhir_raw_bundle: rawBundles,
+
+      sync_batch_id: batchId || null,
+    };
+  }
+
+  private buildNotListedSnapshot(
+    npi: string,
+    payerCode: string,
+    date: string,
+    rawBundle: FhirBundle | null,
+    batchId?: string,
+  ): DirectorySnapshot {
+    // Return a snapshot with all nulls (provider not found in directory)
+    // The mismatch engine will detect this as 'not_listed'
+    return {
+      npi,
+      payer_code: payerCode,
+      snapshot_date: date,
+      listed_name_first: null,
+      listed_name_last: null,
+      listed_name_full: null,
+      listed_credentials: null,
+      listed_gender: null,
+      listed_address_line1: null,
+      listed_address_line2: null,
+      listed_city: null,
+      listed_state: null,
+      listed_zip: null,
+      listed_phone: null,
+      listed_fax: null,
+      listed_specialty_code: null,
+      listed_specialty_display: null,
+      listed_accepting_patients: null,
+      listed_org_name: null,
+      listed_org_npi: null,
+      listed_network_name: null,
+      listed_plan_names: null,
+      listed_languages: null,
+      listed_telehealth_available: null,
+      listed_office_hours: null,
+      listed_disability_access: null,
+      fhir_practitioner_id: null,
+      fhir_practitioner_role_id: null,
+      fhir_location_id: null,
+      fhir_organization_id: null,
+      fhir_raw_bundle: rawBundle as unknown as Record<string, unknown>,
+      sync_batch_id: batchId || null,
+    };
+  }
+
+  // ── Rate limiter helper ───────────────────────────────────
+
+  private getRateLimiter(endpoint: PayerEndpoint): RateLimiter {
+    if (!this.rateLimiters.has(endpoint.payer_code)) {
+      this.rateLimiters.set(endpoint.payer_code, new RateLimiter(endpoint.rate_limit_rpm));
+    }
+    return this.rateLimiters.get(endpoint.payer_code)!;
+  }
+
+  // ── Layer 2: Re-Verification for False Positive Prevention ──
+
+  /**
+   * Re-verify a provider that was marked not_listed after 2+ consecutive
+   * sync cycles. Performs the standard NPI lookup PLUS a name-based search
+   * as a fallback strategy.
+   *
+   * Returns:
+   *   - { found: true, snapshot } if provider is actually listed
+   *   - { found: false } if confirmed not listed
+   */
+  async verifyNotListed(
+    npi: string,
+    providerName: string | null,
+    endpoint: PayerEndpoint,
+  ): Promise<{ found: boolean; snapshot?: DirectorySnapshot }> {
+    // Strategy 1: Standard NPI lookup (same as regular sync)
+    const standardResult = await this.lookupByNpi(npi, endpoint, `reverify_${Date.now()}`);
+
+    if (standardResult && standardResult.listed_name_full) {
+      // Found via standard lookup — was a transient failure before
+      return { found: true, snapshot: standardResult };
+    }
+
+    // Strategy 2: Name-based search (catches NPI format edge cases)
+    if (providerName) {
+      try {
+        const limiter = this.getRateLimiter(endpoint);
+        const nameParts = providerName.replace(/^Dr\.?\s*/i, '').split(/\s+/);
+
+        if (nameParts.length >= 2) {
+          const lastName = nameParts[nameParts.length - 1]
+            .replace(/,?\s*(MD|DO|NP|PA|DPM|DDS|DMD|OD|PhD|APRN|FNP|DNP)$/i, '')
+            .trim();
+          const firstName = nameParts[0];
+
+          if (lastName.length >= 2 && firstName.length >= 2) {
+            await limiter.wait();
+            const nameBundle = await this.fhirGet<FhirBundle>(
+              endpoint,
+              `/Practitioner?family=${encodeURIComponent(lastName)}&given=${encodeURIComponent(firstName)}`,
+            );
+
+            // Check if any returned Practitioner has a matching NPI
+            const entries = nameBundle.entry || [];
+            for (const entry of entries) {
+              const resource = entry.resource as FhirPractitioner;
+              if (resource?.resourceType !== 'Practitioner') continue;
+
+              const identifiers = resource.identifier || [];
+              const hasMatchingNpi = identifiers.some(
+                (id) => id.system === NPI_SYSTEM && id.value === npi,
+              );
+
+              if (hasMatchingNpi) {
+                // Found via name search — the NPI identifier query had an issue
+                console.log(
+                  `  [reverify] ${npi} found via name search in ${endpoint.payer_code} ` +
+                    `(NPI lookup missed it)`,
+                );
+                // Do a full lookup now to get the complete snapshot
+                const fullSnapshot = await this.lookupByNpi(
+                  npi,
+                  endpoint,
+                  `reverify_name_${Date.now()}`,
+                );
+                return { found: true, snapshot: fullSnapshot || undefined };
+              }
+            }
+
+            // Strategy 3: Partial name match without NPI confirmation
+            // If we find practitioners with the same name, log it but don't
+            // auto-confirm — could be a different person with the same name
+            if (entries.length > 0) {
+              console.log(
+                `  [reverify] ${npi} name search returned ${entries.length} results in ` +
+                  `${endpoint.payer_code}, but none matched NPI. Confirmed not listed.`,
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `  [reverify] Name-based search failed for ${npi} in ${endpoint.payer_code}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    // All strategies exhausted — confirmed not listed
+    return { found: false };
+  }
+}

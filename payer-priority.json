@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-04-04T13:53:14.916Z",
+  "total_sites_crawled": 3,
+  "total_mentions": 13,
+  "min_mentions_threshold": 1,
+  "payers": [
+    {
+      "rank": 1,
+      "payer_key": "tricare",
+      "display_name": "TRICARE / Military Health",
+      "mention_count": 1,
+      "pct_of_crawled": 33.3,
+      "priority": "P1",
+      "already_integrated": false,
+      "fhir_status": "confirmed",
+      "fhir_notes": "DHA FHIR API available for military provider directories.",
+      "tx_lives_estimate": "~400K (large military presence in TX)",
+      "cms_interoperability": false,
+      "recommended_action": "Integrate FHIR API (confirmed available)"
+    },
+    {
+      "rank": 2,
+      "payer_key": "curative",
+      "display_name": "Curative",
+      "mention_count": 1,
+      "pct_of_crawled": 33.3,
+      "priority": "P2",
+      "already_integrated": false,
+      "fhir_status": "tbd",
+      "fhir_notes": "Research needed",
+      "tx_lives_estimate": "Unknown",
+      "cms_interoperability": false,
+      "recommended_action": "Contact payer BizDev to confirm API / credential access"
+    }
+  ]
+}

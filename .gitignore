@@ -1,0 +1,47 @@
+node_modules/
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+tsconfig.tsbuildinfo
+tsconfig.scripts.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large data files - never commit
+*.csv
+*.accdb
+*.XLS
+*.xls
+*.xlsx
+data/
+npidata_*
+nppes_*
+Revalidation_*
+MBCPhysician*
+
+# Video files
+*.mp4
+
+# Claude worktrees
+.claude/worktrees/
+
+# Snapshots (large)
+e2e/**/*-snapshots/

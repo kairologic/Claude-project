@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "KairoLogic Corrections Assistant",
+  "version": "1.0.0",
+  "description": "View pending corrections and auto-fix provider data across healthcare systems",
+  "permissions": ["activeTab", "storage", "clipboardWrite"],
+  "host_permissions": [
+    "https://nppes.cms.hhs.gov/*",
+    "https://pecos.cms.hhs.gov/*",
+    "https://caqh.org/*",
+    "https://proview.caqh.org/*",
+    "https://www.caqhh.org/*",
+    "https://www1.caqhh.org/*",
+    "https://provider.aetna.com/*",
+    "https://aetna.com/*",
+    "https://www.aetna.com/*",
+    "https://portal.uhc.com/*",
+    "https://www.myuhc.com/*",
+    "https://www.unitedhealthcare.com/*",
+    "https://availity.com/*",
+    "https://essentials.availity.com/*",
+    "https://www.availity.com/*",
+    "https://cignaforhcp.cigna.com/*",
+    "https://www.cigna.com/*",
+    "https://www.humana.com/*",
+    "https://humana.com/*",
+    "https://blueshieldca.com/*",
+    "https://www.blueshieldca.com/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://nppes.cms.hhs.gov/*",
+        "https://pecos.cms.hhs.gov/*",
+        "https://caqh.org/*",
+        "https://proview.caqh.org/*",
+        "https://www1.caqhh.org/*",
+        "https://provider.aetna.com/*",
+        "https://aetna.com/*",
+        "https://www.aetna.com/*",
+        "https://portal.uhc.com/*",
+        "https://www.myuhc.com/*",
+        "https://www.unitedhealthcare.com/*",
+        "https://availity.com/*",
+        "https://essentials.availity.com/*",
+        "https://www.availity.com/*",
+        "https://cignaforhcp.cigna.com/*",
+        "https://www.cigna.com/*",
+        "https://www.humana.com/*",
+        "https://blueshieldca.com/*",
+        "https://www.blueshieldca.com/*"
+      ],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "KairoLogic Corrections Assistant"
+  },
+  "icons": {
+    "16": "images/icon-16.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
+  }
+}

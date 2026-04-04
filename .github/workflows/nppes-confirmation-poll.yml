@@ -1,0 +1,54 @@
+# .github/workflows/nppes-confirmation-poll.yml
+# ═══ KairoLogic NPPES Confirmation Polling ═══
+# Task 2.6: Polls NPPES API daily for submitted update requests.
+# Confirms when updates are live, sends reminders after 14 days.
+
+name: NPPES Confirmation Poll
+
+on:
+  schedule:
+    # Daily at 10am UTC (4am Central)
+    - cron: '0 10 * * *'
+
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+  SES_SMTP_HOST: ${{ secrets.SES_SMTP_HOST }}
+  SES_SMTP_USER: ${{ secrets.SES_SMTP_USER }}
+  SES_SMTP_PASS: ${{ secrets.SES_SMTP_PASS }}
+  SES_FROM_EMAIL: ${{ secrets.SES_FROM_EMAIL }}
+
+jobs:
+  poll:
+    name: Poll NPPES API
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run confirmation poll
+        run: |
+          # Use the API endpoint to trigger the poll
+          curl -s -X POST "${{ secrets.NEXT_PUBLIC_BASE_URL }}/api/forms/confirm" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"run_poll"}' | jq .
+
+      - name: Report
+        if: always()
+        run: |
+          echo "### NPPES Confirmation Poll" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY

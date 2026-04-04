@@ -1,0 +1,99 @@
+# .github/workflows/nppes-weekly-sync.yml
+# ═══ KairoLogic NPPES Weekly Sync ═══
+# Runs every Monday at 6am UTC (midnight CDT)
+# Downloads NPPES V.2 weekly diff, updates providers, creates snapshots,
+# detects deltas, writes events.
+#
+# Manual trigger: Actions tab → Run workflow
+# Override: pass 'full' for full replacement file, or specific states.
+
+name: NPPES Weekly Sync
+
+on:
+  schedule:
+    # Every Monday at 6:00 UTC (midnight Central)
+    # NPPES weekly diff is published each Monday
+    - cron: '0 6 * * 1'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Sync mode'
+        required: true
+        default: 'weekly'
+        type: choice
+        options:
+          - weekly
+          - full
+      states:
+        description: 'Comma-separated states to sync (default: TX,CA)'
+        required: false
+        default: 'TX,CA'
+      dry_run:
+        description: 'Dry run (parse only, no DB writes)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  sync:
+    name: NPPES V.2 Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tsx runner
+        run: npm install -g tsx
+
+      - name: Run NPPES sync
+        run: |
+          ARGS=""
+
+          # Mode flag
+          if [ "${{ github.event.inputs.mode || 'weekly' }}" = "full" ]; then
+            ARGS="$ARGS --full"
+          fi
+
+          # States
+          STATES="${{ github.event.inputs.states || 'TX,CA' }}"
+          ARGS="$ARGS --states $STATES"
+
+          # Dry run
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: npx tsx scripts/nppes-weekly-sync.ts $ARGS"
+          npx tsx scripts/nppes-weekly-sync.ts $ARGS
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "### NPPES Sync Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ github.event.inputs.mode || 'weekly' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **States:** ${{ github.event.inputs.states || 'TX,CA' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Clean up work directory
+        if: always()
+        run: rm -rf .nppes-work

@@ -1,0 +1,125 @@
+# .github/workflows/url-discovery.yml
+# ═══ KairoLogic URL Discovery ═══
+# Runs after NPPES weekly sync to find practice website URLs
+# for newly added providers using multi-strategy search.
+#
+# Schedule: Monday 8am UTC (2 hours after NPPES sync at 6am)
+# Strategies: address+specialty, name+city, phone, stripped name
+# Cap: 1000 providers per run to control Serper credit usage
+#
+# Manual trigger: Actions tab → Run workflow (can override limit/state)
+
+name: URL Discovery
+
+on:
+  schedule:
+    # Every Monday at 8am UTC (2am Central), 2 hours after NPPES sync
+    - cron: '0 8 * * 1'
+
+  workflow_dispatch:
+    inputs:
+      state:
+        description: 'State to search (default: all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - TX
+          - CA
+      limit:
+        description: 'Max providers to search per state (default 1000)'
+        required: false
+        default: '1000'
+      strategies:
+        description: 'Strategies to use (default: all 4)'
+        required: false
+        default: '1,2,3,4'
+      no_validate:
+        description: 'Skip URL validation'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      dry_run:
+        description: 'Dry run (no API calls, no DB writes)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+
+jobs:
+  discover:
+    name: Find Provider URLs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run URL discovery
+        run: |
+          STATE="${{ github.event.inputs.state || 'all' }}"
+          LIMIT="${{ github.event.inputs.limit || '1000' }}"
+          STRATEGIES="${{ github.event.inputs.strategies || '1,2,3,4' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          NO_VALIDATE="${{ github.event.inputs.no_validate || 'false' }}"
+
+          COMMON_ARGS="--limit $LIMIT --strategies $STRATEGIES"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            COMMON_ARGS="$COMMON_ARGS --dry-run"
+          fi
+
+          if [ "$NO_VALIDATE" = "true" ]; then
+            COMMON_ARGS="$COMMON_ARGS --no-validate"
+          fi
+
+          if [ "$STATE" = "all" ]; then
+            echo "=== Running TX URL discovery ==="
+            python scripts/find-provider-urls-v2.py --state TX $COMMON_ARGS
+
+            echo ""
+            echo "=== Running CA URL discovery ==="
+            python scripts/find-provider-urls-v2.py --state CA $COMMON_ARGS
+          else
+            echo "=== Running $STATE URL discovery ==="
+            python scripts/find-provider-urls-v2.py --state $STATE $COMMON_ARGS
+          fi
+
+      - name: Run co-location for new URLs
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          # Install Node dependencies for co-location script
+          npm ci
+          echo "=== Linking new URLs to providers via co-location ==="
+          npx tsx scripts/populate-practice-providers.ts --limit 60000
+
+      - name: Report
+        if: always()
+        run: |
+          echo "### URL Discovery Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **State:** ${{ github.event.inputs.state || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Limit per state:** ${{ github.event.inputs.limit || '1000' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strategies:** ${{ github.event.inputs.strategies || '1,2,3,4' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY

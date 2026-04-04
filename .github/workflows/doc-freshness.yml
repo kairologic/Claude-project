@@ -1,0 +1,82 @@
+name: Doc Freshness Check
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+jobs:
+  check-code-explain:
+    name: Verify CODE_EXPLAIN.md freshness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CODE_EXPLAIN.md exists
+        run: |
+          if [ ! -f CODE_EXPLAIN.md ]; then
+            echo "::error::CODE_EXPLAIN.md not found at repository root"
+            exit 1
+          fi
+          echo "CODE_EXPLAIN.md found"
+
+      - name: Verify Doc Sync section
+        run: |
+          # Extract the commit hash from the Doc Sync section
+          DOC_HASH=$(grep -oP 'Generated from commit `\K[a-f0-9]+' CODE_EXPLAIN.md || echo "")
+
+          if [ -z "$DOC_HASH" ]; then
+            echo "::warning::No Doc Sync commit hash found in CODE_EXPLAIN.md"
+            exit 0
+          fi
+
+          HEAD_HASH=$(git rev-parse HEAD)
+
+          echo "Doc Sync commit: ${DOC_HASH:0:12}"
+          echo "HEAD commit:     ${HEAD_HASH:0:12}"
+
+          if [ "$DOC_HASH" != "$HEAD_HASH" ]; then
+            echo ""
+            echo "::warning::CODE_EXPLAIN.md Doc Sync is behind HEAD."
+            echo "The document references commit ${DOC_HASH:0:12} but HEAD is ${HEAD_HASH:0:12}."
+            echo ""
+            echo "To update, run:"
+            echo "  bash scripts/update-code-explain.sh --fix"
+            echo "  git add CODE_EXPLAIN.md && git commit --amend --no-edit"
+            # Warning only — not blocking the build
+            exit 0
+          fi
+
+          echo "Doc Sync is current with HEAD"
+
+      - name: Verify required sections exist
+        run: |
+          MISSING=""
+          for section in \
+            "Repo Overview" \
+            "Build / Run / Test Quickstart" \
+            "Architecture & Flow" \
+            "Module / File Index" \
+            "Detailed Module Notes" \
+            "Config & Secrets" \
+            "Observability" \
+            "Data & Schemas" \
+            "Testing Strategy" \
+            "Known Gaps & TODOs" \
+            "Doc Sync"; do
+            if ! grep -q "$section" CODE_EXPLAIN.md; then
+              MISSING="$MISSING\n  - $section"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "::error::CODE_EXPLAIN.md is missing required sections:$MISSING"
+            exit 1
+          fi
+
+          echo "All required sections present"

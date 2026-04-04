@@ -1,0 +1,2898 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KairoLogic — Product Demo</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #070d1b;
+        --card-dark: rgba(255, 255, 255, 0.03);
+        --border-dark: rgba(255, 255, 255, 0.06);
+        --text: #e2e8f0;
+        --muted: #64748b;
+        --green: #34d399;
+        --amber: #fbbf24;
+        --red: #f87171;
+        --orange: #fb923c;
+        --blue: #2563eb;
+        --navy: #0a192f;
+        --gold: #d4a017;
+        --gold-light: #c9973e;
+        --mono: 'JetBrains Mono', monospace;
+        --sans: 'DM Sans', sans-serif;
+        /* Light theme vars */
+        --bg-light: #ffffff;
+        --bg-page: #f8fafc;
+        --text-dark: #1e293b;
+        --text-sec: #475569;
+        --border-light: #e2e8f0;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg-page);
+        color: var(--text-dark);
+        font-family: var(--sans);
+        overflow-x: hidden;
+      }
+      .page {
+        display: none;
+        min-height: 100vh;
+      }
+      .page.active {
+        display: block;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      /* ── SHARED NAV ── */
+      .kl-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 28px;
+        background: white;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .kl-nav .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .kl-nav .logo img,
+      .kl-nav .logo .logo-icon {
+        width: 36px;
+        height: 36px;
+      }
+      .kl-nav .logo .logo-icon {
+        background: linear-gradient(135deg, #e8760c, #c96108);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 18px;
+      }
+      .kl-nav .logo-text {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--navy);
+      }
+      .kl-nav .logo-text span {
+        color: var(--gold-light);
+      }
+      .kl-nav-links {
+        display: flex;
+        gap: 24px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-sec);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .kl-nav .cta-btn {
+        padding: 8px 18px;
+        background: #e8760c;
+        color: white;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+
+      /* ── DEMO STEP BAR ── */
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 8px 16px;
+        background: var(--navy);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .topbar .step {
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+        font-family: var(--sans);
+      }
+      .topbar .step.active {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+      .topbar .step.done {
+        color: var(--green);
+      }
+
+      /* ── PAGE 0,1: PROVIDER SITE ── */
+      .site-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 28px;
+        background: white;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .site-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .site-logo-box {
+        width: 38px;
+        height: 38px;
+        background: var(--blue);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 900;
+        font-size: 15px;
+      }
+      .site-logo-name {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--navy);
+      }
+      .site-logo-sub {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .site-nav {
+        display: flex;
+        gap: 22px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-sec);
+      }
+      .site-hero {
+        background: linear-gradient(135deg, #1e40af, #3b82f6);
+        padding: 56px 28px;
+        text-align: center;
+        color: white;
+      }
+      .site-hero h1 {
+        font-size: 28px;
+        font-weight: 900;
+        margin-bottom: 10px;
+      }
+      .site-hero p {
+        font-size: 14px;
+        opacity: 0.85;
+        max-width: 460px;
+        margin: 0 auto 20px;
+      }
+      .site-hero-btns {
+        display: inline-flex;
+        gap: 10px;
+      }
+      .site-hero-btns .btn {
+        padding: 9px 22px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .site-hero-btns .btn.primary {
+        background: white;
+        color: var(--blue);
+      }
+      .site-hero-btns .btn.ghost {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .site-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 36px 28px;
+      }
+      .site-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        border: 1px solid var(--border-light);
+      }
+      .site-card .emoji {
+        font-size: 22px;
+        margin-bottom: 8px;
+      }
+      .site-card h3 {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 3px;
+      }
+      .site-card p {
+        font-size: 11px;
+        color: var(--text-sec);
+        line-height: 1.5;
+      }
+
+      /* ── SCAN PAGE (light theme) ── */
+      .scan-section {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 40px 24px;
+      }
+      .scan-section h2 {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--navy);
+        margin-bottom: 4px;
+        text-align: center;
+      }
+      .scan-section .sub {
+        font-size: 12px;
+        color: var(--muted);
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      .scan-form {
+        background: white;
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 28px;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+      }
+      .form-group label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-sec);
+        margin-bottom: 4px;
+      }
+      .form-group label .req {
+        color: var(--red);
+      }
+      .form-group input {
+        padding: 10px 12px;
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        font-size: 13px;
+        font-family: var(--sans);
+        color: var(--text-dark);
+        outline: none;
+        background: white;
+      }
+      .form-group input:focus {
+        border-color: var(--blue);
+      }
+      .scan-btn {
+        width: 100%;
+        padding: 12px;
+        background: var(--blue);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        font-family: var(--sans);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s;
+      }
+      .scan-btn:hover {
+        filter: brightness(1.1);
+      }
+      .scan-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .scan-progress {
+        display: none;
+        margin-top: 20px;
+      }
+      .scan-progress.active {
+        display: block;
+      }
+      .scan-phase {
+        font-size: 11px;
+        color: var(--blue);
+        margin-bottom: 8px;
+        font-family: var(--mono);
+      }
+      .bar-bg {
+        width: 100%;
+        height: 4px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--blue), var(--green));
+        border-radius: 3px;
+        transition: width 0.3s;
+      }
+      .scan-checks {
+        margin-top: 12px;
+      }
+      .scan-chk {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 0;
+        font-size: 10px;
+        color: var(--muted);
+        font-family: var(--mono);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .scan-chk.vis {
+        opacity: 1;
+      }
+
+      /* ── RESULTS (light theme) ── */
+      .results-section {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 24px;
+      }
+      .result-card {
+        background: white;
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 16px;
+      }
+      .score-row {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .score-ring-light {
+        position: relative;
+        width: 90px;
+        height: 90px;
+        flex-shrink: 0;
+      }
+      .score-ring-light svg {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+      .score-ring-light .val {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .score-ring-light .val .num {
+        font-size: 28px;
+        font-weight: 900;
+      }
+      .score-ring-light .val .pct {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .tier-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .tier-violation {
+        background: rgba(248, 113, 113, 0.1);
+        color: var(--red);
+        border: 1px solid rgba(248, 113, 113, 0.2);
+      }
+      .tier-drift {
+        background: rgba(251, 191, 36, 0.1);
+        color: #b45309;
+        border: 1px solid rgba(251, 191, 36, 0.25);
+      }
+      .cat-bars {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .cat-bar-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .cat-bar-item .icon {
+        font-size: 16px;
+      }
+      .cat-bar-item .info {
+        flex: 1;
+      }
+      .cat-bar-item .info .name {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--navy);
+      }
+      .cat-bar-item .info .weight {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .cat-bar-item .bar {
+        flex: 2;
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .cat-bar-item .bar div {
+        height: 100%;
+        border-radius: 4px;
+      }
+      .cat-bar-item .score {
+        font-size: 16px;
+        font-weight: 900;
+        width: 50px;
+        text-align: right;
+      }
+      .cat-bar-item .stats {
+        font-size: 9px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .finding-list {
+        margin-top: 12px;
+      }
+      .finding-item {
+        display: flex;
+        align-items: start;
+        gap: 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .finding-item:last-child {
+        border: none;
+      }
+      .finding-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        margin-top: 4px;
+      }
+      .finding-text {
+        flex: 1;
+        font-size: 12px;
+        color: var(--text-sec);
+      }
+      .finding-sev {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .cta-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .cta-card {
+        background: white;
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+      }
+      .cta-card:hover {
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+      .cta-card.rec {
+        border-color: rgba(212, 160, 23, 0.3);
+        background: rgba(212, 160, 23, 0.02);
+      }
+      .cta-card .rec-tag {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 8px;
+        font-weight: 700;
+        background: rgba(212, 160, 23, 0.12);
+        color: var(--gold);
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+      .cta-card .name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 3px;
+      }
+      .cta-card .desc {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      .cta-card .price {
+        font-size: 18px;
+        font-weight: 900;
+        color: var(--gold);
+      }
+
+      /* ── REPORT (branded light) ── */
+      .report-page {
+        background: #fafbfc;
+        padding: 0;
+      }
+      .report-header {
+        background: var(--navy);
+        padding: 20px 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .report-header .brand {
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        color: white;
+      }
+      .report-header .brand span {
+        color: var(--gold-light);
+      }
+      .report-header .label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--gold-light);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      .report-body {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 24px;
+      }
+      .report-cover {
+        background: var(--navy);
+        border-radius: 12px;
+        padding: 32px;
+        text-align: center;
+        color: white;
+        margin-bottom: 24px;
+      }
+      .report-cover .score-val {
+        font-size: 48px;
+        font-weight: 900;
+        color: var(--red);
+      }
+      .report-cover .score-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--red);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-top: 4px;
+      }
+      .report-cover .meta {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 12px;
+        font-family: var(--mono);
+      }
+      .report-section {
+        background: white;
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        padding: 24px;
+        margin-bottom: 16px;
+      }
+      .report-section h2 {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--navy);
+        margin-bottom: 4px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--gold-light);
+      }
+      .report-finding {
+        padding: 14px;
+        border: 1px solid #f1f5f9;
+        border-radius: 8px;
+        margin-top: 12px;
+      }
+      .report-finding.critical {
+        border-left: 3px solid var(--red);
+        background: rgba(248, 113, 113, 0.02);
+      }
+      .report-finding.warning {
+        border-left: 3px solid var(--amber);
+        background: rgba(251, 191, 36, 0.02);
+      }
+      .report-finding.pass {
+        border-left: 3px solid var(--green);
+        background: rgba(52, 211, 153, 0.02);
+      }
+      .report-finding h4 {
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .report-finding .detail {
+        font-size: 11px;
+        color: var(--text-sec);
+        line-height: 1.6;
+        margin-bottom: 6px;
+      }
+      .report-finding .statute {
+        font-size: 9px;
+        color: var(--muted);
+        font-family: var(--mono);
+        margin-bottom: 6px;
+      }
+      .report-finding .fix {
+        font-size: 11px;
+        color: #059669;
+        line-height: 1.6;
+      }
+      .report-finding .fix code {
+        background: rgba(0, 0, 0, 0.04);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+
+      /* ── DASHBOARD (dark) ── */
+      .dash-wrap {
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .alert-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 24px;
+        background: rgba(248, 113, 113, 0.08);
+        border-bottom: 1px solid rgba(248, 113, 113, 0.15);
+      }
+      .alert-banner .msg {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--red);
+        flex: 1;
+      }
+      .alert-banner .abtn {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 12px;
+        border-radius: 6px;
+        background: rgba(248, 113, 113, 0.1);
+        color: var(--red);
+        border: 1px solid rgba(248, 113, 113, 0.2);
+        cursor: pointer;
+      }
+      .dash-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 24px;
+        border-bottom: 1px solid var(--border-dark);
+      }
+      .dash-top h2 {
+        font-size: 15px;
+        font-weight: 800;
+        color: white;
+      }
+      .dash-top .tmeta {
+        font-size: 9px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      .dash-top .shield-badge {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: rgba(52, 211, 153, 0.1);
+        color: var(--green);
+        border: 1px solid rgba(52, 211, 153, 0.2);
+      }
+      .dash-layout {
+        display: flex;
+      }
+      .dash-side {
+        width: 200px;
+        border-right: 1px solid rgba(255, 255, 255, 0.04);
+        padding: 14px 0;
+        flex-shrink: 0;
+      }
+      .dash-side .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 16px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--muted);
+        cursor: pointer;
+        transition: all 0.15s;
+        border-left: 3px solid transparent;
+      }
+      .dash-side .nav-item:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .dash-side .nav-item.active {
+        color: white;
+        background: rgba(255, 255, 255, 0.06);
+        border-left-color: var(--green);
+      }
+      .dash-main {
+        flex: 1;
+        padding: 16px 20px;
+        overflow-y: auto;
+      }
+      .d-card {
+        background: var(--card-dark);
+        border: 1px solid var(--border-dark);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      .d-card h4 {
+        font-size: 12px;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 2px;
+      }
+      .d-card .sub {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .d-grid {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .d-grid.c3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .d-grid.c2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .tab-section {
+        display: none;
+      }
+      .tab-section.active {
+        display: block;
+      }
+      .npi-check {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-dark);
+      }
+      .npi-check:last-child {
+        border: none;
+      }
+      .npi-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .npi-header .title {
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .npi-header .code {
+        font-size: 9px;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+      .npi-header .badge {
+        margin-left: auto;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      .npi-compare {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .npi-side {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        padding: 8px;
+      }
+      .npi-side .sl {
+        font-size: 8px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 3px;
+      }
+      .npi-side .sv {
+        font-size: 11px;
+        color: var(--text);
+      }
+      .npi-detail {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .npi-tip {
+        font-size: 10px;
+        color: rgba(52, 211, 153, 0.7);
+        margin-top: 3px;
+      }
+      .drift-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-dark);
+      }
+      .drift-item:last-child {
+        border: none;
+      }
+      .drift-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-top: 4px;
+        flex-shrink: 0;
+      }
+      .drift-content {
+        flex: 1;
+      }
+      .drift-title {
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .drift-desc {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .drift-time {
+        font-size: 9px;
+        color: var(--muted);
+        font-family: var(--mono);
+        flex-shrink: 0;
+      }
+      .border-row {
+        display: grid;
+        grid-template-columns: 2fr 1.2fr 1fr 2fr;
+        gap: 6px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border-dark);
+        font-size: 10px;
+        align-items: center;
+      }
+      .border-row.hdr {
+        font-size: 8px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-family: var(--mono);
+      }
+      .border-status {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .f-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 0;
+        border-bottom: 1px solid var(--border-dark);
+        font-size: 10px;
+      }
+      .f-row:last-child {
+        border: none;
+      }
+      .f-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* Widget styles */
+      .widget-badge {
+        position: fixed;
+        bottom: 18px;
+        right: 18px;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        border: 2px solid rgba(52, 211, 153, 0.3);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        padding: 8px 14px;
+        gap: 8px;
+        transition: all 0.2s;
+      }
+      .widget-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .widget-pane {
+        position: fixed;
+        bottom: 74px;
+        right: 18px;
+        width: 320px;
+        background: #0f172a;
+        border: 1px solid rgba(52, 211, 153, 0.2);
+        border-radius: 12px;
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: none;
+        overflow: hidden;
+        color: white;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .fade-in {
+        animation: fadeIn 0.35s ease forwards;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══ DEMO STEP BAR ═══ -->
+    <div class="topbar">
+      <div class="step active" id="step0" onclick="showPage('bare')">⓪ Before</div>
+      <div class="step" id="step1" onclick="showPage('widget')">① Widget</div>
+      <div class="step" id="step2" onclick="showPage('scan')">② Sentry Scan</div>
+      <div class="step" id="step3" onclick="showPage('results')">③ Results</div>
+      <div class="step" id="step4" onclick="showPage('report')">④ Audit Report</div>
+      <div class="step" id="step5" onclick="showPage('dashboard')">⑤ Shield Dashboard</div>
+    </div>
+
+    <!-- ═══════ PAGE 0: BARE WEBSITE ═══════ -->
+    <div class="page active" id="pg-bare">
+      <div class="site-header">
+        <div class="site-logo">
+          <div class="site-logo-box">HC</div>
+          <div>
+            <div class="site-logo-name">Hill Country Family Medicine</div>
+            <div class="site-logo-sub">Your Health, Our Priority</div>
+          </div>
+        </div>
+        <div class="site-nav">
+          <span>Home</span><span>Providers</span><span>Services</span><span>Patient Portal</span
+          ><span>Contact</span>
+        </div>
+      </div>
+      <div class="site-hero">
+        <h1>Welcome to Hill Country Family Medicine</h1>
+        <p>
+          Comprehensive family healthcare in the heart of Texas Hill Country. Accepting new
+          patients.
+        </p>
+        <div class="site-hero-btns">
+          <div class="btn primary">Book Appointment</div>
+          <div class="btn ghost">Patient Portal</div>
+        </div>
+      </div>
+      <div class="site-cards">
+        <div class="site-card">
+          <div class="emoji">🩺</div>
+          <h3>Family Practice</h3>
+          <p>
+            Primary care for patients of all ages, from wellness visits to chronic disease
+            management.
+          </p>
+        </div>
+        <div class="site-card">
+          <div class="emoji">💉</div>
+          <h3>Preventive Care</h3>
+          <p>Annual physicals, immunizations, screenings, and health risk assessments.</p>
+        </div>
+        <div class="site-card">
+          <div class="emoji">🧪</div>
+          <h3>Lab Services</h3>
+          <p>On-site laboratory for blood work, diagnostics, and same-day results.</p>
+        </div>
+      </div>
+      <div style="max-width: 860px; margin: 0 auto; padding: 0 28px 40px">
+        <div
+          style="
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 24px;
+          "
+        >
+          <div style="font-size: 13px; font-weight: 700; color: #856404">
+            ⚠️ No compliance verification visible to patients
+          </div>
+          <div style="font-size: 11px; color: #856404; margin-top: 2px">
+            No transparency about data practices, AI usage, or regulatory compliance with Texas SB
+            1188 and HB 149.
+          </div>
+        </div>
+        <div style="text-align: center">
+          <div
+            onclick="showPage('widget')"
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              padding: 12px 28px;
+              background: var(--blue);
+              color: white;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 700;
+              cursor: pointer;
+            "
+          >
+            See what changes with KairoLogic →
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ PAGE 1: WEBSITE + WIDGET ═══════ -->
+    <div class="page" id="pg-widget">
+      <div style="position: relative; min-height: 100vh; background: var(--bg-page)">
+        <div class="site-header">
+          <div class="site-logo">
+            <div class="site-logo-box">HC</div>
+            <div>
+              <div class="site-logo-name">Hill Country Family Medicine</div>
+              <div class="site-logo-sub">Your Health, Our Priority</div>
+            </div>
+          </div>
+          <div class="site-nav">
+            <span>Home</span><span>Providers</span><span>Services</span><span>Patient Portal</span
+            ><span>Contact</span>
+          </div>
+        </div>
+        <div class="site-hero">
+          <h1>Welcome to Hill Country Family Medicine</h1>
+          <p>
+            Comprehensive family healthcare in the heart of Texas Hill Country. Accepting new
+            patients.
+          </p>
+          <div class="site-hero-btns">
+            <div class="btn primary">Book Appointment</div>
+            <div class="btn ghost">Patient Portal</div>
+          </div>
+        </div>
+        <div class="site-cards">
+          <div class="site-card">
+            <div class="emoji">🩺</div>
+            <h3>Family Practice</h3>
+            <p>Primary care for all ages.</p>
+          </div>
+          <div class="site-card">
+            <div class="emoji">💉</div>
+            <h3>Preventive Care</h3>
+            <p>Physicals, immunizations, screenings.</p>
+          </div>
+          <div class="site-card">
+            <div class="emoji">🧪</div>
+            <h3>Lab Services</h3>
+            <p>On-site lab, same-day results.</p>
+          </div>
+        </div>
+        <!-- Widget Badge (matches live sentry.js) -->
+        <div
+          class="widget-badge"
+          onclick="toggleWidgetPane()"
+          style="
+            width: auto;
+            border-radius: 10px;
+            padding: 8px 14px;
+            gap: 8px;
+            border: 2px solid rgba(52, 211, 153, 0.25);
+          "
+        >
+          <span style="font-size: 18px">🛡️</span>
+          <div style="text-align: left">
+            <div style="font-size: 11px; font-weight: 800; color: white; line-height: 1.2">
+              Data & AI Trust
+            </div>
+            <div
+              style="
+                font-size: 8px;
+                color: var(--green);
+                font-family: var(--mono);
+                line-height: 1.2;
+              "
+            >
+              Live Monitoring Active
+            </div>
+          </div>
+          <div
+            style="
+              width: 6px;
+              height: 6px;
+              border-radius: 50%;
+              background: var(--green);
+              box-shadow: 0 0 6px var(--green);
+              animation: pulse 2s infinite;
+            "
+          ></div>
+        </div>
+        <!-- Widget Pane -->
+        <div class="widget-pane" id="widget-pane">
+          <div
+            style="
+              padding: 12px 14px;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            "
+          >
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="font-size: 14px">🛡️</span>
+              <div>
+                <div style="font-size: 11px; font-weight: 800">Sentry Shield™</div>
+                <div style="font-size: 8px; color: var(--green); font-family: var(--mono)">
+                  MONITORING SINCE Feb 1, 2026 · Live
+                </div>
+              </div>
+            </div>
+            <span
+              onclick="toggleWidgetPane()"
+              style="color: var(--muted); cursor: pointer; font-size: 14px"
+              >✕</span
+            >
+          </div>
+          <div style="padding: 10px 14px">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+              "
+            >
+              <span style="color: var(--green); font-size: 12px">✓</span>
+              <div style="flex: 1">
+                <div style="font-size: 11px; font-weight: 600">US-Sovereign Data</div>
+                <div style="font-size: 8px; color: var(--muted)">SB 1188 Compliant</div>
+              </div>
+              <div
+                style="
+                  width: 50px;
+                  height: 3px;
+                  border-radius: 2px;
+                  background: rgba(255, 255, 255, 0.06);
+                "
+              >
+                <div
+                  style="width: 38%; height: 100%; background: var(--red); border-radius: 2px"
+                ></div>
+              </div>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+              "
+            >
+              <span style="color: var(--amber); font-size: 12px">⚠</span>
+              <div style="flex: 1">
+                <div style="font-size: 11px; font-weight: 600">AI Transparent & Disclosed</div>
+                <div style="font-size: 8px; color: var(--muted)">HB 149</div>
+              </div>
+              <div
+                style="
+                  width: 50px;
+                  height: 3px;
+                  border-radius: 2px;
+                  background: rgba(255, 255, 255, 0.06);
+                "
+              >
+                <div
+                  style="width: 62%; height: 100%; background: var(--amber); border-radius: 2px"
+                ></div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 0">
+              <span style="color: var(--green); font-size: 12px">✓</span>
+              <div style="flex: 1">
+                <div style="font-size: 11px; font-weight: 600">Access Controlled</div>
+                <div style="font-size: 8px; color: var(--muted)">HIPAA Aligned</div>
+              </div>
+              <div
+                style="
+                  width: 50px;
+                  height: 3px;
+                  border-radius: 2px;
+                  background: rgba(255, 255, 255, 0.06);
+                "
+              >
+                <div
+                  style="width: 85%; height: 100%; background: var(--green); border-radius: 2px"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 0 14px 10px">
+            <div
+              style="
+                background: rgba(248, 113, 113, 0.06);
+                border: 1px solid rgba(248, 113, 113, 0.15);
+                border-radius: 6px;
+                padding: 8px 10px;
+              "
+            >
+              <div style="font-size: 10px; color: var(--red); font-weight: 600">
+                5 compliance changes detected
+              </div>
+              <div style="font-size: 9px; color: var(--muted); margin-top: 1px">
+                2 critical · 2 high · 1 medium
+              </div>
+            </div>
+          </div>
+          <div style="padding: 0 14px 12px; display: flex; flex-direction: column; gap: 5px">
+            <div id="cta-provider" style="display: flex; flex-direction: column; gap: 5px">
+              <div
+                onclick="showPage('dashboard')"
+                style="
+                  padding: 8px;
+                  background: rgba(52, 211, 153, 0.1);
+                  border: 1px solid rgba(52, 211, 153, 0.2);
+                  border-radius: 6px;
+                  text-align: center;
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--green);
+                  cursor: pointer;
+                "
+              >
+                Open Compliance Dashboard
+              </div>
+              <div
+                onclick="showPage('report')"
+                style="
+                  padding: 8px;
+                  background: rgba(255, 255, 255, 0.04);
+                  border: 1px solid rgba(255, 255, 255, 0.08);
+                  border-radius: 6px;
+                  text-align: center;
+                  font-size: 11px;
+                  font-weight: 600;
+                  color: var(--muted);
+                  cursor: pointer;
+                "
+              >
+                View Full Compliance Report
+              </div>
+            </div>
+            <div id="cta-patient" style="display: none; flex-direction: column; gap: 5px">
+              <div
+                style="
+                  padding: 8px;
+                  background: rgba(52, 211, 153, 0.06);
+                  border: 1px solid rgba(52, 211, 153, 0.15);
+                  border-radius: 6px;
+                  text-align: center;
+                  font-size: 10px;
+                  color: rgba(52, 211, 153, 0.8);
+                  cursor: pointer;
+                "
+              >
+                Learn about your data rights under Texas law →
+              </div>
+            </div>
+          </div>
+          <div style="padding: 6px 14px; background: rgba(0, 0, 0, 0.2); text-align: center">
+            <div style="font-size: 7px; color: var(--muted); font-family: var(--mono)">
+              Powered by KairoLogic Sentry Shield™
+            </div>
+          </div>
+        </div>
+        <!-- Prompt bar with view toggle -->
+        <div
+          style="
+            position: fixed;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--navy);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 18px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          "
+        >
+          <span
+            onclick="setWidgetView('patient')"
+            id="vw-patient"
+            style="
+              font-size: 10px;
+              padding: 4px 10px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-weight: 700;
+              background: rgba(52, 211, 153, 0.15);
+              color: var(--green);
+              border: 1px solid rgba(52, 211, 153, 0.3);
+            "
+            >👤 Patient View</span
+          >
+          <span
+            onclick="setWidgetView('provider')"
+            id="vw-provider"
+            style="
+              font-size: 10px;
+              padding: 4px 10px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-weight: 700;
+              color: var(--muted);
+              border: 1px solid transparent;
+            "
+            >🏥 Provider View</span
+          >
+          <span style="font-size: 10px; color: rgba(255, 255, 255, 0.15)">|</span>
+          <span style="font-size: 10px; color: var(--muted)">👆 Click the badge</span>
+          <span style="font-size: 10px; color: rgba(255, 255, 255, 0.15)">|</span>
+          <span
+            onclick="showPage('scan')"
+            style="font-size: 10px; color: var(--green); font-weight: 700; cursor: pointer"
+            >Continue to Sentry Scan →</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ PAGE 2: SENTRY SCAN (matches live site) ═══════ -->
+    <div class="page" id="pg-scan">
+      <div class="kl-nav">
+        <div class="logo">
+          <div class="logo-icon">🛡</div>
+          <div class="logo-text">Kairo<span>Logic</span></div>
+        </div>
+        <div class="kl-nav-links">
+          <span>COMPLIANCE</span><span>SERVICES</span><span>REGISTRY</span><span>INSIGHTS</span
+          ><span>CONTACT</span>
+        </div>
+        <div class="cta-btn">RUN SENTRY SCAN</div>
+      </div>
+      <div class="scan-section">
+        <h2>Run Sentry Compliance Scan</h2>
+        <div class="sub">Check any Texas healthcare provider's compliance posture in seconds.</div>
+        <div class="scan-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Provider NPI <span class="req">*</span></label
+              ><input type="text" id="demoNpi" value="1234567890" />
+            </div>
+            <div class="form-group">
+              <label>Website URL <span class="req">*</span></label
+              ><input type="text" id="demoUrl" value="https://hillcountryfamilymed.com" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact Name</label><input type="text" value="Dr. Sarah Mitchell" />
+            </div>
+            <div class="form-group">
+              <label
+                >Email <span style="font-weight: 400; color: #94a3b8">(for results)</span></label
+              ><input type="text" value="smitchell@hillcountryfm.com" />
+            </div>
+          </div>
+          <button class="scan-btn" id="scanBtn" onclick="startScan()">🛡 Run Risk Scan</button>
+          <div class="scan-progress" id="scanProgress">
+            <div class="scan-phase" id="scanPhase">Initializing SENTRY engine...</div>
+            <div class="bar-bg"><div class="bar-fill" id="scanBar"></div></div>
+            <div class="scan-checks" id="scanChecks"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ PAGE 3: RESULTS (matches live site) ═══════ -->
+    <div class="page" id="pg-results">
+      <div class="kl-nav">
+        <div class="logo">
+          <div class="logo-icon">🛡</div>
+          <div class="logo-text">Kairo<span>Logic</span></div>
+        </div>
+        <div class="kl-nav-links">
+          <span>COMPLIANCE</span><span>SERVICES</span><span>REGISTRY</span><span>INSIGHTS</span
+          ><span>CONTACT</span>
+        </div>
+        <div class="cta-btn">RUN SENTRY SCAN</div>
+      </div>
+      <div class="results-section fade-in">
+        <!-- Portal detection -->
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: white;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 11px;
+            color: var(--text-sec);
+          "
+        >
+          🌐 Scanned page type: <strong>Patient Portal</strong> — "Home | Hill Country Family
+          Medicine"
+          <span class="tier-badge tier-drift" style="font-size: 9px; margin-left: 8px"
+            >Portal Detected</span
+          >
+        </div>
+
+        <!-- Score Card -->
+        <div class="result-card">
+          <div style="font-size: 16px; font-weight: 800; color: var(--navy); margin-bottom: 2px">
+            Composite Compliance Score
+          </div>
+          <div style="font-size: 10px; color: var(--muted); margin-bottom: 2px">
+            NPI: 1234567890
+          </div>
+          <div
+            style="
+              font-size: 9px;
+              color: var(--muted);
+              font-family: var(--mono);
+              margin-bottom: 16px;
+            "
+          >
+            Engine: SENTRY-3.1.0
+          </div>
+          <div style="text-align: right; margin-top: -60px">
+            <span style="font-size: 48px; font-weight: 900; color: var(--red)">58%</span><br /><span
+              class="tier-badge tier-violation"
+              >Violation</span
+            >
+          </div>
+          <div style="clear: both"></div>
+          <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 16px 0" />
+          <div style="font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 12px">
+            Category Breakdown — Path to 100%
+          </div>
+          <div class="cat-bars">
+            <div class="cat-bar-item">
+              <span class="icon">🌐</span>
+              <div class="info">
+                <div class="name">
+                  Data Residency
+                  <span style="font-weight: 400; color: var(--muted); font-size: 9px"
+                    >(weight: 45%)</span
+                  >
+                </div>
+              </div>
+              <div class="bar"><div style="width: 38%; background: var(--red)"></div></div>
+              <div class="score" style="color: var(--red)">38%</div>
+              <span class="tier-badge tier-violation" style="font-size: 8px">Violation</span>
+            </div>
+            <div style="font-size: 9px; color: var(--muted); margin: -4px 0 4px 28px">
+              1/4 passed · 2 failed · 1 warning
+            </div>
+            <div class="cat-bar-item">
+              <span class="icon">🤖</span>
+              <div class="info">
+                <div class="name">
+                  AI Transparency
+                  <span style="font-weight: 400; color: var(--muted); font-size: 9px"
+                    >(weight: 30%)</span
+                  >
+                </div>
+              </div>
+              <div class="bar"><div style="width: 62%; background: var(--amber)"></div></div>
+              <div class="score" style="color: #b45309">62%</div>
+              <span class="tier-badge tier-drift" style="font-size: 8px">Moderate</span>
+            </div>
+            <div style="font-size: 9px; color: var(--muted); margin: -4px 0 4px 28px">
+              2/4 passed · 1 failed · 1 warning
+            </div>
+            <div class="cat-bar-item">
+              <span class="icon">🏥</span>
+              <div class="info">
+                <div class="name">
+                  NPI Integrity
+                  <span style="font-weight: 400; color: var(--muted); font-size: 9px"
+                    >(weight: 25%)</span
+                  >
+                </div>
+              </div>
+              <div class="bar"><div style="width: 43%; background: var(--red)"></div></div>
+              <div class="score" style="color: var(--red)">43%</div>
+              <span class="tier-badge tier-violation" style="font-size: 8px">Violation</span>
+            </div>
+            <div style="font-size: 9px; color: var(--muted); margin: -4px 0 4px 28px">
+              1/4 passed · 2 failed · 1 warning
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary findings (not detailed - saves detail for report) -->
+        <div class="result-card">
+          <div style="font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 10px">
+            Summary Findings
+          </div>
+          <div class="finding-list">
+            <div class="finding-item">
+              <span class="finding-dot" style="background: var(--red)"></span
+              ><span class="finding-text">2 foreign data routing endpoints detected</span
+              ><span
+                class="finding-sev"
+                style="background: rgba(248, 113, 113, 0.08); color: var(--red)"
+                >Critical</span
+              >
+            </div>
+            <div class="finding-item">
+              <span class="finding-dot" style="background: var(--red)"></span
+              ><span class="finding-text">NPI registry address does not match website</span
+              ><span
+                class="finding-sev"
+                style="background: rgba(248, 113, 113, 0.08); color: var(--red)"
+                >High</span
+              >
+            </div>
+            <div class="finding-item">
+              <span class="finding-dot" style="background: var(--amber)"></span
+              ><span class="finding-text">Specialty classification discrepancy detected</span
+              ><span
+                class="finding-sev"
+                style="background: rgba(251, 191, 36, 0.08); color: #b45309"
+                >Medium</span
+              >
+            </div>
+            <div class="finding-item">
+              <span class="finding-dot" style="background: var(--amber)"></span
+              ><span class="finding-text">AI transparency disclosure not found</span
+              ><span
+                class="finding-sev"
+                style="background: rgba(251, 191, 36, 0.08); color: #b45309"
+                >Medium</span
+              >
+            </div>
+            <div class="finding-item">
+              <span class="finding-dot" style="background: var(--green)"></span
+              ><span class="finding-text">SSL/TLS certificate valid — 287 days remaining</span
+              ><span
+                class="finding-sev"
+                style="background: rgba(52, 211, 153, 0.08); color: #059669"
+                >Pass</span
+              >
+            </div>
+            <div class="finding-item">
+              <span class="finding-dot" style="background: var(--green)"></span
+              ><span class="finding-text">HIPAA notice detected on website</span
+              ><span
+                class="finding-sev"
+                style="background: rgba(52, 211, 153, 0.08); color: #059669"
+                >Pass</span
+              >
+            </div>
+          </div>
+          <div
+            style="
+              font-size: 10px;
+              color: var(--muted);
+              margin-top: 10px;
+              text-align: center;
+              font-style: italic;
+            "
+          >
+            Full finding details, remediation steps, and statutory references available in the Audit
+            Report.
+          </div>
+        </div>
+
+        <!-- Report + CTAs -->
+        <div
+          onclick="showPage('report')"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            background: white;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            border-radius: 8px;
+            color: #059669;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 16px;
+          "
+        >
+          📄 View Full Audit Report →
+        </div>
+        <div class="cta-grid">
+          <div class="cta-card" onclick="showPage('report')">
+            <div class="name">Sovereignty Audit Report</div>
+            <div class="desc">
+              Deep forensic analysis with remediation roadmap and statutory references
+            </div>
+            <div class="price">$149</div>
+          </div>
+          <div class="cta-card rec" onclick="showPage('dashboard')">
+            <div class="rec-tag">RECOMMENDED</div>
+            <div class="name">Safe Harbor™ + Shield</div>
+            <div class="desc">Full audit + live monitoring dashboard + continuous compliance</div>
+            <div class="price">$249 + $79/mo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ PAGE 4: AUDIT REPORT (branded) ═══════ -->
+    <div class="page" id="pg-report">
+      <div class="report-page">
+        <div class="report-header">
+          <div class="brand">KAIRO <span>LOGIC</span></div>
+          <div class="label">Sovereignty Audit Report</div>
+        </div>
+        <div class="report-body">
+          <!-- Cover card -->
+          <div class="report-cover">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px">
+              Hill Country Family Medicine
+            </div>
+            <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5)">
+              NPI: 1234567890 · hillcountryfamilymed.com
+            </div>
+            <div style="margin: 20px 0">
+              <span class="score-val">58</span
+              ><span style="font-size: 18px; color: rgba(255, 255, 255, 0.4)"> / 100</span>
+            </div>
+            <div class="score-label">Violation Risk</div>
+            <div class="meta">
+              Scan Date: February 15, 2026 · Engine: SENTRY-3.1.0 · Classification: CONFIDENTIAL
+            </div>
+          </div>
+
+          <!-- Executive summary -->
+          <div class="report-section">
+            <h2>Executive Summary</h2>
+            <p style="font-size: 12px; color: var(--text-sec); line-height: 1.7; margin-top: 8px">
+              This report presents the findings of a comprehensive compliance scan of
+              <strong>Hill Country Family Medicine</strong> (NPI: 1234567890) conducted on February
+              15, 2026. The scan evaluated 14 compliance checkpoints across three categories: Data
+              Residency, AI Transparency, and NPI Integrity. The practice scored
+              <strong style="color: var(--red)">58/100 (Violation Risk)</strong>, with 3 critical
+              and 4 high-severity findings requiring immediate attention.
+            </p>
+            <table
+              style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 11px"
+            >
+              <tr style="background: var(--navy); color: white">
+                <td style="padding: 6px 10px; font-weight: 700">METRIC</td>
+                <td style="padding: 6px 10px; font-weight: 700">VALUE</td>
+                <td style="padding: 6px 10px; font-weight: 700">STATUS</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9">
+                <td style="padding: 6px 10px">Composite Score</td>
+                <td style="padding: 6px 10px">58 / 100</td>
+                <td style="padding: 6px 10px; color: var(--red); font-weight: 700">
+                  Violation Risk
+                </td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9">
+                <td style="padding: 6px 10px">Data Residency (SB 1188)</td>
+                <td style="padding: 6px 10px">38%</td>
+                <td style="padding: 6px 10px; color: var(--red); font-weight: 700">Violation</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9">
+                <td style="padding: 6px 10px">AI Transparency (HB 149)</td>
+                <td style="padding: 6px 10px">62%</td>
+                <td style="padding: 6px 10px; color: #b45309; font-weight: 700">Moderate</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 10px">NPI Integrity</td>
+                <td style="padding: 6px 10px">43%</td>
+                <td style="padding: 6px 10px; color: var(--red); font-weight: 700">Violation</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Critical findings -->
+          <div class="report-section">
+            <h2>Critical Findings</h2>
+            <div class="report-finding critical">
+              <h4 style="color: var(--red)">Foreign Data Routing — Google Fonts</h4>
+              <div class="detail">
+                fonts.googleapis.com resolving to Dublin, Ireland (52.15.xx). Patient IP addresses
+                exposed to foreign jurisdiction on every page load.
+              </div>
+              <div class="statute">
+                Statute: SB 1188 §183.001 · Category: Data Residency · Severity: Critical
+              </div>
+              <div class="fix">
+                💡 <strong>Remediation:</strong> Download the Google Fonts files (WOFF2 format) and
+                host them on your own web server or a US-based CDN like Cloudflare (US zone). Update
+                your CSS <code>@font-face</code> declarations to reference local paths instead of
+                <code>fonts.googleapis.com</code>. This eliminates cross-border font requests that
+                expose patient IP addresses to Google's EU infrastructure. Estimated effort: 30–45
+                minutes for a web developer.
+              </div>
+            </div>
+            <div class="report-finding critical">
+              <h4 style="color: var(--red)">Foreign Data Routing — Google Analytics</h4>
+              <div class="detail">
+                analytics.google.com resolving to Singapore (35.186.xx). Browsing behavior data
+                leaving US sovereignty.
+              </div>
+              <div class="statute">
+                Statute: SB 1188 §183.001 · Category: Data Residency · Severity: Critical
+              </div>
+              <div class="fix">
+                💡 <strong>Remediation:</strong> Option A: Replace Google Analytics with a
+                privacy-first, US-hosted alternative such as Plausible Analytics or Fathom (both
+                offer HIPAA-ready plans with US-only data processing). Option B: If GA4 is required,
+                enable the "US data residency" setting in GA4 Admin → Data Settings → Data
+                Collection, and configure a server-side GTM container hosted on a US-based Cloud Run
+                instance to proxy all analytics traffic through domestic infrastructure. Estimated
+                effort: 2–4 hours.
+              </div>
+            </div>
+            <div class="report-finding critical">
+              <h4 style="color: var(--red)">Address Mismatch — NPI Registry</h4>
+              <div class="detail">
+                NPI registry shows "1706 HWY 1431 W, Marble Falls, TX" but website displays "2204
+                Hwy 1431 West". Patients may be directed to incorrect location.
+              </div>
+              <div class="statute">Check: NPI-01 · Category: NPI Integrity · Severity: High</div>
+              <div class="fix">
+                💡 <strong>Remediation:</strong> Verify which address is current. If the website
+                address is correct, log into the NPPES portal at <code>nppes.cms.hhs.gov</code> and
+                submit an address update (1–2 business days). Also verify the address matches on
+                Google Business Profile, Healthgrades, Vitals, and insurance directories. Mismatched
+                addresses create patient safety concerns and may affect insurance claim processing.
+              </div>
+            </div>
+          </div>
+
+          <!-- Warnings -->
+          <div class="report-section">
+            <h2>Warnings</h2>
+            <div class="report-finding warning">
+              <h4 style="color: #b45309">Specialty Discrepancy</h4>
+              <div class="detail">
+                NPI classification "Internal Medicine" (207Q00000X) — Website mentions "Family
+                Practice" (208D00000X). These are distinct specialties with different board
+                certifications.
+              </div>
+              <div class="statute">Check: NPI-03 · Category: NPI Integrity · Severity: Medium</div>
+              <div class="fix">
+                💡 <strong>Remediation:</strong> If the provider is board-certified in both,
+                consider adding both taxonomy codes to the NPI record via NPPES. If the website
+                language doesn't reflect actual board certification, update it to match. Insurance
+                networks may deny claims if the billed specialty doesn't match the NPI taxonomy.
+                Estimated effort: 15 minutes for website update, 1–2 business days for NPPES update.
+              </div>
+            </div>
+            <div class="report-finding warning">
+              <h4 style="color: #b45309">No AI Disclosure Statement</h4>
+              <div class="detail">
+                HB 149 requires disclosure when AI is used in patient care decisions. No disclosure
+                page or statement found on the website.
+              </div>
+              <div class="statute">
+                Statute: HB 149 · Category: AI Transparency · Severity: Medium
+              </div>
+              <div class="fix">
+                💡 <strong>Remediation:</strong> Create a dedicated "AI Transparency" page
+                accessible from your navigation or footer. The disclosure should specify: (1) which
+                AI tools are in use, (2) how AI outputs are reviewed by licensed clinicians, and (3)
+                how patients can request a human-only review. KairoLogic Safe Harbor™ includes a
+                pre-drafted, attorney-reviewed disclosure template — deploy in under 10 minutes.
+              </div>
+            </div>
+            <div class="report-finding warning">
+              <h4 style="color: #b45309">Referrer Policy Not Strict</h4>
+              <div class="detail">
+                Current policy "no-referrer-when-downgrade" may leak patient page URLs (e.g.,
+                /patient-portal/appointment/confirmation) to third-party resources.
+              </div>
+              <div class="statute">Category: Data Residency · Severity: Medium</div>
+              <div class="fix">
+                💡 <strong>Remediation:</strong> Add the header
+                <code>Referrer-Policy: strict-origin-when-cross-origin</code> to your web server
+                configuration. This ensures only the domain origin (not the full path) is sent to
+                third parties. One-line configuration change, zero impact on functionality.
+              </div>
+            </div>
+          </div>
+
+          <!-- Passed -->
+          <div class="report-section">
+            <h2>Passed Checks</h2>
+            <div class="report-finding pass">
+              <h4 style="color: #059669">✓ SSL/TLS Certificate Valid</h4>
+              <div class="detail">
+                Certificate issued by Let's Encrypt. Expires Dec 15, 2026 (287 days). No action
+                needed.
+              </div>
+            </div>
+            <div class="report-finding pass">
+              <h4 style="color: #059669">✓ HIPAA Notice Detected</h4>
+              <div class="detail">
+                HIPAA Privacy Notice found at /privacy-policy. Covers required disclosure elements.
+              </div>
+            </div>
+            <div class="report-finding pass">
+              <h4 style="color: #059669">✓ Provider Name Verified</h4>
+              <div class="detail">
+                Organization name matches NPI registry: "Hill Country Family Medicine".
+              </div>
+            </div>
+          </div>
+
+          <!-- CTA -->
+          <div style="text-align: center; padding: 24px 0">
+            <div style="font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px">
+              Want continuous monitoring?
+            </div>
+            <div style="font-size: 12px; color: var(--muted); margin-bottom: 14px">
+              Sentry Shield watches for changes 24/7 and alerts you when compliance drifts.
+            </div>
+            <div
+              onclick="showPage('dashboard')"
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 12px 28px;
+                border-radius: 8px;
+                background: var(--navy);
+                color: white;
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+              "
+            >
+              🛡 See Shield Dashboard Demo →
+            </div>
+          </div>
+
+          <div style="text-align: center; padding: 12px 0; font-size: 9px; color: var(--muted)">
+            © 2026 KairoLogic. This report is protected under TX SB 1188 compliance documentation
+            standards.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ PAGE 5: SHIELD DASHBOARD (dark) ═══════ -->
+    <div class="page" id="pg-dashboard">
+      <div class="dash-wrap">
+        <div class="alert-banner">
+          <span>⚠️</span
+          ><span class="msg">5 open alerts — 2 critical, 2 high severity, 1 medium</span
+          ><span class="abtn" onclick="showDashTab('alerts')">View Details</span>
+        </div>
+        <div class="dash-top">
+          <div>
+            <h2 style="color: white">🛡 Hill Country Family Medicine</h2>
+            <div class="tmeta">NPI: 1234567890 · SHIELD · Monitoring since Feb 1, 2026 · Live</div>
+          </div>
+          <div class="shield-badge">🛡 SHIELD ACTIVE</div>
+        </div>
+        <div class="dash-layout">
+          <div class="dash-side">
+            <div class="nav-item active" data-tab="overview" onclick="showDashTab('overview')">
+              📊 Dashboard
+            </div>
+            <div class="nav-item" data-tab="npi" onclick="showDashTab('npi')">👤 NPI Integrity</div>
+            <div class="nav-item" data-tab="border" onclick="showDashTab('border')">
+              🗺️ Data Border Map
+            </div>
+            <div class="nav-item" data-tab="alerts" onclick="showDashTab('alerts')">
+              🔔 Drift Monitor
+            </div>
+            <div class="nav-item" data-tab="history" onclick="showDashTab('history')">
+              🕐 Scan History
+            </div>
+            <div class="nav-item" data-tab="docs" onclick="showDashTab('docs')">📄 Documents</div>
+            <div class="nav-item" data-tab="settings" onclick="showDashTab('settings')">
+              ⚙️ Settings
+            </div>
+          </div>
+          <div class="dash-main">
+            <!-- Overview -->
+            <div class="tab-section active" id="tab-overview">
+              <div class="d-grid c3">
+                <div class="d-card" style="text-align: center">
+                  <div style="position: relative; width: 70px; height: 70px; margin: 0 auto 6px">
+                    <svg
+                      viewBox="0 0 70 70"
+                      style="width: 100%; height: 100%; transform: rotate(-90deg)"
+                    >
+                      <circle
+                        cx="35"
+                        cy="35"
+                        r="29"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.06)"
+                        stroke-width="5"
+                      />
+                      <circle
+                        cx="35"
+                        cy="35"
+                        r="29"
+                        fill="none"
+                        stroke="var(--red)"
+                        stroke-width="5"
+                        stroke-dasharray="106 182"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                    <div
+                      style="
+                        position: absolute;
+                        inset: 0;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 18px;
+                        font-weight: 900;
+                        color: var(--red);
+                      "
+                    >
+                      58
+                    </div>
+                  </div>
+                  <span
+                    style="
+                      font-size: 9px;
+                      font-weight: 700;
+                      background: rgba(248, 113, 113, 0.1);
+                      color: var(--red);
+                      padding: 2px 8px;
+                      border-radius: 6px;
+                    "
+                    >Violation</span
+                  >
+                </div>
+                <div class="d-card">
+                  <h4>Data Residency</h4>
+                  <div class="sub">SB 1188</div>
+                  <div
+                    style="
+                      font-size: 20px;
+                      font-weight: 900;
+                      color: var(--red);
+                      float: right;
+                      margin-top: -20px;
+                    "
+                  >
+                    38%
+                  </div>
+                  <div class="bar-bg" style="margin-top: 16px">
+                    <div
+                      class="bar-fill"
+                      style="width: 38%; background: var(--red); transition: none"
+                    ></div>
+                  </div>
+                </div>
+                <div class="d-card">
+                  <h4>AI Transparency</h4>
+                  <div class="sub">HB 149</div>
+                  <div
+                    style="
+                      font-size: 20px;
+                      font-weight: 900;
+                      color: var(--amber);
+                      float: right;
+                      margin-top: -20px;
+                    "
+                  >
+                    62%
+                  </div>
+                  <div class="bar-bg" style="margin-top: 16px">
+                    <div
+                      class="bar-fill"
+                      style="width: 62%; background: var(--amber); transition: none"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div class="d-card">
+                <h4>Open Alerts (5)</h4>
+                <div style="margin-top: 8px">
+                  <div class="f-row">
+                    <span class="f-dot" style="background: var(--red)"></span
+                    ><span style="flex: 1; color: var(--red)"
+                      >Foreign data routing — Google Fonts → Dublin</span
+                    ><span class="drift-time">12m ago</span>
+                  </div>
+                  <div class="f-row">
+                    <span class="f-dot" style="background: var(--red)"></span
+                    ><span style="flex: 1; color: var(--red)"
+                      >Foreign data routing — Analytics → Singapore</span
+                    ><span class="drift-time">12m ago</span>
+                  </div>
+                  <div class="f-row">
+                    <span class="f-dot" style="background: var(--orange)"></span
+                    ><span style="flex: 1; color: var(--orange)"
+                      >Address mismatch — NPI vs website</span
+                    ><span class="drift-time">2d ago</span>
+                  </div>
+                  <div class="f-row">
+                    <span class="f-dot" style="background: var(--amber)"></span
+                    ><span style="flex: 1; color: var(--amber)"
+                      >New tracker detected — Meta Pixel</span
+                    ><span class="drift-time">5d ago</span>
+                  </div>
+                  <div class="f-row">
+                    <span class="f-dot" style="background: var(--amber)"></span
+                    ><span style="flex: 1; color: var(--amber)"
+                      >Provider roster changed — 12 → 10</span
+                    ><span class="drift-time">1w ago</span>
+                  </div>
+                </div>
+              </div>
+              <div class="d-card">
+                <h4>Recent Scans</h4>
+                <div style="margin-top: 6px">
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      padding: 4px 0;
+                      border-bottom: 1px solid var(--border-dark);
+                      font-size: 10px;
+                    "
+                  >
+                    <span
+                      ><strong style="color: var(--red)">58</strong>
+                      <span style="color: var(--muted)">batch_v2</span></span
+                    ><span class="drift-time">14 findings · Feb 15 10:30am</span>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      padding: 4px 0;
+                      border-bottom: 1px solid var(--border-dark);
+                      font-size: 10px;
+                    "
+                  >
+                    <span
+                      ><strong style="color: var(--amber)">63</strong>
+                      <span style="color: var(--muted)">monthly</span></span
+                    ><span class="drift-time">12 findings · Feb 1 6:00am</span>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      padding: 4px 0;
+                      font-size: 10px;
+                    "
+                  >
+                    <span
+                      ><strong style="color: var(--amber)">67</strong>
+                      <span style="color: var(--muted)">initial</span></span
+                    ><span class="drift-time">10 findings · Jan 15 2:00pm</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- NPI -->
+            <div class="tab-section" id="tab-npi">
+              <div class="d-card">
+                <h4>NPI Registry Verification</h4>
+                <div class="sub">Comparing NPPES data against your website</div>
+                <div class="npi-check">
+                  <div class="npi-header">
+                    <span style="color: var(--red)">✗</span
+                    ><span class="title" style="color: var(--red)">Address mismatch</span
+                    ><span class="code">NPI-01</span
+                    ><span
+                      class="badge"
+                      style="background: rgba(248, 113, 113, 0.1); color: var(--red)"
+                      >FAIL</span
+                    >
+                  </div>
+                  <div class="npi-compare">
+                    <div class="npi-side">
+                      <div class="sl">NPI Registry</div>
+                      <div class="sv">1706 HWY 1431 W, MARBLE FALLS, TX 78654</div>
+                    </div>
+                    <div class="npi-side">
+                      <div class="sl">Your Website</div>
+                      <div class="sv">2204 Hwy 1431 West, Marble Falls, TX 78654</div>
+                    </div>
+                  </div>
+                  <div class="npi-tip">
+                    💡 Update either NPPES or website. Mismatched addresses affect insurance claims
+                    and patient navigation.
+                  </div>
+                </div>
+                <div class="npi-check">
+                  <div class="npi-header">
+                    <span style="color: var(--red)">✗</span
+                    ><span class="title" style="color: var(--red)">Phone mismatch</span
+                    ><span class="code">NPI-02</span
+                    ><span
+                      class="badge"
+                      style="background: rgba(248, 113, 113, 0.1); color: var(--red)"
+                      >FAIL</span
+                    >
+                  </div>
+                  <div class="npi-compare">
+                    <div class="npi-side">
+                      <div class="sl">NPI Registry</div>
+                      <div class="sv">(830) 693-4466</div>
+                    </div>
+                    <div class="npi-side">
+                      <div class="sl">Your Website</div>
+                      <div class="sv">(830) 693-7500</div>
+                    </div>
+                  </div>
+                  <div class="npi-tip">
+                    💡 Inconsistent phone numbers reduce patient trust and affect directory
+                    listings.
+                  </div>
+                </div>
+                <div class="npi-check">
+                  <div class="npi-header">
+                    <span style="color: var(--amber)">⚠</span
+                    ><span class="title" style="color: var(--amber)">Specialty discrepancy</span
+                    ><span class="code">NPI-03</span
+                    ><span
+                      class="badge"
+                      style="background: rgba(251, 191, 36, 0.1); color: var(--amber)"
+                      >WARN</span
+                    >
+                  </div>
+                  <div class="npi-compare">
+                    <div class="npi-side">
+                      <div class="sl">NPI Registry</div>
+                      <div class="sv">Internal Medicine</div>
+                    </div>
+                    <div class="npi-side">
+                      <div class="sl">Your Website</div>
+                      <div class="sv">Family Practice</div>
+                    </div>
+                  </div>
+                  <div class="npi-tip">
+                    💡 Align specialty language with NPI taxonomy for credentialing accuracy.
+                  </div>
+                </div>
+                <div class="npi-check">
+                  <div class="npi-header">
+                    <span style="color: var(--green)">✓</span
+                    ><span class="title" style="color: var(--green)">Provider name verified</span
+                    ><span class="code">NPI-04</span
+                    ><span
+                      class="badge"
+                      style="background: rgba(52, 211, 153, 0.1); color: var(--green)"
+                      >PASS</span
+                    >
+                  </div>
+                  <div class="npi-detail">Organization name matches NPI registry.</div>
+                </div>
+              </div>
+              <div class="d-card">
+                <h4>Provider Roster Integrity</h4>
+                <div class="sub">Credentialing & directory consistency</div>
+                <div class="npi-check">
+                  <div class="npi-header">
+                    <span style="color: var(--amber)">⚠</span
+                    ><span class="title" style="color: var(--amber)">Roster count changed</span
+                    ><span class="code">RST-01</span
+                    ><span
+                      class="badge"
+                      style="background: rgba(251, 191, 36, 0.1); color: var(--amber)"
+                      >DRIFT</span
+                    >
+                  </div>
+                  <div class="npi-compare">
+                    <div class="npi-side">
+                      <div class="sl">Previous Scan</div>
+                      <div class="sv">12 providers listed</div>
+                    </div>
+                    <div class="npi-side">
+                      <div class="sl">Current</div>
+                      <div class="sv">10 providers listed</div>
+                    </div>
+                  </div>
+                  <div class="npi-detail">
+                    2 providers removed since last scan. Verify credentialing records.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Border Map -->
+            <div class="tab-section" id="tab-border">
+              <div class="d-grid c2">
+                <div
+                  class="d-card"
+                  style="
+                    background: rgba(52, 211, 153, 0.04);
+                    border-color: rgba(52, 211, 153, 0.15);
+                  "
+                >
+                  <div style="font-size: 24px; font-weight: 900; color: var(--green)">4</div>
+                  <div style="font-size: 10px; color: var(--green); opacity: 0.7">US-Sovereign</div>
+                </div>
+                <div
+                  class="d-card"
+                  style="
+                    background: rgba(248, 113, 113, 0.04);
+                    border-color: rgba(248, 113, 113, 0.15);
+                  "
+                >
+                  <div style="font-size: 24px; font-weight: 900; color: var(--red)">3</div>
+                  <div style="font-size: 10px; color: var(--red); opacity: 0.7">Foreign</div>
+                </div>
+              </div>
+              <div class="d-card">
+                <div class="border-row hdr">
+                  <div>Domain</div>
+                  <div>Country</div>
+                  <div>City</div>
+                  <div>Status</div>
+                </div>
+                <div class="border-row">
+                  <div>fonts.googleapis.com</div>
+                  <div>Ireland</div>
+                  <div>Dublin</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(248, 113, 113, 0.1); color: var(--red)"
+                      >⚠️ FOREIGN</span
+                    >
+                  </div>
+                </div>
+                <div class="border-row">
+                  <div>analytics.google.com</div>
+                  <div>Singapore</div>
+                  <div>Singapore</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(248, 113, 113, 0.1); color: var(--red)"
+                      >⚠️ FOREIGN</span
+                    >
+                  </div>
+                </div>
+                <div class="border-row">
+                  <div>cdn.meta.com</div>
+                  <div>Netherlands</div>
+                  <div>Amsterdam</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(248, 113, 113, 0.1); color: var(--red)"
+                      >⚠️ FOREIGN</span
+                    >
+                  </div>
+                </div>
+                <div class="border-row">
+                  <div>hillcountryfamilymed.com</div>
+                  <div>United States</div>
+                  <div>Dallas, TX</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(52, 211, 153, 0.1); color: var(--green)"
+                      >🇺🇸 SOVEREIGN</span
+                    >
+                  </div>
+                </div>
+                <div class="border-row">
+                  <div>cloudflare.com</div>
+                  <div>United States</div>
+                  <div>San Jose</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(52, 211, 153, 0.1); color: var(--green)"
+                      >🇺🇸 SOVEREIGN</span
+                    >
+                  </div>
+                </div>
+                <div class="border-row">
+                  <div>stripe.com</div>
+                  <div>United States</div>
+                  <div>San Francisco</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(52, 211, 153, 0.1); color: var(--green)"
+                      >🇺🇸 SOVEREIGN</span
+                    >
+                  </div>
+                </div>
+                <div class="border-row">
+                  <div>aws.amazon.com</div>
+                  <div>United States</div>
+                  <div>Virginia</div>
+                  <div>
+                    <span
+                      class="border-status"
+                      style="background: rgba(52, 211, 153, 0.1); color: var(--green)"
+                      >🇺🇸 SOVEREIGN</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Drift -->
+            <div class="tab-section" id="tab-alerts">
+              <div class="d-card">
+                <h4>Compliance Drift Timeline</h4>
+                <div class="sub">Changes detected between scans</div>
+                <div style="margin-top: 10px">
+                  <div class="drift-item">
+                    <div class="drift-dot" style="background: var(--red)"></div>
+                    <div class="drift-content">
+                      <div class="drift-title" style="color: var(--red)">
+                        Foreign data routing — Google Fonts → Dublin
+                      </div>
+                      <div class="drift-desc">
+                        fonts.googleapis.com resolving to foreign IP. Patient IPs exposed.
+                      </div>
+                    </div>
+                    <div class="drift-time">12m ago</div>
+                  </div>
+                  <div class="drift-item">
+                    <div class="drift-dot" style="background: var(--red)"></div>
+                    <div class="drift-content">
+                      <div class="drift-title" style="color: var(--red)">
+                        Foreign data routing — Analytics → Singapore
+                      </div>
+                      <div class="drift-desc">
+                        analytics.google.com at 35.186.xx. Browsing data leaving US.
+                      </div>
+                    </div>
+                    <div class="drift-time">12m ago</div>
+                  </div>
+                  <div class="drift-item">
+                    <div class="drift-dot" style="background: var(--orange)"></div>
+                    <div class="drift-content">
+                      <div class="drift-title" style="color: var(--orange)">
+                        Address changed on website
+                      </div>
+                      <div class="drift-desc">
+                        Changed from "1706 HWY 1431 W" to "2204 Hwy 1431 West" — NPI not updated.
+                      </div>
+                    </div>
+                    <div class="drift-time">2d ago</div>
+                  </div>
+                  <div class="drift-item">
+                    <div class="drift-dot" style="background: var(--amber)"></div>
+                    <div class="drift-content">
+                      <div class="drift-title" style="color: var(--amber)">
+                        New tracking script — Meta Pixel
+                      </div>
+                      <div class="drift-desc">
+                        Facebook/Meta pixel added. Data routed to cdn.meta.com (Netherlands).
+                      </div>
+                    </div>
+                    <div class="drift-time">5d ago</div>
+                  </div>
+                  <div class="drift-item">
+                    <div class="drift-dot" style="background: var(--amber)"></div>
+                    <div class="drift-content">
+                      <div class="drift-title" style="color: var(--amber)">
+                        Provider roster changed — 12 → 10
+                      </div>
+                      <div class="drift-desc">
+                        2 providers removed from the team page since last scan.
+                      </div>
+                    </div>
+                    <div class="drift-time">1w ago</div>
+                  </div>
+                  <div class="drift-item">
+                    <div class="drift-dot" style="background: var(--green)"></div>
+                    <div class="drift-content">
+                      <div class="drift-title" style="color: var(--green)">
+                        SSL certificate renewed ✓
+                      </div>
+                      <div class="drift-desc">New expiry: Dec 15, 2026. No action needed.</div>
+                    </div>
+                    <div class="drift-time">
+                      2w ago<br /><span
+                        style="color: var(--green); font-weight: 700; font-size: 8px"
+                        >RESOLVED</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scan History -->
+            <div class="tab-section" id="tab-history">
+              <div class="d-card">
+                <h4>Scan History</h4>
+                <div style="margin-top: 10px">
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 50px 70px 1fr 70px 1fr;
+                      gap: 6px;
+                      padding: 6px 0;
+                      font-size: 8px;
+                      font-weight: 700;
+                      color: var(--muted);
+                      text-transform: uppercase;
+                      font-family: var(--mono);
+                      border-bottom: 1px solid var(--border-dark);
+                    "
+                  >
+                    <div>Score</div>
+                    <div>Status</div>
+                    <div>Type</div>
+                    <div>Findings</div>
+                    <div>Date</div>
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 50px 70px 1fr 70px 1fr;
+                      gap: 6px;
+                      padding: 6px 0;
+                      font-size: 11px;
+                      border-bottom: 1px solid var(--border-dark);
+                    "
+                  >
+                    <div style="font-weight: 900; color: var(--red)">58</div>
+                    <div>
+                      <span
+                        style="
+                          font-size: 8px;
+                          font-weight: 700;
+                          background: rgba(248, 113, 113, 0.1);
+                          color: var(--red);
+                          padding: 2px 5px;
+                          border-radius: 3px;
+                        "
+                        >Violation</span
+                      >
+                    </div>
+                    <div style="color: var(--muted)">batch_v2</div>
+                    <div style="color: var(--muted)">14</div>
+                    <div class="drift-time">Feb 15 10:30am</div>
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 50px 70px 1fr 70px 1fr;
+                      gap: 6px;
+                      padding: 6px 0;
+                      font-size: 11px;
+                      border-bottom: 1px solid var(--border-dark);
+                    "
+                  >
+                    <div style="font-weight: 900; color: var(--amber)">63</div>
+                    <div>
+                      <span
+                        style="
+                          font-size: 8px;
+                          font-weight: 700;
+                          background: rgba(251, 191, 36, 0.1);
+                          color: var(--amber);
+                          padding: 2px 5px;
+                          border-radius: 3px;
+                        "
+                        >Drift</span
+                      >
+                    </div>
+                    <div style="color: var(--muted)">monthly</div>
+                    <div style="color: var(--muted)">12</div>
+                    <div class="drift-time">Feb 1 6:00am</div>
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 50px 70px 1fr 70px 1fr;
+                      gap: 6px;
+                      padding: 6px 0;
+                      font-size: 11px;
+                    "
+                  >
+                    <div style="font-weight: 900; color: var(--amber)">67</div>
+                    <div>
+                      <span
+                        style="
+                          font-size: 8px;
+                          font-weight: 700;
+                          background: rgba(251, 191, 36, 0.1);
+                          color: var(--amber);
+                          padding: 2px 5px;
+                          border-radius: 3px;
+                        "
+                        >Drift</span
+                      >
+                    </div>
+                    <div style="color: var(--muted)">initial</div>
+                    <div style="color: var(--muted)">10</div>
+                    <div class="drift-time">Jan 15 2:00pm</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Documents -->
+            <div class="tab-section" id="tab-docs">
+              <div
+                class="d-card"
+                style="display: flex; align-items: center; justify-content: space-between"
+              >
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <span style="font-size: 20px">📄</span>
+                  <div>
+                    <div style="font-size: 12px; font-weight: 700; color: white">
+                      Compliance Audit Report
+                    </div>
+                    <div style="font-size: 9px; color: var(--muted)">Generated Feb 15, 2026</div>
+                  </div>
+                </div>
+                <div
+                  style="
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    background: rgba(52, 211, 153, 0.08);
+                    border: 1px solid rgba(52, 211, 153, 0.2);
+                    color: var(--green);
+                    font-size: 10px;
+                    font-weight: 700;
+                    cursor: pointer;
+                  "
+                >
+                  ⬇ Download PDF
+                </div>
+              </div>
+              <div
+                class="d-card"
+                style="display: flex; align-items: center; justify-content: space-between"
+              >
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <span style="font-size: 20px">📋</span>
+                  <div>
+                    <div style="font-size: 12px; font-weight: 700; color: white">
+                      Safe Harbor™ Policy Pack
+                    </div>
+                    <div style="font-size: 9px; color: var(--muted)">
+                      SB 1188 compliance templates
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style="
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    background: rgba(52, 211, 153, 0.08);
+                    border: 1px solid rgba(52, 211, 153, 0.2);
+                    color: var(--green);
+                    font-size: 10px;
+                    font-weight: 700;
+                    cursor: pointer;
+                  "
+                >
+                  ⬇ Download
+                </div>
+              </div>
+              <div
+                class="d-card"
+                style="display: flex; align-items: center; justify-content: space-between"
+              >
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <span style="font-size: 20px">📝</span>
+                  <div>
+                    <div style="font-size: 12px; font-weight: 700; color: white">
+                      AI Disclosure Template
+                    </div>
+                    <div style="font-size: 9px; color: var(--muted)">HB 149 patient notice</div>
+                  </div>
+                </div>
+                <div
+                  style="
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    background: rgba(52, 211, 153, 0.08);
+                    border: 1px solid rgba(52, 211, 153, 0.2);
+                    color: var(--green);
+                    font-size: 10px;
+                    font-weight: 700;
+                    cursor: pointer;
+                  "
+                >
+                  ⬇ Download
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="tab-section" id="tab-settings">
+              <div class="d-card">
+                <h4>Widget Embed Code</h4>
+                <div class="sub" style="margin-bottom: 8px">Add before &lt;/body&gt;</div>
+                <pre
+                  style="
+                    background: rgba(0, 0, 0, 0.3);
+                    border: 1px solid var(--border-dark);
+                    border-radius: 6px;
+                    padding: 10px;
+                    font-family: var(--mono);
+                    font-size: 10px;
+                    color: var(--green);
+                    overflow-x: auto;
+                  "
+                >
+&lt;script src="https://kairologic.net/sentry.js" data-npi="1234567890" data-mode="shield"&gt;&lt;/script&gt;</pre
+                >
+              </div>
+              <div class="d-card">
+                <h4>Subscription</h4>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 12px;
+                    margin-top: 8px;
+                    font-size: 11px;
+                  "
+                >
+                  <div>
+                    <div style="font-size: 9px; color: var(--muted)">Plan</div>
+                    <div style="font-weight: 700; color: white">Sentry Shield</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 9px; color: var(--muted)">Status</div>
+                    <div style="font-weight: 700; color: var(--green)">Active</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 9px; color: var(--muted)">Billing</div>
+                    <div style="font-weight: 700; color: white">$79/month</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 9px; color: var(--muted)">Next scan</div>
+                    <div style="font-weight: 700; color: white">Mar 1, 2026</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="padding: 12px 24px; border-top: 1px solid var(--border-dark)">
+          <div style="font-size: 8px; color: var(--muted); font-family: var(--mono)">
+            Powered by KairoLogic Sentry Shield™ · © 2026 KairoLogic
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function showPage(id) {
+        document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
+        document.getElementById('pg-' + id).classList.add('active');
+        document.querySelectorAll('.step').forEach((s) => s.classList.remove('active'));
+        var steps = {
+          bare: 'step0',
+          widget: 'step1',
+          scan: 'step2',
+          results: 'step3',
+          report: 'step4',
+          dashboard: 'step5',
+        };
+        if (steps[id]) document.getElementById(steps[id]).classList.add('active');
+        var order = ['bare', 'widget', 'scan', 'results', 'report', 'dashboard'];
+        var idx = order.indexOf(id);
+        for (var i = 0; i < idx; i++) document.getElementById('step' + i).classList.add('done');
+        window.scrollTo(0, 0);
+      }
+      function toggleWidgetPane() {
+        var p = document.getElementById('widget-pane');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      }
+      function setWidgetView(view) {
+        var providerCta = document.getElementById('cta-provider');
+        var patientCta = document.getElementById('cta-patient');
+        var btnP = document.getElementById('vw-patient');
+        var btnPr = document.getElementById('vw-provider');
+        if (view === 'patient') {
+          providerCta.style.display = 'none';
+          patientCta.style.display = 'flex';
+          btnP.style.background = 'rgba(52,211,153,0.15)';
+          btnP.style.color = '#34d399';
+          btnP.style.borderColor = 'rgba(52,211,153,0.3)';
+          btnPr.style.background = 'transparent';
+          btnPr.style.color = '#64748b';
+          btnPr.style.borderColor = 'transparent';
+        } else {
+          providerCta.style.display = 'flex';
+          patientCta.style.display = 'none';
+          btnPr.style.background = 'rgba(96,165,250,0.15)';
+          btnPr.style.color = '#60a5fa';
+          btnPr.style.borderColor = 'rgba(96,165,250,0.3)';
+          btnP.style.background = 'transparent';
+          btnP.style.color = '#64748b';
+          btnP.style.borderColor = 'transparent';
+        }
+      }
+      var scanPhases = [
+        { text: 'Resolving DNS endpoints...', time: 600 },
+        { text: 'Crawling website content...', time: 800 },
+        { text: 'Analyzing data residency (SB 1188)...', time: 700 },
+        { text: 'Checking AI transparency (HB 149)...', time: 600 },
+        { text: 'Verifying NPI registry data...', time: 500 },
+        { text: 'Cross-referencing NPPES...', time: 600 },
+        { text: 'Mapping data border endpoints...', time: 500 },
+        { text: 'Scanning provider roster...', time: 400 },
+        { text: 'Generating compliance score...', time: 500 },
+      ];
+      var scanChecks = [
+        { icon: '🌍', text: 'fonts.googleapis.com → Dublin, Ireland', color: 'var(--red)' },
+        { icon: '🌍', text: 'analytics.google.com → Singapore', color: 'var(--red)' },
+        { icon: '🇺🇸', text: 'hillcountryfamilymed.com → Dallas, TX', color: '#059669' },
+        { icon: '✗', text: 'Address mismatch: NPI ≠ Website', color: 'var(--red)' },
+        {
+          icon: '⚠',
+          text: 'Specialty: "Internal Medicine" vs "Family Practice"',
+          color: '#b45309',
+        },
+        { icon: '✗', text: 'No AI disclosure statement found', color: '#b45309' },
+        { icon: '✓', text: 'SSL certificate valid (287 days)', color: '#059669' },
+        { icon: '✓', text: 'HIPAA notice detected', color: '#059669' },
+      ];
+      function startScan() {
+        var btn = document.getElementById('scanBtn');
+        btn.disabled = true;
+        btn.textContent = 'Scanning...';
+        var prog = document.getElementById('scanProgress');
+        prog.classList.add('active');
+        var bar = document.getElementById('scanBar');
+        var phase = document.getElementById('scanPhase');
+        var checks = document.getElementById('scanChecks');
+        checks.innerHTML = '';
+        var totalTime = scanPhases.reduce(function (s, p) {
+          return s + p.time;
+        }, 0);
+        var elapsed = 0,
+          checkIdx = 0;
+        function run(i) {
+          if (i >= scanPhases.length) {
+            phase.textContent = '✅ Scan complete — 14 checks performed';
+            phase.style.color = '#059669';
+            bar.style.width = '100%';
+            setTimeout(function () {
+              showPage('results');
+            }, 800);
+            return;
+          }
+          phase.textContent = scanPhases[i].text;
+          elapsed += scanPhases[i].time;
+          bar.style.width = Math.round((elapsed / totalTime) * 100) + '%';
+          if (checkIdx < scanChecks.length) {
+            var c = scanChecks[checkIdx];
+            var d = document.createElement('div');
+            d.className = 'scan-chk';
+            d.innerHTML =
+              '<span>' +
+              c.icon +
+              '</span><span style="color:' +
+              c.color +
+              '">' +
+              c.text +
+              '</span>';
+            checks.appendChild(d);
+            setTimeout(function () {
+              d.classList.add('vis');
+            }, 50);
+            checkIdx++;
+          }
+          setTimeout(function () {
+            run(i + 1);
+          }, scanPhases[i].time);
+        }
+        setTimeout(function () {
+          run(0);
+        }, 300);
+      }
+      function showDashTab(tab) {
+        document.querySelectorAll('.tab-section').forEach((t) => t.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        document
+          .querySelectorAll('.dash-side .nav-item')
+          .forEach((n) => n.classList.remove('active'));
+        document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+      }
+    </script>
+  </body>
+</html>

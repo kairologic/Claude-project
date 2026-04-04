@@ -1,0 +1,633 @@
+/**
+ * POST /api/admin/practice-payer-sync
+ *
+ * Two-phase payer sync for a single practice:
+ *   Phase 1 (always): Read existing snapshots from DB, run mismatch engine
+ *                      against NPPES data, populate payer_directory_mismatches.
+ *   Phase 2 (optional): If { refresh: true }, also re-fetch FHIR directories
+ *                        and upsert new snapshots before running mismatches.
+ *
+ * Input: { practice_id: string, refresh?: boolean }
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createAdminSupabaseClient } from '@/lib/auth/auth-helpers';
+import { FhirDirectoryClient } from '@/lib/payer-directory/fhir-client';
+import { PayerDirectoryLookup } from '@/lib/payer-directory/payer-lookup';
+import {
+  detectMismatches,
+  buildAcceptanceGapMismatch,
+} from '@/lib/payer-directory/mismatch-engine';
+import {
+  detectAcceptanceGaps,
+  type ProviderDirectoryStatus,
+} from '@/lib/payer-directory/acceptance-gap-detector';
+import type {
+  PayerEndpoint,
+  DirectorySnapshot,
+  NppesProviderData,
+  DirectoryMismatch,
+} from '@/lib/payer-directory/types';
+
+// TODO: Add system-admin role check when role system is expanded
+
+// ── Practice-level sync lock ──────────────────────────────────
+// Prevents concurrent syncs for the same practice from creating race conditions.
+// In-memory lock is sufficient for single-instance Vercel deployments.
+const activeSyncs = new Map<string, number>(); // practice_id → start timestamp
+const SYNC_LOCK_TIMEOUT_MS = 300_000; // 5 minutes max lock duration
+
+async function POST_HANDLER(request: NextRequest) {
+  const supabase = createAdminSupabaseClient();
+  const startTime = Date.now();
+  let lockedPracticeId: string | null = null;
+
+  try {
+    const { practice_id, refresh } = await request.json();
+    if (!practice_id) {
+      return NextResponse.json({ error: 'practice_id required' }, { status: 400 });
+    }
+
+    // Check for concurrent sync — reject if another sync is running for this practice
+    const existingSync = activeSyncs.get(practice_id);
+    if (existingSync && Date.now() - existingSync < SYNC_LOCK_TIMEOUT_MS) {
+      const elapsedSec = Math.round((Date.now() - existingSync) / 1000);
+      return NextResponse.json(
+        {
+          error: `Sync already in progress for this practice (started ${elapsedSec}s ago). Please wait for it to complete.`,
+          retry_after_seconds: 30,
+        },
+        { status: 429 },
+      );
+    }
+    activeSyncs.set(practice_id, startTime);
+    lockedPracticeId = practice_id;
+
+    // 1. Get practice providers
+    const { data: providers, error: providersError } = await supabase
+      .from('practice_providers')
+      .select('npi,provider_name')
+      .eq('practice_website_id', practice_id)
+      .eq('roster_status', 'active');
+
+    if (providersError || !providers || providers.length === 0) {
+      return NextResponse.json(
+        { error: 'No active providers found for this practice' },
+        { status: 404 },
+      );
+    }
+
+    const npiList = providers.map((p: any) => p.npi).filter(Boolean);
+
+    // 1b. Fetch practice website metadata (accepted payers + source)
+    let acceptedPayers: string[] = [];
+    let acceptedPayersSource: string = 'assumed';
+    let practiceName: string | null = null;
+    let practiceUrl: string = '';
+    try {
+      const { data: pwRows } = await supabase
+        .from('practice_websites')
+        .select('name,url,accepted_payers,accepted_payers_source')
+        .eq('id', practice_id);
+      if (pwRows?.[0]) {
+        acceptedPayers = pwRows[0].accepted_payers || [];
+        acceptedPayersSource = pwRows[0].accepted_payers_source || 'assumed';
+        practiceName = pwRows[0].name || null;
+        practiceUrl = pwRows[0].url || '';
+      }
+    } catch (pwErr) {
+      console.warn('[practice-payer-sync] Failed to fetch practice website metadata:', pwErr);
+    }
+
+    // Derive signal confidence from acceptance source:
+    //   admin_entered → confirmed (practice explicitly told us)
+    //   scanner       → indicative (extracted from website text)
+    //   assumed       → indicative (default/unknown)
+    const signalType = acceptedPayersSource === 'admin_entered' ? 'confirmed' : 'indicative';
+
+    // ── Payer code normalization ──────────────────────────────────
+    // Website-facing payer names (e.g. "bcbs") may differ from endpoint
+    // payer_codes which are state-specific (e.g. "bcbs_tx").
+    // Build a bidirectional map so acceptance gap detection can match.
+    // Also resolves the state-specific practice location to BCBS affiliate.
+    const PAYER_ALIASES: Record<string, string[]> = {
+      bcbs: ['bcbs_tx', 'bcbs_ca', 'bcbs_il', 'bcbs_fl', 'bcbs_ga'],
+    };
+    // Expand accepted payers to include state-specific codes
+    const expandedAcceptedPayers = new Set<string>();
+    for (const p of acceptedPayers) {
+      expandedAcceptedPayers.add(p);
+      if (PAYER_ALIASES[p]) {
+        for (const alias of PAYER_ALIASES[p]) expandedAcceptedPayers.add(alias);
+      }
+    }
+    // Reverse map: endpoint code → canonical accepted code (for gap reporting)
+    const endpointToCanonical = new Map<string, string>();
+    for (const p of acceptedPayers) {
+      endpointToCanonical.set(p, p);
+      if (PAYER_ALIASES[p]) {
+        for (const alias of PAYER_ALIASES[p]) endpointToCanonical.set(alias, p);
+      }
+    }
+
+    // 2. Bulk-fetch NPPES data for all provider NPIs
+    //    CRITICAL: If NPPES data is unavailable, mismatch detection is meaningless.
+    //    We fail explicitly rather than producing misleading "0 mismatches" results.
+    const nppesMap = new Map<string, NppesProviderData>();
+    let nppesLoadError: string | null = null;
+    if (npiList.length > 0) {
+      try {
+        const { data: nppesRows, error: nppesQueryError } = await supabase
+          .from('providers')
+          .select(
+            'npi,first_name,last_name,organization_name,address_line_1,address_line_2,city,state,zip_code,phone,taxonomy_code,taxonomy_desc,gender',
+          )
+          .in('npi', npiList);
+
+        if (nppesQueryError || !nppesRows) {
+          throw new Error(nppesQueryError?.message || 'Failed to fetch NPPES data');
+        }
+
+        for (const row of nppesRows) {
+          nppesMap.set(row.npi, {
+            npi: row.npi,
+            provider_name:
+              row.organization_name || `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+            first_name: row.first_name,
+            last_name: row.last_name,
+            organization_name: row.organization_name,
+            address_line_1: row.address_line_1,
+            address_line_2: row.address_line_2,
+            city: row.city,
+            state: row.state,
+            zip: row.zip_code,
+            phone: row.phone,
+            taxonomy_code: row.taxonomy_code,
+            taxonomy_desc: row.taxonomy_desc,
+            gender: row.gender,
+          });
+        }
+
+        if (nppesMap.size === 0) {
+          nppesLoadError = `NPPES returned 0 rows for ${npiList.length} NPIs — mismatch detection will be skipped`;
+          console.warn(`[practice-payer-sync] ${nppesLoadError}`);
+        }
+      } catch (nppesErr) {
+        nppesLoadError = `Failed to fetch NPPES data: ${nppesErr instanceof Error ? nppesErr.message : String(nppesErr)}`;
+        console.error(`[practice-payer-sync] ${nppesLoadError}`);
+      }
+    }
+
+    // ═══ Phase 2 (optional): Refresh snapshots from FHIR endpoints ═══
+    const fhirRefreshStats = { attempted: 0, upserted: 0, errors: 0 };
+    // Capture first N error messages for diagnostics (visible in API response)
+    const errorSamples: string[] = [];
+    const MAX_ERROR_SAMPLES = 10;
+    // Track payers that had FHIR errors (auth failures, config issues).
+    // Phase 1 will exclude old snapshots from these payers since the data is unreliable.
+    const failedPayers = new Set<string>();
+    // Circuit breaker: track consecutive failures per payer.
+    // If a payer fails 3+ providers in a row, mark it as failed (likely a systemic issue).
+    const consecutiveFailures = new Map<string, number>();
+    const CIRCUIT_BREAKER_THRESHOLD = 3;
+    if (refresh) {
+      const { data: endpoints, error: endpointsError } = await supabase
+        .from('payer_directory_endpoints')
+        .select('*')
+        .eq('is_active', true);
+
+      if (!endpointsError && endpoints && endpoints.length > 0) {
+        const fhirClient = new FhirDirectoryClient();
+        const payerLookup = new PayerDirectoryLookup();
+        const batchId = `admin-sync-${practice_id.slice(0, 8)}-${Date.now()}`;
+
+        for (const provider of providers) {
+          if (!provider.npi) continue;
+          // Resolve first/last name from NPPES data (needed for scrape endpoints)
+          const nppesData = nppesMap.get(provider.npi);
+          const firstName = nppesData?.first_name || '';
+          const lastName = nppesData?.last_name || '';
+          for (const endpoint of endpoints) {
+            if (failedPayers.has(endpoint.payer_code)) continue; // Skip payer if already failed
+            fhirRefreshStats.attempted++;
+            try {
+              // Route through PayerDirectoryLookup for SCRAPE: endpoints (e.g. BCBS TX)
+              // which delegates to the appropriate scraper adapter.
+              // Standard FHIR endpoints continue to use FhirDirectoryClient directly.
+              let snapshot: DirectorySnapshot | null;
+              if (endpoint.fhir_base_url.startsWith('SCRAPE:')) {
+                snapshot = await payerLookup.lookup(
+                  provider.npi,
+                  firstName,
+                  lastName,
+                  endpoint,
+                  undefined, // geoLocation
+                  batchId,
+                );
+              } else {
+                snapshot = await fhirClient.lookupByNpi(
+                  provider.npi,
+                  endpoint,
+                  batchId,
+                  provider.provider_name,
+                );
+              }
+              if (!snapshot) continue;
+
+              const isListed = !!snapshot.fhir_practitioner_id;
+
+              // Read existing consecutive count
+              let prevCount = 0;
+              try {
+                const { data: existing } = await supabase
+                  .from('payer_directory_snapshots')
+                  .select('consecutive_not_listed_count')
+                  .eq('npi', provider.npi)
+                  .eq('payer_code', endpoint.payer_code)
+                  .limit(1);
+                if (existing?.[0]) prevCount = existing[0].consecutive_not_listed_count || 0;
+              } catch {
+                /* first snapshot */
+              }
+
+              const snapshotRow: Record<string, unknown> = {
+                npi: provider.npi,
+                payer_code: endpoint.payer_code,
+                snapshot_date: snapshot.snapshot_date,
+                listed_name_first: snapshot.listed_name_first,
+                listed_name_last: snapshot.listed_name_last,
+                listed_name_full: snapshot.listed_name_full,
+                listed_credentials: snapshot.listed_credentials,
+                listed_gender: snapshot.listed_gender,
+                listed_address_line1: snapshot.listed_address_line1,
+                listed_address_line2: snapshot.listed_address_line2,
+                listed_city: snapshot.listed_city,
+                listed_state: snapshot.listed_state,
+                listed_zip: snapshot.listed_zip,
+                listed_phone: snapshot.listed_phone,
+                listed_fax: snapshot.listed_fax,
+                listed_specialty_code: snapshot.listed_specialty_code,
+                listed_specialty_display: snapshot.listed_specialty_display,
+                listed_accepting_patients: snapshot.listed_accepting_patients,
+                listed_org_name: snapshot.listed_org_name,
+                listed_org_npi: snapshot.listed_org_npi,
+                listed_network_name: snapshot.listed_network_name,
+                listed_plan_names: snapshot.listed_plan_names,
+                listed_languages: snapshot.listed_languages,
+                listed_telehealth_available: snapshot.listed_telehealth_available,
+                listed_office_hours: snapshot.listed_office_hours,
+                listed_disability_access: snapshot.listed_disability_access,
+                fhir_practitioner_id: snapshot.fhir_practitioner_id,
+                fhir_practitioner_role_id: snapshot.fhir_practitioner_role_id,
+                fhir_location_id: snapshot.fhir_location_id,
+                fhir_organization_id: snapshot.fhir_organization_id,
+                fhir_raw_bundle: snapshot.fhir_raw_bundle,
+                sync_batch_id: batchId,
+                consecutive_not_listed_count: isListed ? 0 : prevCount + 1,
+              };
+
+              if (isListed) {
+                snapshotRow.reverification_confirmed = null;
+                snapshotRow.last_reverification_at = null;
+              }
+
+              await supabase
+                .from('payer_directory_snapshots')
+                .upsert(snapshotRow, { onConflict: 'npi,payer_code,snapshot_date' });
+              fhirRefreshStats.upserted++;
+              // Reset circuit breaker on success
+              consecutiveFailures.set(endpoint.payer_code, 0);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              const stack = err instanceof Error ? err.stack : undefined;
+              console.warn(
+                `[practice-payer-sync] FHIR error for ${provider.npi}/${endpoint.payer_code}: ${msg}`,
+              );
+              if (stack) console.warn(`[practice-payer-sync] Stack: ${stack}`);
+              // Log full error for DB upsert failures to capture PostgREST error body
+              if (msg.includes('DB POST')) {
+                console.warn(
+                  `[practice-payer-sync] Upsert failed for NPI ${provider.npi}/${endpoint.payer_code} — full error: ${msg}`,
+                );
+              }
+              fhirRefreshStats.errors++;
+              if (errorSamples.length < MAX_ERROR_SAMPLES) {
+                errorSamples.push(`${provider.npi}/${endpoint.payer_code}: ${msg.slice(0, 200)}`);
+              }
+
+              // ── Circuit breaker: immediate trip on auth errors ──
+              const isAuthError =
+                msg.includes('OAuth') ||
+                msg.includes('auth error') ||
+                msg.includes('credentials rejected') ||
+                msg.includes('FHIR 401') ||
+                msg.includes('FHIR 403');
+              if (isAuthError) {
+                console.warn(
+                  `[practice-payer-sync] Auth failure for ${endpoint.payer_code} — skipping remaining providers`,
+                );
+                failedPayers.add(endpoint.payer_code);
+                continue;
+              }
+
+              // ── Circuit breaker: consecutive failure tracking ──
+              const prevFailCount = consecutiveFailures.get(endpoint.payer_code) || 0;
+              consecutiveFailures.set(endpoint.payer_code, prevFailCount + 1);
+              if (prevFailCount + 1 >= CIRCUIT_BREAKER_THRESHOLD) {
+                console.warn(
+                  `[practice-payer-sync] Circuit breaker: ${endpoint.payer_code} failed ${prevFailCount + 1} times consecutively — skipping remaining providers`,
+                );
+                failedPayers.add(endpoint.payer_code);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ═══ Phase 1 (always): Read existing snapshots, run mismatch engine ═══
+
+    // Clear existing unresolved mismatches for this practice
+    try {
+      await supabase
+        .from('payer_directory_mismatches')
+        .delete()
+        .eq('practice_website_id', practice_id)
+        .eq('status', 'open');
+    } catch (delErr) {
+      console.warn('[practice-payer-sync] Failed to clear old mismatches:', delErr);
+    }
+
+    // Read all current snapshots for this practice's NPIs
+    let snapshots: DirectorySnapshot[] = [];
+    if (npiList.length > 0) {
+      const { data: snapshotData } = await supabase
+        .from('payer_directory_snapshots')
+        .select('*')
+        .in('npi', npiList);
+      snapshots = snapshotData || [];
+    }
+
+    // If refresh was attempted, exclude snapshots from payers that had auth/config errors.
+    // Their old "not listed" data is unreliable and would create false acceptance gaps.
+    if (refresh && failedPayers.size > 0) {
+      const before = snapshots.length;
+      snapshots = snapshots.filter((s: DirectorySnapshot) => !failedPayers.has(s.payer_code));
+      console.log(
+        `[practice-payer-sync] Excluded ${before - snapshots.length} snapshots from failed payers: ${[...failedPayers].join(', ')}`,
+      );
+    }
+
+    let mismatchesCreated = 0;
+    const allMismatches: DirectoryMismatch[] = [];
+    const payerStats = new Map<string, { total: number; notListed: number }>();
+
+    // Run mismatch detection for each snapshot
+    for (const snapshot of snapshots) {
+      const isListed = !!snapshot.fhir_practitioner_id;
+
+      // Track per-payer stats for acceptance gap
+      const stats = payerStats.get(snapshot.payer_code) || { total: 0, notListed: 0 };
+      stats.total++;
+      if (!isListed) stats.notListed++;
+      payerStats.set(snapshot.payer_code, stats);
+
+      // Run mismatch detection against NPPES
+      const nppesData = nppesMap.get(snapshot.npi);
+      if (nppesData) {
+        try {
+          const mismatches = detectMismatches(nppesData, snapshot, practice_id);
+          if (mismatches.length > 0) {
+            allMismatches.push(...mismatches);
+            for (const m of mismatches) {
+              await supabase.from('payer_directory_mismatches').insert({
+                npi: m.npi,
+                payer_code: m.payer_code,
+                practice_website_id: m.practice_website_id,
+                field_name: m.field_name,
+                mismatch_type: m.mismatch_type,
+                nppes_value: m.nppes_value,
+                website_value: m.website_value,
+                payer_value: m.payer_value,
+                recommended_value: m.recommended_value,
+                priority: m.priority,
+                fix_via_caqh: m.fix_via_caqh,
+                fix_instructions: m.fix_instructions,
+                status: 'open',
+              });
+              mismatchesCreated++;
+            }
+          }
+        } catch (mismatchErr) {
+          console.warn(
+            `[practice-payer-sync] Mismatch error for ${snapshot.npi}/${snapshot.payer_code}:`,
+            mismatchErr,
+          );
+        }
+      }
+    }
+
+    // ═══ Acceptance Gap Detection (website claims vs directory reality) ═══
+    // Only flag gaps for payers the website CLAIMS to accept.
+    // Uses Layer 1 (consecutive not-listed threshold) via snapshot data.
+    let acceptanceGapsCreated = 0;
+
+    if (acceptedPayers.length > 0) {
+      // Build per-provider directory status from snapshots (for claimed payers)
+      const providerStatuses: ProviderDirectoryStatus[] = npiList.map((npi: string) => ({
+        npi,
+        payer_statuses: {} as Record<string, 'listed' | 'not_listed'>,
+      }));
+      const statusMap = new Map(providerStatuses.map((ps) => [ps.npi, ps]));
+
+      for (const snapshot of snapshots) {
+        const ps = statusMap.get(snapshot.npi);
+        if (!ps) continue;
+        // Only track status for claimed payers (including state-specific aliases)
+        if (!expandedAcceptedPayers.has(snapshot.payer_code)) continue;
+
+        const isListed = !!snapshot.fhir_practitioner_id;
+        // Map endpoint code to canonical accepted payer code (e.g. bcbs_tx → bcbs)
+        const canonicalCode = endpointToCanonical.get(snapshot.payer_code) || snapshot.payer_code;
+
+        if (isListed) {
+          ps.payer_statuses[canonicalCode] = 'listed';
+        } else {
+          // Layer 1: Only count as not_listed if consecutive_not_listed_count >= 2
+          // This prevents single-cycle false positives (transient FHIR errors, etc.)
+          const consecutiveCount = (snapshot as any).consecutive_not_listed_count || 0;
+          if (consecutiveCount >= 2) {
+            ps.payer_statuses[canonicalCode] = 'not_listed';
+          }
+          // Below threshold: leave as undefined (not yet conclusive)
+        }
+      }
+
+      // Detect gaps using the full acceptance-gap-detector module
+      const gaps = detectAcceptanceGaps(practice_id, acceptedPayers, providerStatuses, {
+        name: practiceName,
+        url: practiceUrl,
+      });
+
+      for (const gap of gaps) {
+        if (gap.severity === 'warning' || gap.severity === 'action') {
+          try {
+            const gapMismatch = buildAcceptanceGapMismatch({
+              practice_website_id: gap.practice_website_id,
+              payer_code: gap.payer_code,
+              total_providers: gap.total_providers,
+              not_listed_count: gap.not_listed_count,
+              gap_percentage: gap.gap_percentage,
+            });
+            allMismatches.push(gapMismatch);
+            await supabase.from('payer_directory_mismatches').insert({
+              npi: gapMismatch.npi,
+              payer_code: gapMismatch.payer_code,
+              practice_website_id: gapMismatch.practice_website_id,
+              field_name: gapMismatch.field_name,
+              mismatch_type: gapMismatch.mismatch_type,
+              nppes_value: gapMismatch.nppes_value,
+              website_value: gapMismatch.website_value,
+              payer_value: gapMismatch.payer_value,
+              recommended_value: gapMismatch.recommended_value,
+              priority: gapMismatch.priority,
+              fix_via_caqh: gapMismatch.fix_via_caqh,
+              fix_instructions: gapMismatch.fix_instructions,
+              status: 'open',
+              signal_type: signalType,
+              acceptance_source: acceptedPayersSource,
+            });
+            acceptanceGapsCreated++;
+            mismatchesCreated++;
+          } catch (gapErr) {
+            console.warn(
+              `[practice-payer-sync] Acceptance gap error for ${gap.payer_code}:`,
+              gapErr,
+            );
+          }
+        }
+      }
+    } else {
+      console.log(
+        `[practice-payer-sync] No accepted_payers on website — skipping acceptance gap detection`,
+      );
+    }
+
+    // ═══ Correction Packet Completion Tracking ═══
+    // If mismatches dropped to zero for this practice, mark any active correction
+    // packets as completed. If new mismatches exist, ensure a current packet exists.
+    let correctionPacketStatus: string | null = null;
+    try {
+      if (allMismatches.length === 0) {
+        // All clean — mark any active packets as completed
+        const { data: activePackets } = await supabase
+          .from('correction_packets')
+          .select('id')
+          .eq('practice_website_id', practice_id)
+          .eq('status', 'current');
+
+        if (activePackets && activePackets.length > 0) {
+          for (const pkt of activePackets) {
+            await supabase
+              .from('correction_packets')
+              .update({
+                status: 'completed',
+                expires_at: new Date().toISOString(),
+              })
+              .eq('id', pkt.id);
+          }
+          correctionPacketStatus = `completed (${activePackets.length} packet(s) resolved)`;
+        }
+      } else {
+        // Mismatches exist — update or create a current correction packet
+        const { data: existingPackets } = await supabase
+          .from('correction_packets')
+          .select('id')
+          .eq('practice_website_id', practice_id)
+          .eq('status', 'current')
+          .limit(1);
+
+        const packetData = {
+          practice_website_id: practice_id,
+          total_mismatches: allMismatches.length,
+          payers_affected: new Set(allMismatches.map((m) => m.payer_code)).size,
+          providers_affected: new Set(
+            allMismatches.filter((m) => m.npi !== 'PRACTICE').map((m) => m.npi),
+          ).size,
+          caqh_fixable_count: allMismatches.filter((m) => m.fix_via_caqh).length,
+          direct_fix_count: allMismatches.filter(
+            (m) => !m.fix_via_caqh && m.mismatch_type !== 'acceptance_gap',
+          ).length,
+          nppes_fix_count: allMismatches.filter(
+            (m) => m.field_name === 'address' || m.field_name === 'phone',
+          ).length,
+          status: 'current',
+          generated_at: new Date().toISOString(),
+        };
+
+        if (existingPackets && existingPackets.length > 0) {
+          await supabase
+            .from('correction_packets')
+            .update(packetData)
+            .eq('id', existingPackets[0].id);
+          correctionPacketStatus = 'updated';
+        } else {
+          await supabase.from('correction_packets').insert(packetData);
+          correctionPacketStatus = 'created';
+        }
+      }
+    } catch (cpErr) {
+      console.warn('[practice-payer-sync] Correction packet tracking error:', cpErr);
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const listed = snapshots.filter((s: DirectorySnapshot) => !!s.fhir_practitioner_id).length;
+    const notListed = snapshots.filter((s: DirectorySnapshot) => !s.fhir_practitioner_id).length;
+
+    // Build warnings array for issues that didn't prevent sync but affect data quality
+    const warnings: string[] = [];
+    if (nppesLoadError) {
+      warnings.push(`NPPES: ${nppesLoadError}`);
+    }
+    if (failedPayers.size > 0) {
+      warnings.push(`Failed payers (circuit breaker): ${[...failedPayers].join(', ')}`);
+    }
+
+    return NextResponse.json({
+      success: true,
+      practice_id,
+      providers_checked: npiList.length,
+      snapshots_analyzed: snapshots.length,
+      listed,
+      not_listed: notListed,
+      mismatches_detected: allMismatches.length,
+      mismatches_upserted: mismatchesCreated,
+      acceptance_gaps: acceptanceGapsCreated,
+      acceptance_context: {
+        claimed_payers: acceptedPayers,
+        source: acceptedPayersSource,
+        signal_type: signalType,
+      },
+      correction_packet: correctionPacketStatus,
+      fhir_refresh: refresh
+        ? { ...fhirRefreshStats, failed_payers: [...failedPayers], error_samples: errorSamples }
+        : null,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      elapsed_seconds: parseFloat(elapsed),
+      message: `Analyzed ${snapshots.length} snapshots for ${npiList.length} providers in ${elapsed}s. Listed: ${listed}, Not listed: ${notListed}. Mismatches: ${allMismatches.length}`,
+    });
+  } catch (err) {
+    console.error('[practice-payer-sync] Error:', err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Payer sync failed' },
+      { status: 500 },
+    );
+  } finally {
+    // Always release the practice-level sync lock
+    if (lockedPracticeId) {
+      activeSyncs.delete(lockedPracticeId);
+    }
+  }
+}
+
+export { POST_HANDLER as POST };

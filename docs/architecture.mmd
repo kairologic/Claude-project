@@ -1,0 +1,133 @@
+graph TB
+    subgraph "Client Layer"
+        Browser["Browser / Patient"]
+        Widget["Sentry Widget<br/>(public/sentry.js)"]
+        AdminUI["Admin Dashboard<br/>(app/admin/dashboard)"]
+    end
+
+    subgraph "Next.js Application (Vercel)"
+        subgraph "Public Pages (app/)"
+            Home["Homepage<br/>app/page.tsx"]
+            Scan["Scan Page<br/>app/scan/page.tsx"]
+            Results["Scan Results<br/>app/scan/results/"]
+            Registry["Provider Registry<br/>app/registry/"]
+            Compliance["Compliance Info<br/>app/compliance/"]
+            Services["Services / Pricing<br/>app/services/"]
+            Contact["Contact Form<br/>app/contact/"]
+            Patients["Patient Info<br/>app/patients/"]
+            Intake["Intake Form<br/>app/intake/"]
+            Privacy["Privacy Policy<br/>app/privacy/"]
+            Terms["Terms of Service<br/>app/terms/"]
+            Login["Dashboard Login<br/>app/dashboard/login/"]
+        end
+
+        subgraph "API Routes (app/api/)"
+            ScanAPI["POST /api/scan<br/>(Sentry Scanner v3.1)"]
+            ScanRunAPI["POST /api/scan/run<br/>(Check Engine v2)"]
+            WidgetAPI["GET /api/widget/[npi]<br/>(Widget Status)"]
+            WidgetBaseline["POST /api/widget/baseline"]
+            WidgetDrift["POST /api/widget/drift"]
+            WidgetHeart["POST /api/widget/heartbeat"]
+            StripeWebhook["POST /api/stripe/webhook<br/>(Payment Processing)"]
+            StripeSession["POST /api/stripe-session"]
+            EmailSend["POST /api/email/send<br/>(SES Template Email)"]
+            EmailDiag["GET /api/email/diagnose"]
+            ContactAPI["POST /api/contact"]
+            AuthMagic["POST /api/auth/magic-link"]
+            AuthVerify["POST /api/auth/verify"]
+            AuthPin["POST /api/auth/verify-pin"]
+            ReportAPI["POST /api/report"]
+            ProspectsAPI["POST /api/prospects"]
+            RegistryClaim["POST /api/registry-claim"]
+            BulkScan["POST /api/admin/bulk-scan"]
+            GenAsset["POST /api/admin/generate-asset"]
+            ValidScan["POST /api/validate-scan"]
+            FilloutHook["POST /api/fillout/webhook"]
+            ShieldDash["GET /api/shield/dashboard"]
+        end
+
+        subgraph "Check Engine (checks/)"
+            Engine["runScan()<br/>checks/engine.ts"]
+            CheckRegistry["CHECK_REGISTRY<br/>checks/registry.ts"]
+            NpiChecks["NPI-01, NPI-02, NPI-03<br/>checks/npi-checks.ts"]
+            RosterChecks["RST-01, RST-02<br/>checks/roster-checks.ts"]
+            Fetchers["fetchNpiOrgBest()<br/>checks/fetchers.ts"]
+            CrawlerCheck["crawlSite()<br/>checks/crawler.ts"]
+            Utils["Normalization Utils<br/>checks/utils.ts"]
+        end
+
+        subgraph "Lib"
+            Crawler["crawlPage()<br/>lib/crawler.ts"]
+            SupaClient["getSupabase()<br/>lib/supabase.ts"]
+        end
+
+        subgraph "Services"
+            AssetsSvc["assetsService.ts"]
+            PageSvc["pageContentService.ts"]
+            ReportSvc["reportService.ts"]
+            ScanReportSvc["scanReportService.ts"]
+        end
+
+        subgraph "React Hooks"
+            CMSHook["useCMSContent<br/>usePageCMS"]
+        end
+
+        subgraph "Components"
+            Header["Header.tsx"]
+            Footer["Footer.tsx"]
+            TopBanner["TopBanner.tsx"]
+            RiskWidget["RiskScanWidget.tsx"]
+            PDFGen["PDFReportGenerator.tsx"]
+            AdminTabs["Admin Tabs<br/>(Assets, Drift, Email,<br/>PageContent, Prospects,<br/>ProviderDetail)"]
+        end
+    end
+
+    subgraph "External Services"
+        Supabase["Supabase<br/>(PostgreSQL + Auth + Storage)"]
+        Stripe["Stripe<br/>(Payments + Subscriptions)"]
+        SES["Amazon SES<br/>(SMTP Email)"]
+        NPPES["NPPES API<br/>(NPI Registry)"]
+        NLM["NLM Clinical Tables API<br/>(NPI Org Data)"]
+        Browserless["Browserless.io<br/>(Headless Chrome)"]
+        Apollo["Apollo.io<br/>(Tracking)"]
+        Snitcher["Snitcher<br/>(Visitor ID)"]
+    end
+
+    Browser --> Home
+    Browser --> Scan
+    Browser --> Results
+    Browser --> Registry
+    Widget --> WidgetAPI
+    Widget --> WidgetHeart
+    Widget --> WidgetDrift
+    AdminUI --> BulkScan
+    AdminUI --> GenAsset
+
+    ScanAPI --> Crawler
+    ScanRunAPI --> Engine
+    Engine --> CheckRegistry
+    CheckRegistry --> NpiChecks
+    CheckRegistry --> RosterChecks
+    NpiChecks --> Utils
+    RosterChecks --> Utils
+    Engine --> Fetchers
+    Fetchers --> NPPES
+    Fetchers --> NLM
+    CrawlerCheck --> Browser
+    Crawler --> Browserless
+
+    StripeWebhook --> Stripe
+    StripeWebhook --> EmailSend
+    EmailSend --> SES
+    AuthMagic --> SES
+    ContactAPI --> SES
+
+    Engine --> Supabase
+    ScanAPI --> Supabase
+    WidgetAPI --> Supabase
+    SupaClient --> Supabase
+    AssetsSvc --> SupaClient
+    PageSvc --> SupaClient
+    ScanReportSvc --> Supabase
+
+    CMSHook --> PageSvc

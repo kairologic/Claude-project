@@ -1,0 +1,135 @@
+name: Dashboard Test Suite
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'components/dashboard/**'
+      - 'app/api/workflows/**'
+      - 'app/practice/**'
+      - 'lib/workflow/**'
+      - 'lib/resilience/**'
+      - 'lib/outreach/**'
+      - 'tests/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'components/dashboard/**'
+      - 'app/api/workflows/**'
+      - 'app/practice/**'
+      - 'lib/workflow/**'
+      - 'lib/resilience/**'
+      - 'lib/outreach/**'
+      - 'tests/**'
+
+jobs:
+  # ── Step 1: Coverage Audit (no browser needed) ──
+  coverage-audit:
+    name: Coverage Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for diff
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Audit test coverage vs changed files
+        run: npx tsx tests/audit-coverage.ts --diff origin/main
+        # Skippable: add [skip-audit] to commit message
+        if: "!contains(github.event.head_commit.message, '[skip-audit]')"
+
+  # ── Step 2: API Tests (no browser needed — fast) ──
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    needs: coverage-audit
+    env:
+      TEST_BASE_URL: https://kairologic.net
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run API tests
+        run: npx playwright test --project=api
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: |
+            tests/results/
+            playwright-report/
+
+  # ── Step 3: E2E Browser Tests ──
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: coverage-audit
+    env:
+      TEST_BASE_URL: https://kairologic.net
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npx playwright test --project=chromium
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            tests/results/
+            playwright-report/
+            test-results/
+
+  # ── Step 4: Regression summary ──
+  regression-summary:
+    name: Regression Summary
+    runs-on: ubuntu-latest
+    needs: [api-tests, e2e-tests]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+
+      - name: Print regression summary
+        run: |
+          echo "╔══════════════════════════════════════════════╗"
+          echo "║   KairoLogic Dashboard Regression Report     ║"
+          echo "╚══════════════════════════════════════════════╝"
+          echo ""
+          echo "Triggered by: ${{ github.event_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo ""
+          if [ -f api-test-results/tests/results/test-results.json ]; then
+            echo "API Tests:"
+            node -e "const r=require('./api-test-results/tests/results/test-results.json'); console.log('  Suites:', r.suites?.length||0, '| Tests:', r.stats?.expected||0, '| Failures:', r.stats?.unexpected||0)"
+          fi
+          if [ -f e2e-test-results/tests/results/test-results.json ]; then
+            echo "E2E Tests:"
+            node -e "const r=require('./e2e-test-results/tests/results/test-results.json'); console.log('  Suites:', r.suites?.length||0, '| Tests:', r.stats?.expected||0, '| Failures:', r.stats?.unexpected||0)"
+          fi

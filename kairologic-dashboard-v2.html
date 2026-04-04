@@ -1,0 +1,2303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KairoLogic Dashboard v2 — Provider-Centric</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --navy: #0f1e2e;
+        --navy-mid: #1a3249;
+        --navy-light: #8ba3b8;
+        --gold: #d4a017;
+        --gold-light: #f0c040;
+        --gold-pale: #fdf6e3;
+        --gray50: #f8fafc;
+        --gray100: #f1f5f9;
+        --gray200: #e2e8f0;
+        --gray400: #94a3b8;
+        --gray600: #475569;
+        --red: #d64545;
+        --red-pale: #fef2f2;
+        --green: #1a9e6d;
+        --green-pale: #ecfdf5;
+        --blue: #185fa5;
+        --blue-pale: #eff6ff;
+        --amber: #d4a017;
+        --amber-pale: #fffbeb;
+        --font: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: var(--font);
+        background: var(--gray50);
+        color: var(--navy);
+        font-size: 13px;
+      }
+
+      /* Layout */
+      .app {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        width: 224px;
+        background: var(--navy);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .logo {
+        padding: 20px 18px 16px;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .logo-kairo {
+        font-size: 18px;
+        font-weight: 800;
+        color: #fff;
+      }
+      .logo-logic {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--gold);
+      }
+      .site-sel {
+        margin: 0 12px 12px;
+        padding: 8px 12px;
+        background: var(--navy-mid);
+        border-radius: 8px;
+        cursor: pointer;
+        position: relative;
+      }
+      .site-sel-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--navy-light);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 3px;
+      }
+      .site-sel-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .site-sel-value::after {
+        content: '▾';
+        font-size: 10px;
+        color: var(--navy-light);
+      }
+      .site-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--navy-mid);
+        border-radius: 0 0 8px 8px;
+        z-index: 100;
+        display: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .site-dropdown.open {
+        display: block;
+      }
+      .site-opt {
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+      }
+      .site-opt:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .site-opt .cnt {
+        color: var(--navy-light);
+        font-size: 11px;
+      }
+      .site-opt.add {
+        color: var(--gold);
+        font-weight: 600;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .nav {
+        flex: 1;
+        padding: 4px 0;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 18px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--navy-light);
+        cursor: pointer;
+        border-left: 3px solid transparent;
+        transition: all 0.15s;
+        user-select: none;
+      }
+      .nav-item:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .nav-item.active {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.06);
+        border-left-color: var(--gold);
+      }
+      .nav-item .icon {
+        width: 16px;
+        text-align: center;
+        font-size: 14px;
+      }
+      .nav-badge {
+        margin-left: auto;
+        background: var(--red);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 10px;
+      }
+      .nav-section {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--navy-light);
+        opacity: 0.5;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 16px 18px 6px;
+      }
+      .nav-item.dim {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .nav-item.dim:hover {
+        color: var(--navy-light);
+        background: none;
+      }
+      .sidebar-bottom {
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 8px 0;
+      }
+
+      /* Main */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        padding: 14px 24px;
+        background: #fff;
+        border-bottom: 1px solid var(--gray200);
+      }
+      .header-title {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--navy);
+      }
+      .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .header-date {
+        font-size: 12px;
+        color: var(--gray400);
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+      .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 24px;
+      }
+
+      /* KPI */
+      .kpi-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .kpi {
+        flex: 1;
+        padding: 14px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      .kpi:hover {
+        transform: translateY(-1px);
+      }
+      .kpi-num {
+        font-size: 24px;
+        font-weight: 800;
+      }
+      .kpi-label {
+        font-size: 11px;
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .kpi.red {
+        background: rgba(214, 69, 69, 0.12);
+        color: var(--red);
+      }
+      .kpi.amber {
+        background: rgba(212, 160, 23, 0.12);
+        color: #96700a;
+      }
+      .kpi.blue {
+        background: rgba(24, 95, 165, 0.12);
+        color: var(--blue);
+      }
+      .kpi.green {
+        background: rgba(26, 158, 109, 0.12);
+        color: var(--green);
+      }
+
+      /* Columns */
+      .cols {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 20px;
+      }
+      .sec-hd {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--gray400);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .sec-link {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--blue);
+        text-decoration: none;
+        text-transform: none;
+        letter-spacing: normal;
+        cursor: pointer;
+      }
+      .sec-link:hover {
+        text-decoration: underline;
+      }
+
+      /* Provider cards */
+      .prov-card {
+        background: #fff;
+        border: 1px solid var(--gray200);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+        border-left: 3px solid var(--red);
+      }
+      .prov-card:hover {
+        border-color: var(--navy);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      }
+      .prov-card .top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .av {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--red-pale);
+        color: var(--red);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      .prov-card .name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--navy);
+      }
+      .prov-card .npi-text {
+        font-size: 10px;
+        font-family: monospace;
+        color: var(--gray400);
+      }
+      .badge {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+      }
+      .badge-red {
+        background: var(--red-pale);
+        color: var(--red);
+      }
+      .badge-green {
+        background: var(--green-pale);
+        color: var(--green);
+      }
+      .badge-amber {
+        background: var(--amber-pale);
+        color: #96700a;
+      }
+      .badge-blue {
+        background: var(--blue-pale);
+        color: var(--blue);
+      }
+      .badge-sm {
+        font-size: 9px;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+      .prov-card .spec {
+        font-size: 11px;
+        color: var(--gray600);
+        margin-bottom: 6px;
+      }
+      .prov-card .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      /* Compliance / Payer */
+      .card {
+        background: #fff;
+        border: 1px solid var(--gray200);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 12px;
+      }
+      .comp-score {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--green);
+      }
+      .comp-label {
+        font-size: 11px;
+        color: var(--gray400);
+        margin-top: 2px;
+      }
+      .comp-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        font-size: 12px;
+      }
+      .comp-row .label {
+        color: var(--gray600);
+      }
+      .payer-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        font-size: 12px;
+      }
+      .payer-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .payer-name {
+        color: var(--gray600);
+        flex: 1;
+      }
+      .payer-age {
+        color: var(--gray400);
+        font-size: 11px;
+      }
+
+      /* Roster table */
+      .roster {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .roster th {
+        text-align: left;
+        padding: 10px 12px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--gray400);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid var(--gray200);
+        background: #fff;
+        position: sticky;
+        top: 0;
+      }
+      .roster td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--gray100);
+        font-size: 12px;
+      }
+      .roster tr {
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .roster tbody tr:hover {
+        background: var(--blue-pale);
+      }
+      .av-sm {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+      .health-bar {
+        width: 40px;
+        height: 6px;
+        background: var(--gray200);
+        border-radius: 3px;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+      .health-fill {
+        height: 100%;
+        border-radius: 3px;
+      }
+
+      /* Timeline */
+      .tl {
+        padding-top: 4px;
+      }
+      .tl-item {
+        display: flex;
+        gap: 12px;
+        padding-bottom: 12px;
+        position: relative;
+      }
+      .tl-line {
+        position: absolute;
+        left: 4px;
+        top: 14px;
+        bottom: 0;
+        width: 1px;
+        background: var(--gray200);
+      }
+      .tl-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        margin-top: 3px;
+        z-index: 1;
+      }
+      .tl-text {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--navy);
+      }
+      .tl-date {
+        font-size: 11px;
+        color: var(--gray400);
+      }
+      .tl-details {
+        margin-top: 6px;
+        padding: 8px 10px;
+        background: var(--gray50);
+        border-radius: 6px;
+        font-size: 11px;
+      }
+      .tl-detail-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 3px;
+      }
+      .tl-detail-key {
+        color: var(--gray400);
+        font-weight: 600;
+        min-width: 100px;
+      }
+      .tl-detail-val {
+        color: var(--navy);
+        font-weight: 500;
+      }
+
+      /* Panels */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 30, 46, 0.4);
+        z-index: 200;
+        backdrop-filter: blur(2px);
+        display: none;
+      }
+      .overlay.open {
+        display: block;
+      }
+      .panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 560px;
+        background: #fff;
+        z-index: 201;
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+        overflow-y: auto;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+      }
+      .panel.open {
+        transform: translateX(0);
+      }
+      .panel-hdr {
+        padding: 20px;
+        border-bottom: 1px solid var(--gray200);
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 1;
+      }
+      .panel-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: var(--gray400);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-family: var(--font);
+      }
+      .panel-close:hover {
+        background: var(--gray100);
+      }
+      .panel-body {
+        padding: 20px;
+      }
+      .p-sec {
+        margin-bottom: 20px;
+      }
+      .p-sec-hd {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--gray400);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 8px;
+      }
+
+      /* Comparison grid */
+      .cmp-grid {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        border: 1px solid var(--gray200);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .cmp-grid th {
+        padding: 6px 8px;
+        background: var(--gray100);
+        font-weight: 700;
+        color: var(--gray400);
+        text-transform: uppercase;
+        font-size: 10px;
+        letter-spacing: 0.03em;
+        text-align: left;
+      }
+      .cmp-grid td {
+        padding: 6px 8px;
+        border-top: 1px solid var(--gray100);
+      }
+      .cmp-match {
+        color: var(--green);
+      }
+      .cmp-mismatch {
+        color: var(--red);
+        font-weight: 600;
+      }
+      .cmp-nodata {
+        color: var(--gray400);
+        font-style: italic;
+      }
+
+      /* License card */
+      .lic-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        font-size: 12px;
+      }
+      .lic-label {
+        color: var(--gray400);
+        font-weight: 600;
+      }
+
+      /* Action items */
+      .action {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 14px;
+        background: #fff;
+        border: 1px solid var(--gray200);
+        border-radius: 8px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .action:hover {
+        border-color: var(--navy);
+      }
+      .action.expanded {
+        border-color: var(--navy);
+      }
+      .action-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 5px;
+        flex-shrink: 0;
+      }
+      .action-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--navy);
+      }
+      .action-desc {
+        font-size: 11px;
+        color: var(--gray400);
+        margin-top: 2px;
+      }
+      .action-arrow {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--blue);
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .action-expand {
+        margin-top: -1px;
+        padding: 14px;
+        background: var(--gray50);
+        border: 1px solid var(--navy);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        display: none;
+      }
+      .action-expand.open {
+        display: block;
+      }
+
+      /* Workflow detail (nested panel) */
+      .wf-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 540px;
+        background: #fff;
+        z-index: 210;
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+        overflow-y: auto;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+      }
+      .wf-panel.open {
+        transform: translateX(0);
+      }
+      .wf-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 30, 46, 0.25);
+        z-index: 209;
+        display: none;
+      }
+      .wf-overlay.open {
+        display: block;
+      }
+
+      /* Task checklist */
+      .task {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--gray200);
+        border-radius: 8px;
+        margin-bottom: 6px;
+      }
+      .task.active {
+        border-color: rgba(212, 160, 23, 0.4);
+        background: rgba(253, 246, 227, 0.3);
+      }
+      .task.monitor {
+        border-color: rgba(24, 95, 165, 0.4);
+        background: rgba(239, 246, 255, 0.2);
+      }
+      .task-check {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 2px solid var(--gray200);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 10px;
+        margin-top: 1px;
+      }
+      .task-check.done {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .task-check.active {
+        border-color: var(--gold);
+        color: var(--gold);
+      }
+      .task-check.monitor-icon {
+        border: none;
+        border-radius: 50%;
+        background: var(--blue-pale);
+        color: var(--blue);
+        font-size: 12px;
+      }
+      .task-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--navy);
+      }
+      .task-title.done {
+        color: var(--gray400);
+        text-decoration: line-through;
+      }
+      .task-desc {
+        font-size: 10px;
+        color: var(--gray400);
+        margin-top: 2px;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 9px 14px;
+        border: none;
+        border-radius: 6px;
+        font-family: var(--font);
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: opacity 0.15s;
+        text-decoration: none;
+      }
+      .btn:hover {
+        opacity: 0.85;
+      }
+      .btn-navy {
+        background: var(--navy);
+        color: #fff;
+      }
+      .btn-green {
+        background: var(--green);
+        color: #fff;
+      }
+      .btn-outline {
+        background: transparent;
+        border: 1px solid var(--gray200);
+        color: var(--navy);
+      }
+
+      /* Pending verification banner */
+      .pending-banner {
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: var(--blue-pale);
+        border: 1px solid rgba(24, 95, 165, 0.2);
+        font-size: 11px;
+        color: var(--blue);
+        font-weight: 500;
+        margin-top: 8px;
+      }
+
+      /* Approval options */
+      .approval-opt {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1.5px solid var(--gray200);
+        border-radius: 8px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .approval-opt:hover {
+        border-color: var(--blue);
+      }
+      .approval-opt.selected {
+        border-color: var(--blue);
+        background: var(--blue-pale);
+      }
+      .approval-radio {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid var(--gray200);
+        flex-shrink: 0;
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .approval-opt.selected .approval-radio {
+        border-color: var(--blue);
+      }
+      .approval-opt.selected .approval-radio::after {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+
+      /* Search */
+      .search {
+        flex: 1;
+        padding: 8px 14px;
+        border: 1px solid var(--gray200);
+        border-radius: 8px;
+        font-family: var(--font);
+        font-size: 12px;
+        outline: none;
+      }
+      .search:focus {
+        border-color: var(--blue);
+      }
+
+      /* Animations */
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      .pulse {
+        animation: pulse 2s ease-in-out infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- ═══════ Sidebar ═══════ -->
+      <div class="sidebar">
+        <div class="logo">
+          <span class="logo-kairo">Kairo</span><span class="logo-logic">Logic</span>
+        </div>
+        <div class="site-sel" onclick="toggleDropdown()">
+          <div class="site-sel-label">Practice</div>
+          <div class="site-sel-value" id="site-value">North Texas Medical Surgical</div>
+          <div class="site-dropdown" id="site-dd">
+            <div class="site-opt" onclick="selectSite('North Texas Medical Surgical')">
+              North Texas Medical Surgical <span class="cnt">18</span>
+            </div>
+            <div class="site-opt" onclick="selectSite('Denton office')">
+              Denton office <span class="cnt">12</span>
+            </div>
+            <div class="site-opt" onclick="selectSite('Allen office')">
+              Allen office <span class="cnt">6</span>
+            </div>
+            <div class="site-opt add">+ Add practice location</div>
+          </div>
+        </div>
+        <div class="nav" id="main-nav">
+          <div class="nav-item active" data-page="home"><span class="icon">◻</span> Dashboard</div>
+          <div class="nav-item" data-page="roster">
+            <span class="icon">👥</span> Provider roster <span class="nav-badge">16</span>
+          </div>
+          <div class="nav-item" data-page="compliance"><span class="icon">◈</span> Compliance</div>
+          <div class="nav-item" data-page="documents"><span class="icon">▤</span> Documents</div>
+          <div class="nav-item" data-page="audit"><span class="icon">▥</span> Audit trail</div>
+          <div class="nav-section">Coming soon</div>
+          <div class="nav-item dim"><span class="icon">▦</span> Reports</div>
+          <div class="nav-item dim"><span class="icon">⚙</span> Settings</div>
+        </div>
+        <div class="sidebar-bottom">
+          <div class="nav-item"><span class="icon">?</span> Help & support</div>
+          <div class="nav-item"><span class="icon">◯</span> admin@kairologic.net</div>
+        </div>
+      </div>
+
+      <!-- ═══════ Main content ═══════ -->
+      <div class="main">
+        <div class="header">
+          <div class="header-title" id="page-title">Dashboard</div>
+          <div class="header-right">
+            <div class="header-date">March 21, 2026</div>
+            <div class="status-dot" title="All data sources fresh"></div>
+          </div>
+        </div>
+
+        <!-- ─── Dashboard Home ─── -->
+        <div class="content" id="page-home">
+          <div class="kpi-bar">
+            <div class="kpi red">
+              <div class="kpi-num">16</div>
+              <div class="kpi-label">Needs attention</div>
+            </div>
+            <div class="kpi amber">
+              <div class="kpi-num">0</div>
+              <div class="kpi-label">In progress</div>
+            </div>
+            <div class="kpi blue">
+              <div class="kpi-num">0</div>
+              <div class="kpi-label">Monitoring</div>
+            </div>
+            <div class="kpi green">
+              <div class="kpi-num">2</div>
+              <div class="kpi-label">All clear</div>
+            </div>
+          </div>
+          <div class="cols">
+            <div>
+              <div class="sec-hd">
+                Priority providers
+                <span class="sec-link" onclick="showPage('roster')">View all 18 providers →</span>
+              </div>
+              <div id="priority-cards"></div>
+            </div>
+            <div>
+              <div class="sec-hd">Practice compliance</div>
+              <div class="card">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                  <div
+                    style="
+                      width: 40px;
+                      height: 6px;
+                      background: var(--gray200);
+                      border-radius: 3px;
+                      overflow: hidden;
+                    "
+                  >
+                    <div
+                      style="height: 100%; width: 78%; background: var(--green); border-radius: 3px"
+                    ></div>
+                  </div>
+                  <span style="font-size: 11px; color: var(--gray400); font-weight: 600">78%</span>
+                </div>
+                <div style="font-size: 11px; color: var(--gray400); margin-bottom: 8px">
+                  Compliance score
+                </div>
+                <div class="comp-row">
+                  <span class="label">SB 1188 (Data sovereignty)</span
+                  ><span class="badge badge-amber">Pending</span>
+                </div>
+                <div class="comp-row">
+                  <span class="label">HB 149 (AI transparency)</span
+                  ><span class="badge badge-amber">Pending</span>
+                </div>
+                <div class="comp-row">
+                  <span class="label">AB 3030 (CA AI disclosure)</span
+                  ><span style="color: var(--gray400); font-size: 12px">N/A</span>
+                </div>
+              </div>
+              <div class="sec-hd" style="margin-top: 16px">Payer sync status</div>
+              <div class="card">
+                <div class="payer-row">
+                  <div class="payer-dot" style="background: var(--green)"></div>
+                  <span class="payer-name">UnitedHealthcare</span
+                  ><span class="payer-age">2 days ago</span>
+                </div>
+                <div class="payer-row">
+                  <div class="payer-dot" style="background: var(--green)"></div>
+                  <span class="payer-name">Aetna</span><span class="payer-age">2 days ago</span>
+                </div>
+                <div class="payer-row">
+                  <div class="payer-dot" style="background: var(--green)"></div>
+                  <span class="payer-name">Cigna</span><span class="payer-age">2 days ago</span>
+                </div>
+                <div class="payer-row">
+                  <div class="payer-dot" style="background: var(--amber)"></div>
+                  <span class="payer-name">Humana</span><span class="payer-age">9 days ago</span>
+                </div>
+                <div class="payer-row">
+                  <div class="payer-dot" style="background: var(--gray400)"></div>
+                  <span class="payer-name">BCBS TX</span
+                  ><span class="payer-age">Pending credentials</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── Provider Roster ─── -->
+        <div class="content" id="page-roster" style="display: none">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px">
+            <input
+              type="text"
+              class="search"
+              placeholder="Search by name or NPI..."
+              id="roster-search"
+              oninput="filterRoster()"
+            />
+            <button class="btn btn-outline" style="font-size: 11px">Export CSV</button>
+          </div>
+          <table class="roster">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Specialty</th>
+                <th>NPI</th>
+                <th>Health</th>
+                <th>Issues</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="roster-body"></tbody>
+          </table>
+        </div>
+
+        <!-- ─── Compliance ─── -->
+        <div class="content" id="page-compliance" style="display: none">
+          <div class="sec-hd">Website compliance</div>
+          <div class="card" style="max-width: 600px">
+            <div class="comp-score">78%</div>
+            <div class="comp-label">North Texas Medical Surgical Clinic PA — ntmsclinic.com</div>
+            <div style="margin-top: 16px; border-top: 1px solid var(--gray200); padding-top: 12px">
+              <div class="comp-row">
+                <span class="label">SB 1188 — Data sovereignty</span
+                ><span class="badge badge-green">Pass</span>
+              </div>
+              <div class="comp-row">
+                <span class="label">HB 149 — AI transparency</span
+                ><span class="badge badge-amber">Missing AI disclosure</span>
+              </div>
+              <div class="comp-row">
+                <span class="label">Cookie consent</span
+                ><span class="badge badge-green">Present</span>
+              </div>
+              <div class="comp-row">
+                <span class="label">Privacy policy</span
+                ><span class="badge badge-green">Present</span>
+              </div>
+              <div class="comp-row">
+                <span class="label">Last scanned</span
+                ><span style="color: var(--gray400)">Mar 19, 2026</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── Documents ─── -->
+        <div class="content" id="page-documents" style="display: none">
+          <div class="sec-hd">Generated documents</div>
+          <div style="text-align: center; padding: 60px 20px; color: var(--gray400)">
+            <div style="font-size: 24px; margin-bottom: 8px">📄</div>
+            <div style="font-size: 13px; font-weight: 600">No documents yet</div>
+            <div style="font-size: 12px; margin-top: 4px">
+              Documents are generated automatically when you approve a correction.
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── Audit Trail ─── -->
+        <div class="content" id="page-audit" style="display: none">
+          <div class="sec-hd">Recent events</div>
+          <div class="tl" id="audit-timeline"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ Provider Detail Panel ═══════ -->
+    <div class="overlay" id="overlay" onclick="closePanel()"></div>
+    <div class="panel" id="panel">
+      <div class="panel-hdr">
+        <button class="panel-close" onclick="closePanel()">×</button>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <div class="av" style="width: 44px; height: 44px; font-size: 14px" id="panel-avatar">
+            RC
+          </div>
+          <div>
+            <div style="font-size: 15px; font-weight: 800; color: var(--navy)" id="panel-name">
+              Robert Connaughton
+            </div>
+            <div
+              style="display: flex; align-items: center; gap: 8px; margin-top: 3px; flex-wrap: wrap"
+              id="panel-badges"
+            ></div>
+          </div>
+        </div>
+        <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px">
+          <div
+            style="
+              flex: 1;
+              height: 6px;
+              background: var(--gray200);
+              border-radius: 3px;
+              overflow: hidden;
+            "
+          >
+            <div
+              id="panel-health-bar"
+              style="height: 100%; width: 40%; border-radius: 3px; transition: width 0.3s"
+            ></div>
+          </div>
+          <span
+            style="font-size: 10px; color: var(--gray400); font-weight: 600"
+            id="panel-health-text"
+            >40% health</span
+          >
+        </div>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+
+    <!-- ═══════ Workflow Detail Panel ═══════ -->
+    <div class="wf-overlay" id="wf-overlay" onclick="closeWorkflow()"></div>
+    <div class="wf-panel" id="wf-panel">
+      <div class="panel-hdr" style="border-bottom-color: var(--gray200)">
+        <button class="panel-close" onclick="closeWorkflow()">×</button>
+        <div id="wf-header"></div>
+      </div>
+      <div class="panel-body" id="wf-body"></div>
+    </div>
+
+    <script>
+      // ═══════════════════════════════════════════════════════════════
+      // Data
+      // ═══════════════════════════════════════════════════════════════
+      const providers = [
+        {
+          id: 'connaughton',
+          name: 'Robert Connaughton',
+          npi: '1326061003',
+          specialty: 'Plastic Surgery',
+          health: 0,
+          issues: 2,
+          status: 'active',
+          initials: 'RC',
+          tags: ['Address', 'Phone'],
+          avatarBg: 'var(--red-pale)',
+          avatarColor: 'var(--red)',
+          nppes: {
+            address: '22999 Highway 59 N Ste B220, Kingwood, TX 773394460',
+            phone: '(692) 848-9904',
+            specialty: 'Plastic Surgery',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: null,
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'Sep 30, 2027',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [
+            {
+              id: 'w1',
+              type: 'nppes_update',
+              title: 'Address mismatch',
+              status: 'action_needed',
+              field: 'address',
+              summary: 'Address mismatch detected',
+              websiteVal: '3323 Colorado St, Ste 105, Denton, TX 76210',
+              nppesVal: '22999 Highway 59 N Ste B220, Kingwood, TX 773394460',
+              tasks: [
+                {
+                  title: 'Review & approve correction',
+                  type: 'review_approve',
+                  status: 'active',
+                  desc: 'Compare NPPES vs website data and select the correct value',
+                },
+                {
+                  title: 'Submit to NPPES',
+                  type: 'download_submit',
+                  status: 'pending',
+                  desc: 'Update NPPES with the approved correction',
+                },
+                {
+                  title: 'Monitor NPPES confirmation',
+                  type: 'monitor_auto_confirm',
+                  status: 'pending',
+                  desc: 'Automated — checks NPPES for the update',
+                },
+              ],
+              events: [
+                {
+                  text: 'Address mismatch detected',
+                  date: 'Mar 15, 2026',
+                  actor: 'System',
+                  color: 'var(--red)',
+                },
+              ],
+            },
+            {
+              id: 'w2',
+              type: 'nppes_update',
+              title: 'Phone mismatch',
+              status: 'action_needed',
+              field: 'phone',
+              summary: 'Phone number mismatch detected',
+              websiteVal: '(682) 224-3748',
+              nppesVal: '(692) 848-9904',
+              tasks: [
+                {
+                  title: 'Review & approve correction',
+                  type: 'review_approve',
+                  status: 'active',
+                  desc: 'Compare NPPES vs website data and select the correct value',
+                },
+                {
+                  title: 'Submit to NPPES',
+                  type: 'download_submit',
+                  status: 'pending',
+                  desc: 'Update NPPES with the approved correction',
+                },
+                {
+                  title: 'Monitor NPPES confirmation',
+                  type: 'monitor_auto_confirm',
+                  status: 'pending',
+                  desc: 'Automated — checks NPPES for the update',
+                },
+              ],
+              events: [
+                {
+                  text: 'Phone mismatch detected',
+                  date: 'Mar 15, 2026',
+                  actor: 'System',
+                  color: 'var(--red)',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'brooks',
+          name: 'Michael Brooks',
+          npi: '1639196223',
+          specialty: 'Plastic Surgery',
+          health: 0,
+          issues: 2,
+          status: 'active',
+          initials: 'MB',
+          tags: ['Address', 'Phone'],
+          avatarBg: 'var(--red-pale)',
+          avatarColor: 'var(--red)',
+          nppes: {
+            address: '1018 W University Dr, Denton, TX 76201',
+            phone: '(940) 387-7575',
+            specialty: 'Plastic Surgery',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: null,
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'Dec 15, 2027',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [
+            {
+              id: 'w3',
+              type: 'nppes_update',
+              title: 'Address mismatch',
+              status: 'action_needed',
+              field: 'address',
+              summary: 'Address mismatch detected',
+              websiteVal: '3323 Colorado St, Ste 105, Denton, TX 76210',
+              nppesVal: '1018 W University Dr, Denton, TX 76201',
+              tasks: [
+                {
+                  title: 'Review & approve correction',
+                  type: 'review_approve',
+                  status: 'active',
+                  desc: 'Compare NPPES vs website data and select the correct value',
+                },
+                {
+                  title: 'Submit to NPPES',
+                  type: 'download_submit',
+                  status: 'pending',
+                  desc: 'Update NPPES with the approved correction',
+                },
+                {
+                  title: 'Monitor NPPES confirmation',
+                  type: 'monitor_auto_confirm',
+                  status: 'pending',
+                  desc: 'Automated — checks NPPES for the update',
+                },
+              ],
+              events: [
+                {
+                  text: 'Address mismatch detected',
+                  date: 'Mar 18, 2026',
+                  actor: 'System',
+                  color: 'var(--red)',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'paek',
+          name: 'John Paek',
+          npi: '1225452907',
+          specialty: 'Plastic Surgery',
+          health: 0,
+          issues: 2,
+          status: 'active',
+          initials: 'JP',
+          tags: ['License renewal', 'Address'],
+          avatarBg: 'var(--red-pale)',
+          avatarColor: 'var(--red)',
+          nppes: {
+            address: '22999 Highway 59 N Ste B220, Kingwood, TX 773394460',
+            phone: '(682) 224-3748',
+            specialty: 'Plastic Surgery',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: null,
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'May 31, 2026',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [
+            {
+              id: 'w4',
+              type: 'license_renewal',
+              title: 'TX medical license expiring May 31, 2026',
+              status: 'in_progress',
+              field: null,
+              summary: 'TX medical license expiring May 31, 2026',
+              tasks: [
+                {
+                  title: 'Prepare renewal application',
+                  type: 'review_approve',
+                  status: 'completed',
+                  desc: 'Review license details and prepare the renewal submission',
+                },
+                {
+                  title: 'Submit renewal to TMB',
+                  type: 'submit_renewal',
+                  status: 'active',
+                  desc: 'Submit renewal application via Texas Medical Board online portal',
+                },
+                {
+                  title: 'Monitor TMB for confirmation',
+                  type: 'monitor_board',
+                  status: 'pending',
+                  desc: 'Automated — checks TMB records and notifies you when confirmed',
+                },
+              ],
+              events: [
+                {
+                  text: 'License expiration detected — workflow created',
+                  date: 'Mar 18, 2026',
+                  actor: 'System',
+                  color: 'var(--blue)',
+                },
+                {
+                  text: 'Renewal application prepared',
+                  date: 'Mar 20, 2026',
+                  actor: 'admin@kairologic.net',
+                  color: 'var(--green)',
+                },
+              ],
+            },
+            {
+              id: 'w5',
+              type: 'nppes_update',
+              title: 'Address mismatch',
+              status: 'action_needed',
+              field: 'address',
+              summary: 'Address mismatch detected',
+              websiteVal: '3323 Colorado St, Ste 105, Denton, TX 76210',
+              nppesVal: '22999 Highway 59 N Ste B220, Kingwood, TX 773394460',
+              tasks: [
+                {
+                  title: 'Review & approve correction',
+                  type: 'review_approve',
+                  status: 'active',
+                  desc: 'Compare NPPES vs website data and select the correct value',
+                },
+                {
+                  title: 'Submit to NPPES',
+                  type: 'download_submit',
+                  status: 'pending',
+                  desc: 'Update NPPES with the approved correction',
+                },
+                {
+                  title: 'Monitor NPPES confirmation',
+                  type: 'monitor_auto_confirm',
+                  status: 'pending',
+                  desc: 'Automated — checks NPPES for the update',
+                },
+              ],
+              events: [
+                {
+                  text: 'Address mismatch detected',
+                  date: 'Mar 15, 2026',
+                  actor: 'System',
+                  color: 'var(--red)',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'jpaek',
+          name: 'Josh Paek',
+          npi: '1295158939',
+          specialty: 'Chiropractor',
+          health: 0,
+          issues: 2,
+          status: 'active',
+          initials: 'JP',
+          tags: ['Address', 'Phone'],
+          avatarBg: 'var(--red-pale)',
+          avatarColor: 'var(--red)',
+          nppes: {
+            address: '4700 Alliance Blvd Ste 600, Plano, TX 75093',
+            phone: '(469) 305-4100',
+            specialty: 'Chiropractor',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: null,
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'Nov 30, 2027',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [],
+        },
+        {
+          id: 'reddell',
+          name: 'Leslie Reddell',
+          npi: '1699056309',
+          specialty: 'Plastic Surgery',
+          health: 0,
+          issues: 2,
+          status: 'active',
+          initials: 'LR',
+          tags: ['Address', 'Phone'],
+          avatarBg: 'var(--red-pale)',
+          avatarColor: 'var(--red)',
+          nppes: {
+            address: '1105 N Central Expy, Allen, TX 75013',
+            phone: '(469) 305-4100',
+            specialty: 'Plastic Surgery',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: null,
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'Aug 31, 2027',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [
+            {
+              id: 'w6',
+              type: 'nppes_update',
+              title: 'Phone mismatch',
+              status: 'in_progress',
+              field: 'phone',
+              summary: 'Phone number mismatch detected',
+              websiteVal: '(682) 224-3748',
+              nppesVal: '16822243748',
+              approvedValue: '(682) 224-3748',
+              tasks: [
+                {
+                  title: 'Review & approve correction',
+                  type: 'review_approve',
+                  status: 'completed',
+                  desc: 'Compare NPPES vs website data and select the correct value',
+                },
+                {
+                  title: 'Submit to NPPES',
+                  type: 'download_submit',
+                  status: 'active',
+                  desc: 'Update NPPES with the approved correction',
+                },
+                {
+                  title: 'Monitor NPPES confirmation',
+                  type: 'monitor_auto_confirm',
+                  status: 'pending',
+                  desc: 'Automated — checks NPPES for the update',
+                },
+              ],
+              events: [
+                {
+                  text: 'Phone mismatch detected',
+                  date: 'Mar 10, 2026',
+                  actor: 'System',
+                  color: 'var(--red)',
+                },
+                {
+                  text: 'Correction approved: (682) 224-3748',
+                  date: 'Mar 20, 2026',
+                  actor: 'admin@kairologic.net',
+                  color: 'var(--green)',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'kim',
+          name: 'Margaret Kim',
+          npi: '1987654321',
+          specialty: 'Family Medicine',
+          health: 100,
+          issues: 0,
+          status: 'active',
+          initials: 'MK',
+          tags: [],
+          avatarBg: 'var(--green-pale)',
+          avatarColor: 'var(--green)',
+          nppes: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: 'Family Medicine',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: 'Family Medicine',
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'Jan 15, 2028',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [],
+        },
+        {
+          id: 'ramirez',
+          name: 'Anita Ramirez',
+          npi: '1345678901',
+          specialty: 'Pediatrics',
+          health: 100,
+          issues: 0,
+          status: 'onboarding',
+          initials: 'AR',
+          tags: ['Onboarding'],
+          avatarBg: 'var(--blue-pale)',
+          avatarColor: 'var(--blue)',
+          nppes: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: 'Pediatrics',
+          },
+          website: {
+            address: '3323 Colorado St, Ste 105, Denton, TX 76210',
+            phone: '(682) 224-3748',
+            specialty: 'Pediatrics',
+          },
+          license: {
+            state: 'TX',
+            status: 'Active',
+            expires: 'Mar 1, 2028',
+            disciplinary: 'None',
+            pecos: 'Enrolled',
+          },
+          workflows: [],
+        },
+      ];
+
+      const auditEvents = [
+        {
+          text: 'Address mismatch detected — Robert Connaughton',
+          date: 'Mar 15, 2026',
+          actor: 'System',
+          color: 'var(--red)',
+          details: {
+            Field: 'Address',
+            'NPPES value': '22999 Highway 59 N Ste B220',
+            'Website value': '3323 Colorado St, Ste 105',
+          },
+        },
+        {
+          text: 'Phone mismatch detected — Robert Connaughton',
+          date: 'Mar 15, 2026',
+          actor: 'System',
+          color: 'var(--red)',
+          details: {
+            Field: 'Phone',
+            'NPPES value': '(692) 848-9904',
+            'Website value': '(682) 224-3748',
+          },
+        },
+        {
+          text: 'Correction approved — Leslie Reddell',
+          date: 'Mar 20, 2026',
+          actor: 'admin@kairologic.net',
+          color: 'var(--green)',
+          details: {
+            Field: 'Phone',
+            'Approved value': '(682) 224-3748',
+            'NPPES is correct?': 'No',
+          },
+        },
+        {
+          text: 'License expiration detected — John Paek (May 31, 2026)',
+          date: 'Mar 18, 2026',
+          actor: 'System',
+          color: 'var(--amber)',
+          details: {
+            'License state': 'TX',
+            'Expiration date': 'May 31, 2026',
+            'Days remaining': '71',
+          },
+        },
+        {
+          text: 'Payer sync completed — 5 payers queried',
+          date: 'Mar 20, 2026',
+          actor: 'System',
+          color: 'var(--amber)',
+          details: null,
+        },
+        {
+          text: 'Weekly NPPES sync completed — 14 mismatches found',
+          date: 'Mar 17, 2026',
+          actor: 'System',
+          color: 'var(--blue)',
+          details: null,
+        },
+        {
+          text: 'Website compliance scan completed — 78% score',
+          date: 'Mar 19, 2026',
+          actor: 'System',
+          color: 'var(--blue)',
+          details: null,
+        },
+      ];
+
+      const typeLabels = {
+        nppes_update: 'NPPES UPDATE',
+        license_renewal: 'LICENSE RENEWAL',
+        payer_directory: 'PAYER DIRECTORY',
+        onboarding: 'ONBOARDING',
+        compliance: 'COMPLIANCE',
+      };
+      const typeColors = {
+        nppes_update: 'var(--gold)',
+        license_renewal: 'var(--amber)',
+        payer_directory: 'var(--blue)',
+        onboarding: 'var(--blue)',
+        compliance: 'var(--navy)',
+      };
+      const statusBadge = {
+        action_needed: { text: 'NEEDS ACTION', bg: 'var(--red-pale)', color: 'var(--red)' },
+        in_progress: { text: 'IN PROGRESS', bg: 'var(--gold-pale)', color: '#96700A' },
+        awaiting: { text: 'AWAITING', bg: 'var(--blue-pale)', color: 'var(--blue)' },
+        resolved: { text: 'RESOLVED', bg: 'var(--green-pale)', color: 'var(--green)' },
+      };
+
+      // ═══════════════════════════════════════════════════════════════
+      // Navigation
+      // ═══════════════════════════════════════════════════════════════
+      const pageTitles = {
+        home: 'Dashboard',
+        roster: 'Provider Roster',
+        compliance: 'Compliance',
+        documents: 'Documents',
+        audit: 'Audit Trail',
+      };
+
+      document.querySelectorAll('#main-nav .nav-item:not(.dim)').forEach((item) => {
+        item.addEventListener('click', function () {
+          const page = this.dataset.page;
+          if (page) showPage(page);
+        });
+      });
+
+      function showPage(id) {
+        ['home', 'roster', 'compliance', 'documents', 'audit'].forEach((p) => {
+          const el = document.getElementById('page-' + p);
+          if (el) el.style.display = p === id ? '' : 'none';
+        });
+        document
+          .querySelectorAll('#main-nav .nav-item')
+          .forEach((n) => n.classList.remove('active'));
+        const active = document.querySelector(`[data-page="${id}"]`);
+        if (active) active.classList.add('active');
+        document.getElementById('page-title').textContent = pageTitles[id] || 'Dashboard';
+      }
+
+      function toggleDropdown() {
+        document.getElementById('site-dd').classList.toggle('open');
+      }
+      function selectSite(name) {
+        document.getElementById('site-value').textContent = name;
+        document.getElementById('site-dd').classList.remove('open');
+      }
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.site-sel'))
+          document.getElementById('site-dd').classList.remove('open');
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      // Render Dashboard Home — Priority Providers
+      // ═══════════════════════════════════════════════════════════════
+      function renderPriorityCards() {
+        const container = document.getElementById('priority-cards');
+        const priority = providers.filter((p) => p.issues > 0).slice(0, 5);
+        container.innerHTML = priority
+          .map((p) => {
+            const tagHtml = p.tags
+              .map((t) => {
+                const isUrgent =
+                  t === 'License renewal' || t === 'Payer directory' || t === 'Compliance';
+                const isOnboarding = t === 'Onboarding';
+                const bg = isUrgent
+                  ? 'var(--red-pale)'
+                  : isOnboarding
+                    ? 'var(--blue-pale)'
+                    : '#FFF3E0';
+                const color = isUrgent ? 'var(--red)' : isOnboarding ? 'var(--blue)' : '#E65100';
+                return `<span class="badge-sm" style="background:${bg};color:${color};">${t}</span>`;
+              })
+              .join('');
+            return `
+      <div class="prov-card" onclick="openPanel('${p.id}')">
+        <div class="top">
+          <div class="av" style="background:${p.avatarBg};color:${p.avatarColor};">${p.initials}</div>
+          <div style="flex:1;"><div class="name">${p.name}</div><div class="npi-text">${p.npi}</div></div>
+          <span class="badge badge-red">${p.issues} issue${p.issues !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="spec">${p.specialty}</div>
+        <div class="tags">${tagHtml}</div>
+      </div>`;
+          })
+          .join('');
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Render Roster Table
+      // ═══════════════════════════════════════════════════════════════
+      function renderRoster() {
+        const body = document.getElementById('roster-body');
+        body.innerHTML = providers
+          .map((p) => {
+            const hColor =
+              p.health >= 80 ? 'var(--green)' : p.health >= 50 ? 'var(--amber)' : 'var(--red)';
+            const statusBadgeHtml =
+              p.status === 'active'
+                ? '<span class="badge badge-green">Active</span>'
+                : p.status === 'onboarding'
+                  ? '<span class="badge badge-blue">Onboarding</span>'
+                  : '<span class="badge badge-red">Departing</span>';
+            return `<tr onclick="openPanel('${p.id}')">
+      <td><span class="av-sm" style="background:${p.avatarBg};color:${p.avatarColor};">${p.initials}</span>${p.name}</td>
+      <td>${p.specialty}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--gray400);">${p.npi}</td>
+      <td><span class="health-bar"><span class="health-fill" style="width:${p.health}%;background:${hColor};"></span></span>${p.health}%</td>
+      <td>${p.issues > 0 ? `<span class="badge badge-red">${p.issues}</span>` : '<span style="color:var(--gray400);">0</span>'}</td>
+      <td>${statusBadgeHtml}</td>
+    </tr>`;
+          })
+          .join('');
+      }
+
+      function filterRoster() {
+        const q = document.getElementById('roster-search').value.toLowerCase();
+        document.querySelectorAll('#roster-body tr').forEach((row) => {
+          row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Render Audit Trail
+      // ═══════════════════════════════════════════════════════════════
+      function renderAudit() {
+        const container = document.getElementById('audit-timeline');
+        container.innerHTML = auditEvents
+          .map((ev, i) => {
+            const hasLine = i < auditEvents.length - 1;
+            const detailsHtml = ev.details
+              ? `
+      <div class="tl-details" id="audit-detail-${i}" style="display:none;">
+        ${Object.entries(ev.details)
+          .map(
+            ([k, v]) =>
+              `<div class="tl-detail-row"><span class="tl-detail-key">${k}</span><span class="tl-detail-val">${v}</span></div>`,
+          )
+          .join('')}
+      </div>
+      <div style="font-size:11px;color:var(--gray400);cursor:pointer;margin-top:4px;" onclick="toggleAuditDetail(${i},this)">▶ Show details</div>
+    `
+              : '';
+            return `
+      <div class="tl-item">
+        ${hasLine ? '<div class="tl-line"></div>' : ''}
+        <div class="tl-dot" style="background:${ev.color};"></div>
+        <div>
+          <div class="tl-text">${ev.text}</div>
+          <div class="tl-date">${ev.date} · ${ev.actor}</div>
+          ${detailsHtml}
+        </div>
+      </div>`;
+          })
+          .join('');
+      }
+
+      function toggleAuditDetail(i, el) {
+        const detail = document.getElementById('audit-detail-' + i);
+        if (detail.style.display === 'none') {
+          detail.style.display = '';
+          el.textContent = '▼ Hide details';
+        } else {
+          detail.style.display = 'none';
+          el.textContent = '▶ Show details';
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Provider Detail Panel
+      // ═══════════════════════════════════════════════════════════════
+      let currentProvider = null;
+
+      function openPanel(providerId) {
+        const p = providers.find((pr) => pr.id === providerId);
+        if (!p) return;
+        currentProvider = p;
+
+        document.getElementById('panel-avatar').textContent = p.initials;
+        document.getElementById('panel-avatar').style.background = p.avatarBg;
+        document.getElementById('panel-avatar').style.color = p.avatarColor;
+        document.getElementById('panel-name').textContent = p.name;
+
+        const hColor =
+          p.health >= 80 ? 'var(--green)' : p.health >= 50 ? 'var(--amber)' : 'var(--red)';
+        document.getElementById('panel-health-bar').style.width = p.health + '%';
+        document.getElementById('panel-health-bar').style.background = hColor;
+        document.getElementById('panel-health-text').textContent = p.health + '% health';
+
+        const statusBadgeMap = {
+          active: { text: 'Active', cls: 'badge-green' },
+          onboarding: { text: 'Onboarding', cls: 'badge-blue' },
+          departing: { text: 'Departing', cls: 'badge-red' },
+        };
+        const sb = statusBadgeMap[p.status] || statusBadgeMap.active;
+        document.getElementById('panel-badges').innerHTML = `
+    <span style="font-family:monospace;font-size:11px;color:var(--gray400);">NPI ${p.npi}</span>
+    ${p.issues > 0 ? `<span class="badge badge-red">${p.issues} issue${p.issues !== 1 ? 's' : ''}</span>` : ''}
+    <span class="badge ${sb.cls}">${sb.text}</span>
+  `;
+
+        // Build body
+        const activeWf = p.workflows.filter((w) =>
+          ['action_needed', 'in_progress'].includes(w.status),
+        );
+        const monitorWf = p.workflows.filter((w) => w.status === 'awaiting');
+        const allEvents = p.workflows.flatMap((w) => w.events || []);
+
+        const cmpPhone = p.nppes.phone === p.website.phone;
+        const cmpSpec =
+          p.nppes.specialty &&
+          p.website.specialty &&
+          p.nppes.specialty.toLowerCase() === p.website.specialty.toLowerCase();
+
+        let body = `
+    <!-- Data accuracy -->
+    <div class="p-sec">
+      <div class="p-sec-hd">Data accuracy across sources</div>
+      <table class="cmp-grid">
+        <thead><tr><th style="width:70px;">Field</th><th>NPPES</th><th>Website</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600;">Address</td>
+            <td class="${p.nppes.address === p.website.address ? 'cmp-match' : 'cmp-mismatch'}">${p.nppes.address}</td>
+            <td class="${p.nppes.address === p.website.address ? 'cmp-match' : 'cmp-mismatch'}">${p.website.address}</td></tr>
+          <tr><td style="font-weight:600;">Phone</td>
+            <td class="${cmpPhone ? 'cmp-match' : 'cmp-mismatch'}">${p.nppes.phone}</td>
+            <td class="${cmpPhone ? 'cmp-match' : 'cmp-mismatch'}">${p.website.phone}</td></tr>
+          <tr><td style="font-weight:600;">Specialty</td>
+            <td class="${cmpSpec ? 'cmp-match' : p.website.specialty ? 'cmp-mismatch' : ''}">${p.nppes.specialty}</td>
+            <td class="${!p.website.specialty ? 'cmp-nodata' : cmpSpec ? 'cmp-match' : 'cmp-mismatch'}">${p.website.specialty || 'Not available'}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- License -->
+    <div class="p-sec">
+      <div class="p-sec-hd">License & credentialing</div>
+      <div style="background:var(--gray50);border:1px solid var(--gray200);border-radius:8px;padding:12px 14px;">
+        <div class="lic-row"><span class="lic-label">${p.license.state} medical license</span><span class="badge badge-green">${p.license.status}</span></div>
+        <div class="lic-row"><span class="lic-label">Expires</span><span style="font-weight:600;">${p.license.expires}</span></div>
+        <div class="lic-row"><span class="lic-label">Disciplinary</span><span class="badge badge-green">${p.license.disciplinary}</span></div>
+        <div class="lic-row"><span class="lic-label">PECOS enrollment</span><span class="badge badge-green">${p.license.pecos}</span></div>
+      </div>
+    </div>
+
+    <!-- Action items -->
+    <div class="p-sec">
+      <div class="p-sec-hd">Action items ${activeWf.length > 0 ? `<span class="badge badge-red" style="margin-left:4px;">${activeWf.length}</span>` : ''}</div>`;
+
+        if (activeWf.length === 0 && monitorWf.length === 0) {
+          body += `<div style="padding:24px 16px;text-align:center;color:var(--gray400);font-size:12px;background:var(--gray50);border-radius:8px;border:1px solid var(--gray200);">No open action items — all clear!</div>`;
+        }
+
+        activeWf.forEach((w) => {
+          const dotColor = w.status === 'action_needed' ? 'var(--red)' : 'var(--gold)';
+          const isMismatch = w.type === 'nppes_update' && w.field;
+          const typeIcons = {
+            nppes_update: '🔄',
+            license_renewal: '📜',
+            payer_directory: '🏥',
+            onboarding: '🚀',
+            compliance: '◈',
+          };
+          const typeLabelMap = {
+            nppes_update: 'NPPES update',
+            license_renewal: 'License renewal',
+            payer_directory: 'Payer directory update',
+            onboarding: 'Provider onboarding',
+          };
+          const icon = typeIcons[w.type] || '📋';
+          const label = typeLabelMap[w.type] || w.type;
+
+          if (isMismatch) {
+            const fieldName =
+              w.field === 'address' ? 'Address' : w.field === 'phone' ? 'Phone' : w.field;
+            body += `
+        <div class="action" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('expanded');" style="border-radius:${w.approvedValue ? '8px' : '8px 8px 0 0'};">
+          <div class="action-dot" style="background:${dotColor};"></div>
+          <div style="flex:1;">
+            <div class="action-title">${fieldName} mismatch</div>
+            <div class="action-desc">${w.websiteVal} (website) vs ${w.nppesVal} (NPPES)${w.approvedValue ? ' · Approved: ' + w.approvedValue : ' · Approve correction'}</div>
+          </div>
+          <span style="font-size:10px;color:var(--gray400);">▼</span>
+        </div>
+        <div class="action-expand">
+          <div style="margin-bottom:10px;">
+            <div style="font-size:10px;font-weight:700;color:var(--gray400);margin-bottom:4px;">COMPARISON</div>
+            <div style="display:flex;gap:8px;">
+              <div style="flex:1;padding:8px 10px;background:#fff;border:1px solid var(--gray200);border-radius:6px;">
+                <div style="font-size:9px;font-weight:700;color:var(--gray400);text-transform:uppercase;">Website</div>
+                <div style="font-size:12px;font-weight:600;color:var(--navy);margin-top:2px;">${w.websiteVal}</div>
+              </div>
+              <div style="flex:1;padding:8px 10px;background:#fff;border:1px solid var(--gray200);border-radius:6px;">
+                <div style="font-size:9px;font-weight:700;color:var(--gray400);text-transform:uppercase;">NPPES</div>
+                <div style="font-size:12px;font-weight:600;color:var(--navy);margin-top:2px;">${w.nppesVal}</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge" style="background:${statusBadge[w.status]?.bg};color:${statusBadge[w.status]?.color};text-transform:uppercase;">${statusBadge[w.status]?.text}</span>
+            <span style="font-size:11px;font-weight:600;color:var(--blue);cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();openWorkflow('${p.id}','${w.id}')">Open workflow →</span>
+          </div>
+        </div>`;
+          } else {
+            body += `
+        <div class="action" onclick="openWorkflow('${p.id}','${w.id}')">
+          <div class="action-dot" style="background:${dotColor};"></div>
+          <div style="flex:1;">
+            <div class="action-title">${icon} ${w.summary || label}</div>
+            <div class="action-desc">${label} · ${w.status === 'action_needed' ? 'Needs attention' : 'In progress'}</div>
+          </div>
+          <span class="action-arrow">Open →</span>
+        </div>`;
+          }
+        });
+
+        body += `</div>`;
+
+        // Timeline
+        if (allEvents.length > 0) {
+          body += `<div class="p-sec"><div class="p-sec-hd">Timeline</div><div class="tl">`;
+          allEvents.forEach((ev, i) => {
+            body += `<div class="tl-item">${i < allEvents.length - 1 ? '<div class="tl-line"></div>' : ''}<div class="tl-dot" style="background:${ev.color};"></div><div><div class="tl-text">${ev.text}</div><div class="tl-date">${ev.date} · ${ev.actor}</div></div></div>`;
+          });
+          body += `</div></div>`;
+        }
+
+        // Provider reference
+        body += `
+    <div class="p-sec">
+      <div class="p-sec-hd">Provider reference</div>
+      <div style="padding:10px 14px;background:var(--gray50);border-radius:8px;border:1px solid var(--gray200);font-size:12px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--gray400);font-weight:600;">NPI</span><span style="color:var(--navy);font-weight:600;font-family:monospace;font-size:11px;">${p.npi}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--gray400);font-weight:600;">Specialty</span><span style="color:var(--navy);font-weight:600;">${p.specialty}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--gray400);font-weight:600;">Status</span><span style="color:var(--navy);font-weight:600;">${p.status.charAt(0).toUpperCase() + p.status.slice(1)}</span></div>
+      </div>
+    </div>`;
+
+        document.getElementById('panel-body').innerHTML = body;
+        document.getElementById('overlay').classList.add('open');
+        document.getElementById('panel').classList.add('open');
+      }
+
+      function closePanel() {
+        document.getElementById('overlay').classList.remove('open');
+        document.getElementById('panel').classList.remove('open');
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Workflow Detail Panel
+      // ═══════════════════════════════════════════════════════════════
+      function openWorkflow(providerId, workflowId) {
+        const p = providers.find((pr) => pr.id === providerId);
+        if (!p) return;
+        const w = p.workflows.find((wf) => wf.id === workflowId);
+        if (!w) return;
+
+        const sb = statusBadge[w.status] || statusBadge.action_needed;
+        const typeLabel = typeLabels[w.type] || w.type;
+        const typeColor = typeColors[w.type] || 'var(--gold)';
+
+        // Check pending verification
+        const monitorTask = w.tasks.find(
+          (t) =>
+            ['monitor_auto_confirm', 'monitor_board'].includes(t.type) && t.status === 'active',
+        );
+        const humanDone = w.tasks
+          .filter((t) => !['monitor_auto_confirm', 'monitor_board'].includes(t.type))
+          .every((t) => t.status === 'completed');
+        const isPending = monitorTask && humanDone;
+        const pendingLabel =
+          w.type === 'license_renewal'
+            ? 'Pending TMB verification'
+            : w.type === 'payer_directory'
+              ? 'Pending payer verification'
+              : 'Pending NPPES verification';
+
+        const completedTasks = w.tasks.filter((t) => t.status === 'completed').length;
+        const totalTasks = w.tasks.length;
+        const progress = Math.round((completedTasks / totalTasks) * 100);
+
+        // Due text
+        const borderColor =
+          w.status === 'action_needed'
+            ? 'var(--red)'
+            : w.status === 'in_progress'
+              ? 'var(--gold)'
+              : 'var(--blue)';
+
+        let header = `
+    <div style="font-size:10px;font-weight:700;color:${typeColor};text-transform:uppercase;letter-spacing:0.06em;">${typeLabel}</div>
+    <div style="font-size:15px;font-weight:800;color:var(--navy);margin:6px 0 4px;padding-right:30px;">${p.name} — ${w.summary || w.title}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <span class="badge" style="background:${sb.bg};color:${sb.color};">${sb.text}</span>
+      ${isPending ? `<span class="badge" style="background:var(--blue-pale);color:var(--blue);">${pendingLabel}</span>` : ''}
+      <span style="font-size:11px;color:var(--gray400);">Created Mar 18, 2026</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="flex:1;height:6px;background:var(--gray200);border-radius:3px;overflow:hidden;">
+        <div style="height:100%;width:${progress}%;background:${borderColor};border-radius:3px;"></div>
+      </div>
+      <span style="font-size:10px;color:var(--gray400);font-weight:600;">${completedTasks}/${totalTasks}</span>
+    </div>`;
+
+        // Task checklist
+        let body = `<div class="p-sec"><div class="p-sec-hd">Task checklist</div>`;
+
+        w.tasks.forEach((t) => {
+          const isDone = t.status === 'completed';
+          const isActive = t.status === 'active';
+          const isMonitor = ['monitor_auto_confirm', 'monitor_board'].includes(t.type);
+
+          if (isMonitor) {
+            const monitorLabel =
+              w.type === 'license_renewal'
+                ? 'TMB'
+                : w.type === 'payer_directory'
+                  ? 'payer directory'
+                  : 'NPPES';
+            body += `
+        <div class="task ${isActive ? 'monitor' : ''}">
+          <div class="task-check ${isDone ? 'done' : 'monitor-icon'}">${isDone ? '✓' : '📡'}</div>
+          <div style="flex:1;">
+            <div class="task-title${isDone ? ' done' : ''}">
+              ${isDone ? monitorLabel.charAt(0).toUpperCase() + monitorLabel.slice(1) + ' update verified' : t.title}
+              <span class="tag" style="background:var(--blue-pale);color:var(--blue);">AUTOMATED</span>
+            </div>
+            <div class="task-desc">${isActive ? `Monitoring ${monitorLabel} for updates — you'll be notified when confirmed` : t.desc}</div>
+            ${isActive ? `<div class="pending-banner">⏳ Pending ${monitorLabel} verification</div>` : ''}
+          </div>
+        </div>`;
+          } else {
+            body += `
+        <div class="task ${isActive ? 'active' : ''}">
+          <div class="task-check ${isDone ? 'done' : isActive ? 'active' : ''}">${isDone ? '✓' : isActive ? '●' : ''}</div>
+          <div style="flex:1;">
+            <div class="task-title${isDone ? ' done' : ''}">${t.title}</div>
+            <div class="task-desc">${t.desc}</div>
+          </div>
+        </div>`;
+
+            // Active task expanded UI
+            if (isActive && t.type === 'review_approve' && w.type !== 'license_renewal') {
+              const fieldName =
+                w.field === 'address' ? 'address' : w.field === 'phone' ? 'phone number' : w.field;
+              body += `
+          <div style="margin-top:8px;padding:14px;background:var(--gray50);border:1px solid var(--gray200);border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px;">Which ${fieldName} is correct?</div>
+            <div class="approval-opt selected" onclick="selectApproval(this)">
+              <div class="approval-radio"></div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--navy);">Use website value</div><div style="font-size:11px;color:var(--gray600);margin-top:2px;">${w.websiteVal}</div></div>
+            </div>
+            <div class="approval-opt" onclick="selectApproval(this)">
+              <div class="approval-radio"></div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--navy);">NPPES is correct</div><div style="font-size:11px;color:var(--gray600);margin-top:2px;">${w.nppesVal}</div></div>
+            </div>
+            <button class="btn btn-navy" style="width:100%;margin-top:10px;" onclick="alert('Correction approved! In the live app, this updates the database and activates the next step.')">Approve correction</button>
+          </div>`;
+            }
+
+            if (isActive && t.type === 'download_submit') {
+              body += `
+          <div style="margin-top:8px;padding:14px;background:var(--gray50);border:1px solid var(--gray200);border-radius:8px;">
+            ${w.approvedValue ? `<div style="margin-bottom:10px;padding:10px 14px;background:var(--green-pale);border:1px solid var(--green);border-radius:8px;display:flex;align-items:center;gap:8px;"><span style="font-size:14px;color:var(--green);">✓</span><div><div style="font-size:12px;font-weight:600;color:var(--green);">Correction approved</div><div style="font-size:11px;color:var(--gray600);margin-top:2px;">Approved value: ${w.approvedValue}</div></div></div>` : ''}
+            <a href="https://nppes.cms.hhs.gov/" target="_blank" class="btn btn-navy" style="width:100%;margin-bottom:10px;text-decoration:none;">Open NPPES Portal →</a>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border:1px solid var(--gray200);border-radius:6px;margin-bottom:12px;">
+              <span style="font-size:11px;color:var(--gray400);">Need a pre-filled form?</span>
+              <button class="btn btn-outline" style="padding:4px 12px;font-size:11px;" onclick="alert('PDF download would be generated here.')">Download PDF</button>
+            </div>
+            <button class="btn btn-green" style="width:100%;" onclick="alert('Marked as submitted! Monitoring step would now activate.')">I've submitted to NPPES</button>
+            <div style="font-size:10px;color:var(--gray400);margin-top:6px;text-align:center;">We'll monitor NPPES automatically to confirm your update was applied.</div>
+          </div>`;
+            }
+
+            if (isActive && t.type === 'submit_renewal') {
+              body += `
+          <div style="margin-top:8px;padding:14px;background:var(--gray50);border:1px solid var(--gray200);border-radius:8px;">
+            <a href="https://profile.tmb.state.tx.us/" target="_blank" class="btn btn-navy" style="width:100%;margin-bottom:10px;text-decoration:none;">Open TMB Portal →</a>
+            <button class="btn btn-green" style="width:100%;" onclick="alert('Marked as submitted! TMB monitoring step would now activate.')">I've submitted the renewal</button>
+            <div style="font-size:10px;color:var(--gray400);margin-top:6px;text-align:center;">After submission, we'll monitor TMB for your updated license status.</div>
+          </div>`;
+            }
+
+            if (isDone && t.type === 'review_approve') {
+              body += `<div style="margin-top:8px;padding:8px 14px;border-radius:8px;background:var(--green-pale);border:1px solid var(--green);display:flex;align-items:center;gap:8px;"><span style="font-size:14px;color:var(--green);">✓</span><span style="font-size:11px;color:var(--green);font-weight:600;">${w.type === 'license_renewal' ? 'Application prepared' : 'Approved'}</span></div>`;
+            }
+          }
+        });
+
+        body += `</div>`;
+
+        // Timeline
+        if (w.events && w.events.length > 0) {
+          body += `<div class="p-sec"><div class="p-sec-hd">Timeline</div><div class="tl">`;
+          w.events.forEach((ev, i) => {
+            body += `<div class="tl-item">${i < w.events.length - 1 ? '<div class="tl-line"></div>' : ''}<div class="tl-dot" style="background:${ev.color};"></div><div><div class="tl-text">${ev.text}</div><div class="tl-date">${ev.date} · ${ev.actor}</div></div></div>`;
+          });
+          body += `</div></div>`;
+        }
+
+        document.getElementById('wf-header').innerHTML = header;
+        document.getElementById('wf-body').innerHTML = body;
+        document.getElementById('wf-overlay').classList.add('open');
+        document.getElementById('wf-panel').classList.add('open');
+      }
+
+      function closeWorkflow() {
+        document.getElementById('wf-overlay').classList.remove('open');
+        document.getElementById('wf-panel').classList.remove('open');
+      }
+
+      function selectApproval(el) {
+        el.parentElement
+          .querySelectorAll('.approval-opt')
+          .forEach((o) => o.classList.remove('selected'));
+        el.classList.add('selected');
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // Keyboard shortcuts
+      // ═══════════════════════════════════════════════════════════════
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (document.getElementById('wf-panel').classList.contains('open')) closeWorkflow();
+          else closePanel();
+        }
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      // Init
+      // ═══════════════════════════════════════════════════════════════
+      renderPriorityCards();
+      renderRoster();
+      renderAudit();
+    </script>
+  </body>
+</html>
