@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import HeroInteractiveDashboard from '@/components/marketing/HeroInteractiveDashboard';
+import LivePlatformStats from '@/components/marketing/LivePlatformStats';
 
 const ArrowIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -409,65 +410,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ FOUNDERS RATE — Simplified single callout ═══ */}
-      <section className="m-section m-founders-section">
-        <div className="m-container">
-          <div className="m-founders-card">
-            <div className="m-founders-content">
-              <span className="m-tag">Limited Availability</span>
-              <h2>
-                Founders Rate: <em>$99/mo flat</em>
-              </h2>
-              <p>
-                We&apos;re onboarding our first 20 organizations at a flat rate of $99/month —
-                regardless of roster size. Full platform access, all compliance checks,
-                credentialing workflows, and priority support included.
-              </p>
-              <div className="m-founders-perks">
-                <div className="m-founders-perk">
-                  <span className="m-perk-check">&#10003;</span>
-                  Unlimited providers
-                </div>
-                <div className="m-founders-perk">
-                  <span className="m-perk-check">&#10003;</span>
-                  Full compliance dashboard
-                </div>
-                <div className="m-founders-perk">
-                  <span className="m-perk-check">&#10003;</span>
-                  Credentialing workflows
-                </div>
-                <div className="m-founders-perk">
-                  <span className="m-perk-check">&#10003;</span>
-                  Priority support
-                </div>
-                <div className="m-founders-perk">
-                  <span className="m-perk-check">&#10003;</span>
-                  Rate locked for 12 months
-                </div>
-                <div className="m-founders-perk">
-                  <span className="m-perk-check">&#10003;</span>
-                  No credit card required
-                </div>
-              </div>
-              <div className="m-founders-actions">
-                <Link href="/contact" className="m-btn-primary m-gold">
-                  Apply for Founders Rate
-                  <ArrowIcon />
-                </Link>
-                <Link href="/pricing" className="m-btn-ghost">
-                  See all pricing plans &rarr;
-                </Link>
-              </div>
-              <div className="m-founders-spots">
-                <div className="m-spots-bar">
-                  <div className="m-spots-fill" style={{ width: '35%' }}></div>
-                </div>
-                <span>7 of 20 spots filled</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ═══ LIVE PLATFORM STATS — Real-time data from DB ═══ */}
+      <LivePlatformStats />
 
       {/* ═══ TESTIMONIALS ═══ */}
       <section className="m-section m-social-section">
