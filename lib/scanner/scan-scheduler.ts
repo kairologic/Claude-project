@@ -135,13 +135,15 @@ const CADENCE_DAYS: Record<string, number> = {
 export async function fetchDueSites(
   limit: number = 50,
   forceAll: boolean = false,
+  state?: string,
 ): Promise<PracticeWebsite[]> {
   const now = new Date().toISOString();
+  const stateFilter = state ? `&state=eq.${state}` : '';
 
   if (forceAll) {
     // Scan everything regardless of schedule
     return db(
-      `practice_websites?scan_status=neq.unreachable&select=*&order=last_scan_at.asc.nullsfirst&limit=${limit}`,
+      `practice_websites?scan_status=neq.unreachable${stateFilter}&select=*&order=last_scan_at.asc.nullsfirst&limit=${limit}`,
     );
   }
 
@@ -149,7 +151,7 @@ export async function fetchDueSites(
   // - scan_scheduled_at is null (never scheduled) OR scan_scheduled_at <= now
   // - scan_status is not 'unreachable'
   return db(
-    `practice_websites?scan_status=neq.unreachable&or=(scan_scheduled_at.is.null,scan_scheduled_at.lte.${now})&select=*&order=scan_scheduled_at.asc.nullsfirst&limit=${limit}`,
+    `practice_websites?scan_status=neq.unreachable${stateFilter}&or=(scan_scheduled_at.is.null,scan_scheduled_at.lte.${now})&select=*&order=scan_scheduled_at.asc.nullsfirst&limit=${limit}`,
   );
 }
 
@@ -831,16 +833,24 @@ export async function runScheduler(
     limit?: number;
     forceAll?: boolean;
     dryRun?: boolean;
+    state?: string;
     concurrency?: number;
     onProgress?: (scanned: number, total: number) => void;
   } = {},
 ): Promise<SchedulerResult> {
-  const { limit = 50, forceAll = false, dryRun = false, concurrency = 5, onProgress } = options;
+  const {
+    limit = 50,
+    forceAll = false,
+    dryRun = false,
+    state,
+    concurrency = 5,
+    onProgress,
+  } = options;
 
   const startTime = Date.now();
 
-  // Fetch sites due for scanning
-  const sites = await fetchDueSites(limit, forceAll);
+  // Fetch sites due for scanning (filtered by state if provided)
+  const sites = await fetchDueSites(limit, forceAll, state);
 
   if (sites.length === 0) {
     console.log('[Scheduler] No sites due for scanning.');
