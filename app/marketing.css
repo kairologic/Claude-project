@@ -4244,6 +4244,19 @@ a.m-resource-card:hover {
   display: block;
 }
 
+/* Interactive demo badge */
+.m-dash-interactive-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid #a7f3d0;
+}
+
 /* Embedded toolbar / question bar */
 .m-dash-toolbar {
   background: #fafafa;
@@ -4259,10 +4272,27 @@ a.m-resource-card:hover {
   border-radius: 8px;
   padding: 8px 14px;
   margin-bottom: 10px;
+  transition: border-color 0.2s ease;
+}
+.m-dash-search-row:focus-within {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.15);
 }
 .m-dash-search-icon {
   font-size: 14px;
   opacity: 0.5;
+}
+.m-dash-search-input {
+  flex: 1;
+  font-size: 13px;
+  color: #1f2937;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+}
+.m-dash-search-input::placeholder {
+  color: #9ca3af;
 }
 .m-dash-search-label {
   flex: 1;
@@ -4277,6 +4307,19 @@ a.m-resource-card:hover {
   padding: 2px 8px;
   border-radius: 10px;
   white-space: nowrap;
+}
+.m-dash-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-dash-try-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d97706;
+  white-space: nowrap;
+  flex-shrink: 0;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .m-dash-chips {
   display: flex;
@@ -4311,6 +4354,18 @@ a.m-resource-card:hover {
   border-color: #fbbf24;
   color: #1f2937;
   font-weight: 600;
+}
+.m-dash-chip-pulse {
+  animation: chipPulse 2s ease-in-out infinite;
+}
+@keyframes chipPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.25);
+  }
 }
 .m-dash-chip-skeleton {
   width: 160px;
