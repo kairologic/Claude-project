@@ -8,7 +8,14 @@ import { crawlPage, type CrawlResult } from '../crawler';
 
 export interface DiscoveredPage {
   url: string;
-  type: 'contact' | 'about' | 'locations' | 'providers' | 'footer_link';
+  type:
+    | 'contact'
+    | 'about'
+    | 'locations'
+    | 'providers'
+    | 'insurance'
+    | 'patient_center'
+    | 'footer_link';
   priority: number; // 1 = highest (contact/locations), 3 = lowest (generic about)
   crawlResult?: CrawlResult;
 }
@@ -23,6 +30,31 @@ const PAGE_PATTERNS: Array<{
   type: DiscoveredPage['type'];
   priority: number;
 }> = [
+  // Insurance/billing pages — highest priority for payer extraction
+  {
+    regex:
+      /\/(insur(?:ance)?|accepted[_-]?(?:plans?|insurance)|billing|patient[_-]?center)(\/|$|\?|\.)/i,
+    type: 'insurance',
+    priority: 1,
+  },
+  {
+    textRegex: /^(?:insur(?:ance)?|accepted\s+(?:plans?|insurance)|billing|patient\s+center)$/i,
+    regex: /./,
+    type: 'insurance',
+    priority: 1,
+  },
+  {
+    regex: /\/(new[_-]?patient|forms?|intake|registration)(\/|$|\?|#)/i,
+    type: 'patient_center',
+    priority: 2,
+  },
+  {
+    textRegex: /^(?:new\s+patient|patient\s+(?:forms?|registration|intake)|accepting.*patients?)$/i,
+    regex: /./,
+    type: 'patient_center',
+    priority: 2,
+  },
+
   // Contact pages — highest priority
   {
     regex: /\/(contact|contact-us|get-in-touch|reach-us)(\/|$|\?|#)/i,
@@ -153,6 +185,18 @@ export function discoverAddressPages(
   }
 
   return result;
+}
+
+/**
+ * Discover sub-pages relevant to ANY extraction (address, insurance, patient info).
+ * Returns discovered pages sorted by priority.
+ */
+export function discoverRelevantPages(
+  html: string,
+  baseUrl: string,
+  maxPages: number = 6,
+): DiscoveredPage[] {
+  return discoverAddressPages(html, baseUrl, maxPages);
 }
 
 /**

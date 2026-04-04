@@ -51,6 +51,47 @@ const PAYER_ALIASES: { code: string; patterns: RegExp[] }[] = [
     code: 'bcbs',
     patterns: [/blue\s*cross\s*blue\s*shield/i, /blue\s*cross/i, /blue\s*shield/i, /\bbcbs\b/i],
   },
+  // Additional health-tech and payer patterns
+  {
+    code: 'tricare',
+    patterns: [/\btricare\b/i],
+  },
+  {
+    code: 'medicare',
+    patterns: [/\bmedicare\b/i],
+  },
+  {
+    code: 'medicaid',
+    patterns: [/\bmedicaid\b/i],
+  },
+  {
+    code: 'devoted_health',
+    patterns: [/devoted\s*health/i],
+  },
+  {
+    code: 'first_health',
+    patterns: [/first\s*health/i],
+  },
+  {
+    code: 'multiplan',
+    patterns: [/\bmultiplan\b/i, /\bphcs\b/i, /private\s+health\s+care\s+systems/i],
+  },
+  {
+    code: 'molina',
+    patterns: [/\bmolina\b/i],
+  },
+  {
+    code: 'centene',
+    patterns: [/\bcentene\b/i, /superior\s*health\s*plan/i],
+  },
+  {
+    code: 'ambetter',
+    patterns: [/\bambetter\b/i],
+  },
+  {
+    code: 'wellcare',
+    patterns: [/\bwellcare\b/i, /well\s*care/i],
+  },
 ];
 
 // ── Section Detection ─────────────────────────────────────
