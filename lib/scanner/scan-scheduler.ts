@@ -1080,6 +1080,16 @@ const ACCEPTING_PATIENTS_POSITIVE = [
   /(?:call|contact)\s+(?:us\s+)?(?:to|for)\s+(?:schedule|book|make)\s+(?:an?\s+)?appointment/i,
   /patient\s+(?:registration|intake)\s+form/i,
   /make\s+(?:an?\s+)?appointment/i,
+  // Round 2 — patterns found from auditing missed sites
+  /schedule\s+(?:a\s+)?consultation/i,
+  /request\s+your\s+appointment/i,
+  /schedule\s+your\s+appointment/i,
+  /new\s+patient\s+special/i,
+  /schedule\s+today/i,
+  /patient\s+(?:forms?|paperwork)\b/i,
+  /new\s+patient\s+(?:packet|paperwork)/i,
+  /(?:click|tap)\s+(?:here\s+)?(?:to\s+)?schedule/i,
+  /(?:get|ready)\s+(?:to\s+)?(?:get\s+)?started/i,
 ];
 
 const ACCEPTING_PATIENTS_NEGATIVE = [

@@ -754,6 +754,35 @@ const SPECIALTY_PATTERNS: [RegExp, string][] = [
   // Urgent / Emergency
   [/\burgent\s+care\b/i, 'Urgent Care'],
   [/\bemergency\s+medicine\b/i, 'Emergency Medicine'],
+  // Pharmacy
+  [/\bpharmacy\b/i, 'Pharmacy'],
+  [/\bcompounding\s+pharmacy\b/i, 'Compounding Pharmacy'],
+  // Substance abuse / Recovery
+  [/\bsubstance\s+(?:abuse|use)\s+(?:treatment|disorder|program)/i, 'Substance Abuse Treatment'],
+  [/\baddiction\s+(?:treatment|medicine|recovery)/i, 'Addiction Medicine'],
+  [/\brecovery\s+(?:support|services|program)/i, 'Recovery Services'],
+  // Podiatry
+  [/\bpodiatry\b/i, 'Podiatry'],
+  [/\bpodiatric\s+medicine\b/i, 'Podiatric Medicine'],
+  // Audiology / Speech
+  [/\baudiology\b/i, 'Audiology'],
+  [/\bspeech\s+(?:therapy|pathology|language)/i, 'Speech Therapy'],
+  // Occupational therapy
+  [/\boccupational\s+therapy\b/i, 'Occupational Therapy'],
+  // Wound care
+  [/\bwound\s+care\b/i, 'Wound Care'],
+  // Sleep medicine
+  [/\bsleep\s+medicine\b/i, 'Sleep Medicine'],
+  // Hospice / Palliative
+  [/\bhospice\b/i, 'Hospice'],
+  [/\bpalliative\s+care\b/i, 'Palliative Care'],
+  // Radiology
+  [/\bradiology\b/i, 'Radiology'],
+  [/\bdiagnostic\s+imaging\b/i, 'Diagnostic Imaging'],
+  // Anesthesiology
+  [/\banesthesiology\b/i, 'Anesthesiology'],
+  // Pathology
+  [/\bpathology\b/i, 'Pathology'],
 ];
 
 /**
