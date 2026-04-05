@@ -325,7 +325,7 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
         finalUrl: url,
       };
     }
-    return fail('Direct fetch failed and no browser runtime available.');
+    return fail('All strategies failed (direct fetch + Playwright + Browserless).');
   }
 
   // Direct fetch succeeded — check if content is actually rendered
@@ -374,7 +374,7 @@ export async function crawlPage(url: string): Promise<CrawlResult> {
       duration: Date.now() - start,
       isJSRendered: jsShell,
       error: jsShell
-        ? 'Page appears JS-rendered but no browser runtime available. Content may be incomplete. Install Playwright: npx playwright install chromium'
+        ? 'Page appears JS-rendered but browser rendering returned insufficient content.'
         : undefined,
       finalUrl: direct.finalUrl,
     };

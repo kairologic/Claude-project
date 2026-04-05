@@ -89,6 +89,15 @@ export const DIRECTORY_DOMAINS = new Set<string>([
   'caremark.com',
   'insiderx.com',
 
+  // Additional NPI/provider lookup sites
+  'npino.org',
+  'opennpi.com',
+  'dentistreg.com',
+  'idcrawl.com',
+
+  // Health system subdomains (provider directories, not practice sites)
+  'doctors.wellmedhealthcare.com',
+
   // Generic / non-provider
   'google.com',
   'apple.com',
