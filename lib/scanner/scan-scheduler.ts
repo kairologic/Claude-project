@@ -139,19 +139,21 @@ export async function fetchDueSites(
 ): Promise<PracticeWebsite[]> {
   const now = new Date().toISOString();
   const stateFilter = state ? `&state=eq.${state}` : '';
+  // Exclude both unreachable and blocked (junk/directory) sites
+  const statusFilter = 'scan_status=not.in.(unreachable,blocked)';
 
   if (forceAll) {
     // Scan everything regardless of schedule
     return db(
-      `practice_websites?scan_status=neq.unreachable${stateFilter}&select=*&order=last_scan_at.asc.nullsfirst&limit=${limit}`,
+      `practice_websites?${statusFilter}${stateFilter}&select=*&order=last_scan_at.asc.nullsfirst&limit=${limit}`,
     );
   }
 
   // Fetch sites where:
   // - scan_scheduled_at is null (never scheduled) OR scan_scheduled_at <= now
-  // - scan_status is not 'unreachable'
+  // - scan_status is not unreachable or blocked
   return db(
-    `practice_websites?scan_status=neq.unreachable${stateFilter}&or=(scan_scheduled_at.is.null,scan_scheduled_at.lte.${now})&select=*&order=scan_scheduled_at.asc.nullsfirst&limit=${limit}`,
+    `practice_websites?${statusFilter}${stateFilter}&or=(scan_scheduled_at.is.null,scan_scheduled_at.lte.${now})&select=*&order=scan_scheduled_at.asc.nullsfirst&limit=${limit}`,
   );
 }
 
