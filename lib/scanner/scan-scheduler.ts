@@ -139,8 +139,10 @@ export async function fetchDueSites(
 ): Promise<PracticeWebsite[]> {
   const now = new Date().toISOString();
   const stateFilter = state ? `&state=eq.${state}` : '';
-  // Exclude both unreachable and blocked (junk/directory) sites
-  const statusFilter = 'scan_status=not.in.(unreachable,blocked)';
+  // Exclude unreachable, blocked (junk/directory), and error sites.
+  // Error sites have been tried and failed — they need manual review or
+  // data cleanup, not automated rescanning that wastes scan slots.
+  const statusFilter = 'scan_status=not.in.(unreachable,blocked,error)';
 
   if (forceAll) {
     // Scan everything regardless of schedule
