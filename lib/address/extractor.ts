@@ -681,10 +681,87 @@ function findNamesInSchemaOrg(obj: any, names: string[], seen: Set<string>): voi
 // ── Specialty Extraction ─────────────────────────────────
 
 /**
- * Extract medical specialty from schema.org or meta tags.
+ * Known medical/dental/behavioral specialties for visible-text matching.
+ * Each entry: [regex pattern, canonical specialty name].
+ */
+const SPECIALTY_PATTERNS: [RegExp, string][] = [
+  // Dental
+  [/\bgeneral\s+dentistry\b/i, 'General Dentistry'],
+  [/\bfamily\s+dentistry\b/i, 'Family Dentistry'],
+  [/\bcosmetic\s+dentistry\b/i, 'Cosmetic Dentistry'],
+  [/\bpediatric\s+dentistry\b/i, 'Pediatric Dentistry'],
+  [/\borthodontics?\b/i, 'Orthodontics'],
+  [/\bperiodontics?\b/i, 'Periodontics'],
+  [/\bendodontics?\b/i, 'Endodontics'],
+  [/\boral\s+surgery\b/i, 'Oral Surgery'],
+  [/\bprosthodontics?\b/i, 'Prosthodontics'],
+  [/\bimplant\s+dentistry\b/i, 'Implant Dentistry'],
+  [/\brestorative\s+dentistry\b/i, 'Restorative Dentistry'],
+  // Primary care
+  [/\bfamily\s+medicine\b/i, 'Family Medicine'],
+  [/\bfamily\s+practice\b/i, 'Family Practice'],
+  [/\binternal\s+medicine\b/i, 'Internal Medicine'],
+  [/\bgeneral\s+practice\b/i, 'General Practice'],
+  [/\bprimary\s+care\b/i, 'Primary Care'],
+  // Pediatrics
+  [/\bpediatrics?\b/i, 'Pediatrics'],
+  [/\bpediatric\s+medicine\b/i, 'Pediatric Medicine'],
+  // Women's health / OB-GYN
+  [/\bob(?:\s*[-\/]\s*)?gyn\b/i, 'OB/GYN'],
+  [/\bobstetrics?\s+(?:and|&)\s+gynecology\b/i, 'OB/GYN'],
+  [/\bgynecology\b/i, 'Gynecology'],
+  [/\bwomen'?s\s+health\b/i, "Women's Health"],
+  [/\bmaternal\s+(?:fetal|health)\b/i, 'Maternal Health'],
+  // Behavioral / Mental health
+  [/\bbehavioral\s+health\b/i, 'Behavioral Health'],
+  [/\bpsychiatry\b/i, 'Psychiatry'],
+  [/\bpsychology\b/i, 'Psychology'],
+  [/\bmental\s+health\b/i, 'Mental Health'],
+  [/\bcounseling\b/i, 'Counseling'],
+  // Medical specialties
+  [/\bcardiology\b/i, 'Cardiology'],
+  [/\bdermatology\b/i, 'Dermatology'],
+  [/\bendocrinology\b/i, 'Endocrinology'],
+  [/\bgastroenterology\b/i, 'Gastroenterology'],
+  [/\bnephrology\b/i, 'Nephrology'],
+  [/\bneurology\b/i, 'Neurology'],
+  [/\boncology\b/i, 'Oncology'],
+  [/\bophthalmology\b/i, 'Ophthalmology'],
+  [/\borthopedics?\b/i, 'Orthopedics'],
+  [/\botolaryngology\b/i, 'Otolaryngology'],
+  [/\bent\b(?:\s+(?:specialist|doctor|physician|clinic))/i, 'Otolaryngology'],
+  [/\bpulmonology\b/i, 'Pulmonology'],
+  [/\brheumatology\b/i, 'Rheumatology'],
+  [/\burology\b/i, 'Urology'],
+  [/\ballergy\s+(?:and|&)\s+immunology\b/i, 'Allergy & Immunology'],
+  [/\bphysical\s+(?:medicine|therapy)\b/i, 'Physical Medicine'],
+  [/\brehabilitation\b/i, 'Rehabilitation'],
+  [/\bsports\s+medicine\b/i, 'Sports Medicine'],
+  [/\bpain\s+management\b/i, 'Pain Management'],
+  [/\bgeriatrics?\b/i, 'Geriatrics'],
+  [/\binfectious\s+disease/i, 'Infectious Disease'],
+  [/\bhematology\b/i, 'Hematology'],
+  // Surgical
+  [/\bgeneral\s+surgery\b/i, 'General Surgery'],
+  [/\bplastic\s+surgery\b/i, 'Plastic Surgery'],
+  [/\bvascular\s+surgery\b/i, 'Vascular Surgery'],
+  // Chiropractic / Alternative
+  [/\bchiropractic\b/i, 'Chiropractic'],
+  [/\bacupuncture\b/i, 'Acupuncture'],
+  // Optometry / Vision
+  [/\boptometry\b/i, 'Optometry'],
+  [/\bvision\s+care\b/i, 'Vision Care'],
+  // Urgent / Emergency
+  [/\burgent\s+care\b/i, 'Urgent Care'],
+  [/\bemergency\s+medicine\b/i, 'Emergency Medicine'],
+];
+
+/**
+ * Extract medical specialties from structured data, meta tags, or visible text.
+ * Returns the single best specialty (structured > meta > text) for backward compat.
  */
 export function extractSpecialty(html: string): string | null {
-  // Method 1: schema.org medicalSpecialty
+  // Method 1: schema.org medicalSpecialty (highest confidence)
   const jsonLdBlocks = extractJsonLdBlocks(html);
   for (const block of jsonLdBlocks) {
     const specialty = findSpecialtyInSchemaOrg(block);
@@ -697,7 +774,32 @@ export function extractSpecialty(html: string): string | null {
   const match = metaRegex.exec(html);
   if (match) return match[1].trim();
 
+  // Method 3: visible text pattern matching
+  const allSpecialties = extractSpecialtiesFromText(html);
+  if (allSpecialties.length > 0) return allSpecialties[0];
+
   return null;
+}
+
+/**
+ * Extract ALL specialties found in visible page text.
+ * Returns deduplicated array of canonical specialty names.
+ */
+export function extractSpecialtiesFromText(html: string): string[] {
+  // Strip tags to get visible text
+  const text = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  const found = new Set<string>();
+  for (const [pattern, canonical] of SPECIALTY_PATTERNS) {
+    if (pattern.test(text)) {
+      found.add(canonical);
+    }
+  }
+  return [...found];
 }
 
 function findSpecialtyInSchemaOrg(obj: any): string | null {

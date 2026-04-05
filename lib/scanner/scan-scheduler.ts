@@ -37,6 +37,7 @@ import {
 import { runDeltaDetection } from './delta-engine';
 import { extractAcceptedPayers, type PayerExtractionResult } from './payer-acceptance-extractor';
 import { discoverRelevantPages } from '../address/page-discoverer';
+import { extractSpecialtiesFromText } from '../address/extractor';
 import {
   runComplianceChecks,
   getActionableFindings,
@@ -479,8 +480,38 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
     }
 
     // 3b-ii. Extract "accepting new patients" status from website
+    // Check homepage first, then subpages if not found
     try {
-      const acceptingStatus = extractAcceptingPatients(crawl.text);
+      let acceptingStatus = extractAcceptingPatients(crawl.text);
+
+      // If homepage didn't yield a result, check subpages
+      if (acceptingStatus === null) {
+        const subPages = discoverRelevantPages(crawl.html, site.url, 6);
+        const relevantPages = subPages.filter(
+          (p) => p.type === 'patient_center' || p.type === 'contact' || p.type === 'about',
+        );
+
+        for (const page of relevantPages) {
+          try {
+            const subCrawl = await crawlPage(page.url);
+            if (subCrawl.success) {
+              acceptingStatus = extractAcceptingPatients(subCrawl.text);
+              if (acceptingStatus !== null) {
+                console.log(
+                  `[Scanner] Accepting patients found on sub-page ${page.url}: ${acceptingStatus}`,
+                );
+                break;
+              }
+            }
+          } catch (subErr) {
+            console.warn(
+              `[Scanner] Failed to crawl sub-page for accepting patients ${page.url}:`,
+              subErr,
+            );
+          }
+        }
+      }
+
       if (acceptingStatus !== null) {
         console.log(`[Scanner] Accepting patients: ${acceptingStatus} for ${site.url}`);
         await db(`practice_websites?id=eq.${site.id}`, {
@@ -493,6 +524,59 @@ export async function scanSite(site: PracticeWebsite): Promise<ScanResult> {
       }
     } catch (err) {
       console.warn(`[Scanner] Accepting patients extraction failed for ${site.url}:`, err);
+    }
+
+    // 3b-iii. Extract specialties from visible page text (homepage + subpages)
+    try {
+      const allSpecialties = new Set<string>();
+
+      // Check homepage
+      for (const s of extractSpecialtiesFromText(crawl.html)) {
+        allSpecialties.add(s);
+      }
+
+      // Check subpages (about, services, providers) for additional specialties
+      if (allSpecialties.size === 0) {
+        const subPages = discoverRelevantPages(crawl.html, site.url, 6);
+        const relevantPages = subPages.filter(
+          (p) => p.type === 'about' || p.type === 'insurance' || p.type === 'patient_center',
+        );
+
+        for (const page of relevantPages) {
+          try {
+            const subCrawl = await crawlPage(page.url);
+            if (subCrawl.success) {
+              for (const s of extractSpecialtiesFromText(subCrawl.html)) {
+                allSpecialties.add(s);
+              }
+            }
+          } catch (subErr) {
+            console.warn(`[Scanner] Failed to crawl sub-page for specialties ${page.url}:`, subErr);
+          }
+          // Stop after finding some specialties to avoid over-crawling
+          if (allSpecialties.size > 0) break;
+        }
+      }
+
+      if (allSpecialties.size > 0) {
+        const specialtiesArray = [...allSpecialties];
+        console.log(
+          `[Scanner] Text-extracted specialties for ${site.url}: ${specialtiesArray.join(', ')}`,
+        );
+
+        const specialtiesJson = specialtiesArray.map((s) => ({
+          specialty: s,
+          source: 'website_text',
+        }));
+        await db(`practice_websites?id=eq.${site.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            practice_specialties: specialtiesJson,
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn(`[Scanner] Specialty text extraction failed for ${site.url}:`, err);
     }
 
     // 3c. Run compliance checks (WF6: DR/AI/ER scans)
@@ -984,6 +1068,18 @@ const ACCEPTING_PATIENTS_POSITIVE = [
   /schedule\s+(?:a|your)\s+(?:new\s+patient|first)\s+(?:appointment|visit)/i,
   /new\s+patient\s+(?:appointments?|registration|intake)\s+(?:available|open)/i,
   /book\s+(?:a|your)\s+(?:new\s+patient|first)\s+(?:appointment|visit)/i,
+  // Additional patterns — common CTAs and page elements
+  /request\s+(?:an?\s+)?appointment/i,
+  /book\s+(?:an?\s+)?appointment/i,
+  /schedule\s+(?:an?\s+)?appointment/i,
+  /book\s+online/i,
+  /schedule\s+online/i,
+  /schedule\s+(?:a\s+)?visit/i,
+  /become\s+a\s+(?:new\s+)?patient/i,
+  /new\s+patient\s+(?:form|info|information|welcome)/i,
+  /(?:call|contact)\s+(?:us\s+)?(?:to|for)\s+(?:schedule|book|make)\s+(?:an?\s+)?appointment/i,
+  /patient\s+(?:registration|intake)\s+form/i,
+  /make\s+(?:an?\s+)?appointment/i,
 ];
 
 const ACCEPTING_PATIENTS_NEGATIVE = [
