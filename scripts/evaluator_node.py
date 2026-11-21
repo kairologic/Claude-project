@@ -224,7 +224,8 @@ def call_claude(diff_text: str, context_text: str) -> str:
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],
         )
-        return response.content[0].text
+        # Newer models can return a thinking block before the text block.
+        return "".join(b.text for b in response.content if b.type == "text")
 
     except ImportError:
         # Fall back to urllib (no external deps needed)
@@ -255,7 +256,7 @@ def call_claude(diff_text: str, context_text: str) -> str:
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
-                return body["content"][0]["text"]
+                return "".join(b["text"] for b in body["content"] if b.get("type") == "text")
         except urllib.error.HTTPError as e:
             print(f"ERROR: Claude API returned {e.code}: {e.read().decode()}")
             sys.exit(2)
