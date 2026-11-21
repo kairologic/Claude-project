@@ -12,7 +12,7 @@ Usage:
 
 Environment:
     ANTHROPIC_API_KEY  - Required. Claude API key.
-    EVALUATOR_MODEL    - Optional. Default: claude-sonnet-4-20250514
+    EVALUATOR_MODEL    - Optional. Default: claude-sonnet-5-5
 
 Exit codes:
     0  - PASS (all checks passed)
@@ -30,7 +30,7 @@ from pathlib import Path
 # Configuration
 # ---------------------------------------------------------------------------
 
-MODEL = os.environ.get("EVALUATOR_MODEL", "claude-sonnet-4-20250514")
+MODEL = os.environ.get("EVALUATOR_MODEL", "claude-sonnet-5-5")
 MAX_DIFF_CHARS = 80_000  # Truncate very large diffs to stay within context
 MAX_CONTEXT_CHARS = 30_000
 

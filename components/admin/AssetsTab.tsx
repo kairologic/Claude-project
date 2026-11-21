@@ -251,7 +251,8 @@ export const AssetsTab: React.FC<AssetsTabProps> = ({ showNotification }) => {
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
-      next.has(folderId) ? next.delete(folderId) : next.add(folderId);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
       return next;
     });
   };
