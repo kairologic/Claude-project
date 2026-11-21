@@ -84,7 +84,7 @@ const POST_HANDLER = withPracticeAccess(async (request: NextRequest, ctx: Practi
       );
       usedModel = 'sonnet';
       try {
-        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-4-20250514');
+        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-5-5');
         parsedResponse = parseClaudeResponse(claudeResponse);
       } catch (sonnetError: any) {
         console.error(

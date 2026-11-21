@@ -55,7 +55,7 @@ async function conductWebResearch(
   for (const query of queries) {
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-5-5',
         max_tokens: 1024,
         system: RESEARCH_SYSTEM_PROMPT,
         messages: [
