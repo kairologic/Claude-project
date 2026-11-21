@@ -59,7 +59,7 @@ env:
 jobs:
   scan:
     name: Scan + Delta
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:

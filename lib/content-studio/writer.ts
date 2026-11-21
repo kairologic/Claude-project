@@ -98,7 +98,7 @@ ${formatPipelineData(researchContext)}
 Generate the content now. Remember: valid JSON only, no markdown code fences.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-5-5',
     max_tokens: 4096,
     system: WRITER_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],

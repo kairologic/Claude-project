@@ -84,7 +84,7 @@ const POST_HANDLER = withPracticeAccess(async (request: NextRequest, ctx: Practi
       );
       usedModel = 'sonnet';
       try {
-        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-4-20250514');
+        claudeResponse = await callClaudeAPI(query, systemPrompt, 'claude-sonnet-5-5');
         parsedResponse = parseClaudeResponse(claudeResponse);
       } catch (sonnetError: any) {
         console.error(
@@ -402,9 +402,10 @@ async function callClaudeAPI(
   }
 
   const data: any = await response.json();
-  const textContent = data.content[0];
+  // Newer models can return a thinking block before the text block.
+  const textContent = data.content?.find((b: { type: string }) => b.type === 'text');
 
-  if (!textContent || textContent.type !== 'text') {
+  if (!textContent) {
     throw new Error('Unexpected Claude response format');
   }
 
