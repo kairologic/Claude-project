@@ -47,7 +47,7 @@ jobs:
   # ── Step 2: API Tests (no browser needed — fast) ──
   api-tests:
     name: API Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: coverage-audit
     env:
       TEST_BASE_URL: https://kairologic.net
@@ -76,7 +76,7 @@ jobs:
   # ── Step 3: E2E Browser Tests ──
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: coverage-audit
     env:
       TEST_BASE_URL: https://kairologic.net
